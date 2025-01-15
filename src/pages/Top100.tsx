@@ -94,10 +94,10 @@ const Top100 = () => {
   useEffect(() => {
     const fetchFavoriteStats = async () => {
       try {
+        console.log("Fetching favorite stats...");
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
-            id,
             song_id,
             count,
             last_updated,
@@ -105,7 +105,8 @@ const Top100 = () => {
               id,
               title,
               artist,
-              file_path
+              file_path,
+              created_at
             )
           `)
           .order('count', { ascending: false })
@@ -121,6 +122,8 @@ const Top100 = () => {
           return;
         }
 
+        console.log("Received favorite stats:", data);
+
         const formattedStats = data.map(stat => ({
           songId: stat.song_id,
           count: stat.count,
@@ -133,6 +136,7 @@ const Top100 = () => {
           }
         }));
 
+        console.log("Formatted stats:", formattedStats);
         setFavoriteStats(formattedStats);
       } catch (error) {
         console.error("Error in fetchFavoriteStats:", error);
@@ -151,8 +155,8 @@ const Top100 = () => {
           schema: 'public',
           table: 'favorite_stats'
         },
-        () => {
-          console.log("Favorite stats changed, refreshing...");
+        (payload) => {
+          console.log("Favorite stats changed:", payload);
           fetchFavoriteStats();
         }
       )
