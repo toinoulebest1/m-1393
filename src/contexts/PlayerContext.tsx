@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { getAudioFile } from '@/utils/storage';
 
 interface Song {
   id: string;
@@ -58,8 +59,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentSong(song);
       if (audioRef.current) {
         try {
-          audioRef.current.src = song.url;
-          console.log("Set audio source to:", song.url);
+          const audioFile = await getAudioFile(song.url);
+          if (!audioFile) {
+            throw new Error('Fichier audio non trouvé');
+          }
+          const audioUrl = URL.createObjectURL(audioFile);
+          audioRef.current.src = audioUrl;
+          console.log("Set audio source to:", audioUrl);
           await audioRef.current.play();
           console.log("Audio playback started");
           setIsPlaying(true);

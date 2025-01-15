@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
+import { storeAudioFile } from "@/utils/storage";
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
@@ -23,10 +24,11 @@ export const MusicUploader = () => {
     }
 
     try {
-      const audioUrl = URL.createObjectURL(file);
-      const audio = new Audio(audioUrl);
+      const id = Date.now().toString() + Math.random();
+      await storeAudioFile(id, file);
       
-      // Obtenir la durée
+      const audio = new Audio(URL.createObjectURL(file));
+      
       const getDuration = new Promise<number>((resolve, reject) => {
         audio.addEventListener('loadedmetadata', () => {
           console.log("Durée audio détectée:", audio.duration);
@@ -54,11 +56,11 @@ export const MusicUploader = () => {
         }
 
         return {
-          id: Date.now().toString() + Math.random(),
+          id,
           title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
           artist: metadata.common.artist || "Unknown Artist",
           duration: formattedDuration,
-          url: audioUrl,
+          url: id, // On stocke l'ID au lieu de l'URL blob
           imageUrl: imageUrl
         };
 
@@ -66,11 +68,11 @@ export const MusicUploader = () => {
         console.warn("Erreur métadonnées, utilisation des valeurs par défaut:", metadataError);
         
         return {
-          id: Date.now().toString() + Math.random(),
+          id,
           title: file.name.replace(/\.[^/.]+$/, ""),
           artist: "Unknown Artist",
           duration: formattedDuration,
-          url: audioUrl,
+          url: id,
           imageUrl: "https://picsum.photos/240/240"
         };
       }
@@ -111,8 +113,6 @@ export const MusicUploader = () => {
           type="file"
           accept="audio/*"
           multiple
-          webkitdirectory=""
-          directory=""
           className="hidden"
           onChange={handleFileUpload}
         />
