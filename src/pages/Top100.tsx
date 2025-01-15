@@ -30,6 +30,7 @@ interface FavoriteStat {
     url: string;
     duration: string;
   };
+  isHidden?: boolean;
 }
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
@@ -41,6 +42,7 @@ const Top100 = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
+  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkSession = async () => {
@@ -154,11 +156,9 @@ const Top100 = () => {
               }
             };
           } else {
-            // Mettre à jour le compteur seulement si la stat existe
             if (stat.count) {
               acc[key].count = (acc[key].count || 0) + stat.count;
             }
-            // Mettre à jour la date si plus récente
             if (new Date(stat.last_updated) > new Date(acc[key].lastUpdated)) {
               acc[key].lastUpdated = stat.last_updated;
             }
@@ -179,7 +179,6 @@ const Top100 = () => {
 
     fetchFavoriteStats();
 
-    // Écouter les changements en temps réel sur la table favorite_stats
     const channel = supabase
       .channel('favorite_stats_changes')
       .on(
@@ -191,7 +190,7 @@ const Top100 = () => {
         },
         (payload) => {
           console.log("Favorite stats changed:", payload);
-          fetchFavoriteStats(); // Recharger les stats à chaque changement
+          fetchFavoriteStats();
         }
       )
       .subscribe();
@@ -240,81 +239,12 @@ const Top100 = () => {
   };
 
   const handleDelete = async (songId: string) => {
-    console.log("Attempting to delete song:", songId);
-    try {
-      // 1. Supprimer le fichier audio du stockage
-      const { error: storageError } = await supabase.storage
-        .from('audio')
-        .remove([songId]);
-
-      if (storageError) {
-        console.error("Error deleting audio file:", storageError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de supprimer le fichier audio",
-        });
-        return;
-      }
-
-      // 2. Supprimer TOUTES les statistiques liées à cette chanson, sans condition
-      const { error: deleteStatsError } = await supabase
-        .from('favorite_stats')
-        .delete()
-        .eq('song_id', songId);
-
-      if (deleteStatsError) {
-        console.error("Error deleting stats:", deleteStatsError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de supprimer les statistiques",
-        });
-        return;
-      }
-
-      // 3. Supprimer les paroles si elles existent
-      const { error: deleteLyricsError } = await supabase
-        .from('lyrics')
-        .delete()
-        .eq('song_id', songId);
-
-      if (deleteLyricsError) {
-        console.error("Error deleting lyrics:", deleteLyricsError);
-      }
-
-      // 4. Supprimer la chanson elle-même
-      const { error: deleteSongError } = await supabase
-        .from('songs')
-        .delete()
-        .eq('id', songId);
-
-      if (deleteSongError) {
-        console.error("Error deleting song:", deleteSongError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de supprimer la chanson",
-        });
-        return;
-      }
-
-      // 5. Mettre à jour l'état local immédiatement
-      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
-
-      toast({
-        title: "Succès",
-        description: "La musique a été supprimée",
-      });
-
-    } catch (error) {
-      console.error("Error during deletion:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Une erreur est survenue lors de la suppression",
-      });
-    }
+    console.log("Attempting to hide song:", songId);
+    setHiddenSongs(prev => new Set([...prev, songId]));
+    toast({
+      title: "Succès",
+      description: "La musique a été masquée de l'affichage",
+    });
   };
 
   const formatDuration = (duration: string) => {
@@ -376,19 +306,6 @@ const Top100 = () => {
               <Award className="w-8 h-8 text-spotify-accent" />
               <h1 className="text-2xl font-bold">Top 100 Communautaire</h1>
             </div>
-            {isAdmin && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (window.confirm("Êtes-vous sûr de vouloir supprimer toutes les musiques ?")) {
-                    favoriteStats.forEach(stat => handleDelete(stat.songId));
-                  }
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Purger toutes les musiques
-              </Button>
-            )}
           </div>
 
           <Table>
@@ -423,16 +340,16 @@ const Top100 = () => {
                     <div className="flex items-center space-x-3">
                       <img
                         src={PLACEHOLDER_IMAGE}
-                        alt={stat.song.title}
+                        alt={hiddenSongs.has(stat.songId) ? "Musique masquée" : stat.song.title}
                         className="w-12 h-12 rounded-md object-cover"
                       />
                       <span className="font-medium text-white">
-                        {stat.song.title}
+                        {hiddenSongs.has(stat.songId) ? "Musique masquée" : stat.song.title}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
-                    {stat.song.artist}
+                    {hiddenSongs.has(stat.songId) ? "Artiste masqué" : stat.song.artist}
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
                     {formatDuration(stat.song.duration)}
@@ -471,7 +388,7 @@ const Top100 = () => {
                       >
                         <FileText className="w-5 h-5" />
                       </Button>
-                      {isAdmin && (
+                      {isAdmin && !hiddenSongs.has(stat.songId) && (
                         <Button
                           variant="ghost"
                           size="icon"
