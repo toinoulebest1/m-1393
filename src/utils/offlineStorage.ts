@@ -14,7 +14,35 @@ export const downloadAndStoreAudio = async (songId: string, audioUrl: string) =>
     const db = await openDatabase();
     await storeAudio(db, songId, blob);
     
-    // Enregistrer dans Supabase
+    // Vérifier si la chanson existe déjà dans la table songs
+    const { data: existingSong, error: songCheckError } = await supabase
+      .from('songs')
+      .select('*')
+      .eq('id', songId)
+      .maybeSingle();
+
+    if (songCheckError) {
+      console.error("Error checking song existence:", songCheckError);
+      throw songCheckError;
+    }
+
+    // Si la chanson n'existe pas, on la crée
+    if (!existingSong) {
+      const { error: songInsertError } = await supabase
+        .from('songs')
+        .insert({
+          id: songId,
+          title: 'Unknown Title',
+          file_path: songId
+        });
+
+      if (songInsertError) {
+        console.error("Error inserting song:", songInsertError);
+        throw songInsertError;
+      }
+    }
+
+    // Maintenant on peut créer l'entrée offline_songs
     const { error } = await supabase
       .from('offline_songs')
       .insert({
@@ -22,7 +50,10 @@ export const downloadAndStoreAudio = async (songId: string, audioUrl: string) =>
         user_id: (await supabase.auth.getUser()).data.user?.id,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error inserting offline song:", error);
+      throw error;
+    }
     
     console.log("Audio file downloaded and stored successfully:", songId);
     return true;
@@ -68,7 +99,7 @@ export const isAudioAvailableOffline = async (songId: string): Promise<boolean> 
       .from('offline_songs')
       .select()
       .eq('song_id', songId)
-      .single();
+      .maybeSingle();
     
     if (!data) return false;
     
