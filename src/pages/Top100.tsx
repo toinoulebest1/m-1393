@@ -257,7 +257,7 @@ const Top100 = () => {
         return;
       }
 
-      // 2. Supprimer toutes les statistiques liées à cette chanson
+      // 2. Supprimer TOUTES les statistiques liées à cette chanson, sans condition
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
         .delete()
