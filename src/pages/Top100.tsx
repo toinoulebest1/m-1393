@@ -1,10 +1,12 @@
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
-import { Award, Play, Heart } from "lucide-react";
+import { Award, Play, Heart, Trash2 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Table,
   TableBody,
@@ -16,6 +18,25 @@ import {
 
 const Top100 = () => {
   const { favoriteStats, play, currentSong, isPlaying, addToQueue } = usePlayer();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      setIsAdmin(roles?.role === 'admin');
+    };
+
+    checkAdminStatus();
+  }, []);
 
   // Effet pour actualiser les stats toutes les 30 secondes
   useEffect(() => {
@@ -65,6 +86,46 @@ const Top100 = () => {
       });
     } catch (error) {
       console.error("Erreur lors de la lecture:", error);
+    }
+  };
+
+  const handleDelete = async (songId: string) => {
+    try {
+      const { error } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id', songId);
+
+      if (error) {
+        console.error("Erreur lors de la suppression:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de supprimer la musique",
+        });
+        return;
+      }
+
+      toast({
+        title: "Succès",
+        description: "La musique a été supprimée",
+      });
+
+      // Forcer le rafraîchissement des stats
+      const savedStats = localStorage.getItem('favoriteStats');
+      if (savedStats) {
+        const parsedStats = JSON.parse(savedStats);
+        const updatedStats = parsedStats.filter((stat: any) => stat.songId !== songId);
+        localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
+        window.location.reload(); // Recharger la page pour mettre à jour la liste
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression",
+      });
     }
   };
 
@@ -144,17 +205,32 @@ const Top100 = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 hover:bg-white/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlay(stat.song);
-                      }}
-                    >
-                      <Play className="w-5 h-5" />
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlay(stat.song);
+                        }}
+                      >
+                        <Play className="w-5 h-5" />
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(stat.songId);
+                          }}
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
