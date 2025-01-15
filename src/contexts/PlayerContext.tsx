@@ -42,15 +42,11 @@ interface PlayerContextType {
   toggleFavorite: (song: Song) => void;
   removeFavorite: (songId: string) => void;
   setSearchQuery: (query: string) => void;
-  audioContext: AudioContext | null;
-  sourceNode: MediaElementAudioSourceNode | null;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const globalAudio = new Audio();
-const audioContext = new AudioContext();
-const sourceNode = audioContext.createMediaElementSource(globalAudio);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -415,8 +411,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFavorite,
         removeFavorite,
         setSearchQuery,
-        audioContext,
-        sourceNode,
       }}
     >
       {children}

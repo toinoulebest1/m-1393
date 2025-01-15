@@ -1,10 +1,8 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Settings2 } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Equalizer } from "./Equalizer";
 
 export const Player = () => {
   const { 
@@ -15,8 +13,6 @@ export const Player = () => {
     shuffleMode,
     repeatMode,
     favorites,
-    audioContext,
-    sourceNode,
     play,
     pause,
     setVolume,
@@ -27,8 +23,6 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite
   } = usePlayer();
-
-  const [showEqualizer, setShowEqualizer] = useState(false);
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
@@ -95,11 +89,6 @@ export const Player = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0">
-      {showEqualizer && audioContext && sourceNode && (
-        <div className="max-w-screen-xl mx-auto px-4 pb-2">
-          <Equalizer audioContext={audioContext} sourceNode={sourceNode} />
-        </div>
-      )}
       <div className="bg-gradient-to-t from-black/90 to-black/70 backdrop-blur-xl border-t border-white/5 p-4">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -193,26 +182,15 @@ export const Player = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowEqualizer(!showEqualizer)}
-              className={cn(
-                "p-2 hover:bg-white/5 rounded-full transition-colors",
-                showEqualizer && "text-spotify-accent"
-              )}
-            >
-              <Settings2 className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-2">
-              <Volume2 className="text-spotify-neutral w-5 h-5" />
-              <Slider
-                value={[volume]}
-                max={100}
-                step={1}
-                className="w-24"
-                onValueChange={(value) => setVolume(value[0])}
-              />
-            </div>
+          <div className="flex items-center space-x-2">
+            <Volume2 className="text-spotify-neutral w-5 h-5" />
+            <Slider
+              value={[volume]}
+              max={100}
+              step={1}
+              className="w-24"
+              onValueChange={(value) => setVolume(value[0])}
+            />
           </div>
         </div>
       </div>
