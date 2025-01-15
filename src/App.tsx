@@ -18,9 +18,9 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <PlayerProvider>
+          <Toaster />
+          <Sonner />
           <Suspense fallback="Loading...">
-            <Toaster />
-            <Sonner />
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
