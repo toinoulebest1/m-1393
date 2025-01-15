@@ -31,6 +31,8 @@ interface FavoriteStat {
   };
 }
 
+const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
+
 const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -301,23 +303,6 @@ const Top100 = () => {
     }
   };
 
-  if (favoriteStats.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
-        <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
-            <Award className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
-            <p className="text-spotify-neutral text-lg">
-              Aucune musique n'a encore été ajoutée aux favoris par la communauté
-            </p>
-          </div>
-        </div>
-        <Player />
-      </div>
-    );
-  }
-
   const formatDuration = (duration: string) => {
     if (!duration) return "0:00";
     
@@ -340,6 +325,23 @@ const Top100 = () => {
       return "0:00";
     }
   };
+
+  if (favoriteStats.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
+            <Award className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
+            <p className="text-spotify-neutral text-lg">
+              Aucune musique n'a encore été ajoutée aux favoris par la communauté
+            </p>
+          </div>
+        </div>
+        <Player />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
@@ -406,7 +408,7 @@ const Top100 = () => {
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <img
-                        src={stat.song.imageUrl || "https://picsum.photos/64/64"}
+                        src={PLACEHOLDER_IMAGE}
                         alt={stat.song.title}
                         className="w-12 h-12 rounded-md object-cover"
                       />
