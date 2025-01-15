@@ -134,13 +134,15 @@ const Top100 = () => {
 
         console.log("Received favorite stats:", data);
 
-        // Grouper les stats par titre de chanson
+        // Grouper les stats par titre de chanson et mettre à jour le compteur
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
+          if (!stat.songs) return acc; // Skip if song was deleted
+          
           const title = stat.songs.title;
           if (!acc[title]) {
             acc[title] = {
               songId: stat.song_id,
-              count: stat.count,
+              count: stat.count || 0, // Ensure count is never null
               lastUpdated: stat.last_updated,
               song: {
                 id: stat.songs.id,
@@ -151,9 +153,7 @@ const Top100 = () => {
               }
             };
           } else {
-            // Additionner les counts pour le même titre
-            acc[title].count += stat.count;
-            // Mettre à jour lastUpdated si plus récent
+            acc[title].count = (acc[title].count || 0) + (stat.count || 0);
             if (new Date(stat.last_updated) > new Date(acc[title].lastUpdated)) {
               acc[title].lastUpdated = stat.last_updated;
             }
@@ -162,7 +162,7 @@ const Top100 = () => {
         }, {});
 
         const formattedStats = Object.values(groupedStats)
-          .sort((a, b) => b.count - a.count)
+          .sort((a, b) => (b.count || 0) - (a.count || 0))
           .slice(0, 100);
 
         console.log("Formatted and grouped stats:", formattedStats);
@@ -196,44 +196,6 @@ const Top100 = () => {
     };
   }, [toast]);
 
-  const handlePlay = async (song: any) => {
-    try {
-      console.log("Tentative de lecture de la chanson:", song);
-      if (!song) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Chanson invalide"
-        });
-        return;
-      }
-
-      await play(song);
-      console.log("Lecture démarrée:", song.title);
-      
-      const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
-      const remainingSongs = favoriteStats
-        .slice(songIndex + 1)
-        .map(stat => stat.song);
-      
-      console.log("Ajout à la file d'attente:", remainingSongs);
-      
-      remainingSongs.forEach(nextSong => {
-        if (nextSong) {
-          console.log("Ajout à la file d'attente:", nextSong.title);
-          addToQueue(nextSong);
-        }
-      });
-    } catch (error) {
-      console.error("Erreur lors de la lecture:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur de lecture",
-        description: "Impossible de lire cette chanson"
-      });
-    }
-  };
-
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
@@ -252,6 +214,7 @@ const Top100 = () => {
 
       console.log("Current session user:", session.user.id);
 
+      // Vérifier les permissions d'admin
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -278,6 +241,7 @@ const Top100 = () => {
         return;
       }
 
+      // Supprimer d'abord les stats
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
         .delete()
@@ -293,6 +257,7 @@ const Top100 = () => {
         return;
       }
 
+      // Puis supprimer la chanson
       const { error: deleteSongError } = await supabase
         .from('songs')
         .delete()
@@ -307,6 +272,9 @@ const Top100 = () => {
         });
         return;
       }
+
+      // Mettre à jour l'état local
+      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
 
       toast({
         title: "Succès",
@@ -446,7 +414,7 @@ const Top100 = () => {
                   <TableCell className="text-spotify-neutral">
                     <div className="flex items-center space-x-2">
                       <Heart className="w-4 h-4 text-spotify-accent fill-spotify-accent" />
-                      <span>{stat.count}</span>
+                      <span>{stat.count || 0}</span>
                     </div>
                   </TableCell>
                   <TableCell>
