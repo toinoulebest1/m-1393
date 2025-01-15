@@ -10,6 +10,12 @@
     "track": "track",
     "tracks": "tracks",
     "noFavorites": "No favorites yet",
-    "clickHeartToAdd": "Click the heart next to a song to add it to your favorites"
+    "clickHeartToAdd": "Click the heart next to a song to add it to your favorites",
+    "upload": "Upload files",
+    "fileSelected": "{{count}} file imported",
+    "fileSelected_plural": "{{count}} files imported",
+    "top100": "Top 100",
+    "selectSong": "Select a song",
+    "noArtist": "Unknown Artist"
   }
 }

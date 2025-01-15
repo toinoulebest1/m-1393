@@ -10,6 +10,12 @@
     "track": "titre",
     "tracks": "titres",
     "noFavorites": "Pas encore de favoris",
-    "clickHeartToAdd": "Cliquez sur le cœur à côté d'un titre pour l'ajouter à vos favoris"
+    "clickHeartToAdd": "Cliquez sur le cœur à côté d'un titre pour l'ajouter à vos favoris",
+    "upload": "Importer des fichiers",
+    "fileSelected": "{{count}} fichier importé",
+    "fileSelected_plural": "{{count}} fichiers importés",
+    "top100": "Top 100",
+    "selectSong": "Sélectionnez un titre",
+    "noArtist": "Artiste inconnu"
   }
 }
