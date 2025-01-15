@@ -6,6 +6,7 @@ interface Song {
   artist: string;
   duration: string;
   url: string;
+  imageUrl?: string;
 }
 
 interface PlayerContextType {
@@ -36,7 +37,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       title: 'Song One', 
       artist: 'Artist One', 
       duration: '3:45',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      imageUrl: 'https://picsum.photos/240/240'
     },
     { 
       id: '2', 

@@ -10,9 +10,9 @@ export const NowPlaying = () => {
     <div className="flex-1 p-8">
       <div className="flex items-end space-x-6 mb-8">
         <img
-          src="https://picsum.photos/240/240"
+          src={currentSong?.imageUrl || "https://picsum.photos/240/240"}
           alt="Album art"
-          className="w-60 h-60 rounded-lg shadow-lg"
+          className="w-60 h-60 rounded-lg shadow-lg object-cover"
         />
         <div>
           <p className="text-spotify-neutral mb-2">{t('common.nowPlaying')}</p>
@@ -20,7 +20,7 @@ export const NowPlaying = () => {
             {currentSong?.title || 'Select a song'}
           </h1>
           <p className="text-spotify-neutral">
-            {currentSong?.artist || 'No artist'} • 2024
+            {currentSong?.artist || 'No artist'} • {currentSong?.duration || '0:00'}
           </p>
         </div>
       </div>
