@@ -34,7 +34,6 @@ interface FavoriteStat {
 }
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
-const HIDDEN_SONGS_KEY = 'top100_hidden_songs';
 
 const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
@@ -43,14 +42,7 @@ const Top100 = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
-  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(() => {
-    const savedHiddenSongs = localStorage.getItem(HIDDEN_SONGS_KEY);
-    return savedHiddenSongs ? new Set(JSON.parse(savedHiddenSongs)) : new Set();
-  });
-
-  useEffect(() => {
-    localStorage.setItem(HIDDEN_SONGS_KEY, JSON.stringify(Array.from(hiddenSongs)));
-  }, [hiddenSongs]);
+  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkSession = async () => {
@@ -115,6 +107,21 @@ const Top100 = () => {
     const fetchFavoriteStats = async () => {
       try {
         console.log("Fetching favorite stats...");
+        
+        // Fetch hidden songs first
+        const { data: hiddenSongsData, error: hiddenError } = await supabase
+          .from('hidden_songs')
+          .select('song_id');
+
+        if (hiddenError) {
+          console.error("Error fetching hidden songs:", hiddenError);
+          return;
+        }
+
+        const hiddenSongIds = new Set(hiddenSongsData.map(hs => hs.song_id));
+        setHiddenSongs(hiddenSongIds);
+
+        // Then fetch favorite stats excluding hidden songs
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
@@ -145,7 +152,7 @@ const Top100 = () => {
         console.log("Received favorite stats:", data);
 
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
-          if (!stat.songs) return acc;
+          if (!stat.songs || hiddenSongIds.has(stat.song_id)) return acc;
           
           const key = `${stat.songs.title.toLowerCase()}-${(stat.songs.artist || '').toLowerCase()}`;
           
@@ -186,7 +193,8 @@ const Top100 = () => {
 
     fetchFavoriteStats();
 
-    const channel = supabase
+    // Subscribe to changes in both favorite_stats and hidden_songs tables
+    const favoriteStatsChannel = supabase
       .channel('favorite_stats_changes')
       .on(
         'postgres_changes',
@@ -202,8 +210,25 @@ const Top100 = () => {
       )
       .subscribe();
 
+    const hiddenSongsChannel = supabase
+      .channel('hidden_songs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hidden_songs'
+        },
+        (payload) => {
+          console.log("Hidden songs changed:", payload);
+          fetchFavoriteStats();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(favoriteStatsChannel);
+      supabase.removeChannel(hiddenSongsChannel);
     };
   }, [toast]);
 
@@ -247,13 +272,35 @@ const Top100 = () => {
   };
 
   const handleDelete = async (songId: string) => {
-    console.log("Masquage de la chanson:", songId);
-    setHiddenSongs(prev => new Set([...prev, songId]));
-    setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
-    toast({
-      title: "Succès",
-      description: "La musique a été masquée",
-    });
+    try {
+      console.log("Masquage de la chanson dans la base de données:", songId);
+      const { error } = await supabase
+        .from('hidden_songs')
+        .insert({ song_id: songId });
+
+      if (error) {
+        console.error("Erreur lors du masquage de la chanson:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de masquer la chanson"
+        });
+        return;
+      }
+
+      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
+      toast({
+        title: "Succès",
+        description: "La musique a été masquée",
+      });
+    } catch (error) {
+      console.error("Erreur lors du masquage de la chanson:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Une erreur est survenue lors du masquage de la chanson"
+      });
+    }
   };
 
   const formatDuration = (duration: string) => {
@@ -279,9 +326,7 @@ const Top100 = () => {
     }
   };
 
-  const visibleSongs = favoriteStats.filter(stat => !hiddenSongs.has(stat.songId));
-
-  if (visibleSongs.length === 0) {
+  if (favoriteStats.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
         <Sidebar />
@@ -331,7 +376,7 @@ const Top100 = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleSongs.map((stat, index) => (
+              {favoriteStats.map((stat, index) => (
                 <TableRow
                   key={stat.songId}
                   className="group hover:bg-white/10 transition-colors cursor-pointer border-white/5"

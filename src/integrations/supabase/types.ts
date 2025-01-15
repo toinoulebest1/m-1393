@@ -38,6 +38,35 @@ export type Database = {
           },
         ]
       }
+      hidden_songs: {
+        Row: {
+          hidden_at: string | null
+          hidden_by: string | null
+          id: string
+          song_id: string
+        }
+        Insert: {
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          song_id: string
+        }
+        Update: {
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hidden_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: true
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lyrics: {
         Row: {
           content: string
