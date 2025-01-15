@@ -19,11 +19,8 @@ export const Player = () => {
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
     
-    // Extraire les minutes et secondes de la durée de la chanson
     const [minutes, seconds] = currentSong.duration.split(':').map(Number);
     const totalSeconds = minutes * 60 + seconds;
-    
-    // Calculer le temps actuel
     const currentTime = (progress / 100) * totalSeconds;
     const currentMinutes = Math.floor(currentTime / 60);
     const currentSeconds = Math.floor(currentTime % 60);
@@ -32,16 +29,18 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark/90 backdrop-blur-lg border-t border-white/10 p-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-black/70 backdrop-blur-xl border-t border-white/5 p-4">
       <div className="max-w-screen-xl mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <img
             src={currentSong?.imageUrl || "https://picsum.photos/56/56"}
             alt="Album art"
-            className="w-14 h-14 rounded-md"
+            className="w-14 h-14 rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
           />
           <div>
-            <h3 className="text-white font-medium">{currentSong?.title || 'Select a song'}</h3>
+            <h3 className="text-white font-medium hover:text-spotify-accent transition-colors">
+              {currentSong?.title || 'Select a song'}
+            </h3>
             <p className="text-spotify-neutral text-sm">{currentSong?.artist || 'No artist'}</p>
           </div>
         </div>
@@ -49,13 +48,13 @@ export const Player = () => {
         <div className="flex flex-col items-center space-y-2 flex-1 max-w-xl">
           <div className="flex items-center space-x-6">
             <button 
-              className="text-spotify-neutral hover:text-white transition-colors"
+              className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
               onClick={previousSong}
             >
               <SkipBack className="w-5 h-5" />
             </button>
             <button 
-              className="bg-white rounded-full p-2 hover:scale-105 transition-transform"
+              className="bg-white rounded-full p-2 hover:scale-110 transition-all shadow-lg hover:shadow-white/20"
               onClick={() => isPlaying ? pause() : play()}
             >
               {isPlaying ? (
@@ -65,7 +64,7 @@ export const Player = () => {
               )}
             </button>
             <button 
-              className="text-spotify-neutral hover:text-white transition-colors"
+              className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
               onClick={nextSong}
             >
               <SkipForward className="w-5 h-5" />
