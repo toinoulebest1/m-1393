@@ -1,14 +1,10 @@
 import { Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
-
-const queue = [
-  { title: "Song One", artist: "Artist One", duration: "3:45" },
-  { title: "Song Two", artist: "Artist Two", duration: "4:20" },
-  { title: "Song Three", artist: "Artist Three", duration: "3:15" },
-];
+import { usePlayer } from "@/contexts/PlayerContext";
 
 export const NowPlaying = () => {
   const { t } = useTranslation();
+  const { queue, currentSong, play } = usePlayer();
 
   return (
     <div className="flex-1 p-8">
@@ -20,8 +16,12 @@ export const NowPlaying = () => {
         />
         <div>
           <p className="text-spotify-neutral mb-2">{t('common.nowPlaying')}</p>
-          <h1 className="text-4xl font-bold text-white mb-2">Album Name</h1>
-          <p className="text-spotify-neutral">Artist Name • 2024</p>
+          <h1 className="text-4xl font-bold text-white mb-2">
+            {currentSong?.title || 'Select a song'}
+          </h1>
+          <p className="text-spotify-neutral">
+            {currentSong?.artist || 'No artist'} • 2024
+          </p>
         </div>
       </div>
 
@@ -35,10 +35,11 @@ export const NowPlaying = () => {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          {queue.map((song, i) => (
+          {queue.map((song) => (
             <div
-              key={i}
+              key={song.id}
               className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 hover:bg-white/10 transition-colors cursor-pointer text-spotify-neutral hover:text-white"
+              onClick={() => play(song)}
             >
               <div>{song.title}</div>
               <div>{song.artist}</div>

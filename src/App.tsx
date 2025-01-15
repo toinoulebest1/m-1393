@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
+import { PlayerProvider } from "./contexts/PlayerContext";
 
 const queryClient = new QueryClient();
 
@@ -14,13 +15,15 @@ const App = () => (
   <I18nextProvider i18n={i18n}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-          </Routes>
-        </BrowserRouter>
+        <PlayerProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+            </Routes>
+          </BrowserRouter>
+        </PlayerProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </I18nextProvider>
