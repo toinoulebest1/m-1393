@@ -61,7 +61,7 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 bg-spotify-dark flex flex-col h-screen">
+    <div className="w-64 flex flex-col h-screen bg-black/20 backdrop-blur-lg border-r border-white/10">
       <div className="p-6">
         <h1 className="text-2xl font-bold text-white">
           Spotify Clone

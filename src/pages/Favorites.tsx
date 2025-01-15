@@ -77,7 +77,7 @@ const Favorites = () => {
 
   if (favorites.length === 0) {
     return (
-      <div className="flex min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824]">
+      <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
@@ -91,7 +91,7 @@ const Favorites = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824]">
+    <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex-1 overflow-hidden">
         <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">

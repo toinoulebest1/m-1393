@@ -35,7 +35,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Bienvenue</h1>
