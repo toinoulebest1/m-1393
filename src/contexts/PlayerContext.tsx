@@ -191,6 +191,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return newFavorites;
       });
 
+      // Vérifier si la chanson n'est plus dans les favoris de personne
+      const allFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+      if (!allFavorites.some((fav: Song) => fav.id === songId)) {
+        console.log("Song removed from all favorites, cleaning up stats:", songId);
+        
+        // Nettoyer les stats
+        setFavoriteStats(prev => {
+          const newStats = prev.filter(stat => stat.songId !== songId);
+          localStorage.setItem('favoriteStats', JSON.stringify(newStats));
+          return newStats;
+        });
+      }
+
       if (currentSong?.id === songId) {
         setQueue(prev => prev.filter(s => s.id !== songId));
       }
@@ -346,3 +359,4 @@ export const usePlayer = () => {
   }
   return context;
 };
+
