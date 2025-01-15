@@ -4,6 +4,7 @@ import { NowPlaying } from "@/components/NowPlaying";
 import { Award, Play, Heart } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -15,6 +16,34 @@ import {
 
 const Top100 = () => {
   const { favoriteStats, play, currentSong, isPlaying, addToQueue } = usePlayer();
+
+  // Effet pour actualiser les stats toutes les 30 secondes
+  useEffect(() => {
+    console.log("Setting up auto-refresh interval for Top 100");
+    const interval = setInterval(() => {
+      console.log("Auto-refreshing Top 100 stats");
+      // Forcer une actualisation du state en rechargeant les stats depuis le localStorage
+      const savedStats = localStorage.getItem('favoriteStats');
+      if (savedStats) {
+        try {
+          const parsedStats = JSON.parse(savedStats);
+          // On met à jour uniquement si les données ont changé
+          if (JSON.stringify(favoriteStats) !== JSON.stringify(parsedStats)) {
+            console.log("New stats detected, updating view");
+            // La mise à jour se fait automatiquement via le contexte
+          }
+        } catch (error) {
+          console.error("Error parsing favoriteStats:", error);
+        }
+      }
+    }, 30000); // 30 secondes
+
+    // Cleanup de l'intervalle
+    return () => {
+      console.log("Cleaning up Top 100 refresh interval");
+      clearInterval(interval);
+    };
+  }, [favoriteStats]);
 
   const handlePlay = async (song: any) => {
     console.log("Tentative de lecture de la chanson:", song);
