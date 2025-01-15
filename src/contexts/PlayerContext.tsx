@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useRef, useEffect } from 'r
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
+import { downloadAndStoreAudio, getOfflineAudio } from '@/utils/offlineStorage';
 
 interface Song {
   id: string;
@@ -80,15 +81,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentSong(song);
       try {
         let audioUrl: string;
-        try {
-          audioUrl = await getAudioFile(song.url);
-        } catch (error) {
-          console.log("File not found in storage, attempting to store it first");
-          if (typeof song.url !== 'string') {
-            throw new Error('Invalid audio file URL');
+        
+        // Vérifier d'abord si le fichier est disponible hors-ligne
+        const offlineBlob = await getOfflineAudio(song.url);
+        if (offlineBlob) {
+          console.log("Using offline audio file");
+          audioUrl = URL.createObjectURL(offlineBlob);
+        } else {
+          console.log("Fetching audio from storage");
+          try {
+            audioUrl = await getAudioFile(song.url);
+          } catch (error) {
+            console.log("File not found in storage, attempting to store it first");
+            if (typeof song.url !== 'string') {
+              throw new Error('Invalid audio file URL');
+            }
+            await storeAudioFile(song.url, song.url);
+            audioUrl = await getAudioFile(song.url);
           }
-          await storeAudioFile(song.url, song.url);
-          audioUrl = await getAudioFile(song.url);
         }
 
         if (!audioUrl) {

@@ -96,6 +96,38 @@ export type Database = {
           },
         ]
       }
+      offline_songs: {
+        Row: {
+          downloaded_at: string | null
+          id: string
+          last_played_at: string | null
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          downloaded_at?: string | null
+          id?: string
+          last_played_at?: string | null
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          downloaded_at?: string | null
+          id?: string
+          last_played_at?: string | null
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offline_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
