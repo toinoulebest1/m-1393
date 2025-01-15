@@ -60,6 +60,7 @@ export type Database = {
         Row: {
           artist: string | null
           created_at: string
+          duration: string | null
           file_path: string
           id: string
           title: string
@@ -68,6 +69,7 @@ export type Database = {
         Insert: {
           artist?: string | null
           created_at?: string
+          duration?: string | null
           file_path: string
           id?: string
           title: string
@@ -76,6 +78,7 @@ export type Database = {
         Update: {
           artist?: string | null
           created_at?: string
+          duration?: string | null
           file_path?: string
           id?: string
           title?: string

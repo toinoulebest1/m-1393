@@ -22,7 +22,13 @@ interface FavoriteStat {
   songId: string;
   count: number;
   lastUpdated: string;
-  song: any;
+  song: {
+    id: string;
+    title: string;
+    artist: string;
+    url: string;
+    duration: string;
+  };
 }
 
 const Top100 = () => {
@@ -147,7 +153,6 @@ const Top100 = () => {
 
     fetchFavoriteStats();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel('favorite_stats_changes')
       .on(
@@ -251,7 +256,6 @@ const Top100 = () => {
         return;
       }
 
-      // Supprimer les stats
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
         .delete()
@@ -267,7 +271,6 @@ const Top100 = () => {
         return;
       }
 
-      // Supprimer la chanson
       const { error: deleteSongError } = await supabase
         .from('songs')
         .delete()
@@ -319,14 +322,12 @@ const Top100 = () => {
     if (!duration) return "0:00";
     
     try {
-      // Si la durée est déjà au format mm:ss
       if (duration.includes(':')) {
         const [minutes, seconds] = duration.split(':').map(Number);
         if (isNaN(minutes) || isNaN(seconds)) return "0:00";
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
       
-      // Si la durée est en secondes
       const durationInSeconds = parseFloat(duration);
       if (isNaN(durationInSeconds)) return "0:00";
       
