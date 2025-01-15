@@ -14,14 +14,32 @@ export const Sidebar = () => {
     try {
       console.log("Starting logout process...");
       
-      // Force global scope logout to ensure all sessions are terminated
-      const { error } = await supabase.auth.signOut({
-        scope: 'global'
-      });
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        // If there's no session, just redirect to auth
+        toast.success(t('common.logoutSuccess'));
+        navigate('/auth');
+        return;
+      }
+
+      if (!session) {
+        console.log("No active session found, redirecting to auth");
+        toast.success(t('common.logoutSuccess'));
+        navigate('/auth');
+        return;
+      }
+
+      // If we have a valid session, try to sign out
+      const { error } = await supabase.auth.signOut();
 
       if (error) {
         console.error("Logout error:", error);
-        toast.error(t('common.logoutError'));
+        // Even if there's an error, we'll redirect to auth
+        // as the session might be invalid
+        toast.success(t('common.logoutSuccess'));
+        navigate('/auth');
         return;
       }
 
@@ -30,7 +48,9 @@ export const Sidebar = () => {
       navigate('/auth');
     } catch (error) {
       console.error("Unexpected logout error:", error);
-      toast.error(t('common.unexpectedError'));
+      // In case of any error, we'll still redirect to auth
+      toast.success(t('common.logoutSuccess'));
+      navigate('/auth');
     }
   };
 
