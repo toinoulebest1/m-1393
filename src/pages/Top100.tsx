@@ -106,28 +106,23 @@ const Top100 = () => {
     };
   }, [navigate]);
 
-  // Effet pour actualiser les stats toutes les 30 secondes
   useEffect(() => {
     console.log("Setting up auto-refresh interval for Top 100");
     const interval = setInterval(() => {
       console.log("Auto-refreshing Top 100 stats");
-      // Forcer une actualisation du state en rechargeant les stats depuis le localStorage
       const savedStats = localStorage.getItem('favoriteStats');
       if (savedStats) {
         try {
           const parsedStats = JSON.parse(savedStats);
-          // On met à jour uniquement si les données ont changé
           if (JSON.stringify(favoriteStats) !== JSON.stringify(parsedStats)) {
             console.log("New stats detected, updating view");
-            // La mise à jour se fait automatiquement via le contexte
           }
         } catch (error) {
           console.error("Error parsing favoriteStats:", error);
         }
       }
-    }, 30000); // 30 secondes
+    }, 30000);
 
-    // Cleanup de l'intervalle
     return () => {
       console.log("Cleaning up Top 100 refresh interval");
       clearInterval(interval);
@@ -160,23 +155,45 @@ const Top100 = () => {
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
-      const { error } = await supabase
+      // Vérifier d'abord la session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error("Session error during delete:", sessionError);
+        toast({
+          variant: "destructive",
+          title: "Session expirée",
+          description: "Veuillez vous reconnecter",
+        });
+        navigate('/auth');
+        return;
+      }
+
+      // Vérifier le rôle admin
+      const { data: userRole, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (roleError || userRole?.role !== 'admin') {
+        console.error("Role verification error:", roleError);
+        toast({
+          variant: "destructive",
+          title: "Accès refusé",
+          description: "Vous devez être administrateur pour effectuer cette action",
+        });
+        return;
+      }
+
+      // Procéder à la suppression
+      const { error: deleteError } = await supabase
         .from('songs')
         .delete()
         .eq('id', songId);
 
-      if (error) {
-        console.error("Error deleting song:", error);
-        if (error.code === 'PGRST116') {
-          toast({
-            variant: "destructive",
-            title: "Session expirée",
-            description: "Veuillez vous reconnecter",
-          });
-          navigate('/auth');
-          return;
-        }
-        
+      if (deleteError) {
+        console.error("Error deleting song:", deleteError);
         toast({
           variant: "destructive",
           title: "Erreur",
@@ -190,13 +207,13 @@ const Top100 = () => {
         description: "La musique a été supprimée",
       });
 
-      // Forcer le rafraîchissement des stats
+      // Mettre à jour l'interface
       const savedStats = localStorage.getItem('favoriteStats');
       if (savedStats) {
         const parsedStats = JSON.parse(savedStats);
         const updatedStats = parsedStats.filter((stat: any) => stat.songId !== songId);
         localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
-        window.location.reload(); // Recharger la page pour mettre à jour la liste
+        window.location.reload();
       }
     } catch (error) {
       console.error("Error during deletion:", error);
