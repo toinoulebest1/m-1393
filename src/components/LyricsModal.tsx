@@ -38,7 +38,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         .from('lyrics')
         .select('content')
         .eq('song_id', songId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching lyrics:', error);
