@@ -15,25 +15,58 @@ import i18n from "./i18n";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import { Suspense } from "react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Session error:", error);
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(!!session);
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
       setIsAuthenticated(!!session);
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        // Clear any application cache/state here
+        queryClient.clear();
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  if (isAuthenticated === null) {
-    return <div>Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      </div>
+    );
   }
 
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
@@ -46,7 +79,11 @@ const App = () => (
         <PlayerProvider>
           <Toaster />
           <Sonner />
-          <Suspense fallback="Loading...">
+          <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+            </div>
+          }>
             <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
