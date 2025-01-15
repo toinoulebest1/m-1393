@@ -29,6 +29,19 @@ export const Sidebar = () => {
         </h1>
       </div>
 
+      <div className="px-4 space-y-4 mb-4">
+        <MusicUploader />
+        
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-spotify-neutral hover:text-white"
+          onClick={toggleLanguage}
+        >
+          <Languages className="w-5 h-5 mr-2" />
+          <span>{i18n.language === 'en' ? 'Français' : 'English'}</span>
+        </Button>
+      </div>
+
       <nav className="flex-1">
         <NavLink
           to="/"
@@ -67,18 +80,7 @@ export const Sidebar = () => {
         </NavLink>
       </nav>
 
-      <div className="mt-auto p-4 space-y-4">
-        <MusicUploader />
-        
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-spotify-neutral hover:text-white"
-          onClick={toggleLanguage}
-        >
-          <Languages className="w-5 h-5 mr-2" />
-          <span>{i18n.language === 'en' ? 'Français' : 'English'}</span>
-        </Button>
-
+      <div className="mt-auto p-4">
         <button
           onClick={handleLogout}
           className="flex items-center space-x-3 px-6 py-3 text-spotify-neutral hover:text-white transition-colors w-full"
