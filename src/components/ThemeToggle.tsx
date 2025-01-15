@@ -7,6 +7,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type Theme = {
   name: string;
@@ -36,19 +38,51 @@ const themes: Theme[] = [
   }
 ];
 
-const THEME_STORAGE_KEY = 'spotify-clone-theme';
-
 export function ThemeToggle() {
-  const [currentTheme, setCurrentTheme] = useState<Theme>(() => {
-    // Récupérer le thème sauvegardé au chargement initial
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme) {
-      const parsedTheme = JSON.parse(savedTheme);
-      const foundTheme = themes.find(theme => theme.name === parsedTheme.name);
-      return foundTheme || themes[0];
-    }
-    return themes[0];
-  });
+  const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]);
+
+  useEffect(() => {
+    const loadUserTheme = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          return;
+        }
+
+        if (!session) {
+          console.log("No active session found");
+          return;
+        }
+
+        console.log("Loading theme for user:", session.user.id);
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('theme')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Error loading theme:", profileError);
+          return;
+        }
+
+        if (profile?.theme) {
+          console.log("Theme loaded from database:", profile.theme);
+          const savedTheme = themes.find(theme => theme.name === profile.theme.name);
+          if (savedTheme) {
+            setCurrentTheme(savedTheme);
+          }
+        }
+      } catch (error) {
+        console.error("Error in loadUserTheme:", error);
+      }
+    };
+
+    loadUserTheme();
+  }, []);
 
   useEffect(() => {
     const app = document.getElementById('root');
@@ -57,9 +91,7 @@ export function ThemeToggle() {
       return;
     }
     
-    // Sauvegarder le thème dans le localStorage
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(currentTheme));
-    console.log("Theme saved:", currentTheme.name);
+    console.log("Applying theme:", currentTheme.name);
     
     // Retirer toutes les classes de thème existantes
     app.className = app.className
@@ -72,6 +104,44 @@ export function ThemeToggle() {
     
     console.log("Theme applied:", currentTheme.name);
   }, [currentTheme]);
+
+  const handleThemeChange = async (theme: Theme) => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        toast.error("Erreur lors du changement de thème");
+        return;
+      }
+
+      if (!session) {
+        console.log("No active session found");
+        toast.error("Vous devez être connecté pour changer de thème");
+        return;
+      }
+
+      console.log("Saving theme for user:", session.user.id);
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ theme })
+        .eq('id', session.user.id);
+
+      if (updateError) {
+        console.error("Error saving theme:", updateError);
+        toast.error("Erreur lors de la sauvegarde du thème");
+        return;
+      }
+
+      setCurrentTheme(theme);
+      toast.success("Thème mis à jour");
+      console.log("Theme saved successfully:", theme.name);
+    } catch (error) {
+      console.error("Error in handleThemeChange:", error);
+      toast.error("Erreur lors du changement de thème");
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -88,7 +158,7 @@ export function ThemeToggle() {
         {themes.map((theme) => (
           <DropdownMenuItem 
             key={theme.name}
-            onClick={() => setCurrentTheme(theme)}
+            onClick={() => handleThemeChange(theme)}
             className={`text-spotify-neutral hover:text-white cursor-pointer ${
               currentTheme.name === theme.name ? 'bg-white/10' : ''
             }`}
