@@ -102,10 +102,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.currentTime = 0;
         audioRef.current.load();
         
-        await audioRef.current.play();
-        console.log("Audio playback started");
-        setIsPlaying(true);
-        toast.success(`Lecture de ${song.title}`);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log("Audio playback started successfully");
+            setIsPlaying(true);
+            toast.success(`Lecture de ${song.title}`);
+          }).catch(error => {
+            console.error("Error starting playback:", error);
+            toast.error("Erreur lors de la lecture");
+            setIsPlaying(false);
+          });
+        }
       } catch (error) {
         console.error("Error playing audio:", error);
         toast.error("Impossible de lire ce fichier audio. Il n'est peut-être plus disponible.");
@@ -114,9 +122,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } else if (audioRef.current) {
       try {
-        await audioRef.current.play();
-        console.log("Resuming audio playback");
-        setIsPlaying(true);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log("Resuming audio playback");
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error resuming playback:", error);
+            toast.error("Erreur lors de la reprise de la lecture");
+            setIsPlaying(false);
+          });
+        }
       } catch (error) {
         console.error("Error resuming audio:", error);
         toast.error("Erreur lors de la reprise de la lecture");
@@ -348,9 +364,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleEnded = () => {
       if (repeatMode === 'one') {
         audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {
-          toast.error("Erreur lors de la reprise de la lecture");
-        });
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            toast.error("Erreur lors de la reprise de la lecture");
+          });
+        }
       } else {
         nextSong();
       }
