@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { getAudioFile } from '@/utils/storage';
+import { getAudioFile, storeAudioFile } from '@/utils/storage';
 
 interface Song {
   id: string;
@@ -161,16 +161,40 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  const toggleFavorite = (song: Song) => {
-    setFavorites(prev => {
-      const isFavorite = prev.some(s => s.id === song.id);
-      const newFavorites = isFavorite
-        ? prev.filter(s => s.id !== song.id)
-        : [...prev, song];
-      
-      localStorage.setItem('favorites', JSON.stringify(newFavorites));
-      return newFavorites;
-    });
+  const toggleFavorite = async (song: Song) => {
+    try {
+      const audioFile = await getAudioFile(song.url);
+      if (!audioFile) {
+        toast.error("Le fichier audio n'est pas disponible");
+        return;
+      }
+
+      setFavorites(prev => {
+        const isFavorite = prev.some(s => s.id === song.id);
+        let newFavorites;
+
+        if (isFavorite) {
+          newFavorites = prev.filter(s => s.id !== song.id);
+          toast.success("Retiré des favoris");
+        } else {
+          const favoriteId = `favorite_${song.id}`;
+          storeAudioFile(favoriteId, audioFile);
+          
+          const favoriteSong = {
+            ...song,
+            url: favoriteId
+          };
+          newFavorites = [...prev, favoriteSong];
+          toast.success("Ajouté aux favoris");
+        }
+        
+        localStorage.setItem('favorites', JSON.stringify(newFavorites));
+        return newFavorites;
+      });
+    } catch (error) {
+      console.error("Erreur lors de la gestion des favoris:", error);
+      toast.error("Erreur lors de la gestion des favoris");
+    }
   };
 
   useEffect(() => {
