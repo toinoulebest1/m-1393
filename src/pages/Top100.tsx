@@ -18,9 +18,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+interface FavoriteStat {
+  songId: string;
+  count: number;
+  lastUpdated: string;
+  song: any;
+}
+
 const Top100 = () => {
-  const { favoriteStats, play, currentSong, isPlaying, addToQueue } = usePlayer();
+  const { play, currentSong, isPlaying, addToQueue } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -84,27 +92,76 @@ const Top100 = () => {
   }, [navigate]);
 
   useEffect(() => {
-    console.log("Setting up auto-refresh interval for Top 100");
-    const interval = setInterval(() => {
-      console.log("Auto-refreshing Top 100 stats");
-      const savedStats = localStorage.getItem('favoriteStats');
-      if (savedStats) {
-        try {
-          const parsedStats = JSON.parse(savedStats);
-          if (JSON.stringify(favoriteStats) !== JSON.stringify(parsedStats)) {
-            console.log("New stats detected, updating view");
-          }
-        } catch (error) {
-          console.error("Error parsing favoriteStats:", error);
+    const fetchFavoriteStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('favorite_stats')
+          .select(`
+            id,
+            song_id,
+            count,
+            last_updated,
+            songs (
+              id,
+              title,
+              artist,
+              file_path
+            )
+          `)
+          .order('count', { ascending: false })
+          .limit(100);
+
+        if (error) {
+          console.error("Error fetching favorite stats:", error);
+          toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de charger le top 100",
+          });
+          return;
         }
+
+        const formattedStats = data.map(stat => ({
+          songId: stat.song_id,
+          count: stat.count,
+          lastUpdated: stat.last_updated,
+          song: {
+            id: stat.songs.id,
+            title: stat.songs.title,
+            artist: stat.songs.artist,
+            url: stat.songs.file_path,
+          }
+        }));
+
+        setFavoriteStats(formattedStats);
+      } catch (error) {
+        console.error("Error in fetchFavoriteStats:", error);
       }
-    }, 30000);
+    };
+
+    fetchFavoriteStats();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('favorite_stats_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'favorite_stats'
+        },
+        () => {
+          console.log("Favorite stats changed, refreshing...");
+          fetchFavoriteStats();
+        }
+      )
+      .subscribe();
 
     return () => {
-      console.log("Cleaning up Top 100 refresh interval");
-      clearInterval(interval);
+      supabase.removeChannel(channel);
     };
-  }, [favoriteStats]);
+  }, [toast]);
 
   const handlePlay = async (song: any) => {
     console.log("Tentative de lecture de la chanson:", song);
@@ -163,8 +220,6 @@ const Top100 = () => {
         return;
       }
 
-      console.log("User role data:", userRole);
-
       if (userRole?.role !== 'admin') {
         console.error("User is not admin");
         toast({
@@ -175,49 +230,36 @@ const Top100 = () => {
         return;
       }
 
-      // Récupérer la chanson par son file_path
-      const { data: song, error: songError } = await supabase
-        .from('songs')
-        .select('id')
-        .eq('file_path', songId)
-        .maybeSingle();
+      // Supprimer les stats
+      const { error: deleteStatsError } = await supabase
+        .from('favorite_stats')
+        .delete()
+        .eq('song_id', songId);
 
-      // Si on trouve la chanson dans la base de données, on la supprime
-      if (song) {
-        const { error: deleteError } = await supabase
-          .from('songs')
-          .delete()
-          .eq('id', song.id);
-
-        if (deleteError) {
-          console.error("Error deleting song from database:", deleteError);
-          toast({
-            variant: "destructive",
-            title: "Erreur",
-            description: "Impossible de supprimer la musique de la base de données",
-          });
-          return;
-        }
-      } else {
-        console.log("Song not found in database, only removing from localStorage");
+      if (deleteStatsError) {
+        console.error("Error deleting stats:", deleteStatsError);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de supprimer les statistiques",
+        });
+        return;
       }
 
-      // Dans tous les cas, on met à jour le localStorage
-      const savedStats = localStorage.getItem('favoriteStats');
-      if (savedStats) {
-        const parsedStats = JSON.parse(savedStats);
-        const updatedStats = parsedStats.filter((stat: any) => stat.songId !== songId);
-        localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
-        
-        // Mettre à jour les favoris également
-        const savedFavorites = localStorage.getItem('favorites');
-        if (savedFavorites) {
-          const parsedFavorites = JSON.parse(savedFavorites);
-          const updatedFavorites = parsedFavorites.filter((fav: any) => fav.id !== songId);
-          localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-        }
-        
-        window.location.reload();
+      // Supprimer la chanson
+      const { error: deleteSongError } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id', songId);
+
+      if (deleteSongError) {
+        console.error("Error deleting song:", deleteSongError);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de supprimer la chanson",
+        });
+        return;
       }
 
       toast({

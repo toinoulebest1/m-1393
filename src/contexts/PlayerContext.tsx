@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Song {
   id: string;
@@ -180,41 +181,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  const removeFavorite = async (songId: string) => {
-    try {
-      console.log("Attempting to remove favorite with ID:", songId);
-      
-      setFavorites(prev => {
-        const newFavorites = prev.filter(s => s.id !== songId);
-        console.log("Updated favorites list:", newFavorites);
-        localStorage.setItem('favorites', JSON.stringify(newFavorites));
-        return newFavorites;
-      });
-
-      // Vérifier si la chanson n'est plus dans les favoris de personne
-      const allFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-      if (!allFavorites.some((fav: Song) => fav.id === songId)) {
-        console.log("Song removed from all favorites, cleaning up stats:", songId);
-        
-        // Nettoyer les stats
-        setFavoriteStats(prev => {
-          const newStats = prev.filter(stat => stat.songId !== songId);
-          localStorage.setItem('favoriteStats', JSON.stringify(newStats));
-          return newStats;
-        });
-      }
-
-      if (currentSong?.id === songId) {
-        setQueue(prev => prev.filter(s => s.id !== songId));
-      }
-
-      toast.success("Musique retirée des favoris");
-    } catch (error) {
-      console.error("Erreur lors de la suppression du favori:", error);
-      toast.error("Erreur lors de la suppression du favori");
-    }
-  };
-
   const toggleFavorite = async (song: Song) => {
     try {
       const audioFile = await getAudioFile(song.url);
@@ -240,26 +206,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           };
           newFavorites = [...prev, favoriteSong];
           
-          // Mise à jour des statistiques
-          setFavoriteStats(prevStats => {
-            const existingStat = prevStats.find(stat => stat.songId === song.id);
-            const newStats = prevStats.filter(stat => stat.songId !== song.id);
-            
-            const updatedStat = {
-              songId: song.id,
-              count: (existingStat?.count || 0) + 1,
-              lastUpdated: Date.now(),
-              song: favoriteSong
-            };
-            
-            const updatedStats = [...newStats, updatedStat]
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 100);
-            
-            localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
-            return updatedStats;
-          });
-          
+          // Mise à jour des statistiques dans Supabase
+          const updateStats = async () => {
+            const { data: existingStat, error: fetchError } = await supabase
+              .from('favorite_stats')
+              .select()
+              .eq('song_id', song.id)
+              .maybeSingle();
+
+            if (fetchError) {
+              console.error("Error fetching stats:", fetchError);
+              return;
+            }
+
+            if (existingStat) {
+              const { error: updateError } = await supabase
+                .from('favorite_stats')
+                .update({ 
+                  count: existingStat.count + 1,
+                  last_updated: new Date().toISOString()
+                })
+                .eq('song_id', song.id);
+
+              if (updateError) {
+                console.error("Error updating stats:", updateError);
+              }
+            } else {
+              const { error: insertError } = await supabase
+                .from('favorite_stats')
+                .insert({
+                  song_id: song.id,
+                  count: 1,
+                  last_updated: new Date().toISOString()
+                });
+
+              if (insertError) {
+                console.error("Error inserting stats:", insertError);
+              }
+            }
+          };
+
+          updateStats();
           toast.success("Ajouté aux favoris");
         }
         
@@ -359,4 +346,3 @@ export const usePlayer = () => {
   }
   return context;
 };
-
