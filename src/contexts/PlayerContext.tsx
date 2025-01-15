@@ -197,65 +197,81 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newFavorites = prev.filter(s => s.id !== song.id);
           toast.success("Retiré des favoris");
         } else {
-          const favoriteId = `favorite_${song.id}`;
+          const favoriteId = crypto.randomUUID(); // Générer un UUID valide
           storeAudioFile(favoriteId, audioFile);
           
+          // Créer d'abord l'entrée dans la table songs si elle n'existe pas
+          const { data: songData, error: songError } = await supabase
+            .from('songs')
+            .upsert({
+              id: favoriteId,
+              title: song.title,
+              artist: song.artist,
+              file_path: favoriteId
+            })
+            .select()
+            .single();
+
+          if (songError) {
+            console.error("Error creating song entry:", songError);
+            toast.error("Erreur lors de la création de l'entrée de la chanson");
+            return prev;
+          }
+
+          console.log("Song entry created:", songData);
+
+          // Maintenant mettre à jour les stats
+          const { data: existingStat, error: fetchError } = await supabase
+            .from('favorite_stats')
+            .select('*')
+            .eq('song_id', favoriteId)
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error("Error fetching stats:", fetchError);
+            return prev;
+          }
+
+          console.log("Existing stat:", existingStat);
+
+          if (existingStat) {
+            const { error: updateError } = await supabase
+              .from('favorite_stats')
+              .update({ 
+                count: existingStat.count + 1,
+                last_updated: new Date().toISOString()
+              })
+              .eq('song_id', favoriteId);
+
+            if (updateError) {
+              console.error("Error updating stats:", updateError);
+              toast.error("Erreur lors de la mise à jour des statistiques");
+            } else {
+              console.log("Stats updated successfully");
+            }
+          } else {
+            const { error: insertError } = await supabase
+              .from('favorite_stats')
+              .insert({
+                song_id: favoriteId,
+                count: 1,
+                last_updated: new Date().toISOString()
+              });
+
+            if (insertError) {
+              console.error("Error inserting stats:", insertError);
+              toast.error("Erreur lors de l'ajout des statistiques");
+            } else {
+              console.log("Stats inserted successfully");
+            }
+          }
+
           const favoriteSong = {
             ...song,
+            id: favoriteId,
             url: favoriteId
           };
           newFavorites = [...prev, favoriteSong];
-          
-          const updateStats = async () => {
-            console.log("Updating favorite stats for song:", song.id);
-            
-            const { data: existingStat, error: fetchError } = await supabase
-              .from('favorite_stats')
-              .select('*')
-              .eq('song_id', song.id)
-              .maybeSingle();
-
-            if (fetchError) {
-              console.error("Error fetching stats:", fetchError);
-              return;
-            }
-
-            console.log("Existing stat:", existingStat);
-
-            if (existingStat) {
-              const { error: updateError } = await supabase
-                .from('favorite_stats')
-                .update({ 
-                  count: existingStat.count + 1,
-                  last_updated: new Date().toISOString()
-                })
-                .eq('song_id', song.id);
-
-              if (updateError) {
-                console.error("Error updating stats:", updateError);
-                toast.error("Erreur lors de la mise à jour des statistiques");
-              } else {
-                console.log("Stats updated successfully");
-              }
-            } else {
-              const { error: insertError } = await supabase
-                .from('favorite_stats')
-                .insert({
-                  song_id: song.id,
-                  count: 1,
-                  last_updated: new Date().toISOString()
-                });
-
-              if (insertError) {
-                console.error("Error inserting stats:", insertError);
-                toast.error("Erreur lors de l'ajout des statistiques");
-              } else {
-                console.log("Stats inserted successfully");
-              }
-            }
-          };
-
-          updateStats();
           toast.success("Ajouté aux favoris");
         }
         
