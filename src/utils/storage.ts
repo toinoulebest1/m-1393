@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
@@ -6,6 +6,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   let fileToUpload: File;
   if (typeof file === 'string') {
     try {
+      console.log("Fetching file from URL:", file);
       const response = await fetch(file);
       if (!response.ok) {
         throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -22,15 +23,8 @@ export const storeAudioFile = async (id: string, file: File | string) => {
     fileToUpload = file;
   }
 
-  // First try to get the file to see if it exists
-  const { data: existingFile } = await supabase.storage
-    .from('audio')
-    .list('', {
-      search: id
-    });
-
-  // If file doesn't exist, upload it
-  if (!existingFile || existingFile.length === 0) {
+  try {
+    console.log("Uploading file to Supabase storage:", id);
     const { data, error } = await supabase.storage
       .from('audio')
       .upload(id, fileToUpload, {
@@ -43,39 +37,34 @@ export const storeAudioFile = async (id: string, file: File | string) => {
       throw error;
     }
 
-    console.log("Fichier stocké avec succès:", data);
-    return data;
+    console.log("File uploaded successfully:", data);
+    return data.path;
+  } catch (error) {
+    console.error("Erreur lors du stockage du fichier:", error);
+    throw error;
   }
-
-  console.log("Le fichier existe déjà dans le stockage");
-  return existingFile[0];
 };
 
-export const getAudioFile = async (id: string) => {
-  console.log("Récupération du fichier audio:", id);
-  
-  // First check if the file exists
-  const { data: existingFile } = await supabase.storage
-    .from('audio')
-    .list('', {
-      search: id
-    });
+export const getAudioFile = async (path: string) => {
+  console.log("Récupération du fichier audio:", path);
+  try {
+    const { data, error } = await supabase.storage
+      .from('audio')
+      .createSignedUrl(path, 3600);
 
-  if (!existingFile || existingFile.length === 0) {
-    console.error("Fichier non trouvé dans le stockage:", id);
-    throw new Error('Fichier audio non trouvé');
-  }
+    if (error) {
+      console.error("Erreur lors de la récupération du fichier:", error);
+      throw error;
+    }
 
-  // Get a signed URL that's valid for 1 hour
-  const { data, error } = await supabase.storage
-    .from('audio')
-    .createSignedUrl(id, 3600);
+    if (!data?.signedUrl) {
+      throw new Error("URL signée non générée");
+    }
 
-  if (error) {
+    console.log("Signed URL generated successfully:", data.signedUrl);
+    return data.signedUrl;
+  } catch (error) {
     console.error("Erreur lors de la récupération du fichier:", error);
     throw error;
   }
-
-  console.log("URL signée générée:", data.signedUrl);
-  return data.signedUrl;
 };
