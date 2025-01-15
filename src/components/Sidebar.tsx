@@ -1,7 +1,6 @@
 import { Home, ListMusic, Heart, Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { cn } from "@/lib/utils";
 import { MusicUploader } from "./MusicUploader";
 import {
   Select,
