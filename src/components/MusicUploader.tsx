@@ -19,14 +19,21 @@ export const MusicUploader = () => {
     if (files && files.length > 0) {
       const file = files[0];
       console.log("Fichier sélectionné:", file);
+      console.log("Type du fichier:", file.type);
+
+      if (!file.type.startsWith('audio/')) {
+        toast.error("Le fichier sélectionné n'est pas un fichier audio");
+        return;
+      }
 
       try {
+        // Créer une URL pour le fichier audio avant l'extraction des métadonnées
+        const audioUrl = URL.createObjectURL(file);
+        console.log("URL audio créée:", audioUrl);
+
         // Extraire les métadonnées
         const metadata = await mm.parseBlob(file);
-        console.log("Métadonnées:", metadata);
-
-        // Créer une URL pour le fichier audio
-        const audioUrl = URL.createObjectURL(file);
+        console.log("Métadonnées extraites avec succès:", metadata);
 
         // Obtenir l'image de la pochette si elle existe
         let imageUrl = "https://picsum.photos/240/240"; // Image par défaut
@@ -34,6 +41,7 @@ export const MusicUploader = () => {
           const picture = metadata.common.picture[0];
           const blob = new Blob([picture.data], { type: picture.format });
           imageUrl = URL.createObjectURL(blob);
+          console.log("Image de pochette trouvée et convertie en URL");
         }
 
         // Créer un objet song avec les informations du fichier
@@ -46,13 +54,34 @@ export const MusicUploader = () => {
           imageUrl: imageUrl
         };
 
+        console.log("Objet chanson créé:", song);
+
         // Jouer la chanson
         play(song);
         
         toast.success(t('common.fileSelected', { count: 1 }));
       } catch (error) {
-        console.error("Erreur lors de l'extraction des métadonnées:", error);
-        toast.error("Erreur lors de la lecture du fichier");
+        console.error("Erreur détaillée lors de l'extraction des métadonnées:", error);
+        
+        // Essayer de créer un objet song minimal même si les métadonnées échouent
+        try {
+          const audioUrl = URL.createObjectURL(file);
+          const song = {
+            id: Date.now().toString(),
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            artist: "Unknown Artist",
+            duration: "0:00",
+            url: audioUrl,
+            imageUrl: "https://picsum.photos/240/240"
+          };
+
+          console.log("Création d'un objet chanson minimal après erreur:", song);
+          play(song);
+          toast.success(t('common.fileSelected', { count: 1 }));
+        } catch (fallbackError) {
+          console.error("Erreur lors de la création de l'objet chanson minimal:", fallbackError);
+          toast.error("Erreur lors de la lecture du fichier");
+        }
       }
     }
   };
