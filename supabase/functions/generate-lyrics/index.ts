@@ -21,7 +21,7 @@ serve(async (req) => {
     }
 
     const { songTitle, artist } = await req.json();
-    console.log('Generating lyrics for:', songTitle, 'by', artist);
+    console.log('Attempting to generate lyrics for:', songTitle, 'by', artist);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -47,11 +47,17 @@ serve(async (req) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('OpenAI API error response:', errorData);
+      
+      // Check specifically for quota exceeded error
+      if (errorData.error?.message?.includes('exceeded your current quota')) {
+        throw new Error('OpenAI API quota exceeded. Please check your billing status and ensure you have available credits.');
+      }
+      
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
-    console.log('Successfully generated lyrics');
+    console.log('Successfully generated lyrics for:', songTitle);
 
     return new Response(
       JSON.stringify({ lyrics: data.choices[0].message.content }),
@@ -61,8 +67,14 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in generate-lyrics function:', error);
+    
+    // Return a more user-friendly error message
+    const errorMessage = error.message.includes('quota exceeded')
+      ? 'Le service de génération de paroles est temporairement indisponible. Veuillez réessayer plus tard.'
+      : error.message;
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
