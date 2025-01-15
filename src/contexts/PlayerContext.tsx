@@ -205,15 +205,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      const isFavorite = favorites.some(s => s.id === song.id);
+      // Vérifier si la chanson est déjà dans les favoris avec le même titre et artiste
+      const isFavorite = favorites.some(f => 
+        f.title.toLowerCase() === song.title.toLowerCase() && 
+        f.artist?.toLowerCase() === song.artist?.toLowerCase()
+      );
       
       if (isFavorite) {
-        setFavorites(prev => {
-          const newFavorites = prev.filter(s => s.id !== song.id);
-          localStorage.setItem('favorites', JSON.stringify(newFavorites));
-          return newFavorites;
-        });
-        toast.success("Retiré des favoris");
+        // Si la chanson est déjà dans les favoris, on la retire
+        const existingFavorite = favorites.find(f => 
+          f.title.toLowerCase() === song.title.toLowerCase() && 
+          f.artist?.toLowerCase() === song.artist?.toLowerCase()
+        );
+        
+        if (existingFavorite) {
+          await removeFavorite(existingFavorite.id);
+          toast.success("Retiré des favoris");
+        }
         return;
       }
 
