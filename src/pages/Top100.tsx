@@ -142,7 +142,7 @@ const Top100 = () => {
           if (!acc[title]) {
             acc[title] = {
               songId: stat.song_id,
-              count: stat.count || 0, // Ensure count is never null
+              count: stat.count || 0,
               lastUpdated: stat.last_updated,
               song: {
                 id: stat.songs.id,
@@ -153,7 +153,10 @@ const Top100 = () => {
               }
             };
           } else {
-            acc[title].count = (acc[title].count || 0) + (stat.count || 0);
+            // Mettre à jour le compteur seulement si la stat existe
+            if (stat.count) {
+              acc[title].count = (acc[title].count || 0) + stat.count;
+            }
             if (new Date(stat.last_updated) > new Date(acc[title].lastUpdated)) {
               acc[title].lastUpdated = stat.last_updated;
             }
@@ -237,48 +240,6 @@ const Top100 = () => {
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        console.error("Session error during delete:", sessionError);
-        toast({
-          variant: "destructive",
-          title: "Session expirée",
-          description: "Veuillez vous reconnecter",
-        });
-        navigate('/auth');
-        return;
-      }
-
-      console.log("Current session user:", session.user.id);
-
-      // Vérifier les permissions d'admin
-      const { data: userRole, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (roleError) {
-        console.error("Role verification error:", roleError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de vérifier vos permissions",
-        });
-        return;
-      }
-
-      if (userRole?.role !== 'admin') {
-        console.error("User is not admin");
-        toast({
-          variant: "destructive",
-          title: "Accès refusé",
-          description: "Vous devez être administrateur pour effectuer cette action",
-        });
-        return;
-      }
-
       // Supprimer d'abord les stats
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
@@ -295,6 +256,9 @@ const Top100 = () => {
         return;
       }
 
+      // Mettre à jour l'état local immédiatement
+      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
+
       // Puis supprimer la chanson
       const { error: deleteSongError } = await supabase
         .from('songs')
@@ -310,9 +274,6 @@ const Top100 = () => {
         });
         return;
       }
-
-      // Mettre à jour l'état local
-      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
 
       toast({
         title: "Succès",
