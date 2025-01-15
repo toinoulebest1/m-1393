@@ -1,4 +1,4 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, RepeatOnce, Heart } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -118,7 +118,7 @@ export const Player = () => {
               onClick={toggleRepeat}
             >
               {repeatMode === 'one' ? (
-                <RepeatOnce className="w-4 h-4" />
+                <Repeat1 className="w-4 h-4" />
               ) : (
                 <Repeat className="w-4 h-4" />
               )}
