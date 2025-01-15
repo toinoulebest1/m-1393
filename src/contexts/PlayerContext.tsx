@@ -182,6 +182,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleFavorite = async (song: Song) => {
     try {
+      console.log("Toggling favorite for song:", song);
       const audioFile = await getAudioFile(song.url);
       if (!audioFile) {
         toast.error("Le fichier audio n'est pas disponible");
