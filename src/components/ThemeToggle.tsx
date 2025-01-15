@@ -71,7 +71,8 @@ export function ThemeToggle() {
 
         if (profile?.theme) {
           console.log("Theme loaded from database:", profile.theme);
-          const savedTheme = themes.find(theme => theme.name === profile.theme.name);
+          const themeData = profile.theme as Theme;
+          const savedTheme = themes.find(theme => theme.name === themeData.name);
           if (savedTheme) {
             setCurrentTheme(savedTheme);
           }

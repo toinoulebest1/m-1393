@@ -36,10 +36,11 @@ export const Equalizer = ({ audioContext, sourceNode }: EqualizerProps) => {
 
     // Connexion des filtres en série
     sourceNode.disconnect();
-    newFilters.reduce((prev, curr) => {
-      prev.connect(curr);
-      return curr;
-    }, sourceNode);
+    let prevNode: AudioNode = sourceNode;
+    newFilters.forEach((filter) => {
+      prevNode.connect(filter);
+      prevNode = filter;
+    });
     newFilters[newFilters.length - 1].connect(audioContext.destination);
 
     setFilters(newFilters);
