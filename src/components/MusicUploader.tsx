@@ -6,7 +6,7 @@ import * as mm from 'music-metadata-browser';
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
-  const { play } = usePlayer();
+  const { addToQueue } = usePlayer();
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -14,93 +14,91 @@ export const MusicUploader = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      console.log("Fichier sélectionné:", file);
-      console.log("Type du fichier:", file.type);
+  const processAudioFile = async (file: File) => {
+    console.log("Traitement du fichier:", file.name);
+    
+    if (!file.type.startsWith('audio/')) {
+      console.warn("Fichier non audio ignoré:", file.name);
+      return null;
+    }
 
-      if (!file.type.startsWith('audio/')) {
-        toast.error("Le fichier sélectionné n'est pas un fichier audio");
-        return;
-      }
+    try {
+      const audioUrl = URL.createObjectURL(file);
+      const audio = new Audio(audioUrl);
+      
+      // Obtenir la durée
+      const getDuration = new Promise<number>((resolve, reject) => {
+        audio.addEventListener('loadedmetadata', () => {
+          console.log("Durée audio détectée:", audio.duration);
+          resolve(audio.duration);
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error("Erreur lors du chargement de l'audio:", e);
+          reject(new Error("Erreur lors du chargement de l'audio"));
+        });
+      });
+
+      const duration = await getDuration;
+      const formattedDuration = formatDuration(duration);
 
       try {
-        const audioUrl = URL.createObjectURL(file);
-        console.log("URL audio créée:", audioUrl);
+        const metadata = await mm.parseBlob(file);
+        console.log("Métadonnées extraites:", metadata);
 
-        // Créer un élément audio pour obtenir la durée
-        const audio = new Audio(audioUrl);
-        
-        // Utiliser une Promise pour s'assurer d'avoir la durée avant de continuer
-        const getDuration = new Promise<number>((resolve, reject) => {
-          audio.addEventListener('loadedmetadata', () => {
-            console.log("Durée audio détectée:", audio.duration);
-            resolve(audio.duration);
-          });
-          
-          audio.addEventListener('error', (e) => {
-            console.error("Erreur lors du chargement de l'audio:", e);
-            reject(new Error("Erreur lors du chargement de l'audio"));
-          });
-        });
-
-        // Attendre que la durée soit disponible
-        const duration = await getDuration;
-        console.log("Durée obtenue:", duration);
-        const formattedDuration = formatDuration(duration);
-        console.log("Durée formatée:", formattedDuration);
-
-        try {
-          // Essayer d'extraire les métadonnées
-          const metadata = await mm.parseBlob(file);
-          console.log("Métadonnées extraites avec succès:", metadata);
-
-          // Obtenir l'image de la pochette si elle existe
-          let imageUrl = "https://picsum.photos/240/240"; // Image par défaut
-          if (metadata.common.picture && metadata.common.picture.length > 0) {
-            const picture = metadata.common.picture[0];
-            const blob = new Blob([picture.data], { type: picture.format });
-            imageUrl = URL.createObjectURL(blob);
-            console.log("Image de pochette trouvée et convertie en URL");
-          }
-
-          const song = {
-            id: Date.now().toString(),
-            title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-            artist: metadata.common.artist || "Unknown Artist",
-            duration: formattedDuration,
-            url: audioUrl,
-            imageUrl: imageUrl
-          };
-
-          console.log("Objet chanson créé avec métadonnées:", song);
-          play(song);
-          toast.success(t('common.fileSelected', { count: 1 }));
-
-        } catch (metadataError) {
-          console.error("Erreur lors de l'extraction des métadonnées:", metadataError);
-          
-          // Créer un objet song minimal avec la durée correcte
-          const song = {
-            id: Date.now().toString(),
-            title: file.name.replace(/\.[^/.]+$/, ""),
-            artist: "Unknown Artist",
-            duration: formattedDuration,
-            url: audioUrl,
-            imageUrl: "https://picsum.photos/240/240"
-          };
-
-          console.log("Création d'un objet chanson minimal avec durée:", song);
-          play(song);
-          toast.success(t('common.fileSelected', { count: 1 }));
+        let imageUrl = "https://picsum.photos/240/240";
+        if (metadata.common.picture && metadata.common.picture.length > 0) {
+          const picture = metadata.common.picture[0];
+          const blob = new Blob([picture.data], { type: picture.format });
+          imageUrl = URL.createObjectURL(blob);
         }
 
-      } catch (error) {
-        console.error("Erreur lors de la création de l'objet chanson:", error);
-        toast.error("Erreur lors de la lecture du fichier");
+        return {
+          id: Date.now().toString() + Math.random(),
+          title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
+          artist: metadata.common.artist || "Unknown Artist",
+          duration: formattedDuration,
+          url: audioUrl,
+          imageUrl: imageUrl
+        };
+
+      } catch (metadataError) {
+        console.warn("Erreur métadonnées, utilisation des valeurs par défaut:", metadataError);
+        
+        return {
+          id: Date.now().toString() + Math.random(),
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          artist: "Unknown Artist",
+          duration: formattedDuration,
+          url: audioUrl,
+          imageUrl: "https://picsum.photos/240/240"
+        };
       }
+
+    } catch (error) {
+      console.error("Erreur lors du traitement du fichier:", error);
+      toast.error(`Erreur lors du traitement de ${file.name}`);
+      return null;
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    console.log("Nombre de fichiers sélectionnés:", files.length);
+    toast.info(`Traitement de ${files.length} fichier(s)...`);
+
+    const processedSongs = await Promise.all(
+      Array.from(files).map(processAudioFile)
+    );
+
+    const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
+    console.log("Chansons valides traitées:", validSongs.length);
+
+    if (validSongs.length > 0) {
+      validSongs.forEach(song => addToQueue(song));
+      toast.success(t('common.fileSelected', { count: validSongs.length }));
     }
   };
 
@@ -112,6 +110,9 @@ export const MusicUploader = () => {
         <input
           type="file"
           accept="audio/*"
+          multiple
+          webkitdirectory=""
+          directory=""
           className="hidden"
           onChange={handleFileUpload}
         />

@@ -21,6 +21,7 @@ interface PlayerContextType {
   setProgress: (progress: number) => void;
   nextSong: () => void;
   previousSong: () => void;
+  addToQueue: (song: Song) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -30,31 +31,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(70);
+  const [queue, setQueue] = useState<Song[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [queue] = useState<Song[]>([
-    { 
-      id: '1', 
-      title: 'Song One', 
-      artist: 'Artist One', 
-      duration: '3:45',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      imageUrl: 'https://picsum.photos/240/240'
-    },
-    { 
-      id: '2', 
-      title: 'Song Two', 
-      artist: 'Artist Two', 
-      duration: '4:20',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
-    },
-    { 
-      id: '3', 
-      title: 'Song Three', 
-      artist: 'Artist Three', 
-      duration: '3:15',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
-    },
-  ]);
 
   const play = (song?: Song) => {
     if (song && song !== currentSong) {
@@ -105,6 +83,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const addToQueue = (song: Song) => {
+    setQueue(prevQueue => {
+      // Si la queue est vide et qu'aucune chanson n'est en cours, jouer directement
+      if (prevQueue.length === 0 && !currentSong) {
+        play(song);
+      }
+      return [...prevQueue, song];
+    });
+  };
+
   React.useEffect(() => {
     audioRef.current = new Audio();
     
@@ -141,6 +129,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setProgress: updateProgress,
         nextSong,
         previousSong,
+        addToQueue,
       }}
     >
       {children}
