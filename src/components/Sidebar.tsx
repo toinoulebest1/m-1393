@@ -1,4 +1,4 @@
-import { Home, Heart, TrendingUp, LogOut, Upload, Languages } from "lucide-react";
+import { Home, Heart, TrendingUp, LogOut, Languages } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { MusicUploader } from "./MusicUploader";
@@ -67,7 +67,7 @@ export const Sidebar = () => {
         </NavLink>
       </nav>
 
-      <div className="mt-auto p-4 space-y-4 mb-8">
+      <div className="mt-auto p-4 space-y-4">
         <MusicUploader />
         
         <Button
@@ -78,7 +78,9 @@ export const Sidebar = () => {
           <Languages className="w-5 h-5 mr-2" />
           <span>{i18n.language === 'en' ? 'Français' : 'English'}</span>
         </Button>
+      </div>
 
+      <div className="p-4 mb-24">
         <Button
           variant="ghost"
           className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
