@@ -84,6 +84,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioUrl = await getAudioFile(song.url);
         } catch (error) {
           console.log("File not found in storage, attempting to store it first");
+          if (typeof song.url !== 'string') {
+            throw new Error('Invalid audio file URL');
+          }
           await storeAudioFile(song.url, song.url);
           audioUrl = await getAudioFile(song.url);
         }
@@ -94,6 +97,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         audioRef.current.src = audioUrl;
         console.log("Set audio source to:", audioUrl);
+        
+        // Reset the audio element
+        audioRef.current.currentTime = 0;
+        audioRef.current.load();
+        
         await audioRef.current.play();
         console.log("Audio playback started");
         setIsPlaying(true);
