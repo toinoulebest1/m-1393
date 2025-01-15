@@ -155,6 +155,7 @@ const Top100 = () => {
 
     fetchFavoriteStats();
 
+    // Écouter les changements en temps réel sur la table favorite_stats
     const channel = supabase
       .channel('favorite_stats_changes')
       .on(
@@ -166,7 +167,7 @@ const Top100 = () => {
         },
         (payload) => {
           console.log("Favorite stats changed:", payload);
-          fetchFavoriteStats();
+          fetchFavoriteStats(); // Recharger les stats à chaque changement
         }
       )
       .subscribe();
