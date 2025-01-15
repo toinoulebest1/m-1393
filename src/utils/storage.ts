@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
-  // If file is a string (URL), fetch it first
   let fileToUpload: File;
   if (typeof file === 'string') {
     try {
@@ -11,7 +10,9 @@ export const storeAudioFile = async (id: string, file: File | string) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch file: ${response.statusText}`);
       }
-      const blob = await response.blob();
+      // Clone the response before reading it
+      const responseClone = response.clone();
+      const blob = await responseClone.blob();
       fileToUpload = new File([blob], id, { type: blob.type || 'audio/mpeg' });
     } catch (error) {
       console.error("Erreur lors de la conversion de l'URL en fichier:", error);
