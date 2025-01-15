@@ -106,7 +106,8 @@ const Top100 = () => {
               title,
               artist,
               file_path,
-              created_at
+              created_at,
+              duration
             )
           `)
           .order('count', { ascending: false })
@@ -133,6 +134,7 @@ const Top100 = () => {
             title: stat.songs.title,
             artist: stat.songs.artist,
             url: stat.songs.file_path,
+            duration: stat.songs.duration || "0:00"
           }
         }));
 
@@ -313,6 +315,31 @@ const Top100 = () => {
     );
   }
 
+  const formatDuration = (duration: string) => {
+    if (!duration) return "0:00";
+    
+    try {
+      // Si la durée est déjà au format mm:ss
+      if (duration.includes(':')) {
+        const [minutes, seconds] = duration.split(':').map(Number);
+        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      
+      // Si la durée est en secondes
+      const durationInSeconds = parseFloat(duration);
+      if (isNaN(durationInSeconds)) return "0:00";
+      
+      const minutes = Math.floor(durationInSeconds / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting duration:", error);
+      return "0:00";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
       <Sidebar />
@@ -353,6 +380,7 @@ const Top100 = () => {
                 <TableHead className="text-spotify-neutral">#</TableHead>
                 <TableHead className="text-spotify-neutral">Titre</TableHead>
                 <TableHead className="text-spotify-neutral">Artiste</TableHead>
+                <TableHead className="text-spotify-neutral">Durée</TableHead>
                 <TableHead className="text-spotify-neutral">Favoris</TableHead>
                 <TableHead className="text-spotify-neutral">Actions</TableHead>
               </TableRow>
@@ -388,6 +416,9 @@ const Top100 = () => {
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
                     {stat.song.artist}
+                  </TableCell>
+                  <TableCell className="text-spotify-neutral">
+                    {formatDuration(stat.song.duration)}
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
                     <div className="flex items-center space-x-2">
