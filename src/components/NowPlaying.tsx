@@ -1,4 +1,5 @@
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const queue = [
   { title: "Song One", artist: "Artist One", duration: "3:45" },
@@ -7,6 +8,8 @@ const queue = [
 ];
 
 export const NowPlaying = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="flex-1 p-8">
       <div className="flex items-end space-x-6 mb-8">
@@ -16,14 +19,14 @@ export const NowPlaying = () => {
           className="w-60 h-60 rounded-lg shadow-lg"
         />
         <div>
-          <p className="text-spotify-neutral mb-2">Now Playing</p>
+          <p className="text-spotify-neutral mb-2">{t('common.nowPlaying')}</p>
           <h1 className="text-4xl font-bold text-white mb-2">Album Name</h1>
           <p className="text-spotify-neutral">Artist Name • 2024</p>
         </div>
       </div>
 
       <div className="mt-8">
-        <h2 className="text-xl font-bold text-white mb-4">Queue</h2>
+        <h2 className="text-xl font-bold text-white mb-4">{t('common.queue')}</h2>
         <div className="bg-white/5 rounded-lg">
           <div className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 text-spotify-neutral text-sm">
             <div>TITLE</div>

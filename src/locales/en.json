@@ -1,0 +1,11 @@
+{
+  "common": {
+    "nowPlaying": "Now Playing",
+    "queue": "Queue",
+    "upload": "Upload",
+    "playlists": "Playlists",
+    "home": "Home",
+    "search": "Search",
+    "library": "Library"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "common": {
+    "nowPlaying": "En cours de lecture",
+    "queue": "File d'attente",
+    "upload": "Importer",
+    "playlists": "Playlists",
+    "home": "Accueil",
+    "search": "Rechercher",
+    "library": "Bibliothèque"
+  }
+}
