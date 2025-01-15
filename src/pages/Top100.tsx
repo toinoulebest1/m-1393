@@ -175,10 +175,28 @@ const Top100 = () => {
         return;
       }
 
+      // Récupérer d'abord la chanson pour obtenir son vrai ID UUID
+      const { data: song, error: songError } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('file_path', songId)
+        .maybeSingle();
+
+      if (songError || !song) {
+        console.error("Error finding song:", songError);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de trouver la musique",
+        });
+        return;
+      }
+
+      // Utiliser l'ID UUID pour la suppression
       const { error: deleteError } = await supabase
         .from('songs')
         .delete()
-        .eq('id', songId);
+        .eq('id', song.id);
 
       if (deleteError) {
         console.error("Error deleting song:", deleteError);
