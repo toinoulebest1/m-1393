@@ -19,6 +19,8 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    // Forcer l'initialisation synchrone
+    initImmediate: false
   });
 
 export default i18n;
