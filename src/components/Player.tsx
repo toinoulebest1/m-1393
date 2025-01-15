@@ -18,11 +18,17 @@ export const Player = () => {
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
-    const duration = 215; // Example duration in seconds (3:35)
-    const currentTime = (progress / 100) * duration;
-    const minutes = Math.floor(currentTime / 60);
-    const seconds = Math.floor(currentTime % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Extraire les minutes et secondes de la durée de la chanson
+    const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+    const totalSeconds = minutes * 60 + seconds;
+    
+    // Calculer le temps actuel
+    const currentTime = (progress / 100) * totalSeconds;
+    const currentMinutes = Math.floor(currentTime / 60);
+    const currentSeconds = Math.floor(currentTime % 60);
+    
+    return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -30,7 +36,7 @@ export const Player = () => {
       <div className="max-w-screen-xl mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <img
-            src="https://picsum.photos/56/56"
+            src={currentSong?.imageUrl || "https://picsum.photos/56/56"}
             alt="Album art"
             className="w-14 h-14 rounded-md"
           />
