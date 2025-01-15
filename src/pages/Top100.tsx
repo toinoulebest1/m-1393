@@ -43,45 +43,22 @@ const Top100 = () => {
 
         const checkAdminStatus = async () => {
           try {
-            console.log("Checking admin status...");
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            
-            if (userError) {
-              console.error("User fetch error:", userError);
-              if (userError.message.includes("session_not_found")) {
-                await supabase.auth.signOut();
-                navigate('/auth');
-              }
-              return;
-            }
-
-            if (!user) {
-              console.log("No user found");
-              navigate('/auth');
-              return;
-            }
-            
-            console.log("Fetching user role for:", user.id);
+            console.log("Checking admin status for user:", session.user.id);
             const { data: userRole, error: roleError } = await supabase
               .from('user_roles')
               .select('role')
-              .eq('user_id', user.id)
+              .eq('user_id', session.user.id)
               .single();
 
             if (roleError) {
               console.error("Error fetching user role:", roleError);
-              if (roleError.code === 'PGRST116') {
-                navigate('/auth');
-                return;
-              }
               return;
             }
 
-            console.log("User role:", userRole);
+            console.log("User role data:", userRole);
             setIsAdmin(userRole?.role === 'admin');
           } catch (error) {
             console.error("Admin check error:", error);
-            navigate('/auth');
           }
         };
 
@@ -155,7 +132,6 @@ const Top100 = () => {
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
-      // Vérifier d'abord la session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
@@ -169,15 +145,28 @@ const Top100 = () => {
         return;
       }
 
-      // Vérifier le rôle admin
+      console.log("Current session user:", session.user.id);
+
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
         .single();
 
-      if (roleError || userRole?.role !== 'admin') {
+      if (roleError) {
         console.error("Role verification error:", roleError);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de vérifier vos permissions",
+        });
+        return;
+      }
+
+      console.log("User role data:", userRole);
+
+      if (userRole?.role !== 'admin') {
+        console.error("User is not admin");
         toast({
           variant: "destructive",
           title: "Accès refusé",
@@ -186,7 +175,6 @@ const Top100 = () => {
         return;
       }
 
-      // Procéder à la suppression
       const { error: deleteError } = await supabase
         .from('songs')
         .delete()
