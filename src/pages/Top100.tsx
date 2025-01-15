@@ -265,6 +265,24 @@ const Top100 = () => {
 
   const handleDelete = async (songId: string) => {
     try {
+      console.log("Checking if song is already hidden:", songId);
+      
+      // First check if the song is already hidden
+      const { data: existingHidden } = await supabase
+        .from('hidden_songs')
+        .select('id')
+        .eq('song_id', songId)
+        .single();
+
+      if (existingHidden) {
+        console.log("Song is already hidden:", songId);
+        toast({
+          title: "Information",
+          description: "Cette musique est déjà masquée",
+        });
+        return;
+      }
+
       console.log("Masquage de la chanson dans la base de données:", songId);
       const { error } = await supabase
         .from('hidden_songs')
