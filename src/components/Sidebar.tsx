@@ -1,5 +1,5 @@
 import { Home, Heart, TrendingUp, LogOut, Languages } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { MusicUploader } from "./MusicUploader";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,11 +8,29 @@ import { Button } from "./ui/button";
 
 export const Sidebar = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Erreur lors de la déconnexion");
+    try {
+      console.log("Starting logout process...");
+      
+      // Force global scope logout to ensure all sessions are terminated
+      const { error } = await supabase.auth.signOut({
+        scope: 'global'
+      });
+
+      if (error) {
+        console.error("Logout error:", error);
+        toast.error(t('common.logoutError'));
+        return;
+      }
+
+      console.log("Logout successful");
+      toast.success(t('common.logoutSuccess'));
+      navigate('/auth');
+    } catch (error) {
+      console.error("Unexpected logout error:", error);
+      toast.error(t('common.unexpectedError'));
     }
   };
 
