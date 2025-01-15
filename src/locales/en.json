@@ -6,15 +6,10 @@
     "nowPlaying": "Now Playing",
     "queue": "Queue",
     "search": "Search",
-    "upload": "Upload",
-    "uploadMusic": "Upload Music",
-    "dragAndDrop": "Drag and drop your files here",
-    "or": "or",
-    "browse": "Browse",
-    "uploading": "Uploading...",
-    "success": "Success",
-    "error": "Error",
     "language": "Language",
-    "fileSelected": "{{count}} file(s) selected"
+    "track": "track",
+    "tracks": "tracks",
+    "noFavorites": "No favorites yet",
+    "clickHeartToAdd": "Click the heart next to a song to add it to your favorites"
   }
 }

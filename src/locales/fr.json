@@ -6,15 +6,10 @@
     "nowPlaying": "En cours de lecture",
     "queue": "File d'attente",
     "search": "Rechercher",
-    "upload": "Importer",
-    "uploadMusic": "Importer de la musique",
-    "dragAndDrop": "Glissez et déposez vos fichiers ici",
-    "or": "ou",
-    "browse": "Parcourir",
-    "uploading": "Importation en cours...",
-    "success": "Succès",
-    "error": "Erreur",
     "language": "Langue",
-    "fileSelected": "{{count}} fichier(s) sélectionné(s)"
+    "track": "titre",
+    "tracks": "titres",
+    "noFavorites": "Pas encore de favoris",
+    "clickHeartToAdd": "Cliquez sur le cœur à côté d'un titre pour l'ajouter à vos favoris"
   }
 }
