@@ -41,14 +41,17 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const root = window.document.documentElement;
+    const baseClasses = ['bg-gradient-to-br'];
     
     // Remove all existing theme classes
-    themes.forEach(theme => {
-      root.classList.remove(...theme.classes.split(' '));
-    });
+    root.className = root.className
+      .split(' ')
+      .filter(cls => !cls.startsWith('from-') && !cls.startsWith('via-') && !cls.startsWith('to-'))
+      .join(' ');
     
-    // Add new theme classes
-    root.classList.add('bg-gradient-to-br', ...currentTheme.classes.split(' '));
+    // Add base classes and new theme classes
+    const newClasses = [...baseClasses, ...currentTheme.classes.split(' ')];
+    root.classList.add(...newClasses);
     
     console.log("Theme changed to:", currentTheme.name);
   }, [currentTheme]);
