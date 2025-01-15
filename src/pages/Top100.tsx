@@ -170,6 +170,15 @@ const Top100 = () => {
   const handlePlay = async (song: any) => {
     try {
       console.log("Tentative de lecture de la chanson:", song);
+      if (!song) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Chanson invalide"
+        });
+        return;
+      }
+
       await play(song);
       console.log("Lecture démarrée:", song.title);
       
@@ -181,8 +190,10 @@ const Top100 = () => {
       console.log("Ajout à la file d'attente:", remainingSongs);
       
       remainingSongs.forEach(nextSong => {
-        console.log("Ajout à la file d'attente:", nextSong.title);
-        addToQueue(nextSong);
+        if (nextSong) {
+          console.log("Ajout à la file d'attente:", nextSong.title);
+          addToQueue(nextSong);
+        }
       });
     } catch (error) {
       console.error("Erreur lors de la lecture:", error);
