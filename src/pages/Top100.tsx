@@ -30,7 +30,6 @@ interface FavoriteStat {
     url: string;
     duration: string;
   };
-  isHidden?: boolean;
 }
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
@@ -42,7 +41,6 @@ const Top100 = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
-  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkSession = async () => {
@@ -108,20 +106,7 @@ const Top100 = () => {
       try {
         console.log("Fetching favorite stats...");
         
-        // Fetch hidden songs first
-        const { data: hiddenSongsData, error: hiddenError } = await supabase
-          .from('hidden_songs')
-          .select('song_id');
-
-        if (hiddenError) {
-          console.error("Error fetching hidden songs:", hiddenError);
-          return;
-        }
-
-        const hiddenSongIds = new Set(hiddenSongsData.map(hs => hs.song_id));
-        setHiddenSongs(hiddenSongIds);
-
-        // Then fetch favorite stats excluding hidden songs
+        // Fetch favorite stats excluding hidden songs using a join
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
@@ -137,6 +122,11 @@ const Top100 = () => {
               duration
             )
           `)
+          .not('song_id', 'in', (
+            supabase
+              .from('hidden_songs')
+              .select('song_id')
+          ))
           .order('count', { ascending: false });
 
         if (error) {
@@ -152,7 +142,7 @@ const Top100 = () => {
         console.log("Received favorite stats:", data);
 
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
-          if (!stat.songs || hiddenSongIds.has(stat.song_id)) return acc;
+          if (!stat.songs) return acc;
           
           const key = `${stat.songs.title.toLowerCase()}-${(stat.songs.artist || '').toLowerCase()}`;
           
