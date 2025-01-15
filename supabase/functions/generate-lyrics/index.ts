@@ -15,6 +15,11 @@ serve(async (req) => {
   }
 
   try {
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is not set');
+      throw new Error('OpenAI API key is not configured');
+    }
+
     const { songTitle, artist } = await req.json();
     console.log('Generating lyrics for:', songTitle, 'by', artist);
 
@@ -41,12 +46,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
+      console.error('OpenAI API error response:', errorData);
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
-    console.log('Generated lyrics response:', data);
+    console.log('Successfully generated lyrics');
 
     return new Response(
       JSON.stringify({ lyrics: data.choices[0].message.content }),
@@ -55,7 +60,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error generating lyrics:', error);
+    console.error('Error in generate-lyrics function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
