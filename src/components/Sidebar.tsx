@@ -1,4 +1,4 @@
-import { Home, ListMusic, Heart, Languages } from "lucide-react";
+import { Home, ListMusic, Heart, Languages, Award } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { MusicUploader } from "./MusicUploader";
@@ -42,6 +42,13 @@ export const Sidebar = () => {
           >
             <ListMusic className="w-5 h-5" />
             <span>{t('common.library')}</span>
+          </a>
+          <a
+            href="/top100"
+            className="flex items-center space-x-3 text-spotify-neutral hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+          >
+            <Award className="w-5 h-5" />
+            <span>Top 100</span>
           </a>
           {favorites.length > 0 && (
             <a

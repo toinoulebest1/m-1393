@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Favorites from "./pages/Favorites";
+import Top100 from "./pages/Top100";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
@@ -25,6 +26,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/favorites" element={<Favorites />} />
+                <Route path="/top100" element={<Top100 />} />
               </Routes>
             </BrowserRouter>
           </Suspense>
