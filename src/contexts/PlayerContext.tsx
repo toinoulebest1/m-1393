@@ -52,6 +52,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [searchQuery, setSearchQuery] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume / 100;
+      console.log("Audio instance created");
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
   const play = async (song?: Song) => {
     console.log("Play function called with song:", song);
     
@@ -173,7 +186,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return newFavorites;
       });
 
-      // Si c'est la chanson en cours de lecture, on la retire de la queue
       if (currentSong?.id === songId) {
         setQueue(prev => prev.filter(s => s.id !== songId));
       }
@@ -222,9 +234,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.volume = volume / 100;
-    
+    if (!audioRef.current) return;
+
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
       toast.error("Erreur lors de la lecture audio");
@@ -259,13 +270,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    if (audioRef.current) {
-      audioRef.current.addEventListener('error', handleError);
-      audioRef.current.addEventListener('ended', handleEnded);
-      audioRef.current.addEventListener('play', handlePlay);
-      audioRef.current.addEventListener('pause', handlePause);
-      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    }
+    audioRef.current.addEventListener('error', handleError);
+    audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       if (audioRef.current) {
@@ -274,11 +283,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('play', handlePlay);
         audioRef.current.removeEventListener('pause', handlePause);
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.pause();
-        audioRef.current.src = '';
       }
     };
-  }, [repeatMode, volume]);
+  }, [repeatMode]);
 
   return (
     <PlayerContext.Provider
@@ -294,7 +301,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         searchQuery,
         play,
         pause,
-        setVolume,
+        setVolume: updateVolume,
         setProgress: updateProgress,
         nextSong,
         previousSong,
