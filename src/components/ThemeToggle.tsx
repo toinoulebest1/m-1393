@@ -36,23 +36,41 @@ const themes: Theme[] = [
   }
 ];
 
+const THEME_STORAGE_KEY = 'spotify-clone-theme';
+
 export function ThemeToggle() {
-  const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]);
+  const [currentTheme, setCurrentTheme] = useState<Theme>(() => {
+    // Récupérer le thème sauvegardé au chargement initial
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme) {
+      const parsedTheme = JSON.parse(savedTheme);
+      const foundTheme = themes.find(theme => theme.name === parsedTheme.name);
+      return foundTheme || themes[0];
+    }
+    return themes[0];
+  });
 
   useEffect(() => {
     const app = document.getElementById('root');
-    if (!app) return;
+    if (!app) {
+      console.error("Root element not found");
+      return;
+    }
     
-    // Remove all existing theme classes
+    // Sauvegarder le thème dans le localStorage
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(currentTheme));
+    console.log("Theme saved:", currentTheme.name);
+    
+    // Retirer toutes les classes de thème existantes
     app.className = app.className
       .split(' ')
       .filter(cls => !cls.startsWith('from-') && !cls.startsWith('via-') && !cls.startsWith('to-'))
       .join(' ');
     
-    // Add new theme classes
+    // Ajouter les nouvelles classes de thème
     app.className = `min-h-screen bg-gradient-to-br ${currentTheme.classes} ${app.className}`;
     
-    console.log("Theme changed to:", currentTheme.name);
+    console.log("Theme applied:", currentTheme.name);
   }, [currentTheme]);
 
   return (
