@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 
 interface Song {
   id: string;
@@ -42,7 +42,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [queue, setQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
-  const [favorites, setFavorites] = useState<Song[]>([]);
+  const [favorites, setFavorites] = useState<Song[]>(() => {
+    const savedFavorites = localStorage.getItem('favorites');
+    return savedFavorites ? JSON.parse(savedFavorites) : [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -133,14 +136,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const toggleFavorite = (song: Song) => {
     setFavorites(prev => {
       const isFavorite = prev.some(s => s.id === song.id);
-      if (isFavorite) {
-        return prev.filter(s => s.id !== song.id);
-      }
-      return [...prev, song];
+      const newFavorites = isFavorite
+        ? prev.filter(s => s.id !== song.id)
+        : [...prev, song];
+      
+      // Sauvegarder dans localStorage
+      localStorage.setItem('favorites', JSON.stringify(newFavorites));
+      return newFavorites;
     });
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     audioRef.current = new Audio();
     
     audioRef.current.addEventListener('timeupdate', () => {
