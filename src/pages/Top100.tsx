@@ -1,7 +1,7 @@
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
-import { Award, Play, Heart, Trash2, ShieldCheck } from "lucide-react";
+import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
+import { LyricsModal } from "@/components/LyricsModal";
 import {
   Table,
   TableBody,
@@ -39,6 +40,7 @@ const Top100 = () => {
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [selectedSong, setSelectedSong] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -460,6 +462,20 @@ const Top100 = () => {
                       >
                         <Play className="w-5 h-5" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSong({
+                            id: stat.song.id,
+                            title: stat.song.title,
+                          });
+                        }}
+                      >
+                        <FileText className="w-5 h-5" />
+                      </Button>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -483,6 +499,12 @@ const Top100 = () => {
       </div>
       <NowPlaying />
       <Player />
+      <LyricsModal
+        isOpen={!!selectedSong}
+        onClose={() => setSelectedSong(null)}
+        songId={selectedSong?.id || ''}
+        songTitle={selectedSong?.title || ''}
+      />
     </div>
   );
 };

@@ -38,6 +38,35 @@ export type Database = {
           },
         ]
       }
+      lyrics: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          song_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          song_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lyrics_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
