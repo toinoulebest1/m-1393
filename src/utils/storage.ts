@@ -1,24 +1,34 @@
-import { openDB } from 'idb';
-
-const dbName = 'musicPlayerDB';
-const storeName = 'audioFiles';
-
-export const initDB = async () => {
-  return openDB(dbName, 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(storeName)) {
-        db.createObjectStore(storeName);
-      }
-    },
-  });
-};
+import { supabase } from "@/integrations/supabase/client";
 
 export const storeAudioFile = async (id: string, file: File) => {
-  const db = await initDB();
-  await db.put(storeName, file, id);
+  console.log("Stockage du fichier audio:", id);
+  const { data, error } = await supabase.storage
+    .from('audio')
+    .upload(id, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) {
+    console.error("Erreur lors du stockage du fichier:", error);
+    throw error;
+  }
+
+  console.log("Fichier stocké avec succès:", data);
+  return data;
 };
 
 export const getAudioFile = async (id: string) => {
-  const db = await initDB();
-  return db.get(storeName, id);
+  console.log("Récupération du fichier audio:", id);
+  const { data, error } = await supabase.storage
+    .from('audio')
+    .createSignedUrl(id, 3600); // URL valide pendant 1 heure
+
+  if (error) {
+    console.error("Erreur lors de la récupération du fichier:", error);
+    throw error;
+  }
+
+  console.log("URL signée générée:", data.signedUrl);
+  return data.signedUrl;
 };
