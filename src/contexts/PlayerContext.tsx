@@ -15,6 +15,10 @@ interface PlayerContextType {
   progress: number;
   volume: number;
   queue: Song[];
+  shuffleMode: boolean;
+  repeatMode: 'none' | 'one' | 'all';
+  favorites: Song[];
+  searchQuery: string;
   play: (song?: Song) => void;
   pause: () => void;
   setVolume: (volume: number) => void;
@@ -22,6 +26,10 @@ interface PlayerContextType {
   nextSong: () => void;
   previousSong: () => void;
   addToQueue: (song: Song) => void;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+  toggleFavorite: (song: Song) => void;
+  setSearchQuery: (query: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -32,6 +40,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(70);
   const [queue, setQueue] = useState<Song[]>([]);
+  const [shuffleMode, setShuffleMode] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
+  const [favorites, setFavorites] = useState<Song[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const play = (song?: Song) => {
@@ -69,10 +81,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setProgress(newProgress);
   };
 
-  const nextSong = () => {
+  const getNextSong = () => {
     const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-    if (currentIndex < queue.length - 1) {
-      play(queue[currentIndex + 1]);
+    if (shuffleMode) {
+      const remainingSongs = queue.slice(currentIndex + 1);
+      const randomIndex = Math.floor(Math.random() * remainingSongs.length);
+      return remainingSongs[randomIndex];
+    }
+    return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
+  };
+
+  const nextSong = () => {
+    const next = getNextSong();
+    if (next) {
+      play(next);
+    } else if (repeatMode === 'all') {
+      play(queue[0]);
     }
   };
 
@@ -85,11 +109,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addToQueue = (song: Song) => {
     setQueue(prevQueue => {
-      // Si la queue est vide et qu'aucune chanson n'est en cours, jouer directement
       if (prevQueue.length === 0 && !currentSong) {
         play(song);
       }
       return [...prevQueue, song];
+    });
+  };
+
+  const toggleShuffle = () => {
+    setShuffleMode(prev => !prev);
+  };
+
+  const toggleRepeat = () => {
+    setRepeatMode(current => {
+      switch (current) {
+        case 'none': return 'one';
+        case 'one': return 'all';
+        case 'all': return 'none';
+      }
+    });
+  };
+
+  const toggleFavorite = (song: Song) => {
+    setFavorites(prev => {
+      const isFavorite = prev.some(s => s.id === song.id);
+      if (isFavorite) {
+        return prev.filter(s => s.id !== song.id);
+      }
+      return [...prev, song];
     });
   };
 
@@ -104,7 +151,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     audioRef.current.addEventListener('ended', () => {
-      nextSong();
+      if (repeatMode === 'one') {
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play();
+        }
+      } else {
+        nextSong();
+      }
     });
 
     return () => {
@@ -113,7 +167,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.src = '';
       }
     };
-  }, []);
+  }, [repeatMode]);
 
   return (
     <PlayerContext.Provider
@@ -123,6 +177,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         progress,
         volume,
         queue,
+        shuffleMode,
+        repeatMode,
+        favorites,
+        searchQuery,
         play,
         pause,
         setVolume: updateVolume,
@@ -130,6 +188,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         nextSong,
         previousSong,
         addToQueue,
+        toggleShuffle,
+        toggleRepeat,
+        toggleFavorite,
+        setSearchQuery,
       }}
     >
       {children}

@@ -1,10 +1,16 @@
-import { Clock } from "lucide-react";
+import { Clock, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { Input } from "@/components/ui/input";
 
 export const NowPlaying = () => {
   const { t } = useTranslation();
-  const { queue, currentSong, play } = usePlayer();
+  const { queue, currentSong, play, searchQuery, setSearchQuery } = usePlayer();
+
+  const filteredQueue = queue.filter(song => 
+    song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    song.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex-1 p-8 overflow-hidden">
@@ -26,10 +32,23 @@ export const NowPlaying = () => {
       </div>
 
       <div className="mt-12">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-          {t('common.queue')}
-          <div className="h-px flex-1 bg-gradient-to-r from-spotify-accent/50 to-transparent ml-4" />
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white flex items-center">
+            {t('common.queue')}
+            <div className="h-px flex-1 bg-gradient-to-r from-spotify-accent/50 to-transparent ml-4" />
+          </h2>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-spotify-neutral" />
+            <Input
+              type="text"
+              placeholder={t('common.search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-spotify-neutral focus-visible:ring-spotify-accent"
+            />
+          </div>
+        </div>
+        
         <div className="bg-white/5 backdrop-blur-lg rounded-xl shadow-xl">
           <div className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
             <div className="font-medium">TITLE</div>
@@ -38,7 +57,7 @@ export const NowPlaying = () => {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          {queue.map((song, index) => (
+          {filteredQueue.map((song, index) => (
             <div
               key={song.id}
               className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 hover:bg-white/10 transition-all cursor-pointer text-spotify-neutral hover:text-white group"
