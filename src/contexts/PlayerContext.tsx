@@ -206,9 +206,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           newFavorites = [...prev, favoriteSong];
           
           const updateStats = async () => {
+            console.log("Updating favorite stats for song:", song.id);
+            
             const { data: existingStat, error: fetchError } = await supabase
               .from('favorite_stats')
-              .select()
+              .select('*')
               .eq('song_id', song.id)
               .maybeSingle();
 
@@ -216,6 +218,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               console.error("Error fetching stats:", fetchError);
               return;
             }
+
+            console.log("Existing stat:", existingStat);
 
             if (existingStat) {
               const { error: updateError } = await supabase
@@ -228,6 +232,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
               if (updateError) {
                 console.error("Error updating stats:", updateError);
+                toast.error("Erreur lors de la mise à jour des statistiques");
+              } else {
+                console.log("Stats updated successfully");
               }
             } else {
               const { error: insertError } = await supabase
@@ -240,6 +247,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
               if (insertError) {
                 console.error("Error inserting stats:", insertError);
+                toast.error("Erreur lors de l'ajout des statistiques");
+              } else {
+                console.log("Stats inserted successfully");
               }
             }
           };
