@@ -175,19 +175,29 @@ const Top100 = () => {
         return;
       }
 
-      // Récupérer d'abord la chanson pour obtenir son vrai ID UUID
+      // Récupérer la chanson par son file_path
       const { data: song, error: songError } = await supabase
         .from('songs')
         .select('id')
         .eq('file_path', songId)
         .maybeSingle();
 
-      if (songError || !song) {
+      if (songError) {
         console.error("Error finding song:", songError);
         toast({
           variant: "destructive",
           title: "Erreur",
           description: "Impossible de trouver la musique",
+        });
+        return;
+      }
+
+      if (!song) {
+        console.error("Song not found");
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "La musique n'existe plus dans la base de données",
         });
         return;
       }
@@ -262,9 +272,24 @@ const Top100 = () => {
             </Alert>
           )}
           
-          <div className="flex items-center gap-4 mb-8">
-            <Award className="w-8 h-8 text-spotify-accent" />
-            <h1 className="text-2xl font-bold">Top 100 Communautaire</h1>
+          <div className="flex items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <Award className="w-8 h-8 text-spotify-accent" />
+              <h1 className="text-2xl font-bold">Top 100 Communautaire</h1>
+            </div>
+            {isAdmin && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (window.confirm("Êtes-vous sûr de vouloir supprimer toutes les musiques ?")) {
+                    favoriteStats.forEach(stat => handleDelete(stat.songId));
+                  }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Purger toutes les musiques
+              </Button>
+            )}
           </div>
 
           <Table>
