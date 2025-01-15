@@ -136,7 +136,6 @@ const Top100 = () => {
 
         console.log("Received favorite stats:", data);
 
-        // Grouper les stats par titre et artiste de chanson
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
           if (!stat.songs) return acc;
           
@@ -218,6 +217,7 @@ const Top100 = () => {
       const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
       const remainingSongs = favoriteStats
         .slice(songIndex + 1)
+        .filter(stat => !hiddenSongs.has(stat.songId))
         .map(stat => stat.song);
       
       console.log("Ajout à la file d'attente:", remainingSongs);
@@ -239,11 +239,12 @@ const Top100 = () => {
   };
 
   const handleDelete = async (songId: string) => {
-    console.log("Attempting to hide song:", songId);
+    console.log("Masquage de la chanson:", songId);
     setHiddenSongs(prev => new Set([...prev, songId]));
+    setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
     toast({
       title: "Succès",
-      description: "La musique a été masquée de l'affichage",
+      description: "La musique a été masquée",
     });
   };
 
@@ -270,7 +271,10 @@ const Top100 = () => {
     }
   };
 
-  if (favoriteStats.length === 0) {
+  // Filtrer les chansons masquées
+  const visibleSongs = favoriteStats.filter(stat => !hiddenSongs.has(stat.songId));
+
+  if (visibleSongs.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
         <Sidebar />
@@ -320,7 +324,7 @@ const Top100 = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {favoriteStats.map((stat, index) => (
+              {visibleSongs.map((stat, index) => (
                 <TableRow
                   key={stat.songId}
                   className="group hover:bg-white/10 transition-colors cursor-pointer border-white/5"
@@ -340,16 +344,16 @@ const Top100 = () => {
                     <div className="flex items-center space-x-3">
                       <img
                         src={PLACEHOLDER_IMAGE}
-                        alt={hiddenSongs.has(stat.songId) ? "Musique masquée" : stat.song.title}
+                        alt={stat.song.title}
                         className="w-12 h-12 rounded-md object-cover"
                       />
                       <span className="font-medium text-white">
-                        {hiddenSongs.has(stat.songId) ? "Musique masquée" : stat.song.title}
+                        {stat.song.title}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
-                    {hiddenSongs.has(stat.songId) ? "Artiste masqué" : stat.song.artist}
+                    {stat.song.artist}
                   </TableCell>
                   <TableCell className="text-spotify-neutral">
                     {formatDuration(stat.song.duration)}
@@ -388,7 +392,7 @@ const Top100 = () => {
                       >
                         <FileText className="w-5 h-5" />
                       </Button>
-                      {isAdmin && !hiddenSongs.has(stat.songId) && (
+                      {isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
