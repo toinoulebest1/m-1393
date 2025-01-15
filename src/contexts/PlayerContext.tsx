@@ -37,6 +37,9 @@ interface PlayerContextType {
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
+// Créer une instance audio unique partagée entre toutes les pages
+const globalAudio = new Audio();
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,19 +53,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedFavorites ? JSON.parse(savedFavorites) : [];
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(globalAudio);
 
   useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.volume = volume / 100;
-      console.log("Audio instance created");
-    }
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
+    console.log("Initializing audio with volume:", volume);
+    audioRef.current.volume = volume / 100;
   }, []);
 
   const play = async (song?: Song) => {
@@ -71,25 +66,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (song && (!currentSong || song.id !== currentSong.id)) {
       console.log("Setting new current song:", song);
       setCurrentSong(song);
-      if (audioRef.current) {
-        try {
-          const audioFile = await getAudioFile(song.url);
-          if (!audioFile) {
-            throw new Error('Fichier audio non trouvé');
-          }
-          const audioUrl = URL.createObjectURL(audioFile);
-          audioRef.current.src = audioUrl;
-          console.log("Set audio source to:", audioUrl);
-          await audioRef.current.play();
-          console.log("Audio playback started");
-          setIsPlaying(true);
-          toast.success(`Lecture de ${song.title}`);
-        } catch (error) {
-          console.error("Error playing audio:", error);
-          toast.error("Impossible de lire ce fichier audio. Il n'est peut-être plus disponible.");
-          setCurrentSong(null);
-          setIsPlaying(false);
+      try {
+        const audioFile = await getAudioFile(song.url);
+        if (!audioFile) {
+          throw new Error('Fichier audio non trouvé');
         }
+        const audioUrl = URL.createObjectURL(audioFile);
+        audioRef.current.src = audioUrl;
+        console.log("Set audio source to:", audioUrl);
+        await audioRef.current.play();
+        console.log("Audio playback started");
+        setIsPlaying(true);
+        toast.success(`Lecture de ${song.title}`);
+      } catch (error) {
+        console.error("Error playing audio:", error);
+        toast.error("Impossible de lire ce fichier audio. Il n'est peut-être plus disponible.");
+        setCurrentSong(null);
+        setIsPlaying(false);
       }
     } else if (audioRef.current) {
       try {
@@ -234,8 +227,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    if (!audioRef.current) return;
-
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
       toast.error("Erreur lors de la lecture audio");
@@ -243,7 +234,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleEnded = () => {
-      if (repeatMode === 'one' && audioRef.current) {
+      if (repeatMode === 'one') {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => {
           toast.error("Erreur lors de la reprise de la lecture");
@@ -264,10 +255,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleTimeUpdate = () => {
-      if (audioRef.current) {
-        const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-        setProgress(percentage);
-      }
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
     };
 
     audioRef.current.addEventListener('error', handleError);
@@ -277,13 +266,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('error', handleError);
-        audioRef.current.removeEventListener('ended', handleEnded);
-        audioRef.current.removeEventListener('play', handlePlay);
-        audioRef.current.removeEventListener('pause', handlePause);
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-      }
+      audioRef.current.removeEventListener('error', handleError);
+      audioRef.current.removeEventListener('ended', handleEnded);
+      audioRef.current.removeEventListener('play', handlePlay);
+      audioRef.current.removeEventListener('pause', handlePause);
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [repeatMode]);
 
