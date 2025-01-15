@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Favorites from "./pages/Favorites";
 import Top100 from "./pages/Top100";
+import Downloads from "./pages/Downloads";
 import Auth from "./pages/Auth";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
@@ -108,6 +109,14 @@ const App = () => (
                   element={
                     <PrivateRoute>
                       <Top100 />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/downloads"
+                  element={
+                    <PrivateRoute>
+                      <Downloads />
                     </PrivateRoute>
                   }
                 />
