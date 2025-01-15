@@ -46,7 +46,6 @@ interface PlayerContextType {
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
-// Créer une instance audio unique partagée entre toutes les pages
 const globalAudio = new Audio();
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -206,7 +205,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           };
           newFavorites = [...prev, favoriteSong];
           
-          // Mise à jour des statistiques dans Supabase
           const updateStats = async () => {
             const { data: existingStat, error: fetchError } = await supabase
               .from('favorite_stats')
@@ -256,6 +254,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.error("Erreur lors de la gestion des favoris:", error);
       toast.error("Erreur lors de la gestion des favoris");
+    }
+  };
+
+  const removeFavorite = async (songId: string) => {
+    try {
+      setFavorites(prev => {
+        const newFavorites = prev.filter(s => s.id !== songId);
+        localStorage.setItem('favorites', JSON.stringify(newFavorites));
+        return newFavorites;
+      });
+
+      const { error } = await supabase
+        .from('favorite_stats')
+        .delete()
+        .eq('song_id', songId);
+
+      if (error) {
+        console.error("Error removing favorite stats:", error);
+        toast.error("Erreur lors de la suppression des statistiques");
+      } else {
+        toast.success("Favori supprimé avec succès");
+      }
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      toast.error("Erreur lors de la suppression du favori");
     }
   };
 
