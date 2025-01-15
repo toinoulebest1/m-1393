@@ -66,7 +66,13 @@ const Favorites = () => {
 
   const handleRemoveFavorite = async (song: any) => {
     console.log("Removing favorite:", song);
-    await removeFavorite(song.id);
+    try {
+      await removeFavorite(song.id);
+      toast.success(`${song.title} retiré des favoris`);
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      toast.error("Erreur lors de la suppression du favori");
+    }
   };
 
   if (favorites.length === 0) {
@@ -79,6 +85,7 @@ const Favorites = () => {
             <p className="text-spotify-neutral text-lg">{t('no_favorites')}</p>
           </div>
         </div>
+        <Player />
       </div>
     );
   }
@@ -94,7 +101,7 @@ const Favorites = () => {
             </div>
             <div className="space-y-2 flex-1">
               <h1 className="text-4xl font-bold text-white tracking-tight">{t('favorites')}</h1>
-              <p className="text-spotify-neutral">{favorites.length} morceaux</p>
+              <p className="text-spotify-neutral">{favorites.length} {favorites.length > 1 ? 'morceaux' : 'morceau'}</p>
             </div>
             <div className="flex space-x-4">
               <Button
