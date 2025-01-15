@@ -4,7 +4,7 @@ import { NowPlaying } from "@/components/NowPlaying";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824] flex">
+    <div className="flex min-h-screen">
       <Sidebar />
       <NowPlaying />
       <Player />

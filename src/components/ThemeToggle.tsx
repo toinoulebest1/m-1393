@@ -40,18 +40,17 @@ export function ThemeToggle() {
   const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    const baseClasses = ['bg-gradient-to-br'];
+    const app = document.getElementById('root');
+    if (!app) return;
     
     // Remove all existing theme classes
-    root.className = root.className
+    app.className = app.className
       .split(' ')
       .filter(cls => !cls.startsWith('from-') && !cls.startsWith('via-') && !cls.startsWith('to-'))
       .join(' ');
     
-    // Add base classes and new theme classes
-    const newClasses = [...baseClasses, ...currentTheme.classes.split(' ')];
-    root.classList.add(...newClasses);
+    // Add new theme classes
+    app.className = `min-h-screen bg-gradient-to-br ${currentTheme.classes} ${app.className}`;
     
     console.log("Theme changed to:", currentTheme.name);
   }, [currentTheme]);
