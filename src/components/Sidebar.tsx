@@ -56,13 +56,17 @@ export const Sidebar = () => {
 
       <div className="mt-auto space-y-4">
         <div className="px-3">
+          <div className="flex items-center space-x-2 text-spotify-neutral mb-2">
+            <Languages className="w-4 h-4" />
+            <span className="text-sm">{t('common.language')}</span>
+          </div>
           <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-            <SelectTrigger className="w-full bg-transparent border-white/10">
-              <SelectValue placeholder="Select Language" />
+            <SelectTrigger className="w-full bg-transparent border-white/10 hover:bg-white/5 transition-colors">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="fr">Français</SelectItem>
+            <SelectContent className="bg-black/90 border-white/10">
+              <SelectItem value="en" className="text-white hover:bg-white/10">English</SelectItem>
+              <SelectItem value="fr" className="text-white hover:bg-white/10">Français</SelectItem>
             </SelectContent>
           </Select>
         </div>

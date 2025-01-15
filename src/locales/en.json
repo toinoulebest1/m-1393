@@ -13,6 +13,8 @@
     "browse": "Browse",
     "uploading": "Uploading...",
     "success": "Success",
-    "error": "Error"
+    "error": "Error",
+    "language": "Language",
+    "fileSelected": "{{count}} file(s) selected"
   }
 }

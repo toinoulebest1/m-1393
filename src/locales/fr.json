@@ -13,6 +13,8 @@
     "browse": "Parcourir",
     "uploading": "Importation en cours...",
     "success": "Succès",
-    "error": "Erreur"
+    "error": "Erreur",
+    "language": "Langue",
+    "fileSelected": "{{count}} fichier(s) sélectionné(s)"
   }
 }
