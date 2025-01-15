@@ -23,7 +23,7 @@ const Favorites = () => {
     currentSong, 
     isPlaying, 
     addToQueue,
-    toggleFavorite,
+    removeFavorite,
     queue 
   } = usePlayer();
   
@@ -65,8 +65,8 @@ const Favorites = () => {
   };
 
   const handleRemoveFavorite = async (song: any) => {
-    await toggleFavorite(song);
-    toast.success(`${song.title} a été retiré des favoris`);
+    console.log("Removing favorite:", song);
+    await removeFavorite(song.id);
   };
 
   if (favorites.length === 0) {

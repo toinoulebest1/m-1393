@@ -31,6 +31,7 @@ interface PlayerContextType {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   toggleFavorite: (song: Song) => void;
+  removeFavorite: (songId: string) => void;
   setSearchQuery: (query: string) => void;
 }
 
@@ -161,6 +162,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
+  const removeFavorite = async (songId: string) => {
+    try {
+      console.log("Attempting to remove favorite with ID:", songId);
+      
+      setFavorites(prev => {
+        const newFavorites = prev.filter(s => s.id !== songId);
+        console.log("Updated favorites list:", newFavorites);
+        localStorage.setItem('favorites', JSON.stringify(newFavorites));
+        return newFavorites;
+      });
+
+      // Si c'est la chanson en cours de lecture, on la retire de la queue
+      if (currentSong?.id === songId) {
+        setQueue(prev => prev.filter(s => s.id !== songId));
+      }
+
+      toast.success("Musique retirée des favoris");
+    } catch (error) {
+      console.error("Erreur lors de la suppression du favori:", error);
+      toast.error("Erreur lors de la suppression du favori");
+    }
+  };
+
   const toggleFavorite = async (song: Song) => {
     try {
       const audioFile = await getAudioFile(song.url);
@@ -278,6 +302,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleShuffle,
         toggleRepeat,
         toggleFavorite,
+        removeFavorite,
         setSearchQuery,
       }}
     >
