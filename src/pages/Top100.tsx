@@ -182,40 +182,42 @@ const Top100 = () => {
         .eq('file_path', songId)
         .maybeSingle();
 
-      if (songError) {
-        console.error("Error finding song:", songError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de trouver la musique",
-        });
-        return;
+      // Si on trouve la chanson dans la base de données, on la supprime
+      if (song) {
+        const { error: deleteError } = await supabase
+          .from('songs')
+          .delete()
+          .eq('id', song.id);
+
+        if (deleteError) {
+          console.error("Error deleting song from database:", deleteError);
+          toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de supprimer la musique de la base de données",
+          });
+          return;
+        }
+      } else {
+        console.log("Song not found in database, only removing from localStorage");
       }
 
-      if (!song) {
-        console.error("Song not found");
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "La musique n'existe plus dans la base de données",
-        });
-        return;
-      }
-
-      // Utiliser l'ID UUID pour la suppression
-      const { error: deleteError } = await supabase
-        .from('songs')
-        .delete()
-        .eq('id', song.id);
-
-      if (deleteError) {
-        console.error("Error deleting song:", deleteError);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de supprimer la musique",
-        });
-        return;
+      // Dans tous les cas, on met à jour le localStorage
+      const savedStats = localStorage.getItem('favoriteStats');
+      if (savedStats) {
+        const parsedStats = JSON.parse(savedStats);
+        const updatedStats = parsedStats.filter((stat: any) => stat.songId !== songId);
+        localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
+        
+        // Mettre à jour les favoris également
+        const savedFavorites = localStorage.getItem('favorites');
+        if (savedFavorites) {
+          const parsedFavorites = JSON.parse(savedFavorites);
+          const updatedFavorites = parsedFavorites.filter((fav: any) => fav.id !== songId);
+          localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+        }
+        
+        window.location.reload();
       }
 
       toast({
@@ -223,14 +225,6 @@ const Top100 = () => {
         description: "La musique a été supprimée",
       });
 
-      // Mettre à jour l'interface
-      const savedStats = localStorage.getItem('favoriteStats');
-      if (savedStats) {
-        const parsedStats = JSON.parse(savedStats);
-        const updatedStats = parsedStats.filter((stat: any) => stat.songId !== songId);
-        localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
-        window.location.reload();
-      }
     } catch (error) {
       console.error("Error during deletion:", error);
       toast({
