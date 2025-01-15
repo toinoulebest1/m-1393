@@ -106,6 +106,15 @@ const Top100 = () => {
       try {
         console.log("Fetching favorite stats...");
         
+        // First, get the list of hidden song IDs
+        const { data: hiddenSongsData } = await supabase
+          .from('hidden_songs')
+          .select('song_id');
+        
+        const hiddenSongIds = hiddenSongsData?.map(hs => hs.song_id) || [];
+        console.log("Hidden song IDs:", hiddenSongIds);
+
+        // Then fetch favorite stats excluding hidden songs
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
@@ -121,11 +130,7 @@ const Top100 = () => {
               duration
             )
           `)
-          .not('song_id', 'in', (
-            supabase
-              .from('hidden_songs')
-              .select('song_id')
-          ))
+          .not('song_id', 'in', `(${hiddenSongIds.join(',')})`)
           .order('count', { ascending: false });
 
         if (error) {
