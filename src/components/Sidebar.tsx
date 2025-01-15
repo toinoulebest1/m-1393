@@ -1,24 +1,11 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Download, Music2, LogOut } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Home, Heart, Trophy, Download, Music2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "./ThemeToggle";
-import { MusicUploader } from "./MusicUploader";
-import { Button } from "./ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
 
 export const Sidebar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
@@ -26,21 +13,6 @@ export const Sidebar = () => {
     { to: "/top100", icon: Trophy, label: t('common.top100') },
     { to: "/downloads", icon: Download, label: t('common.downloads') }
   ];
-
-  const handleLanguageChange = (value: string) => {
-    i18n.changeLanguage(value);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-      toast.success("Déconnexion réussie");
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-      toast.error("Erreur lors de la déconnexion");
-    }
-  };
 
   return (
     <div className="w-64 bg-spotify-dark p-6 flex flex-col h-screen">
@@ -68,35 +40,6 @@ export const Sidebar = () => {
           </Link>
         ))}
       </nav>
-
-      <div className="space-y-2 pt-4 border-t border-white/10">
-        <MusicUploader />
-        
-        <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-          <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-            <SelectValue placeholder="Langue" />
-          </SelectTrigger>
-          <SelectContent className="bg-spotify-dark border-white/10">
-            <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-              Français
-            </SelectItem>
-            <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-              English
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <ThemeToggle />
-
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
-          onClick={handleLogout}
-        >
-          <LogOut className="w-5 h-5 mr-2" />
-          <span>{t('common.logout')}</span>
-        </Button>
-      </div>
     </div>
   );
 };
