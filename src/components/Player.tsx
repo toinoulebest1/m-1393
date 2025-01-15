@@ -27,21 +27,55 @@ export const Player = () => {
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
     
-    // If duration is missing, calculate it from the audio element
-    const duration = currentSong.duration || "0:00";
-    
     try {
-      const [minutes, seconds] = duration.split(':').map(Number);
-      if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+      // Si la durée est au format mm:ss
+      if (currentSong.duration && currentSong.duration.includes(':')) {
+        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+        
+        const totalSeconds = minutes * 60 + seconds;
+        const currentTime = (progress / 100) * totalSeconds;
+        const currentMinutes = Math.floor(currentTime / 60);
+        const currentSeconds = Math.floor(currentTime % 60);
+        
+        return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+      }
+      // Si la durée est en secondes
+      const duration = parseFloat(currentSong.duration);
+      if (isNaN(duration)) return "0:00";
       
-      const totalSeconds = minutes * 60 + seconds;
-      const currentTime = (progress / 100) * totalSeconds;
+      const currentTime = (progress / 100) * duration;
       const currentMinutes = Math.floor(currentTime / 60);
       const currentSeconds = Math.floor(currentTime % 60);
       
       return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
     } catch (error) {
       console.error("Error formatting time:", error);
+      return "0:00";
+    }
+  };
+
+  const formatDuration = (duration: string | undefined) => {
+    if (!duration) return "0:00";
+    
+    try {
+      // Si la durée est déjà au format mm:ss
+      if (duration.includes(':')) {
+        const [minutes, seconds] = duration.split(':').map(Number);
+        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      
+      // Si la durée est en secondes
+      const durationInSeconds = parseFloat(duration);
+      if (isNaN(durationInSeconds)) return "0:00";
+      
+      const minutes = Math.floor(durationInSeconds / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting duration:", error);
       return "0:00";
     }
   };
@@ -143,7 +177,7 @@ export const Player = () => {
               className="w-full"
               onValueChange={(value) => setProgress(value[0])}
             />
-            <span className="text-xs text-spotify-neutral">{currentSong?.duration || "0:00"}</span>
+            <span className="text-xs text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
           </div>
         </div>
 
