@@ -11,9 +11,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch file: ${response.statusText}`);
       }
-      // Clone the response before reading it
-      const responseClone = response.clone();
-      const blob = await responseClone.blob();
+      const blob = await response.blob();
       fileToUpload = new File([blob], id, { type: blob.type || 'audio/mpeg' });
     } catch (error) {
       console.error("Erreur lors de la conversion de l'URL en fichier:", error);
@@ -29,7 +27,8 @@ export const storeAudioFile = async (id: string, file: File | string) => {
       .from('audio')
       .upload(id, fileToUpload, {
         cacheControl: '3600',
-        upsert: true
+        upsert: true,
+        contentType: fileToUpload.type || 'audio/mpeg'
       });
 
     if (error) {
@@ -47,7 +46,25 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 
 export const getAudioFile = async (path: string) => {
   console.log("Récupération du fichier audio:", path);
+  
+  if (!path) {
+    console.error("Chemin du fichier non fourni");
+    throw new Error("Chemin du fichier non fourni");
+  }
+
   try {
+    // First check if the file exists
+    const { data: fileExists } = await supabase.storage
+      .from('audio')
+      .list('', {
+        search: path
+      });
+
+    if (!fileExists || fileExists.length === 0) {
+      console.error("Fichier non trouvé dans le stockage:", path);
+      throw new Error("Fichier audio non trouvé");
+    }
+
     const { data, error } = await supabase.storage
       .from('audio')
       .createSignedUrl(path, 3600);
