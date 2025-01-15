@@ -196,6 +196,44 @@ const Top100 = () => {
     };
   }, [toast]);
 
+  const handlePlay = async (song: any) => {
+    try {
+      console.log("Tentative de lecture de la chanson:", song);
+      if (!song) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Chanson invalide"
+        });
+        return;
+      }
+
+      await play(song);
+      console.log("Lecture démarrée:", song.title);
+      
+      const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
+      const remainingSongs = favoriteStats
+        .slice(songIndex + 1)
+        .map(stat => stat.song);
+      
+      console.log("Ajout à la file d'attente:", remainingSongs);
+      
+      remainingSongs.forEach(nextSong => {
+        if (nextSong) {
+          console.log("Ajout à la file d'attente:", nextSong.title);
+          addToQueue(nextSong);
+        }
+      });
+    } catch (error) {
+      console.error("Erreur lors de la lecture:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de lecture",
+        description: "Impossible de lire cette chanson"
+      });
+    }
+  };
+
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
