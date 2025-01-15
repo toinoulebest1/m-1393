@@ -257,7 +257,7 @@ const Top100 = () => {
         return;
       }
 
-      // 2. Supprimer d'abord les stats pour respecter les contraintes de clé étrangère
+      // 2. Supprimer toutes les statistiques liées à cette chanson
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
         .delete()
@@ -283,7 +283,7 @@ const Top100 = () => {
         console.error("Error deleting lyrics:", deleteLyricsError);
       }
 
-      // 4. Enfin, supprimer la chanson elle-même
+      // 4. Supprimer la chanson elle-même
       const { error: deleteSongError } = await supabase
         .from('songs')
         .delete()
