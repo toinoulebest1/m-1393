@@ -1,12 +1,13 @@
-import { Home, Heart, TrendingUp, LogOut } from "lucide-react";
+import { Home, Heart, TrendingUp, LogOut, Upload, Languages } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { MusicUploader } from "./MusicUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Button } from "./ui/button";
 
 export const Sidebar = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -15,11 +16,16 @@ export const Sidebar = () => {
     }
   };
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'fr' : 'en';
+    i18n.changeLanguage(newLang);
+  };
+
   return (
-    <div className="w-64 bg-spotify-darker flex flex-col">
+    <div className="w-64 bg-spotify-dark flex flex-col h-screen">
       <div className="p-6">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-spotify-accent to-spotify-light bg-clip-text text-transparent">
-          {t('common.appName')}
+        <h1 className="text-2xl font-bold text-white">
+          Spotify Clone
         </h1>
       </div>
 
@@ -61,14 +67,24 @@ export const Sidebar = () => {
         </NavLink>
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto p-4 space-y-4">
         <MusicUploader />
+        
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-spotify-neutral hover:text-white"
+          onClick={toggleLanguage}
+        >
+          <Languages className="w-5 h-5 mr-2" />
+          <span>{i18n.language === 'en' ? 'Français' : 'English'}</span>
+        </Button>
+
         <button
           onClick={handleLogout}
           className="flex items-center space-x-3 px-6 py-3 text-spotify-neutral hover:text-white transition-colors w-full"
         >
           <LogOut className="w-5 h-5" />
-          <span>Se déconnecter</span>
+          <span>{t('common.logout')}</span>
         </button>
       </div>
     </div>

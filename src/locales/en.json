@@ -1,12 +1,11 @@
 {
   "common": {
+    "appName": "Spotify Clone",
     "home": "Home",
-    "library": "Library",
     "favorites": "Favorites",
-    "nowPlaying": "Now Playing",
     "queue": "Queue",
     "search": "Search",
-    "language": "Language",
+    "nowPlaying": "Now Playing",
     "track": "track",
     "tracks": "tracks",
     "noFavorites": "No favorites yet",
@@ -16,6 +15,7 @@
     "fileSelected_plural": "{{count}} files imported",
     "top100": "Top 100",
     "selectSong": "Select a song",
-    "noArtist": "Unknown Artist"
+    "noArtist": "Unknown Artist",
+    "logout": "Logout"
   }
 }

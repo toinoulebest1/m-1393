@@ -1,12 +1,11 @@
 {
   "common": {
+    "appName": "Spotify Clone",
     "home": "Accueil",
-    "library": "Bibliothèque",
     "favorites": "Favoris",
-    "nowPlaying": "En cours de lecture",
     "queue": "File d'attente",
     "search": "Rechercher",
-    "language": "Langue",
+    "nowPlaying": "En cours de lecture",
     "track": "titre",
     "tracks": "titres",
     "noFavorites": "Pas encore de favoris",
@@ -16,6 +15,7 @@
     "fileSelected_plural": "{{count}} fichiers importés",
     "top100": "Top 100",
     "selectSong": "Sélectionnez un titre",
-    "noArtist": "Artiste inconnu"
+    "noArtist": "Artiste inconnu",
+    "logout": "Se déconnecter"
   }
 }
