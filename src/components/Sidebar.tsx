@@ -1,12 +1,23 @@
-import { Home, ListMusic, Heart } from "lucide-react";
+import { Home, ListMusic, Heart, Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { MusicUploader } from "./MusicUploader";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Sidebar = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { favorites } = usePlayer();
+
+  const handleLanguageChange = (value: string) => {
+    i18n.changeLanguage(value);
+  };
 
   return (
     <div className="w-64 bg-black/30 backdrop-blur-xl border-r border-white/5 p-4 flex flex-col">
@@ -43,7 +54,18 @@ export const Sidebar = () => {
         )}
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto space-y-4">
+        <div className="px-3">
+          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
+            <SelectTrigger className="w-full bg-transparent border-white/10">
+              <SelectValue placeholder="Select Language" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="fr">Français</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <MusicUploader />
       </div>
     </div>
