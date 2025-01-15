@@ -1,5 +1,5 @@
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Clock } from "lucide-react";
+import { Clock, Heart } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const Favorites = () => {
