@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -21,35 +22,62 @@ const Top100 = () => {
   const { favoriteStats, play, currentSong, isPlaying, addToQueue } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      console.log("Checking admin status...");
-      const { data: { user } } = await supabase.auth.getUser();
+    const checkSession = async () => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (!user) {
-        console.log("No user found");
-        return;
-      }
-      
-      console.log("Fetching user role for:", user.id);
-      const { data: userRole, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching user role:", error);
+      if (sessionError || !session) {
+        console.error("Session error:", sessionError);
+        navigate('/auth');
         return;
       }
 
-      console.log("User role:", userRole);
-      setIsAdmin(userRole?.role === 'admin');
+      const checkAdminStatus = async () => {
+        console.log("Checking admin status...");
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.log("No user found");
+          return;
+        }
+        
+        console.log("Fetching user role for:", user.id);
+        const { data: userRole, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching user role:", error);
+          if (error.code === 'PGRST116') {
+            navigate('/auth');
+            return;
+          }
+          return;
+        }
+
+        console.log("User role:", userRole);
+        setIsAdmin(userRole?.role === 'admin');
+      };
+
+      await checkAdminStatus();
     };
 
-    checkAdminStatus();
-  }, []);
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        navigate('/auth');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   // Effet pour actualiser les stats toutes les 30 secondes
   useEffect(() => {
@@ -112,6 +140,16 @@ const Top100 = () => {
 
       if (error) {
         console.error("Error deleting song:", error);
+        if (error.code === 'PGRST116') {
+          toast({
+            variant: "destructive",
+            title: "Session expirée",
+            description: "Veuillez vous reconnecter",
+          });
+          navigate('/auth');
+          return;
+        }
+        
         toast({
           variant: "destructive",
           title: "Erreur",
