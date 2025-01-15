@@ -168,9 +168,8 @@ const Top100 = () => {
   }, [toast]);
 
   const handlePlay = async (song: any) => {
-    console.log("Tentative de lecture de la chanson:", song);
-    
     try {
+      console.log("Tentative de lecture de la chanson:", song);
       await play(song);
       console.log("Lecture démarrée:", song.title);
       
@@ -187,6 +186,11 @@ const Top100 = () => {
       });
     } catch (error) {
       console.error("Erreur lors de la lecture:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de lecture",
+        description: "Impossible de lire cette chanson"
+      });
     }
   };
 
