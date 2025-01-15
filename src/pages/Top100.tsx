@@ -242,7 +242,22 @@ const Top100 = () => {
   const handleDelete = async (songId: string) => {
     console.log("Attempting to delete song:", songId);
     try {
-      // Supprimer d'abord les stats
+      // 1. Supprimer le fichier audio du stockage
+      const { error: storageError } = await supabase.storage
+        .from('audio')
+        .remove([songId]);
+
+      if (storageError) {
+        console.error("Error deleting audio file:", storageError);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de supprimer le fichier audio",
+        });
+        return;
+      }
+
+      // 2. Supprimer d'abord les stats pour respecter les contraintes de clé étrangère
       const { error: deleteStatsError } = await supabase
         .from('favorite_stats')
         .delete()
@@ -258,10 +273,17 @@ const Top100 = () => {
         return;
       }
 
-      // Mettre à jour l'état local immédiatement
-      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
+      // 3. Supprimer les paroles si elles existent
+      const { error: deleteLyricsError } = await supabase
+        .from('lyrics')
+        .delete()
+        .eq('song_id', songId);
 
-      // Puis supprimer la chanson
+      if (deleteLyricsError) {
+        console.error("Error deleting lyrics:", deleteLyricsError);
+      }
+
+      // 4. Enfin, supprimer la chanson elle-même
       const { error: deleteSongError } = await supabase
         .from('songs')
         .delete()
@@ -276,6 +298,9 @@ const Top100 = () => {
         });
         return;
       }
+
+      // 5. Mettre à jour l'état local immédiatement
+      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
 
       toast({
         title: "Succès",
