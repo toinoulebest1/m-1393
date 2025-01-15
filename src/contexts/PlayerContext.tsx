@@ -58,12 +58,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentSong(song);
       if (audioRef.current) {
         try {
-          // Vérifie si l'URL est valide
-          const response = await fetch(song.url);
-          if (!response.ok) {
-            throw new Error('URL audio invalide');
-          }
-
           audioRef.current.src = song.url;
           console.log("Set audio source to:", song.url);
           await audioRef.current.play();
@@ -168,7 +162,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ? prev.filter(s => s.id !== song.id)
         : [...prev, song];
       
-      // Sauvegarder dans localStorage
       localStorage.setItem('favorites', JSON.stringify(newFavorites));
       return newFavorites;
     });
