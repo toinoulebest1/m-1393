@@ -27,13 +27,23 @@ export const Player = () => {
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
     
-    const [minutes, seconds] = currentSong.duration.split(':').map(Number);
-    const totalSeconds = minutes * 60 + seconds;
-    const currentTime = (progress / 100) * totalSeconds;
-    const currentMinutes = Math.floor(currentTime / 60);
-    const currentSeconds = Math.floor(currentTime % 60);
+    // If duration is missing, calculate it from the audio element
+    const duration = currentSong.duration || "0:00";
     
-    return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+    try {
+      const [minutes, seconds] = duration.split(':').map(Number);
+      if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+      
+      const totalSeconds = minutes * 60 + seconds;
+      const currentTime = (progress / 100) * totalSeconds;
+      const currentMinutes = Math.floor(currentTime / 60);
+      const currentSeconds = Math.floor(currentTime % 60);
+      
+      return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "0:00";
+    }
   };
 
   const handleFavorite = () => {
