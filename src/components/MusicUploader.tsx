@@ -27,80 +27,79 @@ export const MusicUploader = () => {
       }
 
       try {
-        // Créer une URL pour le fichier audio avant l'extraction des métadonnées
         const audioUrl = URL.createObjectURL(file);
         console.log("URL audio créée:", audioUrl);
 
-        // Extraire les métadonnées
-        const metadata = await mm.parseBlob(file);
-        console.log("Métadonnées extraites avec succès:", metadata);
+        // Créer un élément audio pour obtenir la durée
+        const audio = new Audio(audioUrl);
+        
+        // Utiliser une Promise pour s'assurer d'avoir la durée avant de continuer
+        const getDuration = new Promise<number>((resolve, reject) => {
+          audio.addEventListener('loadedmetadata', () => {
+            console.log("Durée audio détectée:", audio.duration);
+            resolve(audio.duration);
+          });
+          
+          audio.addEventListener('error', (e) => {
+            console.error("Erreur lors du chargement de l'audio:", e);
+            reject(new Error("Erreur lors du chargement de l'audio"));
+          });
+        });
 
-        // Obtenir la durée réelle du fichier audio
-        const duration = metadata.format.duration || 0;
-        console.log("Durée extraite:", duration);
+        // Attendre que la durée soit disponible
+        const duration = await getDuration;
+        console.log("Durée obtenue:", duration);
         const formattedDuration = formatDuration(duration);
         console.log("Durée formatée:", formattedDuration);
 
-        // Obtenir l'image de la pochette si elle existe
-        let imageUrl = "https://picsum.photos/240/240"; // Image par défaut
-        if (metadata.common.picture && metadata.common.picture.length > 0) {
-          const picture = metadata.common.picture[0];
-          const blob = new Blob([picture.data], { type: picture.format });
-          imageUrl = URL.createObjectURL(blob);
-          console.log("Image de pochette trouvée et convertie en URL");
-        }
-
-        // Créer un objet song avec les informations du fichier
-        const song = {
-          id: Date.now().toString(),
-          title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-          artist: metadata.common.artist || "Unknown Artist",
-          duration: formattedDuration,
-          url: audioUrl,
-          imageUrl: imageUrl
-        };
-
-        console.log("Objet chanson créé:", song);
-
-        // Jouer la chanson
-        play(song);
-        
-        toast.success(t('common.fileSelected', { count: 1 }));
-      } catch (error) {
-        console.error("Erreur détaillée lors de l'extraction des métadonnées:", error);
-        
-        // Essayer de créer un objet song minimal même si les métadonnées échouent
         try {
-          const audioUrl = URL.createObjectURL(file);
+          // Essayer d'extraire les métadonnées
+          const metadata = await mm.parseBlob(file);
+          console.log("Métadonnées extraites avec succès:", metadata);
+
+          // Obtenir l'image de la pochette si elle existe
+          let imageUrl = "https://picsum.photos/240/240"; // Image par défaut
+          if (metadata.common.picture && metadata.common.picture.length > 0) {
+            const picture = metadata.common.picture[0];
+            const blob = new Blob([picture.data], { type: picture.format });
+            imageUrl = URL.createObjectURL(blob);
+            console.log("Image de pochette trouvée et convertie en URL");
+          }
+
+          const song = {
+            id: Date.now().toString(),
+            title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
+            artist: metadata.common.artist || "Unknown Artist",
+            duration: formattedDuration,
+            url: audioUrl,
+            imageUrl: imageUrl
+          };
+
+          console.log("Objet chanson créé avec métadonnées:", song);
+          play(song);
+          toast.success(t('common.fileSelected', { count: 1 }));
+
+        } catch (metadataError) {
+          console.error("Erreur lors de l'extraction des métadonnées:", metadataError);
           
-          // Créer un élément audio temporaire pour obtenir la durée
-          const audio = new Audio(audioUrl);
-          audio.addEventListener('loadedmetadata', () => {
-            const duration = formatDuration(audio.duration);
-            console.log("Durée obtenue via l'élément Audio:", duration);
-            
-            const song = {
-              id: Date.now().toString(),
-              title: file.name.replace(/\.[^/.]+$/, ""),
-              artist: "Unknown Artist",
-              duration: duration,
-              url: audioUrl,
-              imageUrl: "https://picsum.photos/240/240"
-            };
+          // Créer un objet song minimal avec la durée correcte
+          const song = {
+            id: Date.now().toString(),
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            artist: "Unknown Artist",
+            duration: formattedDuration,
+            url: audioUrl,
+            imageUrl: "https://picsum.photos/240/240"
+          };
 
-            console.log("Création d'un objet chanson minimal après erreur:", song);
-            play(song);
-            toast.success(t('common.fileSelected', { count: 1 }));
-          });
-
-          audio.addEventListener('error', (e) => {
-            console.error("Erreur lors du chargement de l'audio:", e);
-            toast.error("Erreur lors de la lecture du fichier");
-          });
-        } catch (fallbackError) {
-          console.error("Erreur lors de la création de l'objet chanson minimal:", fallbackError);
-          toast.error("Erreur lors de la lecture du fichier");
+          console.log("Création d'un objet chanson minimal avec durée:", song);
+          play(song);
+          toast.success(t('common.fileSelected', { count: 1 }));
         }
+
+      } catch (error) {
+        console.error("Erreur lors de la création de l'objet chanson:", error);
+        toast.error("Erreur lors de la lecture du fichier");
       }
     }
   };
