@@ -49,17 +49,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [searchQuery, setSearchQuery] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const play = (song?: Song) => {
-    if (song && song !== currentSong) {
+  const play = async (song?: Song) => {
+    console.log("Play function called with song:", song);
+    
+    if (song && (!currentSong || song.id !== currentSong.id)) {
+      console.log("Setting new current song:", song);
       setCurrentSong(song);
       if (audioRef.current) {
-        audioRef.current.src = song.url;
-        audioRef.current.play();
+        try {
+          audioRef.current.src = song.url;
+          console.log("Set audio source to:", song.url);
+          await audioRef.current.play();
+          console.log("Audio playback started");
+          setIsPlaying(true);
+        } catch (error) {
+          console.error("Error playing audio:", error);
+          throw error;
+        }
       }
     } else if (audioRef.current) {
-      audioRef.current.play();
+      try {
+        await audioRef.current.play();
+        console.log("Resuming audio playback");
+        setIsPlaying(true);
+      } catch (error) {
+        console.error("Error resuming audio:", error);
+        throw error;
+      }
     }
-    setIsPlaying(true);
   };
 
   const pause = () => {
@@ -160,11 +177,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (repeatMode === 'one') {
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
-          audioRef.current.play();
+          audioRef.current.play().catch(console.error);
         }
       } else {
         nextSong();
       }
+    });
+
+    audioRef.current.addEventListener('play', () => {
+      console.log("Audio started playing");
+      setIsPlaying(true);
+    });
+
+    audioRef.current.addEventListener('pause', () => {
+      console.log("Audio paused");
+      setIsPlaying(false);
+    });
+
+    audioRef.current.addEventListener('error', (e) => {
+      console.error("Audio error:", e);
     });
 
     return () => {

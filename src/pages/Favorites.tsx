@@ -8,9 +8,43 @@ import { toast } from "sonner";
 
 const Favorites = () => {
   const { t } = useTranslation();
-  const { favorites, play, currentSong, isPlaying, addToQueue } = usePlayer();
+  const { 
+    favorites, 
+    play, 
+    currentSong, 
+    isPlaying, 
+    addToQueue,
+    queue 
+  } = usePlayer();
   
   console.log("Current favorites:", favorites);
+  console.log("Current queue:", queue);
+
+  const handlePlay = async (song: any) => {
+    console.log("Attempting to play song:", song);
+    
+    try {
+      // On joue d'abord la chanson sélectionnée
+      await play(song);
+      console.log("Song started playing:", song.title);
+      
+      // On ajoute le reste des chansons à la queue
+      const songIndex = favorites.findIndex(fav => fav.id === song.id);
+      const remainingSongs = favorites.slice(songIndex + 1);
+      console.log("Adding to queue:", remainingSongs);
+      
+      // Vider la file d'attente actuelle et ajouter les nouvelles chansons
+      remainingSongs.forEach(nextSong => {
+        console.log("Adding to queue:", nextSong.title);
+        addToQueue(nextSong);
+      });
+
+      toast.success(`Lecture de ${song.title}`);
+    } catch (error) {
+      console.error("Error playing song:", error);
+      toast.error("Erreur lors de la lecture de la musique");
+    }
+  };
 
   if (favorites.length === 0) {
     return (
@@ -25,21 +59,6 @@ const Favorites = () => {
       </div>
     );
   }
-
-  const handlePlay = (song: any) => {
-    console.log("Attempting to play song:", song);
-    
-    // On joue d'abord la chanson sélectionnée
-    play(song);
-    
-    // On ajoute le reste des chansons à la queue
-    const songIndex = favorites.findIndex(fav => fav.id === song.id);
-    const remainingSongs = favorites.slice(songIndex + 1);
-    console.log("Adding to queue:", remainingSongs);
-    remainingSongs.forEach(song => addToQueue(song));
-
-    toast.success(`Lecture de ${song.title}`);
-  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824]">
