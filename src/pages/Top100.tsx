@@ -118,8 +118,7 @@ const Top100 = () => {
               duration
             )
           `)
-          .order('count', { ascending: false })
-          .limit(100);
+          .order('count', { ascending: false });
 
         if (error) {
           console.error("Error fetching favorite stats:", error);
@@ -133,20 +132,38 @@ const Top100 = () => {
 
         console.log("Received favorite stats:", data);
 
-        const formattedStats = data.map(stat => ({
-          songId: stat.song_id,
-          count: stat.count,
-          lastUpdated: stat.last_updated,
-          song: {
-            id: stat.songs.id,
-            title: stat.songs.title,
-            artist: stat.songs.artist,
-            url: stat.songs.file_path,
-            duration: stat.songs.duration || "0:00"
+        // Grouper les stats par titre de chanson
+        const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
+          const title = stat.songs.title;
+          if (!acc[title]) {
+            acc[title] = {
+              songId: stat.song_id,
+              count: stat.count,
+              lastUpdated: stat.last_updated,
+              song: {
+                id: stat.songs.id,
+                title: stat.songs.title,
+                artist: stat.songs.artist,
+                url: stat.songs.file_path,
+                duration: stat.songs.duration || "0:00"
+              }
+            };
+          } else {
+            // Additionner les counts pour le même titre
+            acc[title].count += stat.count;
+            // Mettre à jour lastUpdated si plus récent
+            if (new Date(stat.last_updated) > new Date(acc[title].lastUpdated)) {
+              acc[title].lastUpdated = stat.last_updated;
+            }
           }
-        }));
+          return acc;
+        }, {});
 
-        console.log("Formatted stats:", formattedStats);
+        const formattedStats = Object.values(groupedStats)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 100);
+
+        console.log("Formatted and grouped stats:", formattedStats);
         setFavoriteStats(formattedStats);
       } catch (error) {
         console.error("Error in fetchFavoriteStats:", error);
