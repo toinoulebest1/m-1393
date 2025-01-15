@@ -11,6 +11,13 @@ interface Song {
   imageUrl?: string;
 }
 
+interface FavoriteStat {
+  songId: string;
+  count: number;
+  lastUpdated: number;
+  song: Song;
+}
+
 interface PlayerContextType {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -21,6 +28,7 @@ interface PlayerContextType {
   repeatMode: 'none' | 'one' | 'all';
   favorites: Song[];
   searchQuery: string;
+  favoriteStats: FavoriteStat[];
   play: (song?: Song) => void;
   pause: () => void;
   setVolume: (volume: number) => void;
@@ -53,6 +61,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedFavorites ? JSON.parse(savedFavorites) : [];
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>(() => {
+    const savedStats = localStorage.getItem('favoriteStats');
+    return savedStats ? JSON.parse(savedStats) : [];
+  });
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
 
   useEffect(() => {
@@ -214,6 +226,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             url: favoriteId
           };
           newFavorites = [...prev, favoriteSong];
+          
+          // Mise à jour des statistiques
+          setFavoriteStats(prevStats => {
+            const existingStat = prevStats.find(stat => stat.songId === song.id);
+            const newStats = prevStats.filter(stat => stat.songId !== song.id);
+            
+            const updatedStat = {
+              songId: song.id,
+              count: (existingStat?.count || 0) + 1,
+              lastUpdated: Date.now(),
+              song: favoriteSong
+            };
+            
+            const updatedStats = [...newStats, updatedStat]
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 100);
+            
+            localStorage.setItem('favoriteStats', JSON.stringify(updatedStats));
+            return updatedStats;
+          });
+          
           toast.success("Ajouté aux favoris");
         }
         
@@ -286,6 +319,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         repeatMode,
         favorites,
         searchQuery,
+        favoriteStats,
         play,
         pause,
         setVolume: updateVolume,
