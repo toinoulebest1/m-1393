@@ -26,49 +26,76 @@ const Top100 = () => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        console.error("Session error:", sessionError);
-        navigate('/auth');
-        return;
-      }
-
-      const checkAdminStatus = async () => {
-        console.log("Checking admin status...");
-        const { data: { user } } = await supabase.auth.getUser();
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (!user) {
-          console.log("No user found");
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          navigate('/auth');
           return;
         }
-        
-        console.log("Fetching user role for:", user.id);
-        const { data: userRole, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
 
-        if (error) {
-          console.error("Error fetching user role:", error);
-          if (error.code === 'PGRST116') {
+        if (!session) {
+          console.log("No active session found");
+          navigate('/auth');
+          return;
+        }
+
+        const checkAdminStatus = async () => {
+          try {
+            console.log("Checking admin status...");
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            
+            if (userError) {
+              console.error("User fetch error:", userError);
+              if (userError.message.includes("session_not_found")) {
+                await supabase.auth.signOut();
+                navigate('/auth');
+              }
+              return;
+            }
+
+            if (!user) {
+              console.log("No user found");
+              navigate('/auth');
+              return;
+            }
+            
+            console.log("Fetching user role for:", user.id);
+            const { data: userRole, error: roleError } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id)
+              .single();
+
+            if (roleError) {
+              console.error("Error fetching user role:", roleError);
+              if (roleError.code === 'PGRST116') {
+                navigate('/auth');
+                return;
+              }
+              return;
+            }
+
+            console.log("User role:", userRole);
+            setIsAdmin(userRole?.role === 'admin');
+          } catch (error) {
+            console.error("Admin check error:", error);
             navigate('/auth');
-            return;
           }
-          return;
-        }
+        };
 
-        console.log("User role:", userRole);
-        setIsAdmin(userRole?.role === 'admin');
-      };
-
-      await checkAdminStatus();
+        await checkAdminStatus();
+      } catch (error) {
+        console.error("Session check error:", error);
+        navigate('/auth');
+      }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
       if (event === 'SIGNED_OUT' || !session) {
         navigate('/auth');
       }
