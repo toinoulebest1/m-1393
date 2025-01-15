@@ -10,29 +10,29 @@ import { useEffect, useState } from "react";
 
 type Theme = {
   name: string;
-  gradient: string;
+  classes: string;
 };
 
 const themes: Theme[] = [
   {
     name: "Défaut",
-    gradient: "from-spotify-dark via-[#1e2435] to-[#141824]"
+    classes: "from-spotify-dark via-[#1e2435] to-[#141824]"
   },
   {
     name: "Violet",
-    gradient: "from-purple-900 via-violet-800 to-purple-900"
+    classes: "from-purple-900 via-violet-800 to-purple-900"
   },
   {
     name: "Ocean",
-    gradient: "from-blue-900 via-blue-800 to-indigo-900"
+    classes: "from-blue-900 via-blue-800 to-indigo-900"
   },
   {
     name: "Forêt",
-    gradient: "from-green-900 via-emerald-800 to-green-900"
+    classes: "from-green-900 via-emerald-800 to-green-900"
   },
   {
     name: "Sunset",
-    gradient: "from-orange-900 via-red-800 to-pink-900"
+    classes: "from-orange-900 via-red-800 to-pink-900"
   }
 ];
 
@@ -42,21 +42,13 @@ export function ThemeToggle() {
   useEffect(() => {
     const root = window.document.documentElement;
     
-    // First, remove all possible gradient classes from all themes
+    // Remove all existing theme classes
     themes.forEach(theme => {
-      const gradientClasses = theme.gradient.split(' ');
-      gradientClasses.forEach(className => {
-        root.classList.remove(className);
-      });
+      root.classList.remove(...theme.classes.split(' '));
     });
-    root.classList.remove("bg-gradient-to-br");
     
-    // Then add the new theme's gradient classes
-    const newGradientClasses = currentTheme.gradient.split(' ');
-    root.classList.add("bg-gradient-to-br");
-    newGradientClasses.forEach(className => {
-      root.classList.add(className);
-    });
+    // Add new theme classes
+    root.classList.add('bg-gradient-to-br', ...currentTheme.classes.split(' '));
     
     console.log("Theme changed to:", currentTheme.name);
   }, [currentTheme]);
@@ -81,7 +73,7 @@ export function ThemeToggle() {
               currentTheme.name === theme.name ? 'bg-white/10' : ''
             }`}
           >
-            <div className={`w-3 h-3 rounded-full mr-2 bg-gradient-to-br ${theme.gradient}`} />
+            <div className={`w-3 h-3 rounded-full mr-2 bg-gradient-to-br ${theme.classes}`} />
             <span>{theme.name}</span>
           </DropdownMenuItem>
         ))}
