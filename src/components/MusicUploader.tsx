@@ -15,6 +15,10 @@ export const MusicUploader = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const generateUUID = () => {
+    return crypto.randomUUID();
+  };
+
   const processAudioFile = async (file: File) => {
     console.log("Traitement du fichier:", file.name);
     
@@ -24,7 +28,7 @@ export const MusicUploader = () => {
     }
 
     try {
-      const id = Date.now().toString() + Math.random();
+      const id = generateUUID();
       await storeAudioFile(id, file);
       
       const audio = new Audio(URL.createObjectURL(file));
@@ -60,7 +64,7 @@ export const MusicUploader = () => {
           title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
           artist: metadata.common.artist || "Unknown Artist",
           duration: formattedDuration,
-          url: id, // On stocke l'ID au lieu de l'URL blob
+          url: id,
           imageUrl: imageUrl
         };
 
