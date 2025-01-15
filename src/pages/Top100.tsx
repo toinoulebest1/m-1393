@@ -34,6 +34,7 @@ interface FavoriteStat {
 }
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
+const HIDDEN_SONGS_KEY = 'top100_hidden_songs';
 
 const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
@@ -42,7 +43,14 @@ const Top100 = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
-  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(new Set());
+  const [hiddenSongs, setHiddenSongs] = useState<Set<string>>(() => {
+    const savedHiddenSongs = localStorage.getItem(HIDDEN_SONGS_KEY);
+    return savedHiddenSongs ? new Set(JSON.parse(savedHiddenSongs)) : new Set();
+  });
+
+  useEffect(() => {
+    localStorage.setItem(HIDDEN_SONGS_KEY, JSON.stringify(Array.from(hiddenSongs)));
+  }, [hiddenSongs]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -271,7 +279,6 @@ const Top100 = () => {
     }
   };
 
-  // Filtrer les chansons masquées
   const visibleSongs = favoriteStats.filter(stat => !hiddenSongs.has(stat.songId));
 
   if (visibleSongs.length === 0) {
