@@ -1,17 +1,34 @@
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { usePlayer } from "@/contexts/PlayerContext";
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
+  const { play } = usePlayer();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      // Pour l'instant, on affiche juste un message de succès
-      // Plus tard, on pourra gérer l'upload vers Supabase
-      toast.success(`${files.length} fichier(s) sélectionné(s)`);
-      console.log("Fichiers sélectionnés:", files);
+    if (files && files.length > 0) {
+      const file = files[0];
+      console.log("Fichier sélectionné:", file);
+
+      // Créer une URL pour le fichier audio
+      const audioUrl = URL.createObjectURL(file);
+
+      // Créer un objet song avec les informations du fichier
+      const song = {
+        id: Date.now().toString(), // Génère un ID unique
+        title: file.name.replace(/\.[^/.]+$/, ""), // Nom du fichier sans extension
+        artist: "Local File", // Artiste par défaut pour les fichiers locaux
+        duration: "0:00", // La durée sera mise à jour lors de la lecture
+        url: audioUrl
+      };
+
+      // Jouer la chanson
+      play(song);
+      
+      toast.success(t('common.fileSelected', { count: files.length }));
     }
   };
 
@@ -23,7 +40,6 @@ export const MusicUploader = () => {
         <input
           type="file"
           accept="audio/*"
-          multiple
           className="hidden"
           onChange={handleFileUpload}
         />
