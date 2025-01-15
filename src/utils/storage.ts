@@ -1,12 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export const storeAudioFile = async (id: string, file: File) => {
+export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
+  
+  // If file is a string (URL), fetch it first
+  let fileToUpload: File;
+  if (typeof file === 'string') {
+    try {
+      const response = await fetch(file);
+      const blob = await response.blob();
+      fileToUpload = new File([blob], id, { type: blob.type });
+    } catch (error) {
+      console.error("Erreur lors de la conversion de l'URL en fichier:", error);
+      throw error;
+    }
+  } else {
+    fileToUpload = file;
+  }
+
   const { data, error } = await supabase.storage
     .from('audio')
-    .upload(id, file, {
+    .upload(id, fileToUpload, {
       cacheControl: '3600',
-      upsert: false
+      upsert: true // Changed to true to allow overwriting
     });
 
   if (error) {
@@ -20,6 +36,19 @@ export const storeAudioFile = async (id: string, file: File) => {
 
 export const getAudioFile = async (id: string) => {
   console.log("Récupération du fichier audio:", id);
+  
+  // First check if the file exists
+  const { data: existingFile } = await supabase.storage
+    .from('audio')
+    .list('', {
+      search: id
+    });
+
+  if (!existingFile || existingFile.length === 0) {
+    console.error("Fichier non trouvé dans le stockage:", id);
+    throw new Error('Fichier audio non trouvé');
+  }
+
   const { data, error } = await supabase.storage
     .from('audio')
     .createSignedUrl(id, 3600); // URL valide pendant 1 heure

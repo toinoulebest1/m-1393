@@ -79,10 +79,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log("Setting new current song:", song);
       setCurrentSong(song);
       try {
-        const audioUrl = await getAudioFile(song.url);
+        let audioUrl: string;
+        try {
+          audioUrl = await getAudioFile(song.url);
+        } catch (error) {
+          console.log("File not found in storage, attempting to store it first");
+          await storeAudioFile(song.url, song.url);
+          audioUrl = await getAudioFile(song.url);
+        }
+
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');
         }
+
         audioRef.current.src = audioUrl;
         console.log("Set audio source to:", audioUrl);
         await audioRef.current.play();
