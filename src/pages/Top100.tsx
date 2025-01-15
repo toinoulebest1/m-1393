@@ -134,20 +134,21 @@ const Top100 = () => {
 
         console.log("Received favorite stats:", data);
 
-        // Grouper les stats par titre de chanson et mettre à jour le compteur
+        // Grouper les stats par titre et artiste de chanson
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
-          if (!stat.songs) return acc; // Skip if song was deleted
+          if (!stat.songs) return acc;
           
-          const title = stat.songs.title;
-          if (!acc[title]) {
-            acc[title] = {
+          const key = `${stat.songs.title.toLowerCase()}-${(stat.songs.artist || '').toLowerCase()}`;
+          
+          if (!acc[key]) {
+            acc[key] = {
               songId: stat.song_id,
               count: stat.count || 0,
               lastUpdated: stat.last_updated,
               song: {
                 id: stat.songs.id,
                 title: stat.songs.title,
-                artist: stat.songs.artist,
+                artist: stat.songs.artist || '',
                 url: stat.songs.file_path,
                 duration: stat.songs.duration || "0:00"
               }
@@ -155,10 +156,11 @@ const Top100 = () => {
           } else {
             // Mettre à jour le compteur seulement si la stat existe
             if (stat.count) {
-              acc[title].count = (acc[title].count || 0) + stat.count;
+              acc[key].count = (acc[key].count || 0) + stat.count;
             }
-            if (new Date(stat.last_updated) > new Date(acc[title].lastUpdated)) {
-              acc[title].lastUpdated = stat.last_updated;
+            // Mettre à jour la date si plus récente
+            if (new Date(stat.last_updated) > new Date(acc[key].lastUpdated)) {
+              acc[key].lastUpdated = stat.last_updated;
             }
           }
           return acc;
