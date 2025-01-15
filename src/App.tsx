@@ -73,8 +73,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => (
-  <I18nextProvider i18n={i18n}>
-    <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
+    <I18nextProvider i18n={i18n}>
       <TooltipProvider>
         <PlayerProvider>
           <Toaster />
@@ -116,8 +116,8 @@ const App = () => (
           </Suspense>
         </PlayerProvider>
       </TooltipProvider>
-    </QueryClientProvider>
-  </I18nextProvider>
+    </I18nextProvider>
+  </QueryClientProvider>
 );
 
 export default App;
