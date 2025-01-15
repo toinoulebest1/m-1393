@@ -24,6 +24,8 @@ export const Equalizer = ({ audioContext, sourceNode }: EqualizerProps) => {
   const [gains, setGains] = useState<number[]>(new Array(BANDS.length).fill(0));
 
   useEffect(() => {
+    console.log("Initializing equalizer filters");
+    
     // Création des filtres
     const newFilters = BANDS.map(({ frequency }) => {
       const filter = audioContext.createBiquadFilter();
@@ -41,13 +43,25 @@ export const Equalizer = ({ audioContext, sourceNode }: EqualizerProps) => {
       prevNode.connect(filter);
       prevNode = filter;
     });
-    newFilters[newFilters.length - 1].connect(audioContext.destination);
+    
+    // Connexion du dernier filtre à la destination
+    const lastFilter = newFilters[newFilters.length - 1];
+    if (lastFilter) {
+      console.log("Connecting last filter to destination");
+      lastFilter.connect(audioContext.destination);
+    }
 
     setFilters(newFilters);
 
+    // Cleanup function
     return () => {
-      newFilters.forEach(filter => filter.disconnect());
+      console.log("Cleaning up equalizer");
+      newFilters.forEach(filter => {
+        filter.disconnect();
+      });
+      // Reconnect source directly to destination when equalizer is removed
       sourceNode.disconnect();
+      sourceNode.connect(audioContext.destination);
     };
   }, [audioContext, sourceNode]);
 
