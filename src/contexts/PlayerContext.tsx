@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface Song {
   id: string;
@@ -57,14 +58,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentSong(song);
       if (audioRef.current) {
         try {
+          // Vérifie si l'URL est valide
+          const response = await fetch(song.url);
+          if (!response.ok) {
+            throw new Error('URL audio invalide');
+          }
+
           audioRef.current.src = song.url;
           console.log("Set audio source to:", song.url);
           await audioRef.current.play();
           console.log("Audio playback started");
           setIsPlaying(true);
+          toast.success(`Lecture de ${song.title}`);
         } catch (error) {
           console.error("Error playing audio:", error);
-          throw error;
+          toast.error("Impossible de lire ce fichier audio. Il n'est peut-être plus disponible.");
+          setCurrentSong(null);
+          setIsPlaying(false);
         }
       }
     } else if (audioRef.current) {
@@ -74,7 +84,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsPlaying(true);
       } catch (error) {
         console.error("Error resuming audio:", error);
-        throw error;
+        toast.error("Erreur lors de la reprise de la lecture");
+        setIsPlaying(false);
       }
     }
   };
@@ -165,46 +176,62 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     audioRef.current = new Audio();
+    audioRef.current.volume = volume / 100;
     
-    audioRef.current.addEventListener('timeupdate', () => {
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      toast.error("Erreur lors de la lecture audio");
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      if (repeatMode === 'one' && audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {
+          toast.error("Erreur lors de la reprise de la lecture");
+        });
+      } else {
+        nextSong();
+      }
+    };
+
+    const handlePlay = () => {
+      console.log("Audio started playing");
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      console.log("Audio paused");
+      setIsPlaying(false);
+    };
+
+    const handleTimeUpdate = () => {
       if (audioRef.current) {
         const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
         setProgress(percentage);
       }
-    });
+    };
 
-    audioRef.current.addEventListener('ended', () => {
-      if (repeatMode === 'one') {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(console.error);
-        }
-      } else {
-        nextSong();
-      }
-    });
-
-    audioRef.current.addEventListener('play', () => {
-      console.log("Audio started playing");
-      setIsPlaying(true);
-    });
-
-    audioRef.current.addEventListener('pause', () => {
-      console.log("Audio paused");
-      setIsPlaying(false);
-    });
-
-    audioRef.current.addEventListener('error', (e) => {
-      console.error("Audio error:", e);
-    });
+    if (audioRef.current) {
+      audioRef.current.addEventListener('error', handleError);
+      audioRef.current.addEventListener('ended', handleEnded);
+      audioRef.current.addEventListener('play', handlePlay);
+      audioRef.current.addEventListener('pause', handlePause);
+      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    }
 
     return () => {
       if (audioRef.current) {
+        audioRef.current.removeEventListener('error', handleError);
+        audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.pause();
         audioRef.current.src = '';
       }
     };
-  }, [repeatMode]);
+  }, [repeatMode, volume]);
 
   return (
     <PlayerContext.Provider
@@ -220,7 +247,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         searchQuery,
         play,
         pause,
-        setVolume: updateVolume,
+        setVolume,
         setProgress: updateProgress,
         nextSong,
         previousSong,
