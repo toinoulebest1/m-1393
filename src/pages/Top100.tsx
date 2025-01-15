@@ -6,7 +6,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -23,16 +23,28 @@ const Top100 = () => {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
+      console.log("Checking admin status...");
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: roles } = await supabase
+      
+      if (!user) {
+        console.log("No user found");
+        return;
+      }
+      
+      console.log("Fetching user role for:", user.id);
+      const { data: userRole, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .single();
 
-      setIsAdmin(roles?.role === 'admin');
+      if (error) {
+        console.error("Error fetching user role:", error);
+        return;
+      }
+
+      console.log("User role:", userRole);
+      setIsAdmin(userRole?.role === 'admin');
     };
 
     checkAdminStatus();
@@ -90,6 +102,7 @@ const Top100 = () => {
   };
 
   const handleDelete = async (songId: string) => {
+    console.log("Attempting to delete song:", songId);
     try {
       const { error } = await supabase
         .from('songs')
@@ -97,7 +110,7 @@ const Top100 = () => {
         .eq('id', songId);
 
       if (error) {
-        console.error("Erreur lors de la suppression:", error);
+        console.error("Error deleting song:", error);
         toast({
           variant: "destructive",
           title: "Erreur",
@@ -120,7 +133,7 @@ const Top100 = () => {
         window.location.reload(); // Recharger la page pour mettre à jour la liste
       }
     } catch (error) {
-      console.error("Erreur lors de la suppression:", error);
+      console.error("Error during deletion:", error);
       toast({
         variant: "destructive",
         title: "Erreur",
