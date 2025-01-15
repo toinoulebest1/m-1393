@@ -40,7 +40,7 @@ const Top100 = () => {
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [selectedSong, setSelectedSong] = useState<{ id: string; title: string } | null>(null);
+  const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -471,6 +471,7 @@ const Top100 = () => {
                           setSelectedSong({
                             id: stat.song.id,
                             title: stat.song.title,
+                            artist: stat.song.artist,
                           });
                         }}
                       >
@@ -504,6 +505,7 @@ const Top100 = () => {
         onClose={() => setSelectedSong(null)}
         songId={selectedSong?.id || ''}
         songTitle={selectedSong?.title || ''}
+        artist={selectedSong?.artist || ''}
       />
     </div>
   );
