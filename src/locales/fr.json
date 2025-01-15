@@ -1,11 +1,18 @@
 {
   "common": {
+    "home": "Accueil",
+    "library": "Bibliothèque",
+    "favorites": "Favoris",
     "nowPlaying": "En cours de lecture",
     "queue": "File d'attente",
-    "upload": "Importer",
-    "playlists": "Playlists",
-    "home": "Accueil",
     "search": "Rechercher",
-    "library": "Bibliothèque"
+    "upload": "Importer",
+    "uploadMusic": "Importer de la musique",
+    "dragAndDrop": "Glissez et déposez vos fichiers ici",
+    "or": "ou",
+    "browse": "Parcourir",
+    "uploading": "Importation en cours...",
+    "success": "Succès",
+    "error": "Erreur"
   }
 }

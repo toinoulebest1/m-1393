@@ -1,11 +1,18 @@
 {
   "common": {
+    "home": "Home",
+    "library": "Library",
+    "favorites": "Favorites",
     "nowPlaying": "Now Playing",
     "queue": "Queue",
-    "upload": "Upload",
-    "playlists": "Playlists",
-    "home": "Home",
     "search": "Search",
-    "library": "Library"
+    "upload": "Upload",
+    "uploadMusic": "Upload Music",
+    "dragAndDrop": "Drag and drop your files here",
+    "or": "or",
+    "browse": "Browse",
+    "uploading": "Uploading...",
+    "success": "Success",
+    "error": "Error"
   }
 }
