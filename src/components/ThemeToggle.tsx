@@ -41,12 +41,17 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const root = window.document.documentElement;
+    
     // Remove all possible theme gradients
     themes.forEach(theme => {
-      root.classList.remove(`bg-gradient-to-br`, theme.gradient);
+      // Remove classes individually to avoid the whitespace issue
+      root.classList.remove("bg-gradient-to-br");
+      root.classList.remove(theme.gradient);
     });
-    // Add the selected theme gradient
-    root.classList.add(`bg-gradient-to-br`, currentTheme.gradient);
+    
+    // Add the new theme classes individually
+    root.classList.add("bg-gradient-to-br");
+    root.classList.add(currentTheme.gradient);
     
     // Log the theme change for debugging
     console.log("Theme changed to:", currentTheme.name);
