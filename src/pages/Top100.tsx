@@ -106,7 +106,6 @@ const Top100 = () => {
       try {
         console.log("Fetching favorite stats...");
         
-        // Fetch favorite stats excluding hidden songs using a join
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
@@ -183,7 +182,6 @@ const Top100 = () => {
 
     fetchFavoriteStats();
 
-    // Subscribe to changes in both favorite_stats and hidden_songs tables
     const favoriteStatsChannel = supabase
       .channel('favorite_stats_changes')
       .on(
@@ -240,7 +238,6 @@ const Top100 = () => {
       const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
       const remainingSongs = favoriteStats
         .slice(songIndex + 1)
-        .filter(stat => !hiddenSongs.has(stat.songId))
         .map(stat => stat.song);
       
       console.log("Ajout à la file d'attente:", remainingSongs);
