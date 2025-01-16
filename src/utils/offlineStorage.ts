@@ -4,6 +4,19 @@ export const downloadAndStoreAudio = async (songId: string, audioUrl: string, so
   console.log("Downloading audio file:", songId, "with metadata:", songMetadata);
   
   try {
+    // Vérifier si la chanson est déjà téléchargée
+    const { data: existingDownload } = await supabase
+      .from('offline_songs')
+      .select('*')
+      .eq('song_id', songId)
+      .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+      .maybeSingle();
+
+    if (existingDownload) {
+      console.log("Song already downloaded:", songId);
+      return true;
+    }
+
     // Télécharger le fichier audio
     const response = await fetch(audioUrl);
     if (!response.ok) throw new Error('Failed to download audio file');
