@@ -16,6 +16,7 @@ interface DownloadedSong {
   duration: string;
   downloaded_at: string;
   last_played_at: string | null;
+  file_path: string; // Ajout du file_path pour le stockage
 }
 
 const Downloads = () => {
@@ -36,7 +37,8 @@ const Downloads = () => {
             id,
             title,
             artist,
-            duration
+            duration,
+            file_path
           )
         `)
         .order('downloaded_at', { ascending: false });
@@ -53,7 +55,8 @@ const Downloads = () => {
         artist: item.songs.artist || t('common.unknownArtist'),
         duration: item.songs.duration || '0:00',
         downloaded_at: new Date(item.downloaded_at).toLocaleDateString(),
-        last_played_at: item.last_played_at ? new Date(item.last_played_at).toLocaleDateString() : null
+        last_played_at: item.last_played_at ? new Date(item.last_played_at).toLocaleDateString() : null,
+        file_path: item.songs.file_path // Stockage du file_path
       }));
 
       setDownloads(formattedDownloads);
@@ -71,8 +74,11 @@ const Downloads = () => {
 
   const handlePlay = async (song: DownloadedSong) => {
     try {
-      const audioBlob = await getOfflineAudio(song.id);
+      console.log("Trying to play offline song:", song);
+      // Utiliser le file_path au lieu de l'id pour récupérer l'audio
+      const audioBlob = await getOfflineAudio(song.file_path);
       if (!audioBlob) {
+        console.error("Audio file not found for:", song);
         toast.error(t('common.audioFileNotFound'));
         return;
       }
@@ -82,9 +88,10 @@ const Downloads = () => {
         title: song.title,
         artist: song.artist,
         duration: song.duration,
-        url: song.id,
+        url: song.file_path, // Utiliser le file_path comme url
       };
 
+      console.log("Adding song to queue:", songToPlay);
       addToQueue(songToPlay);
       
       // Update last_played_at
@@ -101,8 +108,13 @@ const Downloads = () => {
 
   const handleDelete = async (songId: string) => {
     try {
-      // Remove from IndexedDB
-      await removeOfflineAudio(songId);
+      const songToDelete = downloads.find(song => song.id === songId);
+      if (!songToDelete) {
+        throw new Error("Song not found");
+      }
+
+      // Remove from IndexedDB using file_path
+      await removeOfflineAudio(songToDelete.file_path);
       
       // Remove from Supabase
       const { error } = await supabase
