@@ -75,7 +75,6 @@ const Downloads = () => {
   const handlePlay = async (song: DownloadedSong) => {
     try {
       console.log("Trying to play offline song:", song);
-      // Utiliser le file_path au lieu de l'id pour récupérer l'audio
       const audioBlob = await getOfflineAudio(song.file_path);
       if (!audioBlob) {
         console.error("Audio file not found for:", song);

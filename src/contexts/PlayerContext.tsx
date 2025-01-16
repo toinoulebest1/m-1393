@@ -82,10 +82,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         let audioUrl: string;
         
-        // Vérifier d'abord si le fichier est disponible hors-ligne
+        // Utiliser l'URL comme clé pour le stockage hors-ligne
         const offlineBlob = await getOfflineAudio(song.url);
         if (offlineBlob) {
-          console.log("Using offline audio file");
+          console.log("Using offline audio file from:", song.url);
           audioUrl = URL.createObjectURL(offlineBlob);
         } else {
           console.log("Fetching audio from storage");
