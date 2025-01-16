@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
-import { getOfflineAudio } from "@/utils/offlineStorage";
+import { getOfflineAudio, removeOfflineAudio } from "@/utils/offlineStorage";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface DownloadedSong {
   id: string;
@@ -22,48 +24,48 @@ const Downloads = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { addToQueue } = usePlayer();
 
-  useEffect(() => {
-    const fetchDownloads = async () => {
-      try {
-        const { data: offlineSongs, error } = await supabase
-          .from('offline_songs')
-          .select(`
-            song_id,
-            downloaded_at,
-            last_played_at,
-            songs (
-              id,
-              title,
-              artist,
-              duration
-            )
-          `)
-          .order('downloaded_at', { ascending: false });
+  const fetchDownloads = async () => {
+    try {
+      const { data: offlineSongs, error } = await supabase
+        .from('offline_songs')
+        .select(`
+          song_id,
+          downloaded_at,
+          last_played_at,
+          songs (
+            id,
+            title,
+            artist,
+            duration
+          )
+        `)
+        .order('downloaded_at', { ascending: false });
 
-        if (error) {
-          console.error("Error fetching downloads:", error);
-          toast.error(t('common.errorFetchingDownloads'));
-          return;
-        }
-
-        const formattedDownloads = offlineSongs.map(item => ({
-          id: item.songs.id,
-          title: item.songs.title,
-          artist: item.songs.artist || t('common.unknownArtist'),
-          duration: item.songs.duration || '0:00',
-          downloaded_at: new Date(item.downloaded_at).toLocaleDateString(),
-          last_played_at: item.last_played_at ? new Date(item.last_played_at).toLocaleDateString() : null
-        }));
-
-        setDownloads(formattedDownloads);
-      } catch (error) {
-        console.error("Error in fetchDownloads:", error);
+      if (error) {
+        console.error("Error fetching downloads:", error);
         toast.error(t('common.errorFetchingDownloads'));
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
+      const formattedDownloads = offlineSongs.map(item => ({
+        id: item.songs.id,
+        title: item.songs.title,
+        artist: item.songs.artist || t('common.unknownArtist'),
+        duration: item.songs.duration || '0:00',
+        downloaded_at: new Date(item.downloaded_at).toLocaleDateString(),
+        last_played_at: item.last_played_at ? new Date(item.last_played_at).toLocaleDateString() : null
+      }));
+
+      setDownloads(formattedDownloads);
+    } catch (error) {
+      console.error("Error in fetchDownloads:", error);
+      toast.error(t('common.errorFetchingDownloads'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDownloads();
   }, [t]);
 
@@ -97,6 +99,28 @@ const Downloads = () => {
     }
   };
 
+  const handleDelete = async (songId: string) => {
+    try {
+      // Remove from IndexedDB
+      await removeOfflineAudio(songId);
+      
+      // Remove from Supabase
+      const { error } = await supabase
+        .from('offline_songs')
+        .delete()
+        .eq('song_id', songId);
+
+      if (error) throw error;
+
+      // Update UI
+      setDownloads(prev => prev.filter(song => song.id !== songId));
+      toast.success(t('common.songDeletedSuccessfully'));
+    } catch (error) {
+      console.error("Error deleting song:", error);
+      toast.error(t('common.errorDeletingSong'));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen">
@@ -126,24 +150,34 @@ const Downloads = () => {
           </div>
         ) : (
           <div className="bg-white/5 backdrop-blur-lg rounded-xl shadow-xl">
-            <div className="grid grid-cols-[1fr,1fr,auto,auto,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
+            <div className="grid grid-cols-[1fr,1fr,auto,auto,auto,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
               <div className="font-medium">{t('common.title')}</div>
               <div className="font-medium">{t('common.artist')}</div>
               <div className="font-medium">{t('common.duration')}</div>
               <div className="font-medium">{t('common.downloadedAt')}</div>
               <div className="font-medium">{t('common.lastPlayed')}</div>
+              <div className="font-medium">{t('common.actions')}</div>
             </div>
             {downloads.map((song) => (
               <div
                 key={song.id}
-                onClick={() => handlePlay(song)}
-                className="grid grid-cols-[1fr,1fr,auto,auto,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white cursor-pointer"
+                className="grid grid-cols-[1fr,1fr,auto,auto,auto,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white group"
               >
-                <div>{song.title}</div>
-                <div>{song.artist}</div>
-                <div>{song.duration}</div>
+                <div className="cursor-pointer" onClick={() => handlePlay(song)}>{song.title}</div>
+                <div className="cursor-pointer" onClick={() => handlePlay(song)}>{song.artist}</div>
+                <div className="cursor-pointer" onClick={() => handlePlay(song)}>{song.duration}</div>
                 <div>{song.downloaded_at}</div>
                 <div>{song.last_played_at || '-'}</div>
+                <div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(song.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500 hover:text-red-400" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
