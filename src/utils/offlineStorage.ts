@@ -1,7 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
-export const downloadAndStoreAudio = async (songId: string, audioUrl: string) => {
-  console.log("Downloading audio file:", songId);
+export const downloadAndStoreAudio = async (songId: string, audioUrl: string, songMetadata?: { title: string; artist: string; duration: string }) => {
+  console.log("Downloading audio file:", songId, "with metadata:", songMetadata);
   
   try {
     // Télécharger le fichier audio
@@ -26,13 +26,15 @@ export const downloadAndStoreAudio = async (songId: string, audioUrl: string) =>
       throw songCheckError;
     }
 
-    // Si la chanson n'existe pas, on la crée
+    // Si la chanson n'existe pas, on la crée avec les métadonnées
     if (!existingSong) {
       const { error: songInsertError } = await supabase
         .from('songs')
         .insert({
           id: songId,
-          title: 'Unknown Title',
+          title: songMetadata?.title || 'Unknown Title',
+          artist: songMetadata?.artist || 'Unknown Artist',
+          duration: songMetadata?.duration,
           file_path: songId
         });
 

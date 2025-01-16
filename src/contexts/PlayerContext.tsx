@@ -91,6 +91,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("Fetching audio from storage");
           try {
             audioUrl = await getAudioFile(song.url);
+            
+            // Télécharger pour utilisation hors-ligne avec les métadonnées
+            await downloadAndStoreAudio(song.url, audioUrl, {
+              title: song.title,
+              artist: song.artist,
+              duration: song.duration
+            });
+            
           } catch (error) {
             console.log("File not found in storage, attempting to store it first");
             if (typeof song.url !== 'string') {
