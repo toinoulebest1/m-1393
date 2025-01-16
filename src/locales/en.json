@@ -16,6 +16,13 @@
     "top100": "Top 100",
     "selectSong": "Select a song",
     "noArtist": "Unknown Artist",
-    "logout": "Logout"
+    "logout": "Logout",
+    "downloads": "Downloads",
+    "noDownloads": "No downloads yet",
+    "title": "Title",
+    "artist": "Artist",
+    "duration": "Duration",
+    "downloadedAt": "Downloaded on",
+    "lastPlayed": "Last played"
   }
 }
