@@ -62,17 +62,38 @@ export const MusicUploader = () => {
       
       const response = await lastfm.track.getInfo({
         artist,
-        track: title
+        track: title,
+        autocorrect: 1
       });
 
       if (response?.track?.album?.image) {
         const images = response.track.album.image;
-        const largestImage = images[images.length - 1];
-        return largestImage['#text'] || null;
+        // Recherche de l'image la plus grande
+        const largeImage = images.find(img => img.size === 'extralarge') || 
+                         images.find(img => img.size === 'large') ||
+                         images[images.length - 1];
+        return largeImage?.['#text'] || null;
       }
       return null;
     } catch (error) {
       console.warn("Impossible de récupérer la pochette depuis Last.fm:", error);
+      return null;
+    }
+  };
+
+  const extractMetadata = async (file: File) => {
+    try {
+      console.log("Extraction des métadonnées pour:", file.name);
+      const metadata = await mm.parseBlob(file);
+      console.log("Métadonnées extraites:", metadata.common);
+      
+      return {
+        artist: metadata.common.artist || undefined,
+        title: metadata.common.title || undefined,
+        picture: metadata.common.picture && metadata.common.picture.length > 0 ? metadata.common.picture[0] : undefined
+      };
+    } catch (error) {
+      console.warn("Erreur lors de l'extraction des métadonnées:", error);
       return null;
     }
   };
@@ -113,28 +134,29 @@ export const MusicUploader = () => {
       let imageUrl = "https://picsum.photos/240/240";
       let { artist, title } = parseFileName(file.name);
 
-      try {
-        const metadata = await mm.parseBlob(file);
-        if (metadata.common.artist) {
-          artist = metadata.common.artist;
-        }
-        if (metadata.common.title) {
-          title = metadata.common.title;
-        }
-        if (metadata.common.picture && metadata.common.picture.length > 0) {
-          const picture = metadata.common.picture[0];
-          const blob = new Blob([picture.data], { type: picture.format });
-          imageUrl = URL.createObjectURL(blob);
-        } else {
-          const lastfmArt = await fetchAlbumArt(artist, title);
-          if (lastfmArt) {
-            imageUrl = lastfmArt;
+      // Tentative d'extraction des métadonnées
+      const metadataResult = await extractMetadata(file);
+      if (metadataResult) {
+        if (metadataResult.artist) artist = metadataResult.artist;
+        if (metadataResult.title) title = metadataResult.title;
+        
+        if (metadataResult.picture) {
+          try {
+            const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
+            imageUrl = URL.createObjectURL(blob);
+            console.log("Pochette extraite des métadonnées");
+          } catch (error) {
+            console.warn("Erreur lors de la création de la pochette depuis les métadonnées:", error);
           }
         }
-      } catch (metadataError) {
-        console.warn("Impossible de lire les métadonnées:", metadataError);
+      }
+
+      // Si pas de pochette dans les métadonnées, essayer Last.fm
+      if (imageUrl === "https://picsum.photos/240/240") {
+        console.log("Recherche de pochette sur Last.fm pour:", artist, "-", title);
         const lastfmArt = await fetchAlbumArt(artist, title);
         if (lastfmArt) {
+          console.log("Pochette trouvée sur Last.fm");
           imageUrl = lastfmArt;
         }
       }
