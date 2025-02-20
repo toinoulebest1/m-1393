@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
@@ -82,8 +81,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const { data, error } = await supabase
           .from('play_history')
           .select(`
-            *,
-            songs:song_id (
+            id,
+            played_at,
+            songs:songs (
               id,
               title,
               artist,
@@ -91,6 +91,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               file_path
             )
           `)
+          .eq('user_id', session.user.id)
           .order('played_at', { ascending: false })
           .limit(50);
 
@@ -117,6 +118,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     loadHistory();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        loadHistory();
+      } else if (event === 'SIGNED_OUT') {
+        setHistory([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -145,13 +158,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           if (historyError) {
             console.error("Erreur lors de l'enregistrement dans l'historique:", historyError);
+          } else {
+            setHistory(prev => {
+              const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
+              return newHistory;
+            });
           }
         }
-
-        setHistory(prev => {
-          const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
-          return newHistory;
-        });
 
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
