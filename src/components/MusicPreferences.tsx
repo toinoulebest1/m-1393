@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,8 +18,8 @@ import { toast } from "sonner";
 
 export const MusicPreferences = () => {
   const [preferences, setPreferences] = useState({
-    crossfadeEnabled: false,
-    crossfadeDuration: 0,
+    overlapEnabled: false,
+    overlapDuration: 3,
     audioQuality: 'high',
     preferredLanguages: [] as string[],
   });
@@ -51,8 +52,8 @@ export const MusicPreferences = () => {
       if (data) {
         console.log('Loaded preferences:', data);
         setPreferences({
-          crossfadeEnabled: data.crossfade_enabled || false,
-          crossfadeDuration: data.crossfade_duration || 0,
+          overlapEnabled: data.crossfade_enabled || false,
+          overlapDuration: data.crossfade_duration || 3,
           audioQuality: data.audio_quality || 'high',
           preferredLanguages: data.preferred_languages || [],
         });
@@ -61,7 +62,7 @@ export const MusicPreferences = () => {
         const defaultPreferences = {
           user_id: session.user.id,
           crossfade_enabled: false,
-          crossfade_duration: 0,
+          crossfade_duration: 3,
           audio_quality: 'high',
           preferred_languages: []
         };
@@ -73,8 +74,8 @@ export const MusicPreferences = () => {
         if (insertError) throw insertError;
         
         setPreferences({
-          crossfadeEnabled: false,
-          crossfadeDuration: 0,
+          overlapEnabled: false,
+          overlapDuration: 3,
           audioQuality: 'high',
           preferredLanguages: [],
         });
@@ -124,8 +125,8 @@ export const MusicPreferences = () => {
       const { error } = await supabase
         .from('music_preferences')
         .update({
-          crossfade_enabled: preferences.crossfadeEnabled,
-          crossfade_duration: preferences.crossfadeDuration,
+          crossfade_enabled: preferences.overlapEnabled,
+          crossfade_duration: preferences.overlapDuration,
           audio_quality: preferences.audioQuality,
           preferred_languages: preferences.preferredLanguages,
         })
@@ -172,33 +173,33 @@ export const MusicPreferences = () => {
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="crossfade" className="flex items-center gap-2">
-                Crossfade entre les pistes
+              <Label htmlFor="overlap" className="flex items-center gap-2">
+                Fondu enchaîné entre les pistes
               </Label>
               <Switch
-                id="crossfade"
-                checked={preferences.crossfadeEnabled}
+                id="overlap"
+                checked={preferences.overlapEnabled}
                 onCheckedChange={(checked) => 
-                  setPreferences(prev => ({ ...prev, crossfadeEnabled: checked }))
+                  setPreferences(prev => ({ ...prev, overlapEnabled: checked }))
                 }
               />
             </div>
 
-            {preferences.crossfadeEnabled && (
+            {preferences.overlapEnabled && (
               <div className="space-y-2">
-                <Label htmlFor="crossfadeDuration">
-                  Durée du crossfade (secondes)
+                <Label htmlFor="overlapDuration">
+                  Durée du fondu (secondes)
                 </Label>
                 <Input
-                  id="crossfadeDuration"
+                  id="overlapDuration"
                   type="number"
-                  min="0"
-                  max="12"
-                  value={preferences.crossfadeDuration}
+                  min="1"
+                  max="10"
+                  value={preferences.overlapDuration}
                   onChange={(e) => 
                     setPreferences(prev => ({ 
                       ...prev, 
-                      crossfadeDuration: parseInt(e.target.value) || 0 
+                      overlapDuration: parseInt(e.target.value) || 3 
                     }))
                   }
                   className="bg-white/5 border-white/10"
