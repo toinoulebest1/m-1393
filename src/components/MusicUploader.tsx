@@ -5,6 +5,9 @@ import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
+import LastFM from 'lastfm-node-client';
+
+const lastfm = new LastFM('YOUR_API_KEY');
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
@@ -23,21 +26,16 @@ export const MusicUploader = () => {
   };
 
   const parseFileName = (fileName: string) => {
-    // Enlever l'extension du fichier
     const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
-    
-    // Rechercher le format "Artiste - Titre"
     const match = nameWithoutExt.match(/^(.*?)\s*-\s*(.*)$/);
     
     if (match) {
-      // Si on trouve le format "Artiste - Titre"
       return {
         artist: match[1].trim(),
         title: match[2].trim()
       };
     }
     
-    // Si on ne trouve pas le format, retourner le nom complet comme titre
     return {
       artist: "Unknown Artist",
       title: nameWithoutExt.trim()
@@ -46,6 +44,26 @@ export const MusicUploader = () => {
 
   const generateUUID = () => {
     return crypto.randomUUID();
+  };
+
+  const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
+    try {
+      const response = await lastfm.track.getInfo({
+        artist,
+        track: title
+      });
+
+      if (response?.track?.album?.image) {
+        // Récupérer l'image la plus grande disponible
+        const images = response.track.album.image;
+        const largestImage = images[images.length - 1];
+        return largestImage['#text'] || null;
+      }
+      return null;
+    } catch (error) {
+      console.warn("Impossible de récupérer la pochette depuis Last.fm:", error);
+      return null;
+    }
   };
 
   const processAudioFile = async (file: File) => {
@@ -97,9 +115,20 @@ export const MusicUploader = () => {
           const picture = metadata.common.picture[0];
           const blob = new Blob([picture.data], { type: picture.format });
           imageUrl = URL.createObjectURL(blob);
+        } else {
+          // Si pas d'image dans les métadonnées, essayer Last.fm
+          const lastfmArt = await fetchAlbumArt(artist, title);
+          if (lastfmArt) {
+            imageUrl = lastfmArt;
+          }
         }
       } catch (metadataError) {
         console.warn("Impossible de lire les métadonnées:", metadataError);
+        // Essayer Last.fm même si la lecture des métadonnées a échoué
+        const lastfmArt = await fetchAlbumArt(artist, title);
+        if (lastfmArt) {
+          imageUrl = lastfmArt;
+        }
       }
 
       return {
