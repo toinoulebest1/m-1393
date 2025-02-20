@@ -1,10 +1,13 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTranslation } from "react-i18next";
-import { Play, Heart, Trash2, Shuffle } from "lucide-react";
+import { Play, Heart, Trash2, Shuffle, Clock, Signal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ColorThief from 'colorthief';
+import React from 'react';
 import {
   Table,
   TableBody,
@@ -26,26 +29,49 @@ const Favorites = () => {
     removeFavorite,
     queue 
   } = usePlayer();
-  
-  console.log("Current favorites:", favorites);
-  console.log("Current queue:", queue);
+  const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
 
-  const handlePlay = async (song: any) => {
-    console.log("Attempting to play song:", song);
-    
+  const extractDominantColor = async (imageUrl: string) => {
     try {
-      await play(song);
-      console.log("Song started playing:", song.title);
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
       
-      const songIndex = favorites.findIndex(fav => fav.id === song.id);
-      const remainingSongs = favorites.slice(songIndex + 1);
-      console.log("Adding to queue:", remainingSongs);
-      
-      remainingSongs.forEach(nextSong => {
-        console.log("Adding to queue:", nextSong.title);
-        addToQueue(nextSong);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
       });
 
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
+      ];
+      setDominantColor(saturatedColor);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
+
+  React.useEffect(() => {
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
+
+  const handlePlay = async (song: any) => {
+    try {
+      await play(song);
+      const songIndex = favorites.findIndex(fav => fav.id === song.id);
+      const remainingSongs = favorites.slice(songIndex + 1);
+      remainingSongs.forEach(nextSong => {
+        addToQueue(nextSong);
+      });
       toast.success(`Lecture de ${song.title}`);
     } catch (error) {
       console.error("Error playing song:", error);
@@ -65,7 +91,6 @@ const Favorites = () => {
   };
 
   const handleRemoveFavorite = async (song: any) => {
-    console.log("Removing favorite:", song);
     try {
       await removeFavorite(song.id);
       toast.success(`${song.title} retiré des favoris`);
@@ -124,74 +149,99 @@ const Favorites = () => {
             </div>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-white/5 border-white/5">
-                <TableHead className="text-spotify-neutral">#</TableHead>
-                <TableHead className="text-spotify-neutral">Titre</TableHead>
-                <TableHead className="text-spotify-neutral">Artiste</TableHead>
-                <TableHead className="text-spotify-neutral">Durée</TableHead>
-                <TableHead className="text-spotify-neutral w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {favorites.map((song, index) => (
-                <TableRow
+          <div className="space-y-2">
+            {favorites.map((song) => {
+              const isCurrentSong = currentSong?.id === song.id;
+              const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
+              
+              const glowStyle = isCurrentSong && dominantColor ? {
+                boxShadow: `
+                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                `,
+                transition: 'box-shadow 0.3s ease-in-out',
+                transform: 'scale(1.02)',
+              } : {};
+
+              return (
+                <div
                   key={song.id}
                   className={cn(
-                    "group hover:bg-white/10 transition-colors cursor-pointer border-white/5",
-                    currentSong?.id === song.id && "bg-white/20"
+                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                    isCurrentSong 
+                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                      : "bg-transparent"
                   )}
                   onClick={() => handlePlay(song)}
                 >
-                  <TableCell className="font-medium text-white">
-                    {currentSong?.id === song.id && isPlaying ? (
-                      <div className="w-4 h-4 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotify-accent opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-spotify-accent"></span>
-                      </div>
-                    ) : (
-                      index + 1
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={song.imageUrl || "https://picsum.photos/64/64"}
-                        alt={song.title}
-                        className="w-12 h-12 rounded-md object-cover"
+                  {isCurrentSong && (
+                    <div className="absolute inset-0 z-0 overflow-hidden">
+                      <div 
+                        className="absolute inset-0 animate-gradient opacity-20" 
+                        style={{
+                          backgroundSize: '200% 200%',
+                          animation: 'gradient 3s linear infinite',
+                          background: dominantColor 
+                            ? `linear-gradient(45deg, 
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                              )`
+                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                        }}
                       />
-                      <span className={cn(
-                        "font-medium",
-                        currentSong?.id === song.id ? "text-spotify-accent" : "text-white"
-                      )}>
-                        {song.title}
-                      </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-spotify-neutral">
-                    {song.artist}
-                  </TableCell>
-                  <TableCell className="text-spotify-neutral">
-                    {song.duration}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 hover:bg-white/10 hover:text-red-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFavorite(song);
-                      }}
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  )}
+
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={imageSource}
+                        alt={`Pochette de ${song.title}`}
+                        className={cn(
+                          "w-14 h-14 rounded-lg shadow-lg object-cover",
+                          isCurrentSong && "animate-pulse"
+                        )}
+                        style={glowStyle}
+                        loading="lazy"
+                      />
+                      <div>
+                        <h3 className={cn(
+                          "font-medium transition-colors",
+                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                        )}>
+                          {song.title}
+                        </h3>
+                        <p className="text-sm text-spotify-neutral">{song.artist}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-1 text-spotify-neutral">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm">{song.duration || "0:00"}</span>
+                      </div>
+
+                      <div className="flex items-center space-x-1 text-spotify-neutral">
+                        <Signal className="w-4 h-4" />
+                        <span className="text-sm">{song.bitrate || "320 kbps"}</span>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFavorite(song);
+                        }}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                      >
+                        <Trash2 className="w-5 h-5 text-spotify-neutral group-hover:text-red-500 transition-colors" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
       <Player />
