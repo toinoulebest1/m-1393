@@ -1,3 +1,4 @@
+
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -9,13 +10,17 @@ import { useState } from "react";
 const processAudioFile = async (file: File) => {
   try {
     const metadata = await mm.parseBlob(file);
+    const filePath = await storeAudioFile(file.name, file);
+    
     const song = {
       id: file.name,
       title: metadata.common.title || file.name,
       artist: metadata.common.artist || "Unknown Artist",
-      bitrate: metadata.format.bitrate ? `${metadata.format.bitrate} kbps` : undefined,
+      duration: metadata.format.duration ? String(metadata.format.duration) : "0",
+      url: file.name,
+      bitrate: metadata.format.bitrate ? `${Math.round(metadata.format.bitrate / 1000)} kbps` : "320 kbps",
     };
-    await storeAudioFile(file);
+    
     return song;
   } catch (error) {
     console.error("Error processing audio file:", error);
@@ -30,7 +35,9 @@ export const MusicUploader = () => {
   const [uploadedSongs, setUploadedSongs] = useState<Array<{
     id: string;
     title: string;
-    artist?: string;
+    artist: string;
+    duration: string;
+    url: string;
     bitrate?: string;
   }>>([]);
 
