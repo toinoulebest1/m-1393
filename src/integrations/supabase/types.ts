@@ -15,18 +15,21 @@ export type Database = {
           id: string
           last_updated: string | null
           song_id: string
+          user_id: string | null
         }
         Insert: {
           count?: number | null
           id?: string
           last_updated?: string | null
           song_id: string
+          user_id?: string | null
         }
         Update: {
           count?: number | null
           id?: string
           last_updated?: string | null
           song_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

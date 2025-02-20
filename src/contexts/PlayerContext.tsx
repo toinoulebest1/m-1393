@@ -61,10 +61,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [queue, setQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
-  const [favorites, setFavorites] = useState<Song[]>(() => {
-    const savedFavorites = localStorage.getItem('favorites');
-    return savedFavorites ? JSON.parse(savedFavorites) : [];
-  });
+  const [favorites, setFavorites] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>(() => {
     const savedStats = localStorage.getItem('favoriteStats');
@@ -129,6 +126,68 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loadHistory();
       } else if (event === 'SIGNED_OUT') {
         setHistory([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setFavorites([]);
+          return;
+        }
+
+        const { data: favoriteStats, error } = await supabase
+          .from('favorite_stats')
+          .select(`
+            song_id,
+            songs (
+              id,
+              title,
+              artist,
+              duration,
+              file_path,
+              image_url
+            )
+          `)
+          .eq('user_id', session.user.id);
+
+        if (error) {
+          console.error("Erreur lors du chargement des favoris:", error);
+          toast.error("Erreur lors du chargement des favoris");
+          return;
+        }
+
+        if (favoriteStats) {
+          const formattedFavorites = favoriteStats.map(stat => ({
+            id: stat.songs.id,
+            title: stat.songs.title,
+            artist: stat.songs.artist,
+            duration: stat.songs.duration,
+            url: stat.songs.file_path,
+            imageUrl: stat.songs.image_url
+          }));
+          setFavorites(formattedFavorites);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des favoris:", error);
+        toast.error("Erreur lors du chargement des favoris");
+      }
+    };
+
+    loadFavorites();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        loadFavorites();
+      } else if (event === 'SIGNED_OUT') {
+        setFavorites([]);
       }
     });
 
@@ -305,76 +364,72 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleFavorite = async (song: Song) => {
     try {
-      const audioUrl = await getAudioFile(song.url);
-      if (!audioUrl) {
-        toast.error("Le fichier audio n'est pas disponible");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Vous devez être connecté pour gérer vos favoris");
         return;
       }
 
-      const isFavorite = favorites.some(f => 
-        f.title.toLowerCase() === song.title.toLowerCase() && 
-        f.artist?.toLowerCase() === song.artist?.toLowerCase()
-      );
+      const isFavorite = favorites.some(f => f.id === song.id);
       
       if (isFavorite) {
-        const existingFavorite = favorites.find(f => 
-          f.title.toLowerCase() === song.title.toLowerCase() && 
-          f.artist?.toLowerCase() === song.artist?.toLowerCase()
-        );
-        
-        if (existingFavorite) {
-          await removeFavorite(existingFavorite.id);
-          toast.success("Retiré des favoris");
+        const { error } = await supabase
+          .from('favorite_stats')
+          .delete()
+          .eq('song_id', song.id)
+          .eq('user_id', session.user.id);
+
+        if (error) {
+          console.error("Erreur lors de la suppression du favori:", error);
+          toast.error("Erreur lors de la suppression du favori");
+          return;
         }
-        return;
+
+        setFavorites(prev => prev.filter(f => f.id !== song.id));
+        toast.success("Retiré des favoris");
+      } else {
+        const { data: existingSong, error: songCheckError } = await supabase
+          .from('songs')
+          .select()
+          .eq('id', song.id)
+          .single();
+
+        if (!existingSong) {
+          const { error: songInsertError } = await supabase
+            .from('songs')
+            .insert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration,
+              image_url: song.imageUrl
+            });
+
+          if (songInsertError) {
+            console.error("Erreur lors de l'ajout de la chanson:", songInsertError);
+            toast.error("Erreur lors de l'ajout aux favoris");
+            return;
+          }
+        }
+
+        const { error: favoriteError } = await supabase
+          .from('favorite_stats')
+          .insert({
+            song_id: song.id,
+            user_id: session.user.id,
+            count: 1
+          });
+
+        if (favoriteError) {
+          console.error("Erreur lors de l'ajout aux favoris:", favoriteError);
+          toast.error("Erreur lors de l'ajout aux favoris");
+          return;
+        }
+
+        setFavorites(prev => [...prev, song]);
+        toast.success("Ajouté aux favoris");
       }
-
-      const favoriteId = crypto.randomUUID();
-      storeAudioFile(favoriteId, audioUrl);
-      
-      const { error: songError } = await supabase
-        .from('songs')
-        .upsert({
-          id: favoriteId,
-          title: song.title,
-          artist: song.artist,
-          file_path: favoriteId
-        })
-        .select()
-        .single();
-
-      if (songError) {
-        console.error("Error creating song entry:", songError);
-        toast.error("Erreur lors de la création de l'entrée de la chanson");
-        return;
-      }
-
-      const { error: statError } = await supabase
-        .from('favorite_stats')
-        .insert({
-          song_id: favoriteId,
-          count: 1,
-          last_updated: new Date().toISOString()
-        });
-
-      if (statError) {
-        console.error("Error inserting stats:", statError);
-        toast.error("Erreur lors de l'ajout des statistiques");
-      }
-
-      const favoriteSong = {
-        ...song,
-        id: favoriteId,
-        url: favoriteId
-      };
-
-      setFavorites(prev => {
-        const newFavorites = [...prev, favoriteSong];
-        localStorage.setItem('favorites', JSON.stringify(newFavorites));
-        return newFavorites;
-      });
-      
-      toast.success("Ajouté aux favoris");
     } catch (error) {
       console.error("Erreur lors de la gestion des favoris:", error);
       toast.error("Erreur lors de la gestion des favoris");
@@ -383,25 +438,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const removeFavorite = async (songId: string) => {
     try {
-      setFavorites(prev => {
-        const newFavorites = prev.filter(s => s.id !== songId);
-        localStorage.setItem('favorites', JSON.stringify(newFavorites));
-        return newFavorites;
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Vous devez être connecté pour gérer vos favoris");
+        return;
+      }
 
       const { error } = await supabase
         .from('favorite_stats')
         .delete()
-        .eq('song_id', songId);
+        .eq('song_id', songId)
+        .eq('user_id', session.user.id);
 
       if (error) {
-        console.error("Error removing favorite stats:", error);
-        toast.error("Erreur lors de la suppression des statistiques");
-      } else {
-        toast.success("Favori supprimé avec succès");
+        console.error("Erreur lors de la suppression du favori:", error);
+        toast.error("Erreur lors de la suppression du favori");
+        return;
       }
+
+      setFavorites(prev => prev.filter(s => s.id !== songId));
+      toast.success("Favori supprimé avec succès");
     } catch (error) {
-      console.error("Error removing favorite:", error);
+      console.error("Erreur lors de la suppression du favori:", error);
       toast.error("Erreur lors de la suppression du favori");
     }
   };
