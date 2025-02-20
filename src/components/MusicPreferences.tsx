@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -122,23 +121,15 @@ export const MusicPreferences = () => {
         return;
       }
 
-      console.log('Saving preferences:', {
-        user_id: session.user.id,
-        crossfade_enabled: preferences.crossfadeEnabled,
-        crossfade_duration: preferences.crossfadeDuration,
-        audio_quality: preferences.audioQuality,
-        preferred_languages: preferences.preferredLanguages,
-      });
-
       const { error } = await supabase
         .from('music_preferences')
-        .upsert({
-          user_id: session.user.id,
+        .update({
           crossfade_enabled: preferences.crossfadeEnabled,
           crossfade_duration: preferences.crossfadeDuration,
           audio_quality: preferences.audioQuality,
           preferred_languages: preferences.preferredLanguages,
-        });
+        })
+        .eq('user_id', session.user.id);
 
       if (error) throw error;
 
