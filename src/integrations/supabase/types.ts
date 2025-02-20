@@ -203,6 +203,7 @@ export type Database = {
           duration: string | null
           file_path: string
           id: string
+          image_url: string | null
           title: string
           uploaded_by: string | null
         }
@@ -212,6 +213,7 @@ export type Database = {
           duration?: string | null
           file_path: string
           id?: string
+          image_url?: string | null
           title: string
           uploaded_by?: string | null
         }
@@ -221,6 +223,7 @@ export type Database = {
           duration?: string | null
           file_path?: string
           id?: string
+          image_url?: string | null
           title?: string
           uploaded_by?: string | null
         }
