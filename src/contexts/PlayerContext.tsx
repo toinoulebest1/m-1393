@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
@@ -52,6 +53,7 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 const globalAudio = new Audio();
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const audioRef = useRef<HTMLAudioElement>(globalAudio);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -119,7 +121,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     audioRef.current.volume = volume / 100;
-  }, []);
+  }, [volume]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -457,8 +459,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         history,
         play,
         pause,
-        setVolume: updateVolume,
-        setProgress: updateProgress,
+        setVolume,
+        setProgress,
         nextSong,
         previousSong,
         addToQueue,
@@ -467,7 +469,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFavorite,
         removeFavorite,
         setSearchQuery,
-        setPlaybackRate: updatePlaybackRate,
+        setPlaybackRate,
       }}
     >
       {children}
