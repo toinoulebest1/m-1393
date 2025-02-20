@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,13 @@ export const NowPlaying = () => {
 
       const colorThief = new ColorThief();
       const color = colorThief.getColor(img);
-      setDominantColor(color);
+      // Augmenter la saturation de la couleur pour un effet plus visible
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2), // Augmenter le rouge
+        Math.min(255, color[1] * 1.2), // Augmenter le vert
+        Math.min(255, color[2] * 1.2)  // Augmenter le bleu
+      ];
+      setDominantColor(saturatedColor);
     } catch (error) {
       console.error('Erreur lors de l\'extraction de la couleur:', error);
       setDominantColor(null);
@@ -120,8 +127,13 @@ export const NowPlaying = () => {
           const isFavorite = favorites.some(s => s.id === song.id);
           const isCurrentSong = currentSong?.id === song.id;
           const glowStyle = isCurrentSong && dominantColor ? {
-            boxShadow: `0 0 20px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)`,
-            transition: 'box-shadow 0.3s ease-in-out'
+            boxShadow: `
+              0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+              0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+              0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+            `,
+            transition: 'box-shadow 0.3s ease-in-out',
+            transform: 'scale(1.02)',
           } : {};
           
           return (
@@ -137,10 +149,17 @@ export const NowPlaying = () => {
             >
               {isCurrentSong && (
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                  <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] opacity-20" 
+                  <div 
+                    className="absolute inset-0 animate-gradient opacity-20" 
                     style={{
                       backgroundSize: '200% 200%',
                       animation: 'gradient 3s linear infinite',
+                      background: dominantColor 
+                        ? `linear-gradient(45deg, 
+                            rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                            rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                          )`
+                        : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
                     }}
                   />
                 </div>
