@@ -1,12 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { Music, Clock, Signal, Heart } from "lucide-react";
 import { toast } from "sonner";
+import ColorThief from 'colorthief';
 
 export const NowPlaying = () => {
   const { queue, currentSong, favorites, toggleFavorite, play } = usePlayer();
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [hearts, setHearts] = useState<Array<{ 
     id: number; 
     x: number; 
@@ -15,6 +16,34 @@ export const NowPlaying = () => {
     rotation: number;
     bounceHeight: number;
   }>>([]);
+
+  const extractDominantColor = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      setDominantColor(color);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
+
+  useEffect(() => {
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
 
   const createFloatingHearts = () => {
     const numberOfHearts = 50;
@@ -89,19 +118,24 @@ export const NowPlaying = () => {
       <div className="space-y-2">
         {queue.map((song) => {
           const isFavorite = favorites.some(s => s.id === song.id);
+          const isCurrentSong = currentSong?.id === song.id;
+          const glowStyle = isCurrentSong && dominantColor ? {
+            boxShadow: `0 0 20px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)`,
+            transition: 'box-shadow 0.3s ease-in-out'
+          } : {};
           
           return (
             <div
               key={song.id}
               className={cn(
                 "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
-                currentSong?.id === song.id 
+                isCurrentSong 
                   ? "relative bg-white/5 shadow-lg overflow-hidden" 
                   : "bg-transparent"
               )}
               onClick={() => play(song)}
             >
-              {currentSong?.id === song.id && (
+              {isCurrentSong && (
                 <div className="absolute inset-0 z-0 overflow-hidden">
                   <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] opacity-20" 
                     style={{
@@ -119,13 +153,14 @@ export const NowPlaying = () => {
                     alt="Album art"
                     className={cn(
                       "w-14 h-14 rounded-lg shadow-lg",
-                      currentSong?.id === song.id && "animate-pulse"
+                      isCurrentSong && "animate-pulse"
                     )}
+                    style={glowStyle}
                   />
                   <div>
                     <h3 className={cn(
                       "font-medium",
-                      currentSong?.id === song.id ? "text-white" : "text-spotify-neutral"
+                      isCurrentSong ? "text-white" : "text-spotify-neutral"
                     )}>
                       {song.title}
                     </h3>
