@@ -1,3 +1,4 @@
+
 import { Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,10 @@ const themes: Theme[] = [
   {
     name: "Défaut",
     classes: "from-spotify-dark via-[#1e2435] to-[#141824]"
+  },
+  {
+    name: "Multicolore",
+    classes: "from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9]"
   },
   {
     name: "Violet",
