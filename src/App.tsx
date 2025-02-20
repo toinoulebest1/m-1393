@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Favorites from "./pages/Favorites";
+import History from "./pages/History";
 import Top100 from "./pages/Top100";
 import Auth from "./pages/Auth";
 import "./i18n";
@@ -100,6 +101,14 @@ const App = () => (
                   element={
                     <PrivateRoute>
                       <Favorites />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <PrivateRoute>
+                      <History />
                     </PrivateRoute>
                   }
                 />

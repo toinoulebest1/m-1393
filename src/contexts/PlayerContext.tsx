@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
@@ -33,6 +32,7 @@ interface PlayerContextType {
   searchQuery: string;
   favoriteStats: FavoriteStat[];
   playbackRate: number;
+  history: Song[];
   play: (song?: Song) => void;
   pause: () => void;
   setVolume: (volume: number) => void;
@@ -69,6 +69,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedStats ? JSON.parse(savedStats) : [];
   });
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [history, setHistory] = useState<Song[]>(() => {
+    const savedHistory = localStorage.getItem('playHistory');
+    return savedHistory ? JSON.parse(savedHistory) : [];
+  });
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
 
   useEffect(() => {
@@ -84,6 +88,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const play = async (song?: Song) => {
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
+      setHistory(prev => {
+        const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
+        localStorage.setItem('playHistory', JSON.stringify(newHistory));
+        return newHistory;
+      });
+
       try {
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
@@ -98,7 +108,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (playPromise !== undefined) {
           playPromise.then(() => {
             setIsPlaying(true);
-            // Ajout de l'animation toast avec une icône de musique
             toast.success(
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
@@ -389,6 +398,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         searchQuery,
         favoriteStats,
         playbackRate,
+        history,
         play,
         pause,
         setVolume: updateVolume,
