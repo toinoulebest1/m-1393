@@ -7,18 +7,36 @@ import { toast } from "sonner";
 
 export const NowPlaying = () => {
   const { queue, currentSong, favorites, toggleFavorite } = usePlayer();
-  const [hearts, setHearts] = useState<Array<{ id: number; x: number; delay: number }>>([]);
+  const [hearts, setHearts] = useState<Array<{ 
+    id: number; 
+    x: number; 
+    delay: number;
+    duration: number;
+    rotation: number;
+  }>>([]);
 
   const createFloatingHearts = () => {
-    const newHearts = Array.from({ length: 10 }, (_, index) => ({
+    const numberOfHearts = 25;
+    const minDuration = 3;
+    const maxDuration = 6;
+    const screenWidth = window.innerWidth;
+
+    const newHearts = Array.from({ length: numberOfHearts }, (_, index) => ({
       id: Date.now() + index,
-      x: Math.random() * 200 - 100, // Valeur aléatoire entre -100 et 100
-      delay: Math.random() * 0.5 // Délai aléatoire entre 0 et 0.5s
+      x: Math.random() * screenWidth,
+      delay: Math.random() * 2, // Délai aléatoire entre 0 et 2s
+      duration: minDuration + Math.random() * (maxDuration - minDuration), // Durée entre 3 et 6s
+      rotation: Math.random() * 360 // Rotation aléatoire
     }));
+
     setHearts(prev => [...prev, ...newHearts]);
-    setTimeout(() => {
-      setHearts(prev => prev.filter(heart => !newHearts.find(n => n.id === heart.id)));
-    }, 3000);
+
+    // Suppression progressive des cœurs
+    newHearts.forEach((heart, index) => {
+      setTimeout(() => {
+        setHearts(prev => prev.filter(h => h.id !== heart.id));
+      }, (5000 + index * 100)); // Commence à supprimer après 5s, avec 100ms entre chaque suppression
+    });
   };
 
   const handleFavorite = (song: any) => {
@@ -46,9 +64,13 @@ export const NowPlaying = () => {
           key={heart.id}
           className="floating-heart text-red-500 fill-red-500 w-6 h-6"
           style={{
-            '--x-offset': `${heart.x}px`,
-            left: `${50 + Math.random() * 20}%`,
-            animationDelay: `${heart.delay}s`
+            '--x-offset': `${Math.sin(heart.rotation) * 150}px`,
+            '--fall-duration': `${heart.duration}s`,
+            '--rotation': `${heart.rotation}deg`,
+            left: `${heart.x}px`,
+            animationDelay: `${heart.delay}s`,
+            opacity: 0,
+            transform: 'translateY(-10vh)',
           } as React.CSSProperties}
         />
       ))}
@@ -59,6 +81,7 @@ export const NowPlaying = () => {
           Now Playing
         </h2>
       </div>
+
       <div className="space-y-2">
         {queue.map((song) => (
           <div
