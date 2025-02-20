@@ -34,9 +34,10 @@ export const MusicUploader = () => {
       return null;
     }
 
+    const fileId = generateUUID(); // Générer l'ID en dehors du bloc try
+
     try {
-      const id = generateUUID();
-      await storeAudioFile(id, file);
+      await storeAudioFile(fileId, file);
       
       const metadata = await mm.parseBlob(file);
       console.log("Métadonnées extraites:", metadata);
@@ -56,11 +57,11 @@ export const MusicUploader = () => {
       console.log("Bitrate détecté:", formattedBitrate);
 
       return {
-        id,
+        id: fileId,
         title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
         artist: metadata.common.artist || "Unknown Artist",
         duration: formattedDuration,
-        url: id,
+        url: fileId,
         imageUrl: imageUrl,
         bitrate: formattedBitrate
       };
@@ -79,11 +80,11 @@ export const MusicUploader = () => {
         });
 
         return {
-          id: generateUUID(),
+          id: fileId,
           title: file.name.replace(/\.[^/.]+$/, ""),
           artist: "Unknown Artist",
           duration: formatDuration(duration),
-          url: id,
+          url: fileId,
           imageUrl: "https://picsum.photos/240/240",
           bitrate: formatBitrate(0)
         };
