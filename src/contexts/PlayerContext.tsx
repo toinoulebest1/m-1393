@@ -126,22 +126,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (playPromise !== undefined) {
           playPromise.then(() => {
             setIsPlaying(true);
-            toast.success(
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
-                <span>
-                  <strong className="block">{song.title}</strong>
-                  <span className="text-sm opacity-75">{song.artist}</span>
-                </span>
-              </div>,
-              {
-                duration: 3000,
-                className: "bg-black/90 border border-white/10",
-              }
-            );
           }).catch(error => {
             console.error("Error starting playback:", error);
-            toast.error("Erreur lors de la lecture");
             setIsPlaying(false);
           });
         }
@@ -149,7 +135,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         preloadNextSong();
       } catch (error) {
         console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce fichier audio");
         setCurrentSong(null);
         setIsPlaying(false);
       }
@@ -162,13 +147,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsPlaying(true);
           }).catch(error => {
             console.error("Error resuming playback:", error);
-            toast.error("Erreur lors de la reprise de la lecture");
             setIsPlaying(false);
           });
         }
       } catch (error) {
         console.error("Error resuming audio:", error);
-        toast.error("Erreur lors de la reprise de la lecture");
         setIsPlaying(false);
       }
     }
@@ -266,20 +249,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const nextSong = queue[currentIndex + 1];
         
         if (nextSong) {
-          toast(
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
-              <div>
-                <p className="font-medium">Prochaine chanson :</p>
-                <p className="text-sm">{nextSong.title}</p>
-                <p className="text-xs opacity-75">{nextSong.artist}</p>
-              </div>
-            </div>,
-            {
-              duration: 3000,
-              className: "bg-black/90 border border-white/10",
-            }
-          );
+          // Afficher l'alerte de prochaine chanson
+          const alertElement = document.getElementById('next-song-alert');
+          const titleElement = document.getElementById('next-song-title');
+          const artistElement = document.getElementById('next-song-artist');
+
+          if (alertElement && titleElement && artistElement) {
+            titleElement.textContent = nextSong.title;
+            artistElement.textContent = nextSong.artist;
+            alertElement.classList.remove('opacity-0', 'translate-y-2');
+            alertElement.classList.add('opacity-100', 'translate-y-0');
+
+            // Cacher l'alerte après 3 secondes
+            setTimeout(() => {
+              alertElement.classList.add('opacity-0', 'translate-y-2');
+              alertElement.classList.remove('opacity-100', 'translate-y-0');
+            }, 3000);
+          }
         }
 
         nextAudioRef.current.currentTime = 0;
@@ -456,7 +442,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error("Vous devez être connecté pour gérer vos favoris");
         return;
       }
 
@@ -471,12 +456,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (error) {
           console.error("Erreur lors de la suppression du favori:", error);
-          toast.error("Erreur lors de la suppression du favori");
           return;
         }
 
         setFavorites(prev => prev.filter(f => f.id !== song.id));
-        toast.success("Retiré des favoris");
       } else {
         const { data: existingSong, error: songCheckError } = await supabase
           .from('songs')
@@ -498,7 +481,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           if (songInsertError) {
             console.error("Erreur lors de l'ajout de la chanson:", songInsertError);
-            toast.error("Erreur lors de l'ajout aux favoris");
             return;
           }
         }
@@ -513,16 +495,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (favoriteError) {
           console.error("Erreur lors de l'ajout aux favoris:", favoriteError);
-          toast.error("Erreur lors de l'ajout aux favoris");
           return;
         }
 
         setFavorites(prev => [...prev, song]);
-        toast.success("Ajouté aux favoris");
       }
     } catch (error) {
       console.error("Erreur lors de la gestion des favoris:", error);
-      toast.error("Erreur lors de la gestion des favoris");
     }
   };
 
@@ -530,7 +509,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error("Vous devez être connecté pour gérer vos favoris");
         return;
       }
 
@@ -542,15 +520,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (error) {
         console.error("Erreur lors de la suppression du favori:", error);
-        toast.error("Erreur lors de la suppression du favori");
         return;
       }
 
       setFavorites(prev => prev.filter(s => s.id !== songId));
-      toast.success("Favori supprimé avec succès");
     } catch (error) {
       console.error("Erreur lors de la suppression du favori:", error);
-      toast.error("Erreur lors de la suppression du favori");
     }
   };
 
@@ -558,7 +533,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setPlaybackRate(rate);
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
-      toast.success(`Vitesse de lecture : ${rate}x`);
     }
   };
 
@@ -609,7 +583,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
-      toast.error("Erreur lors de la lecture audio");
       setIsPlaying(false);
     };
 
@@ -619,7 +592,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
-            toast.error("Erreur lors de la reprise de la lecture");
           });
         }
       } else {
