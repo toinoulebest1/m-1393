@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -88,7 +89,7 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black to-spotify-dark border-t border-white/5 p-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-95 border-t border-white/5 p-4">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center flex-1 min-w-0">
@@ -108,7 +109,7 @@ export const Player = () => {
                   </p>
                 </div>
                 <button
-                  onClick={() => toggleFavorite(currentSong)}
+                  onClick={handleFavorite}
                   className="ml-4 p-2 hover:bg-white/5 rounded-full transition-colors"
                 >
                   <Heart
