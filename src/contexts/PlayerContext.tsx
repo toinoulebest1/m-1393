@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { getAudioFile } from '@/utils/storage';
+import { getAudioFile, storeAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Song {
@@ -56,12 +56,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  const [preferences] = useState({
-    crossfadeEnabled: true,
-    crossfadeDuration: 10,
-  });
+  const overlapTimeRef = useRef(3);
   const fadingRef = useRef(false);
-  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [preferences, setPreferences] = useState({
+    crossfadeEnabled: false,
+    crossfadeDuration: 3,
+  });
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -79,6 +80,62 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data } = await supabase
+          .from('music_preferences')
+          .select('crossfade_enabled, crossfade_duration')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (data) {
+          setPreferences({
+            crossfadeEnabled: data.crossfade_enabled,
+            crossfadeDuration: data.crossfade_duration,
+          });
+          overlapTimeRef.current = data.crossfade_duration;
+          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    };
+
+    loadPreferences();
+    
+    const preferenceChannel = supabase
+      .channel('music_preferences_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'music_preferences'
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData.crossfade_duration !== undefined) {
+            overlapTimeRef.current = newData.crossfade_duration;
+            setPreferences(prev => ({
+              ...prev,
+              crossfadeDuration: newData.crossfade_duration,
+              crossfadeEnabled: newData.crossfade_enabled
+            }));
+            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      preferenceChannel.unsubscribe();
+    };
+  }, []);
+
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -95,22 +152,115 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await nextAudioRef.current.load();
       nextAudioRef.current.volume = 0;
       setNextSongPreloaded(true);
-      console.log("Prochaine chanson préchargée");
     } catch (error) {
       console.error("Erreur lors du préchargement:", error);
     }
   };
 
-  const cleanupFade = () => {
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
+
+      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
+      
+      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
+        fadingRef.current = true;
+
+        nextAudioRef.current.currentTime = 0;
+        const playPromise = nextAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Erreur lors du démarrage du fondu:", error);
+            fadingRef.current = false;
+          });
+        }
+
+        const steps = 100;
+        const intervalTime = (overlapTimeRef.current * 1000) / steps;
+        const volumeStep = 1 / steps;
+
+        let currentOutVolume = 1;
+        let currentInVolume = 0;
+
+        const fadeInterval = setInterval(() => {
+          if (currentOutVolume > 0 || currentInVolume < 1) {
+            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+            currentInVolume = Math.min(1, currentInVolume + volumeStep);
+            
+            if (audioRef.current) audioRef.current.volume = currentOutVolume;
+            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+          } else {
+            clearInterval(fadeInterval);
+            
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+            }
+
+            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+            const nextSong = queue[currentIndex + 1];
+            if (nextSong) {
+              setCurrentSong(nextSong);
+              
+              const tempAudio = audioRef.current;
+              audioRef.current = nextAudioRef.current;
+              nextAudioRef.current = tempAudio;
+              
+              setProgress(0);
+              setNextSongPreloaded(false);
+              fadingRef.current = false;
+              
+              preloadNextSong();
+            }
+          }
+        }, intervalTime);
+      }
+    };
+
+    const handleEnded = () => {
+      if (!fadingRef.current) {
+        setProgress(0);
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          play(nextSong);
+        } else if (repeatMode === 'all') {
+          play(queue[0]);
+        } else {
+          setIsPlaying(false);
+        }
+      }
+    };
+
+    const handleTimeUpdateProgress = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+    };
+  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
+
+  useEffect(() => {
+    if (currentSong) {
+      preloadNextSong();
     }
-    fadingRef.current = false;
-  };
+  }, [currentSong]);
 
   const play = async (song?: Song) => {
-    cleanupFade();
+    fadingRef.current = false;
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
@@ -144,9 +294,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
-        if (!fadingRef.current) {
-          audioRef.current.volume = volume / 100;
-        }
+        audioRef.current.volume = 1;
         nextAudioRef.current.volume = 0;
         
         audioRef.current.src = audioUrl;
@@ -186,9 +334,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } else if (audioRef.current) {
       try {
-        if (!fadingRef.current) {
-          audioRef.current.volume = volume / 100;
-        }
+        audioRef.current.volume = 1;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
@@ -206,109 +352,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
   };
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const handleTimeUpdate = () => {
-      if (!currentSong || !nextSongPreloaded || fadingRef.current || !preferences.crossfadeEnabled) return;
-
-      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
-      
-      if (timeLeft <= preferences.crossfadeDuration && nextAudioRef.current.paused) {
-        fadingRef.current = true;
-        console.log("Démarrage du fondu enchaîné");
-
-        nextAudioRef.current.currentTime = 0;
-        nextAudioRef.current.volume = 0;
-        
-        const playPromise = nextAudioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            const steps = 100;
-            const intervalTime = (preferences.crossfadeDuration * 1000) / steps;
-            const volumeStep = 1 / steps;
-
-            let currentStep = 0;
-
-            fadeIntervalRef.current = setInterval(() => {
-              currentStep++;
-              
-              if (currentStep <= steps) {
-                const outVolume = Math.max(0, (volume / 100) * (1 - (currentStep * volumeStep)));
-                const inVolume = Math.min(volume / 100, (volume / 100) * (currentStep * volumeStep));
-
-                audioRef.current.volume = outVolume;
-                nextAudioRef.current.volume = inVolume;
-                console.log("Volumes:", { out: outVolume, in: inVolume });
-              } else {
-                cleanupFade();
-                
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-
-                const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-                const nextSong = queue[currentIndex + 1];
-                if (nextSong) {
-                  setCurrentSong(nextSong);
-                  
-                  const tempAudio = audioRef.current;
-                  audioRef.current = nextAudioRef.current;
-                  nextAudioRef.current = tempAudio;
-                  
-                  setProgress(0);
-                  setNextSongPreloaded(false);
-                  
-                  preloadNextSong();
-                }
-              }
-            }, intervalTime);
-
-          }).catch(error => {
-            console.error("Erreur lors du démarrage du fondu:", error);
-            cleanupFade();
-          });
-        }
-      }
-    };
-
-    const handleEnded = () => {
-      if (!fadingRef.current) {
-        console.log("Fin naturelle de la chanson");
-        cleanupFade();
-        setProgress(0);
-        
-        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-        const nextSong = queue[currentIndex + 1];
-        
-        if (nextSong) {
-          play(nextSong);
-        } else if (repeatMode === 'all') {
-          play(queue[0]);
-        }
-      }
-    };
-
-    const handleTimeUpdateProgress = () => {
-      if (!fadingRef.current) {
-        const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-        setProgress(percentage);
-      }
-    };
-
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
-    audioRef.current.addEventListener('ended', handleEnded);
-
-    return () => {
-      cleanupFade();
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
-        audioRef.current.removeEventListener('ended', handleEnded);
-      }
-    };
-  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled, preferences.crossfadeDuration, volume]);
 
   const pause = () => {
     if (audioRef.current) {
@@ -584,13 +627,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('error', handleError);
-        audioRef.current.removeEventListener('ended', handleEnded);
-        audioRef.current.removeEventListener('play', handlePlay);
-        audioRef.current.removeEventListener('pause', handlePause);
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-      }
+      audioRef.current.removeEventListener('error', handleError);
+      audioRef.current.removeEventListener('ended', handleEnded);
+      audioRef.current.removeEventListener('play', handlePlay);
+      audioRef.current.removeEventListener('pause', handlePause);
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [repeatMode]);
 
