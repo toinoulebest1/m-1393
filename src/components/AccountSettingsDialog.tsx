@@ -21,10 +21,13 @@ export const AccountSettingsDialog = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [signupDate, setSignupDate] = useState<string | null>(null);
   const [lastLogins, setLastLogins] = useState<any[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (isOpen) {
+      fetchProfile();
+    }
+  }, [isOpen]);
 
   const fetchProfile = async () => {
     try {
@@ -55,7 +58,10 @@ export const AccountSettingsDialog = () => {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) {
+        toast.error("Vous devez être connecté pour effectuer cette action");
+        return;
+      }
 
       const { error } = await supabase
         .from('profiles')
@@ -67,6 +73,7 @@ export const AccountSettingsDialog = () => {
       if (error) throw error;
 
       toast.success("Profil mis à jour avec succès");
+      await fetchProfile(); // Recharger les données après la mise à jour
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error("Erreur lors de la mise à jour du profil");
@@ -82,7 +89,10 @@ export const AccountSettingsDialog = () => {
     try {
       setIsUploading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) {
+        toast.error("Vous devez être connecté pour effectuer cette action");
+        return;
+      }
 
       const fileExt = file.name.split('.').pop();
       const filePath = `${session.user.id}/${crypto.randomUUID()}.${fileExt}`;
@@ -111,6 +121,7 @@ export const AccountSettingsDialog = () => {
 
       setAvatarUrl(publicUrl);
       toast.success("Avatar mis à jour avec succès");
+      await fetchProfile(); // Recharger les données après la mise à jour
     } catch (error) {
       console.error('Error uploading avatar:', error);
       toast.error("Erreur lors du téléchargement de l'avatar");
@@ -120,7 +131,7 @@ export const AccountSettingsDialog = () => {
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button
           variant="ghost"
