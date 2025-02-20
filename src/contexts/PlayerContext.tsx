@@ -425,6 +425,62 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const addToHistory = async (song: Song) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: existingSong, error: songError } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('id', song.id)
+        .single();
+
+      if (!existingSong) {
+        const { error: insertError } = await supabase
+          .from('songs')
+          .insert({
+            id: song.id,
+            title: song.title,
+            artist: song.artist,
+            duration: song.duration,
+            file_path: song.url,
+            image_url: song.imageUrl
+          });
+
+        if (insertError) {
+          console.error("Erreur lors de l'insertion de la chanson:", insertError);
+          return;
+        }
+      }
+
+      const { error: historyError } = await supabase
+        .from('play_history')
+        .insert({
+          user_id: session.user.id,
+          song_id: song.id,
+          played_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error("Erreur lors de l'ajout à l'historique:", historyError);
+        return;
+      }
+
+      setHistory(prev => [{
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        duration: song.duration,
+        url: song.url,
+        imageUrl: song.imageUrl
+      }, ...prev]);
+
+    } catch (error) {
+      console.error("Erreur lors de l'ajout à l'historique:", error);
+    }
+  };
+
   useEffect(() => {
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
