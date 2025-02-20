@@ -50,7 +50,7 @@ export const NowPlaying = () => {
       <div className="flex items-center space-x-2">
         <Heart className={cn(
           "w-4 h-4",
-          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500 animate-scale-in"
+          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500"
         )} />
         <span>{isFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
       </div>
@@ -149,7 +149,7 @@ export const NowPlaying = () => {
                       "w-5 h-5 transition-all duration-300 group-hover:scale-110",
                       favorites.some(s => s.id === song.id)
                         ? "text-red-500 fill-red-500"
-                        : "text-spotify-neutral"
+                        : "text-spotify-neutral hover:text-white"
                     )}
                   />
                 </button>

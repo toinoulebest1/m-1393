@@ -88,38 +88,40 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0">
-      <div className="bg-gradient-to-t from-black/90 to-black/70 backdrop-blur-xl border-t border-white/5 p-4">
-        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <img
-              src={currentSong?.imageUrl || "https://picsum.photos/56/56"}
-              alt="Album art"
-              className="w-14 h-14 rounded-lg shadow-lg transition-transform duration-300 hover:scale-105"
-            />
-            <div className="flex items-center space-x-2">
-              <div>
-                <h3 className="text-white font-medium hover:text-spotify-accent transition-colors">
-                  {currentSong?.title || 'Select a song'}
-                </h3>
-                <p className="text-spotify-neutral text-sm">{currentSong?.artist || 'No artist'}</p>
-              </div>
-              {currentSong && (
+    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black to-spotify-dark border-t border-white/5 p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center flex-1 min-w-0">
+            {currentSong && (
+              <>
+                <img
+                  src={currentSong.imageUrl || "https://picsum.photos/56/56"}
+                  alt="Album art"
+                  className="w-14 h-14 rounded-lg shadow-lg mr-4"
+                />
+                <div className="min-w-0">
+                  <h3 className="font-medium text-white truncate">
+                    {currentSong.title}
+                  </h3>
+                  <p className="text-sm text-spotify-neutral truncate">
+                    {currentSong.artist}
+                  </p>
+                </div>
                 <button
-                  onClick={handleFavorite}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                  onClick={() => toggleFavorite(currentSong)}
+                  className="ml-4 p-2 hover:bg-white/5 rounded-full transition-colors"
                 >
                   <Heart
                     className={cn(
-                      "w-5 h-5 transition-colors",
+                      "w-5 h-5",
                       favorites.some(s => s.id === currentSong.id)
                         ? "text-red-500 fill-red-500"
-                        : "text-spotify-neutral"
+                        : "text-spotify-neutral hover:text-white"
                     )}
                   />
                 </button>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           <div className="flex flex-col items-center space-y-2 flex-1 max-w-xl">
