@@ -48,22 +48,19 @@ export const MusicUploader = () => {
       const query = encodeURIComponent(`${artist} ${title}`);
       console.log("Recherche Deezer pour:", { artist, title });
       
-      const response = await fetch(`${supabase.functions.url}/deezer-proxy?q=${query}`, {
-        headers: {
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
-        }
+      const { data: deezerData, error } = await supabase.functions.invoke('deezer-proxy', {
+        body: { query }
       });
-      
-      if (!response.ok) {
-        console.error("Erreur API Deezer:", response.status);
+
+      if (error) {
+        console.error("Erreur API Deezer:", error);
         return null;
       }
 
-      const data = await response.json();
-      console.log("Résultat de la recherche Deezer:", data);
+      console.log("Résultat de la recherche Deezer:", deezerData);
       
-      if (data.data && data.data.length > 0) {
-        const track = data.data[0];
+      if (deezerData.data && deezerData.data.length > 0) {
+        const track = deezerData.data[0];
         if (track.album?.cover_xl) {
           console.log("Pochette trouvée:", track.album.cover_xl);
           return track.album.cover_xl;
