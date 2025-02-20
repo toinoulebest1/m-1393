@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Favorites from "./pages/Favorites";
@@ -15,7 +15,6 @@ import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
 import { PlayerProvider } from "./contexts/PlayerContext";
-import { Suspense } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,60 +72,80 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <I18nextProvider i18n={i18n}>
-      <TooltipProvider>
-        <PlayerProvider>
-          <Toaster />
-          <Sonner />
-          <Suspense fallback={
-            <div className="flex items-center justify-center min-h-screen">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-            </div>
-          }>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute>
-                      <Index />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/favorites"
-                  element={
-                    <PrivateRoute>
-                      <Favorites />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/history"
-                  element={
-                    <PrivateRoute>
-                      <History />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/top100"
-                  element={
-                    <PrivateRoute>
-                      <Top100 />
-                    </PrivateRoute>
-                  }
-                />
-              </Routes>
-            </BrowserRouter>
-          </Suspense>
-        </PlayerProvider>
-      </TooltipProvider>
-    </I18nextProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [i18nInitialized, setI18nInitialized] = useState(false);
+
+  useEffect(() => {
+    const initI18n = async () => {
+      await i18n.initPromise;
+      setI18nInitialized(true);
+    };
+    initI18n();
+  }, []);
+
+  if (!i18nInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      </div>
+    );
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <TooltipProvider>
+          <PlayerProvider>
+            <Toaster />
+            <Sonner />
+            <Suspense fallback={
+              <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+              </div>
+            }>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route
+                    path="/"
+                    element={
+                      <PrivateRoute>
+                        <Index />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/favorites"
+                    element={
+                      <PrivateRoute>
+                        <Favorites />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/history"
+                    element={
+                      <PrivateRoute>
+                        <History />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/top100"
+                    element={
+                      <PrivateRoute>
+                        <Top100 />
+                      </PrivateRoute>
+                    }
+                  />
+                </Routes>
+              </BrowserRouter>
+            </Suspense>
+          </PlayerProvider>
+        </TooltipProvider>
+      </I18nextProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
