@@ -1,3 +1,4 @@
+
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -63,6 +64,36 @@ export const MusicUploader = () => {
     return null;
   };
 
+  const searchDeezerCoverHash = async (artist: string, title: string): Promise<string | null> => {
+    try {
+      const query = encodeURIComponent(`${artist} ${title}`);
+      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
+      
+      if (!response.ok) {
+        console.error("Erreur API Deezer:", response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      
+      if (data.data && data.data.length > 0) {
+        const track = data.data[0];
+        if (track.album?.cover) {
+          // Extrait le hash de l'URL de la pochette
+          const coverUrl = track.album.cover;
+          const hash = coverUrl.split('/').pop();
+          console.log("Hash de pochette trouvé:", hash);
+          return hash;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de la recherche Deezer:", error);
+      return null;
+    }
+  };
+
   const extractMetadata = async (file: File) => {
     try {
       console.log("Tentative d'extraction des métadonnées pour:", file.name);
@@ -106,6 +137,7 @@ export const MusicUploader = () => {
     const fileId = generateUUID();
 
     try {
+      console.log("Stockage du fichier audio:", fileId);
       await storeAudioFile(fileId, file);
 
       const audioUrl = URL.createObjectURL(file);
@@ -157,17 +189,18 @@ export const MusicUploader = () => {
         }
       }
 
-      // Si pas de pochette dans les métadonnées, essayer avec le hash Deezer
-      // Note : Il faudra remplacer ce hash par celui correspondant à la musique
+      // Si pas de pochette dans les métadonnées, essayer avec Deezer
       if (imageUrl === "https://picsum.photos/240/240") {
-        const deezerHash = "89c2dae2b498dc9ca9151324d02eca2d"; // À remplacer par le hash de l'album
-        console.log("Tentative de récupération de pochette via Deezer avec le hash:", deezerHash);
-        const deezerArt = await fetchAlbumArt(deezerHash);
-        if (deezerArt) {
-          console.log("Pochette Deezer trouvée:", deezerArt);
-          imageUrl = deezerArt;
-        } else {
-          console.log("Aucune pochette trouvée sur Deezer");
+        console.log("Recherche de la pochette sur Deezer pour:", { artist, title });
+        const coverHash = await searchDeezerCoverHash(artist, title);
+        if (coverHash) {
+          const deezerArt = await fetchAlbumArt(coverHash);
+          if (deezerArt) {
+            console.log("Pochette Deezer trouvée:", deezerArt);
+            imageUrl = deezerArt;
+          } else {
+            console.log("Aucune pochette trouvée sur Deezer");
+          }
         }
       }
 
