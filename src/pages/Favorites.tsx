@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -67,11 +66,17 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
-      // Si la chanson est déjà en cours de lecture, on ne fait rien
+      // Si la chanson est déjà en cours de lecture, on met en pause
       if (currentSong?.id === song.id) {
+        if (isPlaying) {
+          pause();
+        } else {
+          play();
+        }
         return;
       }
       
+      // Si c'est une nouvelle chanson, on la joue et on met à jour la queue
       await play(song);
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
       const remainingSongs = favorites.slice(songIndex + 1);
