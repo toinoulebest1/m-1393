@@ -84,7 +84,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           .select(`
             id,
             played_at,
-            songs (
+            song_id,
+            songs!inner (
               id,
               title,
               artist,
@@ -110,7 +111,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             artist: item.songs.artist,
             duration: item.songs.duration,
             url: item.songs.file_path,
-            imageUrl: item.songs.image_url
+            imageUrl: item.songs.image_url,
+            playedAt: item.played_at
           }));
           setHistory(formattedHistory);
         }
@@ -417,28 +419,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data: existingSong, error: songError } = await supabase
+      const { error: songError } = await supabase
         .from('songs')
-        .select('id')
-        .eq('id', song.id)
-        .single();
+        .upsert({
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          duration: song.duration,
+          file_path: song.url,
+          image_url: song.imageUrl
+        });
 
-      if (!existingSong) {
-        const { error: insertError } = await supabase
-          .from('songs')
-          .insert({
-            id: song.id,
-            title: song.title,
-            artist: song.artist,
-            duration: song.duration,
-            file_path: song.url,
-            image_url: song.imageUrl
-          });
-
-        if (insertError) {
-          console.error("Erreur lors de l'insertion de la chanson:", insertError);
-          return;
-        }
+      if (songError) {
+        console.error("Erreur lors de l'insertion de la chanson:", songError);
+        return;
       }
 
       const { error: historyError } = await supabase
@@ -455,13 +449,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       setHistory(prev => [{
-        id: song.id,
-        title: song.title,
-        artist: song.artist,
-        duration: song.duration,
-        url: song.url,
-        imageUrl: song.imageUrl
-      }, ...prev]);
+        ...song,
+        playedAt: new Date().toISOString()
+      }, ...prev.filter(s => s.id !== song.id)]);
 
     } catch (error) {
       console.error("Erreur lors de l'ajout à l'historique:", error);
