@@ -1,4 +1,3 @@
-
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -307,6 +306,7 @@ export const MusicUploader = () => {
     id: string;
     title: string;
     artist?: string;
+    bitrate?: string;
   }>>([]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -350,15 +350,18 @@ export const MusicUploader = () => {
         <div className="space-y-2">
           {uploadedSongs.map(song => (
             <div key={song.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-              <div>
+              <div className="flex-1">
                 <h3 className="text-sm font-medium">{song.title}</h3>
                 {song.artist && <p className="text-xs text-gray-400">{song.artist}</p>}
               </div>
-              <ReportDialog
-                songTitle={song.title}
-                songArtist={song.artist || ""}
-                songId={song.id}
-              />
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-400">{song.bitrate || "320 kbps"}</span>
+                <ReportDialog
+                  songTitle={song.title}
+                  songArtist={song.artist || ""}
+                  songId={song.id}
+                />
+              </div>
             </div>
           ))}
         </div>
