@@ -1,5 +1,6 @@
+
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Download, Music2, Upload, LogOut } from "lucide-react";
+import { Home, Heart, Trophy, Download, Music2, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -51,6 +52,26 @@ export const Sidebar = () => {
         </div>
       </div>
 
+      <div className="space-y-4 mb-8">
+        <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
+          <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
+            <SelectValue placeholder="Langue" />
+          </SelectTrigger>
+          <SelectContent className="bg-spotify-dark border-white/10">
+            <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
+              Français
+            </SelectItem>
+            <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
+              English
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <ThemeToggle />
+
+        <MusicUploader />
+      </div>
+
       <nav className="space-y-2 flex-1">
         {links.map(({ to, icon: Icon, label }) => (
           <Link
@@ -69,25 +90,7 @@ export const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="mt-auto space-y-2 border-t border-white/10 pt-4">
-        <MusicUploader />
-        
-        <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-          <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-            <SelectValue placeholder="Langue" />
-          </SelectTrigger>
-          <SelectContent className="bg-spotify-dark border-white/10">
-            <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-              Français
-            </SelectItem>
-            <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-              English
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <ThemeToggle />
-
+      <div className="mt-auto pt-4 border-t border-white/10">
         <Button
           variant="ghost"
           className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
