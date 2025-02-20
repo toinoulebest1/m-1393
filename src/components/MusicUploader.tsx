@@ -1,4 +1,3 @@
-
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -44,57 +43,24 @@ export const MusicUploader = () => {
     return crypto.randomUUID();
   };
 
-  const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
-    try {
-      console.log("Recherche sur Deezer pour:", { artist, title });
-      
-      // 1. D'abord chercher la chanson
-      const query = encodeURIComponent(`${artist} ${title}`);
-      const searchResponse = await fetch(`https://api.deezer.com/search?q=${query}`);
-      
-      if (!searchResponse.ok) {
-        console.error("Erreur API Deezer (recherche):", searchResponse.status);
-        return null;
-      }
-
-      const searchData = await searchResponse.json();
-      console.log("Réponse recherche Deezer:", searchData);
-
-      if (searchData.data && searchData.data.length > 0) {
-        const track = searchData.data[0];
-        const albumId = track.album?.id;
-
-        if (albumId) {
-          // 2. Si on a un ID d'album, récupérer les détails de l'album
-          console.log("ID Album trouvé:", albumId);
-          const albumResponse = await fetch(`https://api.deezer.com/album/${albumId}`);
-          
-          if (albumResponse.ok) {
-            const albumData = await albumResponse.json();
-            console.log("Détails album Deezer:", albumData);
-
-            if (albumData.cover_xl) {
-              console.log("Image XL trouvée:", albumData.cover_xl);
-              return albumData.cover_xl;
-            } else if (albumData.cover_big) {
-              console.log("Image Big trouvée:", albumData.cover_big);
-              return albumData.cover_big;
-            } else if (albumData.cover_medium) {
-              console.log("Image Medium trouvée:", albumData.cover_medium);
-              return albumData.cover_medium;
-            }
-          } else {
-            console.error("Erreur API Deezer (album):", albumResponse.status);
-          }
+  const fetchAlbumArt = async (coverHash: string): Promise<string | null> => {
+    const sizes = ['1000x1000', '500x500', '250x250'];
+    
+    for (const size of sizes) {
+      const imageUrl = `https://e-cdn-images.dzcdn.net/images/cover/${coverHash}/${size}-000000-80-0-0.jpg`;
+      try {
+        const response = await fetch(imageUrl, { method: 'HEAD' });
+        if (response.ok) {
+          console.log(`Image trouvée en ${size}:`, imageUrl);
+          return imageUrl;
         }
+      } catch (error) {
+        console.error(`Erreur lors de la vérification de l'image ${size}:`, error);
       }
-
-      console.log("Aucune image trouvée sur Deezer");
-      return null;
-    } catch (error) {
-      console.error("Erreur lors de la recherche Deezer:", error);
-      return null;
     }
+    
+    console.log("Aucune image Deezer trouvée");
+    return null;
   };
 
   const extractMetadata = async (file: File) => {
@@ -191,10 +157,12 @@ export const MusicUploader = () => {
         }
       }
 
-      // Si pas de pochette dans les métadonnées, essayer Deezer
+      // Si pas de pochette dans les métadonnées, essayer avec le hash Deezer
+      // Note : Il faudra remplacer ce hash par celui correspondant à la musique
       if (imageUrl === "https://picsum.photos/240/240") {
-        console.log("Tentative de récupération de pochette via Deezer");
-        const deezerArt = await fetchAlbumArt(artist, title);
+        const deezerHash = "89c2dae2b498dc9ca9151324d02eca2d"; // À remplacer par le hash de l'album
+        console.log("Tentative de récupération de pochette via Deezer avec le hash:", deezerHash);
+        const deezerArt = await fetchAlbumArt(deezerHash);
         if (deezerArt) {
           console.log("Pochette Deezer trouvée:", deezerArt);
           imageUrl = deezerArt;
