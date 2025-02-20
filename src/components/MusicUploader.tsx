@@ -96,6 +96,7 @@ export const MusicUploader = () => {
 
   const getAlbumCover = async (albumId: number): Promise<string | null> => {
     try {
+      console.log("Tentative de récupération de la pochette pour l'album:", albumId);
       const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/album/${albumId}`, {
         headers: {
           'Origin': window.location.origin
@@ -193,40 +194,34 @@ export const MusicUploader = () => {
       let { artist, title } = parseFileName(file.name);
       console.log("Informations extraites du nom:", { artist, title });
 
-      // Tentative d'extraction des métadonnées
-      const metadataResult = await extractMetadata(file);
-      if (metadataResult) {
-        if (metadataResult.artist) {
-          console.log("Artiste trouvé dans les métadonnées:", metadataResult.artist);
-          artist = metadataResult.artist;
-        }
-        if (metadataResult.title) {
-          console.log("Titre trouvé dans les métadonnées:", metadataResult.title);
-          title = metadataResult.title;
-        }
+      // Test avec l'ID d'album spécifique de Deezer
+      const deezerCover = await getAlbumCover(120044);
+      if (deezerCover) {
+        console.log("Pochette Deezer trouvée:", deezerCover);
+        imageUrl = deezerCover;
+      } else {
+        console.log("Aucune pochette trouvée sur Deezer");
         
-        if (metadataResult.picture) {
-          try {
-            const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
-            imageUrl = URL.createObjectURL(blob);
-            console.log("Pochette créée depuis les métadonnées");
-          } catch (error) {
-            console.error("Erreur lors de la création du blob:", error);
+        // Si pas de pochette Deezer, essayer les métadonnées
+        const metadataResult = await extractMetadata(file);
+        if (metadataResult) {
+          if (metadataResult.artist) {
+            console.log("Artiste trouvé dans les métadonnées:", metadataResult.artist);
+            artist = metadataResult.artist;
           }
-        }
-      }
-
-      // Si pas de pochette dans les métadonnées, essayer avec Deezer
-      if (imageUrl === "https://picsum.photos/240/240") {
-        console.log("Recherche de la pochette sur Deezer pour:", { artist, title });
-        const albumId = await searchDeezerAlbumId(artist, title);
-        if (albumId) {
-          const deezerCover = await getAlbumCover(albumId);
-          if (deezerCover) {
-            console.log("Pochette Deezer trouvée:", deezerCover);
-            imageUrl = deezerCover;
-          } else {
-            console.log("Aucune pochette trouvée sur Deezer");
+          if (metadataResult.title) {
+            console.log("Titre trouvé dans les métadonnées:", metadataResult.title);
+            title = metadataResult.title;
+          }
+          
+          if (metadataResult.picture) {
+            try {
+              const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
+              imageUrl = URL.createObjectURL(blob);
+              console.log("Pochette créée depuis les métadonnées");
+            } catch (error) {
+              console.error("Erreur lors de la création du blob:", error);
+            }
           }
         }
       }
