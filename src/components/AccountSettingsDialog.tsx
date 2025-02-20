@@ -12,10 +12,10 @@ export const AccountSettingsDialog = () => {
       <DialogTrigger asChild>
         <Button
           variant="ghost"
-          className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
+          size="icon"
+          className="text-spotify-neutral hover:text-white hover:bg-white/5"
         >
-          <UserCog className="w-5 h-5 mr-2" />
-          <span>Paramètres du compte</span>
+          <UserCog className="w-5 h-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-spotify-dark text-white">

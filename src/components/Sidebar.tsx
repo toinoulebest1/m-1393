@@ -1,4 +1,3 @@
-
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Heart, Trophy, Music2, LogOut, History } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -8,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
-import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import {
   Select,
   SelectContent,
@@ -93,8 +91,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <div className="pt-4 space-y-2 border-t border-white/10">
-        <AccountSettingsDialog />
+      <div className="pt-4 border-t border-white/10">
         <Button
           variant="ghost"
           className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
