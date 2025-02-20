@@ -2,10 +2,16 @@
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
-import { Music } from "lucide-react";
+import { Music, Clock, Signal, Heart } from "lucide-react";
+import { toast } from "sonner";
 
 export const NowPlaying = () => {
-  const { queue, currentSong } = usePlayer();
+  const { queue, currentSong, favorites, toggleFavorite } = usePlayer();
+
+  const handleFavorite = (song: any) => {
+    toggleFavorite(song);
+    toast.success(`${favorites.some(s => s.id === song.id) ? 'Retiré des' : 'Ajouté aux'} favoris`);
+  };
 
   return (
     <div className="flex-1 p-8">
@@ -39,23 +45,58 @@ export const NowPlaying = () => {
             )}
             
             {/* Contenu de la chanson */}
-            <div className="relative z-10 flex items-center space-x-4">
-              <img
-                src={song.imageUrl || "https://picsum.photos/56/56"}
-                alt="Album art"
-                className={cn(
-                  "w-14 h-14 rounded-lg shadow-lg",
-                  currentSong?.id === song.id && "animate-pulse"
-                )}
-              />
-              <div>
-                <h3 className={cn(
-                  "font-medium",
-                  currentSong?.id === song.id ? "text-white" : "text-spotify-neutral"
-                )}>
-                  {song.title}
-                </h3>
-                <p className="text-sm text-spotify-neutral">{song.artist}</p>
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <img
+                  src={song.imageUrl || "https://picsum.photos/56/56"}
+                  alt="Album art"
+                  className={cn(
+                    "w-14 h-14 rounded-lg shadow-lg",
+                    currentSong?.id === song.id && "animate-pulse"
+                  )}
+                />
+                <div>
+                  <h3 className={cn(
+                    "font-medium",
+                    currentSong?.id === song.id ? "text-white" : "text-spotify-neutral"
+                  )}>
+                    {song.title}
+                  </h3>
+                  <p className="text-sm text-spotify-neutral">{song.artist}</p>
+                </div>
+              </div>
+
+              {/* Informations supplémentaires */}
+              <div className="flex items-center space-x-6">
+                {/* Durée */}
+                <div className="flex items-center space-x-1 text-spotify-neutral">
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm">{song.duration || "0:00"}</span>
+                </div>
+
+                {/* Bitrate */}
+                <div className="flex items-center space-x-1 text-spotify-neutral">
+                  <Signal className="w-4 h-4" />
+                  <span className="text-sm">{song.bitrate || "320 kbps"}</span>
+                </div>
+
+                {/* Bouton favoris */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFavorite(song);
+                  }}
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                >
+                  <Heart
+                    className={cn(
+                      "w-5 h-5 transition-colors",
+                      favorites.some(s => s.id === song.id)
+                        ? "text-red-500 fill-red-500"
+                        : "text-spotify-neutral"
+                    )}
+                  />
+                </button>
               </div>
             </div>
           </div>
