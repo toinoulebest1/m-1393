@@ -56,13 +56,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  const overlapTimeRef = useRef(3);
-  const fadingRef = useRef(false);
-
   const [preferences, setPreferences] = useState({
-    crossfadeEnabled: false,
+    crossfadeEnabled: true,
     crossfadeDuration: 3,
   });
+  const overlapTimeRef = useRef(preferences.crossfadeDuration);
+  const fadingRef = useRef(false);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -199,17 +198,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!audioRef.current) return;
 
     const handleTimeUpdate = () => {
-      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
+      if (!currentSong || !nextSongPreloaded || fadingRef.current || !preferences.crossfadeEnabled) return;
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
       if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
         fadingRef.current = true;
+        console.log("Démarrage du fondu");
 
         nextAudioRef.current.currentTime = 0;
         const playPromise = nextAudioRef.current.play();
         if (playPromise !== undefined) {
-          playPromise.catch(error => {
+          playPromise.then(() => {
+            console.log("Lecture de la prochaine chanson démarrée");
+          }).catch(error => {
             console.error("Erreur lors du démarrage du fondu:", error);
             fadingRef.current = false;
           });
@@ -227,10 +229,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
             currentInVolume = Math.min(1, currentInVolume + volumeStep);
             
-            if (audioRef.current) audioRef.current.volume = currentOutVolume;
-            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+            if (audioRef.current) {
+              audioRef.current.volume = currentOutVolume;
+              console.log("Volume sortant:", currentOutVolume);
+            }
+            if (nextAudioRef.current) {
+              nextAudioRef.current.volume = currentInVolume;
+              console.log("Volume entrant:", currentInVolume);
+            }
           } else {
             clearInterval(fadeInterval);
+            console.log("Fondu terminé");
             
             if (audioRef.current) {
               audioRef.current.pause();
@@ -240,6 +249,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
             const nextSong = queue[currentIndex + 1];
             if (nextSong) {
+              console.log("Passage à la chanson suivante après le fondu");
               setCurrentSong(nextSong);
               
               const tempAudio = audioRef.current;
@@ -259,6 +269,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handleEnded = () => {
       if (!fadingRef.current) {
+        console.log("Fin naturelle de la chanson");
         setProgress(0);
         const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
         const nextSong = queue[currentIndex + 1];
@@ -274,8 +285,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleTimeUpdateProgress = () => {
-      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-      setProgress(percentage);
+      if (!fadingRef.current) {
+        const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+        setProgress(percentage);
+      }
     };
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
@@ -289,7 +302,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [currentSong, nextSongPreloaded, queue, repeatMode]);
+  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled]);
 
   const pause = () => {
     if (audioRef.current) {
@@ -565,11 +578,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      audioRef.current.removeEventListener('error', handleError);
-      audioRef.current.removeEventListener('ended', handleEnded);
-      audioRef.current.removeEventListener('play', handlePlay);
-      audioRef.current.removeEventListener('pause', handlePause);
-      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('error', handleError);
+        audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      }
     };
   }, [repeatMode]);
 
