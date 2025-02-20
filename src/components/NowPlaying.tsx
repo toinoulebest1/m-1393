@@ -1,59 +1,12 @@
-import { Clock, Search, Download, Check, X } from "lucide-react";
+
+import { Clock, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { downloadAndStoreAudio, removeOfflineAudio, isAudioAvailableOffline } from "@/utils/offlineStorage";
-import { getAudioFile } from "@/utils/storage";
 
 export const NowPlaying = () => {
   const { t } = useTranslation();
   const { queue, currentSong, play, searchQuery, setSearchQuery } = usePlayer();
-  const [downloadStates, setDownloadStates] = useState<Record<string, boolean>>({});
-  const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const checkOfflineStatus = async () => {
-      const states: Record<string, boolean> = {};
-      for (const song of queue) {
-        states[song.id] = await isAudioAvailableOffline(song.id);
-      }
-      setDownloadStates(states);
-    };
-
-    checkOfflineStatus();
-  }, [queue]);
-
-  const handleDownload = async (songId: string) => {
-    setIsLoading(prev => ({ ...prev, [songId]: true }));
-    try {
-      const audioUrl = await getAudioFile(songId);
-      await downloadAndStoreAudio(songId, audioUrl);
-      setDownloadStates(prev => ({ ...prev, [songId]: true }));
-      toast.success(t('common.downloadSuccess'));
-    } catch (error) {
-      console.error("Error downloading song:", error);
-      toast.error(t('common.downloadError'));
-    } finally {
-      setIsLoading(prev => ({ ...prev, [songId]: false }));
-    }
-  };
-
-  const handleRemoveDownload = async (songId: string) => {
-    setIsLoading(prev => ({ ...prev, [songId]: true }));
-    try {
-      await removeOfflineAudio(songId);
-      setDownloadStates(prev => ({ ...prev, [songId]: false }));
-      toast.success(t('common.removeDownloadSuccess'));
-    } catch (error) {
-      console.error("Error removing download:", error);
-      toast.error(t('common.removeDownloadError'));
-    } finally {
-      setIsLoading(prev => ({ ...prev, [songId]: false }));
-    }
-  };
 
   const filteredQueue = queue.filter(song => 
     song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -99,18 +52,17 @@ export const NowPlaying = () => {
         </div>
         
         <div className="bg-white/5 backdrop-blur-lg rounded-xl shadow-xl">
-          <div className="grid grid-cols-[1fr,1fr,auto,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
+          <div className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
             <div className="font-medium">TITLE</div>
             <div className="font-medium">ARTIST</div>
             <div className="flex items-center">
               <Clock className="w-4 h-4" />
             </div>
-            <div className="w-24 text-center font-medium">OFFLINE</div>
           </div>
           {filteredQueue.map((song, index) => (
             <div
               key={song.id}
-              className="grid grid-cols-[1fr,1fr,auto,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white group"
+              className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white group"
             >
               <div 
                 className="flex items-center space-x-3 cursor-pointer"
@@ -121,31 +73,6 @@ export const NowPlaying = () => {
               </div>
               <div>{song.artist}</div>
               <div>{song.duration}</div>
-              <div className="flex justify-center">
-                {isLoading[song.id] ? (
-                  <Button variant="ghost" size="icon" disabled>
-                    <span className="animate-spin">⌛</span>
-                  </Button>
-                ) : downloadStates[song.id] ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveDownload(song.id)}
-                    className="text-green-500 hover:text-red-500"
-                  >
-                    <Check className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDownload(song.id)}
-                    className="text-spotify-neutral hover:text-white"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
             </div>
           ))}
         </div>

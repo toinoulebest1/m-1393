@@ -1,8 +1,8 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile, storeAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
-import { downloadAndStoreAudio, getOfflineAudio } from '@/utils/offlineStorage';
 
 interface Song {
   id: string;
@@ -72,7 +72,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
 
   useEffect(() => {
-    console.log("Initializing audio with volume:", volume);
     audioRef.current.volume = volume / 100;
   }, []);
 
@@ -83,56 +82,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [playbackRate]);
 
   const play = async (song?: Song) => {
-    console.log("Play function called with song:", song);
-    
     if (song && (!currentSong || song.id !== currentSong.id)) {
-      console.log("Setting new current song:", song);
       setCurrentSong(song);
       try {
-        let audioUrl: string;
-        
-        // Utiliser l'URL comme clé pour le stockage hors-ligne
-        const offlineBlob = await getOfflineAudio(song.url);
-        if (offlineBlob) {
-          console.log("Using offline audio file from:", song.url);
-          audioUrl = URL.createObjectURL(offlineBlob);
-        } else {
-          console.log("Fetching audio from storage");
-          try {
-            audioUrl = await getAudioFile(song.url);
-            
-            // Télécharger pour utilisation hors-ligne avec les métadonnées
-            await downloadAndStoreAudio(song.url, audioUrl, {
-              title: song.title,
-              artist: song.artist,
-              duration: song.duration
-            });
-            
-          } catch (error) {
-            console.log("File not found in storage, attempting to store it first");
-            if (typeof song.url !== 'string') {
-              throw new Error('Invalid audio file URL');
-            }
-            await storeAudioFile(song.url, song.url);
-            audioUrl = await getAudioFile(song.url);
-          }
-        }
-
+        const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');
         }
 
         audioRef.current.src = audioUrl;
-        console.log("Set audio source to:", audioUrl);
-        
-        // Reset the audio element
         audioRef.current.currentTime = 0;
         audioRef.current.load();
         
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            console.log("Audio playback started successfully");
             setIsPlaying(true);
             toast.success(`Lecture de ${song.title}`);
           }).catch(error => {
@@ -143,7 +107,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       } catch (error) {
         console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce fichier audio. Il n'est peut-être plus disponible.");
+        toast.error("Impossible de lire ce fichier audio");
         setCurrentSong(null);
         setIsPlaying(false);
       }
@@ -152,7 +116,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            console.log("Resuming audio playback");
             setIsPlaying(true);
           }).catch(error => {
             console.error("Error resuming playback:", error);
@@ -241,21 +204,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleFavorite = async (song: Song) => {
     try {
-      console.log("Toggling favorite for song:", song);
-      const audioFile = await getAudioFile(song.url);
-      if (!audioFile) {
+      const audioUrl = await getAudioFile(song.url);
+      if (!audioUrl) {
         toast.error("Le fichier audio n'est pas disponible");
         return;
       }
 
-      // Vérifier si la chanson est déjà dans les favoris avec le même titre et artiste
       const isFavorite = favorites.some(f => 
         f.title.toLowerCase() === song.title.toLowerCase() && 
         f.artist?.toLowerCase() === song.artist?.toLowerCase()
       );
       
       if (isFavorite) {
-        // Si la chanson est déjà dans les favoris, on la retire
         const existingFavorite = favorites.find(f => 
           f.title.toLowerCase() === song.title.toLowerCase() && 
           f.artist?.toLowerCase() === song.artist?.toLowerCase()
@@ -269,10 +229,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const favoriteId = crypto.randomUUID();
-      storeAudioFile(favoriteId, audioFile);
+      storeAudioFile(favoriteId, audioUrl);
       
-      // Créer d'abord l'entrée dans la table songs
-      const { data: songData, error: songError } = await supabase
+      const { error: songError } = await supabase
         .from('songs')
         .upsert({
           id: favoriteId,
@@ -289,52 +248,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      console.log("Song entry created:", songData);
-
-      // Mettre à jour les stats
-      const { data: existingStat, error: fetchError } = await supabase
+      const { error: statError } = await supabase
         .from('favorite_stats')
-        .select('*')
-        .eq('song_id', favoriteId)
-        .maybeSingle();
+        .insert({
+          song_id: favoriteId,
+          count: 1,
+          last_updated: new Date().toISOString()
+        });
 
-      if (fetchError) {
-        console.error("Error fetching stats:", fetchError);
-        return;
-      }
-
-      console.log("Existing stat:", existingStat);
-
-      if (existingStat) {
-        const { error: updateError } = await supabase
-          .from('favorite_stats')
-          .update({ 
-            count: existingStat.count + 1,
-            last_updated: new Date().toISOString()
-          })
-          .eq('song_id', favoriteId);
-
-        if (updateError) {
-          console.error("Error updating stats:", updateError);
-          toast.error("Erreur lors de la mise à jour des statistiques");
-        } else {
-          console.log("Stats updated successfully");
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from('favorite_stats')
-          .insert({
-            song_id: favoriteId,
-            count: 1,
-            last_updated: new Date().toISOString()
-          });
-
-        if (insertError) {
-          console.error("Error inserting stats:", insertError);
-          toast.error("Erreur lors de l'ajout des statistiques");
-        } else {
-          console.log("Stats inserted successfully");
-        }
+      if (statError) {
+        console.error("Error inserting stats:", statError);
+        toast.error("Erreur lors de l'ajout des statistiques");
       }
 
       const favoriteSong = {
@@ -411,12 +335,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handlePlay = () => {
-      console.log("Audio started playing");
       setIsPlaying(true);
     };
 
     const handlePause = () => {
-      console.log("Audio paused");
       setIsPlaying(false);
     };
 
