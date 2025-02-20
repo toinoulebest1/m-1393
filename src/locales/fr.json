@@ -1,3 +1,4 @@
+
 {
   "common": {
     "appName": "Spotify Clone",
@@ -23,6 +24,7 @@
     "artist": "Artiste",
     "duration": "Durée",
     "downloadedAt": "Téléchargé le",
-    "lastPlayed": "Dernière lecture"
+    "lastPlayed": "Dernière lecture",
+    "history": "Historique"
   }
 }
