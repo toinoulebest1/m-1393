@@ -52,27 +52,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <div className="space-y-4 mb-8">
-        <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-          <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-            <SelectValue placeholder="Langue" />
-          </SelectTrigger>
-          <SelectContent className="bg-spotify-dark border-white/10">
-            <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-              Français
-            </SelectItem>
-            <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-              English
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <ThemeToggle />
-
-        <MusicUploader />
-      </div>
-
-      <nav className="space-y-2 flex-1">
+      <nav className="space-y-2">
         {links.map(({ to, icon: Icon, label }) => (
           <Link
             key={to}
@@ -90,7 +70,29 @@ export const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="mt-auto pt-4 border-t border-white/10">
+      <div className="flex-1">
+        <div className="mt-8 space-y-4 border-t border-white/10 pt-4">
+          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
+            <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
+              <SelectValue placeholder="Langue" />
+            </SelectTrigger>
+            <SelectContent className="bg-spotify-dark border-white/10">
+              <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
+                Français
+              </SelectItem>
+              <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
+                English
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <ThemeToggle />
+
+          <MusicUploader />
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-white/10">
         <Button
           variant="ghost"
           className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
