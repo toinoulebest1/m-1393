@@ -1,3 +1,5 @@
+
+import { useState } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
