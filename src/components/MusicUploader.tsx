@@ -37,15 +37,15 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
-      // Exécuter la requête SQL directement
+      // Stocker temporairement le signalement dans les métadonnées de la chanson
       const { error } = await supabase
-        .from('song_reports')
-        .insert({
-          song_id: songId,
-          user_id: session.user.id,
-          reason: reason,
-          status: 'pending'
-        });
+        .from('songs')
+        .update({
+          reported_at: new Date().toISOString(),
+          report_reason: reason,
+          reported_by: session.user.id
+        })
+        .eq('id', songId);
 
       if (error) {
         console.error("Erreur lors du signalement:", error);
