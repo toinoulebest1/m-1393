@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { MusicPreferences } from "./MusicPreferences";
+import { Separator } from "@/components/ui/separator";
 
 export const AccountSettingsDialog = () => {
   const { t } = useTranslation();
@@ -135,7 +137,7 @@ export const AccountSettingsDialog = () => {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-spotify-dark text-white">
+      <DialogContent className="bg-spotify-dark text-white max-w-4xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Paramètres du compte</DialogTitle>
         </DialogHeader>
@@ -235,6 +237,10 @@ export const AccountSettingsDialog = () => {
               "Enregistrer les modifications"
             )}
           </Button>
+
+          <Separator className="bg-white/10" />
+
+          <MusicPreferences />
         </div>
       </DialogContent>
     </Dialog>

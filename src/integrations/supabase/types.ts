@@ -70,6 +70,47 @@ export type Database = {
           },
         ]
       }
+      listening_stats: {
+        Row: {
+          created_at: string | null
+          favorite_periods: Json[] | null
+          id: string
+          peak_hours: Json | null
+          total_listening_time: number | null
+          tracks_played: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          favorite_periods?: Json[] | null
+          id?: string
+          peak_hours?: Json | null
+          total_listening_time?: number | null
+          tracks_played?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          favorite_periods?: Json[] | null
+          id?: string
+          peak_hours?: Json | null
+          total_listening_time?: number | null
+          tracks_played?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listening_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lyrics: {
         Row: {
           content: string
@@ -95,6 +136,50 @@ export type Database = {
             columns: ["song_id"]
             isOneToOne: false
             referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      music_preferences: {
+        Row: {
+          audio_quality: string | null
+          created_at: string | null
+          crossfade_duration: number | null
+          crossfade_enabled: boolean | null
+          favorite_genres: Json[] | null
+          id: string
+          preferred_languages: string[] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          audio_quality?: string | null
+          created_at?: string | null
+          crossfade_duration?: number | null
+          crossfade_enabled?: boolean | null
+          favorite_genres?: Json[] | null
+          id?: string
+          preferred_languages?: string[] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          audio_quality?: string | null
+          created_at?: string | null
+          crossfade_duration?: number | null
+          crossfade_enabled?: boolean | null
+          favorite_genres?: Json[] | null
+          id?: string
+          preferred_languages?: string[] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
