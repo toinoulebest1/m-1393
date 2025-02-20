@@ -6,8 +6,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import LastFM from 'lastfm-node-client';
-
-const lastfm = new LastFM('YOUR_API_KEY');
+import { supabase } from "@/integrations/supabase/client";
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
@@ -48,13 +47,24 @@ export const MusicUploader = () => {
 
   const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
     try {
+      const { data: { LASTFM_API_KEY }, error } = await supabase
+        .from('secrets')
+        .select('LASTFM_API_KEY')
+        .single();
+
+      if (error || !LASTFM_API_KEY) {
+        console.warn("Impossible de récupérer la clé API Last.fm:", error);
+        return null;
+      }
+
+      const lastfm = new LastFM(LASTFM_API_KEY);
+      
       const response = await lastfm.track.getInfo({
         artist,
         track: title
       });
 
       if (response?.track?.album?.image) {
-        // Récupérer l'image la plus grande disponible
         const images = response.track.album.image;
         const largestImage = images[images.length - 1];
         return largestImage['#text'] || null;
@@ -104,7 +114,6 @@ export const MusicUploader = () => {
 
       try {
         const metadata = await mm.parseBlob(file);
-        // Utiliser les métadonnées si disponibles
         if (metadata.common.artist) {
           artist = metadata.common.artist;
         }
@@ -116,7 +125,6 @@ export const MusicUploader = () => {
           const blob = new Blob([picture.data], { type: picture.format });
           imageUrl = URL.createObjectURL(blob);
         } else {
-          // Si pas d'image dans les métadonnées, essayer Last.fm
           const lastfmArt = await fetchAlbumArt(artist, title);
           if (lastfmArt) {
             imageUrl = lastfmArt;
@@ -124,7 +132,6 @@ export const MusicUploader = () => {
         }
       } catch (metadataError) {
         console.warn("Impossible de lire les métadonnées:", metadataError);
-        // Essayer Last.fm même si la lecture des métadonnées a échoué
         const lastfmArt = await fetchAlbumArt(artist, title);
         if (lastfmArt) {
           imageUrl = lastfmArt;
