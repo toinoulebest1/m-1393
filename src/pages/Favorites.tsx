@@ -27,7 +27,8 @@ const Favorites = () => {
     isPlaying, 
     addToQueue,
     removeFavorite,
-    queue 
+    queue,
+    pause 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
 
@@ -66,6 +67,11 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
+      // Si la chanson est déjà en cours de lecture, on ne fait rien
+      if (currentSong?.id === song.id) {
+        return;
+      }
+      
       await play(song);
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
       const remainingSongs = favorites.slice(songIndex + 1);
