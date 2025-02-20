@@ -1,4 +1,3 @@
-
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -64,9 +63,8 @@ export const MusicUploader = () => {
     return null;
   };
 
-  const searchDeezerCoverHash = async (artist: string, title: string): Promise<string | null> => {
+  const searchDeezerAlbumId = async (artist: string, title: string): Promise<number | null> => {
     try {
-      // Utilisation de l'API publique avec CORS
       const query = encodeURIComponent(`${artist} ${title}`);
       const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`, {
         headers: {
@@ -75,7 +73,7 @@ export const MusicUploader = () => {
       });
       
       if (!response.ok) {
-        console.error("Erreur API Deezer:", response.status);
+        console.error("Erreur API Deezer (recherche):", response.status);
         return null;
       }
 
@@ -83,18 +81,42 @@ export const MusicUploader = () => {
       
       if (data.data && data.data.length > 0) {
         const track = data.data[0];
-        if (track.album?.cover_xl) {
-          // Extrait le hash de l'URL de la pochette
-          const coverUrl = track.album.cover_xl;
-          const hash = coverUrl.split('/').slice(-2)[0];
-          console.log("Hash de pochette trouvé:", hash);
-          return hash;
+        if (track.album?.id) {
+          console.log("ID de l'album trouvé:", track.album.id);
+          return track.album.id;
         }
       }
       
       return null;
     } catch (error) {
       console.error("Erreur lors de la recherche Deezer:", error);
+      return null;
+    }
+  };
+
+  const getAlbumCover = async (albumId: number): Promise<string | null> => {
+    try {
+      const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/album/${albumId}`, {
+        headers: {
+          'Origin': window.location.origin
+        }
+      });
+
+      if (!response.ok) {
+        console.error("Erreur API Deezer (album):", response.status);
+        return null;
+      }
+
+      const albumData = await response.json();
+      if (albumData.cover_xl) {
+        const coverUrl = albumData.cover_xl;
+        console.log("URL de la pochette trouvée:", coverUrl);
+        return coverUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de la récupération de l'album:", error);
       return null;
     }
   };
@@ -197,12 +219,12 @@ export const MusicUploader = () => {
       // Si pas de pochette dans les métadonnées, essayer avec Deezer
       if (imageUrl === "https://picsum.photos/240/240") {
         console.log("Recherche de la pochette sur Deezer pour:", { artist, title });
-        const coverHash = await searchDeezerCoverHash(artist, title);
-        if (coverHash) {
-          const deezerArt = await fetchAlbumArt(coverHash);
-          if (deezerArt) {
-            console.log("Pochette Deezer trouvée:", deezerArt);
-            imageUrl = deezerArt;
+        const albumId = await searchDeezerAlbumId(artist, title);
+        if (albumId) {
+          const deezerCover = await getAlbumCover(albumId);
+          if (deezerCover) {
+            console.log("Pochette Deezer trouvée:", deezerCover);
+            imageUrl = deezerCover;
           } else {
             console.log("Aucune pochette trouvée sur Deezer");
           }
