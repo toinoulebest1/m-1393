@@ -28,6 +28,7 @@ interface ReportDialogProps {
 const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
   const { t } = useTranslation();
   const [reason, setReason] = useState<string>("");
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleReport = async () => {
     try {
@@ -37,13 +38,12 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
-      // Stocker temporairement le signalement dans les métadonnées de la chanson
       const { error } = await supabase
         .from('songs')
         .update({
-          reported_at: new Date().toISOString(),
           report_reason: reason,
-          reported_by: session.user.id
+          reported_by: session.user.id,
+          reported_at: new Date().toISOString()
         })
         .eq('id', songId);
 
@@ -54,6 +54,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
       }
 
       toast.success("Merci pour votre signalement");
+      setIsOpen(false);
     } catch (error) {
       console.error("Erreur lors du signalement:", error);
       toast.error("Une erreur est survenue lors du signalement");
@@ -61,7 +62,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="hover:text-red-500">
           <Flag className="h-4 w-4" />
