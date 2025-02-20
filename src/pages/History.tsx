@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import ColorThief from 'colorthief';
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
+import { getAudioFile } from '@/utils/storage';
 
 const History = () => {
   const { t } = useTranslation();
@@ -31,6 +32,7 @@ const History = () => {
           ) : (
             history.map((song) => {
               const isFavorite = favorites.some(s => s.id === song.id);
+              const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
               
               return (
                 <div
@@ -41,12 +43,13 @@ const History = () => {
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <img
-                        src={song.imageUrl || "https://picsum.photos/56/56"}
-                        alt="Album art"
-                        className="w-14 h-14 rounded-lg shadow-lg"
+                        src={imageSource}
+                        alt={`Pochette de ${song.title}`}
+                        className="w-14 h-14 rounded-lg shadow-lg object-cover"
+                        loading="lazy"
                       />
                       <div>
-                        <h3 className="font-medium text-spotify-neutral">
+                        <h3 className="font-medium text-spotify-neutral hover:text-white transition-colors">
                           {song.title}
                         </h3>
                         <p className="text-sm text-spotify-neutral">{song.artist}</p>
