@@ -3,7 +3,6 @@ import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
-import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -114,19 +113,36 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
 
 const processAudioFile = async (file: File) => {
   try {
-    const metadata = await mm.parseBlob(file);
-    const filePath = await storeAudioFile(file.name, file);
+    // On utilise l'API Audio native au lieu de music-metadata-browser
+    const audioElement = document.createElement('audio');
+    const objectUrl = URL.createObjectURL(file);
     
-    const song = {
-      id: file.name,
-      title: metadata.common.title || file.name,
-      artist: metadata.common.artist || "Unknown Artist",
-      duration: metadata.format.duration ? String(metadata.format.duration) : "0",
-      url: file.name,
-      bitrate: metadata.format.bitrate ? `${Math.round(metadata.format.bitrate / 1000)} kbps` : "320 kbps",
-    };
-    
-    return song;
+    return new Promise((resolve, reject) => {
+      audioElement.onloadedmetadata = async () => {
+        URL.revokeObjectURL(objectUrl);
+
+        // Stockage du fichier
+        const filePath = await storeAudioFile(file.name, file);
+        
+        const song = {
+          id: file.name,
+          title: file.name.replace(/\.[^/.]+$/, ""), // Retire l'extension
+          artist: "Unknown Artist",
+          duration: String(audioElement.duration),
+          url: file.name,
+          bitrate: "320 kbps", // Valeur par défaut
+        };
+        
+        resolve(song);
+      };
+
+      audioElement.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Erreur lors du chargement du fichier audio"));
+      };
+
+      audioElement.src = objectUrl;
+    });
   } catch (error) {
     console.error("Error processing audio file:", error);
     toast.error("Erreur lors du traitement du fichier audio");
@@ -153,19 +169,24 @@ export const MusicUploader = () => {
     console.log("Nombre de fichiers sélectionnés:", files.length);
     toast.info(`Traitement de ${files.length} fichier(s)...`);
 
-    const processedSongs = await Promise.all(
-      Array.from(files).map(processAudioFile)
-    );
+    try {
+      const processedSongs = await Promise.all(
+        Array.from(files).map(processAudioFile)
+      );
 
-    const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
-    console.log("Chansons valides traitées:", validSongs);
+      const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
+      console.log("Chansons valides traitées:", validSongs);
 
-    if (validSongs.length > 0) {
-      validSongs.forEach(song => {
-        addToQueue(song);
-      });
-      setUploadedSongs(validSongs);
-      toast.success(t('common.fileSelected', { count: validSongs.length }));
+      if (validSongs.length > 0) {
+        validSongs.forEach(song => {
+          addToQueue(song);
+        });
+        setUploadedSongs(validSongs);
+        toast.success(t('common.fileSelected', { count: validSongs.length }));
+      }
+    } catch (error) {
+      console.error("Erreur lors du traitement des fichiers:", error);
+      toast.error("Erreur lors du traitement des fichiers");
     }
   };
 
