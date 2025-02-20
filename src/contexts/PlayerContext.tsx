@@ -54,6 +54,15 @@ const globalAudio = new Audio();
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
+  const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const nextGainNodeRef = useRef<GainNode | null>(null);
+  const [preferences, setPreferences] = useState({
+    crossfadeEnabled: false,
+    crossfadeDuration: 0,
+  });
+
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -71,143 +80,95 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [history, setHistory] = useState<Song[]>([]);
 
   useEffect(() => {
-    const loadHistory = async () => {
+    const loadPreferences = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const { data, error } = await supabase
-          .from('play_history')
-          .select(`
-            id,
-            played_at,
-            song_id,
-            songs!inner (
-              id,
-              title,
-              artist,
-              duration,
-              file_path,
-              image_url
-            )
-          `)
+        const { data } = await supabase
+          .from('music_preferences')
+          .select('crossfade_enabled, crossfade_duration')
           .eq('user_id', session.user.id)
-          .order('played_at', { ascending: false })
-          .limit(50);
-
-        if (error) {
-          console.error("Erreur lors du chargement de l'historique:", error);
-          toast.error("Erreur lors du chargement de l'historique");
-          return;
-        }
+          .maybeSingle();
 
         if (data) {
-          const formattedHistory = data.map(item => ({
-            id: item.songs.id,
-            title: item.songs.title,
-            artist: item.songs.artist,
-            duration: item.songs.duration,
-            url: item.songs.file_path,
-            imageUrl: item.songs.image_url,
-            playedAt: item.played_at
-          }));
-          setHistory(formattedHistory);
+          setPreferences({
+            crossfadeEnabled: data.crossfade_enabled,
+            crossfadeDuration: data.crossfade_duration,
+          });
         }
       } catch (error) {
-        console.error("Erreur lors du chargement de l'historique:", error);
-        toast.error("Erreur lors du chargement de l'historique");
+        console.error("Erreur lors du chargement des préférences:", error);
       }
     };
 
-    loadHistory();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        loadHistory();
-      } else if (event === 'SIGNED_OUT') {
-        setHistory([]);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    loadPreferences();
   }, []);
 
-  useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setFavorites([]);
-          return;
-        }
-
-        const { data: favoriteStats, error } = await supabase
-          .from('favorite_stats')
-          .select(`
-            song_id,
-            songs (
-              id,
-              title,
-              artist,
-              duration,
-              file_path,
-              image_url
-            )
-          `)
-          .eq('user_id', session.user.id);
-
-        if (error) {
-          console.error("Erreur lors du chargement des favoris:", error);
-          toast.error("Erreur lors du chargement des favoris");
-          return;
-        }
-
-        if (favoriteStats) {
-          const formattedFavorites = favoriteStats.map(stat => ({
-            id: stat.songs.id,
-            title: stat.songs.title,
-            artist: stat.songs.artist,
-            duration: stat.songs.duration,
-            url: stat.songs.file_path,
-            imageUrl: stat.songs.image_url
-          }));
-          setFavorites(formattedFavorites);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des favoris:", error);
-        toast.error("Erreur lors du chargement des favoris");
-      }
-    };
-
-    loadFavorites();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
-        loadFavorites();
-      } else if (event === 'SIGNED_OUT') {
-        setFavorites([]);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    audioRef.current.volume = volume / 100;
-  }, [volume]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
+  const setupAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      gainNodeRef.current = audioContextRef.current.createGain();
+      nextGainNodeRef.current = audioContextRef.current.createGain();
     }
-  }, [playbackRate]);
+  };
+
+  const crossfade = async (nextSong: Song) => {
+    try {
+      setupAudioContext();
+      const audioContext = audioContextRef.current!;
+      const currentGainNode = gainNodeRef.current!;
+      const nextGainNode = nextGainNodeRef.current!;
+
+      const audioUrl = await getAudioFile(nextSong.url);
+      if (!audioUrl) {
+        throw new Error('Fichier audio non trouvé');
+      }
+
+      nextAudioRef.current.src = audioUrl;
+      await nextAudioRef.current.load();
+
+      const currentSource = audioContext.createMediaElementSource(audioRef.current);
+      const nextSource = audioContext.createMediaElementSource(nextAudioRef.current);
+      
+      currentSource.connect(currentGainNode);
+      nextSource.connect(nextGainNode);
+      currentGainNode.connect(audioContext.destination);
+      nextGainNode.connect(audioContext.destination);
+
+      currentGainNode.gain.value = 1;
+      nextGainNode.gain.value = 0;
+
+      const playPromise = nextAudioRef.current.play();
+      if (playPromise !== undefined) {
+        await playPromise;
+      }
+
+      const duration = preferences.crossfadeDuration;
+      currentGainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+      nextGainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + duration);
+
+      setTimeout(() => {
+        const tempAudio = audioRef.current;
+        audioRef.current = nextAudioRef.current;
+        nextAudioRef.current = tempAudio;
+        
+        setCurrentSong(nextSong);
+        setIsPlaying(true);
+      }, duration * 1000);
+    } catch (error) {
+      console.error("Erreur lors du crossfade:", error);
+      play(nextSong);
+    }
+  };
 
   const play = async (song?: Song) => {
     if (song && (!currentSong || song.id !== currentSong.id)) {
+      if (preferences.crossfadeEnabled && currentSong && preferences.crossfadeDuration > 0) {
+        await crossfade(song);
+        return;
+      }
+
       setCurrentSong(song);
 
       try {
