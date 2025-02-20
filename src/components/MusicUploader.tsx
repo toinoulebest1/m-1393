@@ -1,21 +1,131 @@
-import { Upload } from "lucide-react";
+
+import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ReportDialogProps {
+  songTitle: string;
+  songArtist: string;
+  songId: string;
+}
+
+const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
+  const [reason, setReason] = useState<string>("");
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleReport = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Vous devez être connecté pour signaler un problème");
+        return;
+      }
+
+      const { data: existingReports } = await supabase
+        .from('song_reports')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', session.user.id)
+        .eq('status', 'pending');
+
+      if (existingReports && existingReports.length > 0) {
+        toast.error("Vous avez déjà signalé cette chanson");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('song_reports')
+        .insert({
+          song_id: songId,
+          user_id: session.user.id,
+          reason: reason,
+          status: 'pending'
+        });
+
+      if (error) {
+        console.error("Erreur lors du signalement:", error);
+        toast.error("Une erreur est survenue lors du signalement");
+        return;
+      }
+
+      toast.success("Merci pour votre signalement");
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Erreur lors du signalement:", error);
+      toast.error("Une erreur est survenue lors du signalement");
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-spotify-neutral hover:text-white">
+          <Flag className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Signaler un problème</DialogTitle>
+          <DialogDescription>
+            {songTitle} - {songArtist}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup onValueChange={setReason}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="poor_quality" id="poor_quality" />
+              <Label htmlFor="poor_quality">Qualité audio médiocre</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
+              <Label htmlFor="wrong_metadata">Métadonnées incorrectes</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
+              <Label htmlFor="corrupted_file">Fichier corrompu</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="other" id="other" />
+              <Label htmlFor="other">Autre problème</Label>
+            </div>
+          </RadioGroup>
+          <Button onClick={handleReport}>Envoyer le signalement</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const processAudioFile = async (file: File) => {
   try {
     const metadata = await mm.parseBlob(file);
+    const filePath = await storeAudioFile(file.name, file);
+    
     const song = {
       id: file.name,
       title: metadata.common.title || file.name,
       artist: metadata.common.artist || "Unknown Artist",
-      bitrate: metadata.format.bitrate ? `${metadata.format.bitrate} kbps` : undefined,
+      duration: metadata.format.duration ? String(metadata.format.duration) : "0",
+      url: file.name,
+      bitrate: metadata.format.bitrate ? `${Math.round(metadata.format.bitrate / 1000)} kbps` : "320 kbps",
     };
-    await storeAudioFile(file);
+    
     return song;
   } catch (error) {
     console.error("Error processing audio file:", error);
@@ -30,7 +140,9 @@ export const MusicUploader = () => {
   const [uploadedSongs, setUploadedSongs] = useState<Array<{
     id: string;
     title: string;
-    artist?: string;
+    artist: string;
+    duration: string;
+    url: string;
     bitrate?: string;
   }>>([]);
 
@@ -74,13 +186,18 @@ export const MusicUploader = () => {
       {uploadedSongs.length > 0 && (
         <div className="space-y-2">
           {uploadedSongs.map(song => (
-            <div key={song.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+            <div key={song.id} className="flex items-center justify-between p-2 bg-gray-800 rounded hover:bg-gray-700/50 transition-colors">
               <div className="flex-1">
                 <h3 className="text-sm font-medium">{song.title}</h3>
-                {song.artist && <p className="text-xs text-gray-400">{song.artist}</p>}
+                <p className="text-xs text-gray-400">{song.artist}</p>
+                <p className="text-xs text-gray-500">{song.bitrate || "320 kbps"}</p>
               </div>
-              <div className="text-xs text-gray-400">
-                {song.bitrate || "320 kbps"}
+              <div className="flex items-center space-x-2">
+                <ReportDialog
+                  songTitle={song.title}
+                  songArtist={song.artist}
+                  songId={song.id}
+                />
               </div>
             </div>
           ))}
