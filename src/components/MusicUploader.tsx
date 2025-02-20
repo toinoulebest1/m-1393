@@ -48,7 +48,11 @@ export const MusicUploader = () => {
       const query = encodeURIComponent(`${artist} ${title}`);
       console.log("Recherche Deezer pour:", { artist, title });
       
-      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
+      const response = await fetch(`${supabase.functions.url}/deezer-proxy?q=${query}`, {
+        headers: {
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+        }
+      });
       
       if (!response.ok) {
         console.error("Erreur API Deezer:", response.status);
@@ -69,30 +73,7 @@ export const MusicUploader = () => {
       return null;
     } catch (error) {
       console.error("Erreur lors de la recherche Deezer:", error);
-      try {
-        const query = encodeURIComponent(`${artist} ${title}`);
-        const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`, {
-          headers: {
-            'Origin': window.location.origin
-          }
-        });
-        
-        if (!response.ok) {
-          console.error("Erreur API Deezer (second essai):", response.status);
-          return null;
-        }
-
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-          const track = data.data[0];
-          if (track.album?.cover_xl) {
-            return track.album.cover_xl;
-          }
-        }
-      } catch (retryError) {
-        console.error("Erreur lors de la seconde tentative:", retryError);
-      }
-      return null;
+      return "https://picsum.photos/240/240"; // Fallback en cas d'erreur
     }
   };
 
