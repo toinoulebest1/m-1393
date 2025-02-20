@@ -1,13 +1,15 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserCog, Upload, Loader2 } from "lucide-react";
+import { UserCog, Upload, Loader2, Clock, CalendarDays } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 export const AccountSettingsDialog = () => {
   const { t } = useTranslation();
@@ -15,6 +17,8 @@ export const AccountSettingsDialog = () => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [signupDate, setSignupDate] = useState<string | null>(null);
+  const [lastLogins, setLastLogins] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProfile();
@@ -27,7 +31,7 @@ export const AccountSettingsDialog = () => {
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('username, avatar_url')
+        .select('username, avatar_url, signup_date, last_logins')
         .eq('id', session.user.id)
         .single();
 
@@ -36,6 +40,8 @@ export const AccountSettingsDialog = () => {
       if (profile) {
         setUsername(profile.username || '');
         setAvatarUrl(profile.avatar_url);
+        setSignupDate(profile.signup_date);
+        setLastLogins(profile.last_logins || []);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -186,6 +192,34 @@ export const AccountSettingsDialog = () => {
               placeholder="Entrez votre nom d'utilisateur"
             />
           </div>
+
+          {signupDate && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-spotify-neutral flex items-center gap-2">
+                <CalendarDays className="w-4 h-4" />
+                Date d'inscription
+              </h3>
+              <p className="text-sm text-white/80">
+                {format(new Date(signupDate), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+              </p>
+            </div>
+          )}
+
+          {lastLogins.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-spotify-neutral flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Dernières connexions
+              </h3>
+              <div className="space-y-1">
+                {lastLogins.slice(0, 3).map((login: any, index: number) => (
+                  <p key={index} className="text-sm text-white/80">
+                    {format(new Date(login.timestamp), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Button
             onClick={handleUpdateProfile}

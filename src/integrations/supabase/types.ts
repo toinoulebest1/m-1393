@@ -165,6 +165,8 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           id: string
+          last_logins: Json[] | null
+          signup_date: string | null
           theme: Json | null
           username: string | null
         }
@@ -172,6 +174,8 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id: string
+          last_logins?: Json[] | null
+          signup_date?: string | null
           theme?: Json | null
           username?: string | null
         }
@@ -179,6 +183,8 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          last_logins?: Json[] | null
+          signup_date?: string | null
           theme?: Json | null
           username?: string | null
         }
