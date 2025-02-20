@@ -49,44 +49,61 @@ export const MusicUploader = () => {
     try {
       console.log("Recherche sur Last.fm pour:", { artist, title });
       
-      const { data, error } = await supabase
+      const { data: secretData, error: secretError } = await supabase
         .from('secrets')
         .select('value')
         .eq('name', 'LASTFM_API_KEY')
         .maybeSingle();
 
-      if (error || !data?.value) {
-        console.warn("Impossible de récupérer la clé API Last.fm:", error);
+      // Debug de la réponse de Supabase
+      console.log("Réponse Supabase pour la clé Last.fm:", { secretData, secretError });
+
+      if (secretError || !secretData?.value) {
+        console.warn("Impossible de récupérer la clé API Last.fm:", secretError);
         return null;
       }
 
-      console.log("Clé Last.fm récupérée, appel de l'API");
-      const lastfm = new LastFM(data.value);
+      const apiKey = secretData.value;
+      console.log("Clé Last.fm récupérée, vérification:", apiKey ? "Clé présente" : "Clé manquante");
+
+      const lastfm = new LastFM(apiKey);
       
-      const response = await lastfm.track.getInfo({
-        artist,
-        track: title,
-        autocorrect: 1
-      });
+      try {
+        const response = await lastfm.track.getInfo({
+          artist,
+          track: title,
+          autocorrect: 1
+        });
 
-      console.log("Réponse Last.fm:", response);
+        console.log("Réponse Last.fm brute:", JSON.stringify(response, null, 2));
 
-      if (response?.track?.album?.image) {
-        const images = response.track.album.image;
-        console.log("Images disponibles:", images);
-        
-        // Recherche de l'image la plus grande
-        const largeImage = images.find(img => img.size === 'extralarge') || 
-                         images.find(img => img.size === 'large') ||
-                         images[images.length - 1];
+        if (response?.track?.album?.image) {
+          const images = response.track.album.image;
+          console.log("Images disponibles:", JSON.stringify(images, null, 2));
+          
+          // Recherche de l'image la plus grande
+          const largeImage = images.find(img => img.size === 'extralarge') || 
+                           images.find(img => img.size === 'large') ||
+                           images[images.length - 1];
 
-        if (largeImage?.['#text']) {
-          console.log("Image sélectionnée:", largeImage['#text']);
-          return largeImage['#text'];
+          if (largeImage?.['#text']) {
+            console.log("Image sélectionnée:", largeImage['#text']);
+            return largeImage['#text'];
+          }
         }
+
+        console.log("Structure de la réponse Last.fm:", {
+          hasTrack: !!response?.track,
+          hasAlbum: !!response?.track?.album,
+          hasImages: !!response?.track?.album?.image
+        });
+
+        console.log("Aucune image trouvée dans la réponse Last.fm");
+        return null;
+      } catch (lastfmError) {
+        console.error("Erreur lors de l'appel à l'API Last.fm:", lastfmError);
+        return null;
       }
-      console.log("Aucune image trouvée dans la réponse Last.fm");
-      return null;
     } catch (error) {
       console.error("Erreur détaillée Last.fm:", error);
       return null;
