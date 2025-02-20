@@ -149,6 +149,24 @@ export type Database = {
         }
         Relationships: []
       }
+      secrets: {
+        Row: {
+          id: string
+          name: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          value: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          value?: string
+        }
+        Relationships: []
+      }
       songs: {
         Row: {
           artist: string | null

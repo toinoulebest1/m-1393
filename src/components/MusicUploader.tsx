@@ -1,3 +1,4 @@
+
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -46,13 +47,18 @@ export const MusicUploader = () => {
 
   const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
     try {
-      const apiKey = process.env.LASTFM_API_KEY;
-      if (!apiKey) {
-        console.warn("Clé API Last.fm non trouvée");
+      const { data, error } = await supabase
+        .from('secrets')
+        .select('value')
+        .eq('name', 'LASTFM_API_KEY')
+        .single();
+
+      if (error || !data?.value) {
+        console.warn("Impossible de récupérer la clé API Last.fm:", error);
         return null;
       }
 
-      const lastfm = new LastFM(apiKey);
+      const lastfm = new LastFM(data.value);
       
       const response = await lastfm.track.getInfo({
         artist,
