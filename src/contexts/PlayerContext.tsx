@@ -58,9 +58,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [preferences, setPreferences] = useState({
     crossfadeEnabled: true,
-    crossfadeDuration: 3,
+    crossfadeDuration: 10,
   });
-  const overlapTimeRef = useRef(preferences.crossfadeDuration);
   const fadingRef = useRef(false);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -95,6 +94,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await nextAudioRef.current.load();
       nextAudioRef.current.volume = 0;
       setNextSongPreloaded(true);
+      console.log("Prochaine chanson préchargée");
     } catch (error) {
       console.error("Erreur lors du préchargement:", error);
     }
@@ -202,68 +202,69 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
-      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
+      if (timeLeft <= preferences.crossfadeDuration && nextAudioRef.current.paused) {
         fadingRef.current = true;
-        console.log("Démarrage du fondu");
+        console.log("Démarrage du fondu, durée:", preferences.crossfadeDuration);
 
         nextAudioRef.current.currentTime = 0;
         const playPromise = nextAudioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
             console.log("Lecture de la prochaine chanson démarrée");
+
+            const steps = 100;
+            const intervalTime = (preferences.crossfadeDuration * 1000) / steps;
+            const volumeStep = 1 / steps;
+
+            let currentOutVolume = 1;
+            let currentInVolume = 0;
+
+            const fadeInterval = setInterval(() => {
+              if (currentOutVolume > 0 || currentInVolume < 1) {
+                currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+                currentInVolume = Math.min(1, currentInVolume + volumeStep);
+                
+                if (audioRef.current) {
+                  audioRef.current.volume = currentOutVolume;
+                  console.log("Volume sortant:", currentOutVolume);
+                }
+                if (nextAudioRef.current) {
+                  nextAudioRef.current.volume = currentInVolume;
+                  console.log("Volume entrant:", currentInVolume);
+                }
+              } else {
+                clearInterval(fadeInterval);
+                console.log("Fondu terminé");
+                
+                if (audioRef.current) {
+                  audioRef.current.pause();
+                  audioRef.current.currentTime = 0;
+                }
+
+                const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+                const nextSong = queue[currentIndex + 1];
+                if (nextSong) {
+                  console.log("Passage à la chanson suivante après le fondu");
+                  setCurrentSong(nextSong);
+                  
+                  const tempAudio = audioRef.current;
+                  audioRef.current = nextAudioRef.current;
+                  nextAudioRef.current = tempAudio;
+                  
+                  setProgress(0);
+                  setNextSongPreloaded(false);
+                  fadingRef.current = false;
+                  
+                  preloadNextSong();
+                }
+              }
+            }, intervalTime);
+
           }).catch(error => {
             console.error("Erreur lors du démarrage du fondu:", error);
             fadingRef.current = false;
           });
         }
-
-        const steps = 100;
-        const intervalTime = (overlapTimeRef.current * 1000) / steps;
-        const volumeStep = 1 / steps;
-
-        let currentOutVolume = 1;
-        let currentInVolume = 0;
-
-        const fadeInterval = setInterval(() => {
-          if (currentOutVolume > 0 || currentInVolume < 1) {
-            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
-            currentInVolume = Math.min(1, currentInVolume + volumeStep);
-            
-            if (audioRef.current) {
-              audioRef.current.volume = currentOutVolume;
-              console.log("Volume sortant:", currentOutVolume);
-            }
-            if (nextAudioRef.current) {
-              nextAudioRef.current.volume = currentInVolume;
-              console.log("Volume entrant:", currentInVolume);
-            }
-          } else {
-            clearInterval(fadeInterval);
-            console.log("Fondu terminé");
-            
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-            }
-
-            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-            const nextSong = queue[currentIndex + 1];
-            if (nextSong) {
-              console.log("Passage à la chanson suivante après le fondu");
-              setCurrentSong(nextSong);
-              
-              const tempAudio = audioRef.current;
-              audioRef.current = nextAudioRef.current;
-              nextAudioRef.current = tempAudio;
-              
-              setProgress(0);
-              setNextSongPreloaded(false);
-              fadingRef.current = false;
-              
-              preloadNextSong();
-            }
-          }
-        }, intervalTime);
       }
     };
 
@@ -302,7 +303,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled]);
+  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled, preferences.crossfadeDuration]);
 
   const pause = () => {
     if (audioRef.current) {
