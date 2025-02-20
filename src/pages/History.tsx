@@ -24,7 +24,41 @@ import {
 
 const History = () => {
   const { t } = useTranslation();
-  const { history, play, favorites, toggleFavorite, setHistory } = usePlayer();
+  const { history, play, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
+  const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
+
+  const extractDominantColor = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
+      ];
+      setDominantColor(saturatedColor);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
+
+  React.useEffect(() => {
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
 
   const clearHistory = async () => {
     try {
@@ -103,24 +137,65 @@ const History = () => {
           ) : (
             history.map((song) => {
               const isFavorite = favorites.some(s => s.id === song.id);
+              const isCurrentSong = currentSong?.id === song.id;
               const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
               
+              const glowStyle = isCurrentSong && dominantColor ? {
+                boxShadow: `
+                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                `,
+                transition: 'box-shadow 0.3s ease-in-out',
+                transform: 'scale(1.02)',
+              } : {};
+
               return (
                 <div
                   key={song.id}
-                  className="p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5 bg-transparent"
+                  className={cn(
+                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                    isCurrentSong 
+                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                      : "bg-transparent"
+                  )}
                   onClick={() => play(song)}
                 >
+                  {isCurrentSong && (
+                    <div className="absolute inset-0 z-0 overflow-hidden">
+                      <div 
+                        className="absolute inset-0 animate-gradient opacity-20" 
+                        style={{
+                          backgroundSize: '200% 200%',
+                          animation: 'gradient 3s linear infinite',
+                          background: dominantColor 
+                            ? `linear-gradient(45deg, 
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                              )`
+                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <img
                         src={imageSource}
                         alt={`Pochette de ${song.title}`}
-                        className="w-14 h-14 rounded-lg shadow-lg object-cover"
+                        className={cn(
+                          "w-14 h-14 rounded-lg shadow-lg object-cover",
+                          isCurrentSong && "animate-pulse"
+                        )}
+                        style={glowStyle}
                         loading="lazy"
                       />
                       <div>
-                        <h3 className="font-medium text-spotify-neutral hover:text-white transition-colors">
+                        <h3 className={cn(
+                          "font-medium transition-colors",
+                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                        )}>
                           {song.title}
                         </h3>
                         <p className="text-sm text-spotify-neutral">{song.artist}</p>
