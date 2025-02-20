@@ -9,7 +9,7 @@ export const NowPlaying = () => {
 
   return (
     <div className="flex-1 p-8">
-      <div className="flex items-center space-x-2 mb-4">
+      <div className="flex items-center space-x-2 mb-4 p-3 border-2 border-spotify-accent rounded-lg w-fit">
         <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
         <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
           Now Playing
