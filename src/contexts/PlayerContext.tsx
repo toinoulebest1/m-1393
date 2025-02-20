@@ -69,11 +69,53 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedStats ? JSON.parse(savedStats) : [];
   });
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [history, setHistory] = useState<Song[]>(() => {
-    const savedHistory = localStorage.getItem('playHistory');
-    return savedHistory ? JSON.parse(savedHistory) : [];
-  });
-  const audioRef = useRef<HTMLAudioElement>(globalAudio);
+  const [history, setHistory] = useState<Song[]>([]);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('play_history')
+          .select(`
+            *,
+            songs:song_id (
+              id,
+              title,
+              artist,
+              duration,
+              file_path
+            )
+          `)
+          .order('played_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          console.error("Erreur lors du chargement de l'historique:", error);
+          toast.error("Erreur lors du chargement de l'historique");
+          return;
+        }
+
+        if (data) {
+          const formattedHistory = data.map(item => ({
+            id: item.songs.id,
+            title: item.songs.title,
+            artist: item.songs.artist,
+            duration: item.songs.duration,
+            url: item.songs.file_path
+          }));
+          setHistory(formattedHistory);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement de l'historique:", error);
+        toast.error("Erreur lors du chargement de l'historique");
+      }
+    };
+
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     audioRef.current.volume = volume / 100;
@@ -88,13 +130,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const play = async (song?: Song) => {
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
-      setHistory(prev => {
-        const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
-        localStorage.setItem('playHistory', JSON.stringify(newHistory));
-        return newHistory;
-      });
 
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { error: historyError } = await supabase
+            .from('play_history')
+            .insert({
+              user_id: session.user.id,
+              song_id: song.id
+            });
+
+          if (historyError) {
+            console.error("Erreur lors de l'enregistrement dans l'historique:", historyError);
+          }
+        }
+
+        setHistory(prev => {
+          const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
+          return newHistory;
+        });
+
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');

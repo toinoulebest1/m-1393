@@ -128,6 +128,35 @@ export type Database = {
           },
         ]
       }
+      play_history: {
+        Row: {
+          id: string
+          played_at: string | null
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          played_at?: string | null
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          played_at?: string | null
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_history_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
