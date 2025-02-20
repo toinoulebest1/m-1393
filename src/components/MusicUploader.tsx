@@ -1,3 +1,4 @@
+
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -34,6 +35,19 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Vous devez être connecté pour signaler un problème");
+        return;
+      }
+
+      // Vérifier si un signalement existe déjà
+      const { data: existingReports } = await supabase
+        .from('song_reports')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', session.user.id)
+        .eq('status', 'pending');
+
+      if (existingReports && existingReports.length > 0) {
+        toast.error("Vous avez déjà signalé cette chanson");
         return;
       }
 
@@ -282,7 +296,6 @@ export const MusicUploader = () => {
       };
 
       console.log("Chanson traitée avec succès:", song);
-
       return song;
 
     } catch (error) {
@@ -307,7 +320,23 @@ export const MusicUploader = () => {
     console.log("Chansons valides traitées:", validSongs);
 
     if (validSongs.length > 0) {
-      validSongs.forEach(song => addToQueue(song));
+      validSongs.forEach(song => {
+        addToQueue(song);
+        // Ajouter le bouton de signalement après chaque chanson
+        return (
+          <div key={song.id} className="flex items-center justify-between">
+            <div>
+              <h3>{song.title}</h3>
+              <p>{song.artist}</p>
+            </div>
+            <ReportDialog
+              songTitle={song.title}
+              songArtist={song.artist || ""}
+              songId={song.id}
+            />
+          </div>
+        );
+      });
       toast.success(t('common.fileSelected', { count: validSongs.length }));
     }
   };
