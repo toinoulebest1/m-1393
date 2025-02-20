@@ -318,11 +318,13 @@ export const NowPlaying = () => {
                     />
                   </button>
 
-                  <ReportDialog
-                    songTitle={song.title}
-                    songArtist={song.artist}
-                    songId={song.id}
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ReportDialog
+                      songTitle={song.title}
+                      songArtist={song.artist}
+                      songId={song.id}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -332,4 +334,3 @@ export const NowPlaying = () => {
     </div>
   );
 };
-
