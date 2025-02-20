@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +19,6 @@ interface Song {
 export const MusicUploader = () => {
   const { t } = useTranslation();
   const { addToQueue } = usePlayer();
-  const [uploadedSongs, setUploadedSongs] = useState<Song[]>([]);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -228,7 +226,6 @@ export const MusicUploader = () => {
 
     if (validSongs.length > 0) {
       validSongs.forEach(song => addToQueue(song));
-      setUploadedSongs(prev => [...prev, ...validSongs]);
     }
   };
 
@@ -245,20 +242,6 @@ export const MusicUploader = () => {
           onChange={handleFileUpload}
         />
       </label>
-
-      {uploadedSongs.length > 0 && (
-        <div className="space-y-2">
-          {uploadedSongs.map(song => (
-            <div key={song.id} className="flex items-center justify-between p-2 bg-gray-800 rounded hover:bg-gray-700/50 transition-colors">
-              <div className="flex-1">
-                <h3 className="text-sm font-medium">{song.title}</h3>
-                <p className="text-xs text-gray-400">{song.artist}</p>
-                <p className="text-xs text-gray-500">{song.duration} - {song.bitrate}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
