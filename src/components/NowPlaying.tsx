@@ -6,7 +6,7 @@ import { Music, Clock, Signal, Heart } from "lucide-react";
 import { toast } from "sonner";
 
 export const NowPlaying = () => {
-  const { queue, currentSong, favorites, toggleFavorite } = usePlayer();
+  const { queue, currentSong, favorites, toggleFavorite, play } = usePlayer();
   const [hearts, setHearts] = useState<Array<{ 
     id: number; 
     x: number; 
@@ -43,10 +43,8 @@ export const NowPlaying = () => {
   const handleFavorite = async (song: any) => {
     const wasFavorite = favorites.some(s => s.id === song.id);
     
-    // On toggle d'abord le favori
     await toggleFavorite(song);
     
-    // Si ce n'était pas un favori avant (donc on l'ajoute), on lance l'animation
     if (!wasFavorite) {
       createFloatingHearts();
     }
@@ -96,11 +94,12 @@ export const NowPlaying = () => {
             <div
               key={song.id}
               className={cn(
-                "p-4 rounded-lg transition-all duration-300",
+                "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
                 currentSong?.id === song.id 
                   ? "relative bg-white/5 shadow-lg overflow-hidden" 
                   : "bg-transparent"
               )}
+              onClick={() => play(song)}
             >
               {currentSong?.id === song.id && (
                 <div className="absolute inset-0 z-0 overflow-hidden">
