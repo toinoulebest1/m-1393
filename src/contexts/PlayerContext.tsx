@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { getAudioFile, storeAudioFile } from '@/utils/storage';
+import { getAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Song {
@@ -80,7 +80,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
-  // Déclarons d'abord la fonction play avant de l'utiliser ailleurs
   const play = async (song?: Song) => {
     fadingRef.current = false;
     
@@ -252,8 +251,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  
-
   useEffect(() => {
     if (!audioRef.current) return;
 
@@ -264,6 +261,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
         fadingRef.current = true;
+
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          toast(
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
+              <div>
+                <p className="font-medium">Prochaine chanson :</p>
+                <p className="text-sm">{nextSong.title}</p>
+                <p className="text-xs opacity-75">{nextSong.artist}</p>
+              </div>
+            </div>,
+            {
+              duration: 3000,
+              className: "bg-black/90 border border-white/10",
+            }
+          );
+        }
 
         nextAudioRef.current.currentTime = 0;
         const playPromise = nextAudioRef.current.play();
@@ -355,8 +372,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       preloadNextSong();
     }
   }, [currentSong]);
-
-  
 
   const pause = () => {
     if (audioRef.current) {
