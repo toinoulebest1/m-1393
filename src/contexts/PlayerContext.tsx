@@ -80,6 +80,122 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
+  // Déclarons d'abord la fonction play avant de l'utiliser ailleurs
+  const play = async (song?: Song) => {
+    fadingRef.current = false;
+    
+    if (song && (!currentSong || song.id !== currentSong.id)) {
+      setCurrentSong(song);
+      setNextSongPreloaded(false);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { error: songError } = await supabase
+            .from('songs')
+            .upsert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration,
+              image_url: song.imageUrl
+            }, {
+              onConflict: 'id'
+            });
+
+          if (songError) {
+            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
+          }
+
+          await addToHistory(song);
+        }
+
+        const audioUrl = await getAudioFile(song.url);
+        if (!audioUrl) {
+          throw new Error('Fichier audio non trouvé');
+        }
+
+        audioRef.current.volume = 1;
+        nextAudioRef.current.volume = 0;
+        
+        audioRef.current.src = audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.load();
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+            toast.success(
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
+                <span>
+                  <strong className="block">{song.title}</strong>
+                  <span className="text-sm opacity-75">{song.artist}</span>
+                </span>
+              </div>,
+              {
+                duration: 3000,
+                className: "bg-black/90 border border-white/10",
+              }
+            );
+          }).catch(error => {
+            console.error("Error starting playback:", error);
+            toast.error("Erreur lors de la lecture");
+            setIsPlaying(false);
+          });
+        }
+
+        preloadNextSong();
+      } catch (error) {
+        console.error("Error playing audio:", error);
+        toast.error("Impossible de lire ce fichier audio");
+        setCurrentSong(null);
+        setIsPlaying(false);
+      }
+    } else if (audioRef.current) {
+      try {
+        audioRef.current.volume = 1;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error resuming playback:", error);
+            toast.error("Erreur lors de la reprise de la lecture");
+            setIsPlaying(false);
+          });
+        }
+      } catch (error) {
+        console.error("Error resuming audio:", error);
+        toast.error("Erreur lors de la reprise de la lecture");
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const preloadNextSong = async () => {
+    if (!currentSong || queue.length === 0) return;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    const nextSong = queue[currentIndex + 1];
+    
+    if (!nextSong) return;
+
+    try {
+      const audioUrl = await getAudioFile(nextSong.url);
+      if (!audioUrl) return;
+
+      nextAudioRef.current.src = audioUrl;
+      await nextAudioRef.current.load();
+      nextAudioRef.current.volume = 0;
+      setNextSongPreloaded(true);
+    } catch (error) {
+      console.error("Erreur lors du préchargement:", error);
+    }
+  };
+
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -136,26 +252,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  const preloadNextSong = async () => {
-    if (!currentSong || queue.length === 0) return;
-    
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    const nextSong = queue[currentIndex + 1];
-    
-    if (!nextSong) return;
-
-    try {
-      const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) return;
-
-      nextAudioRef.current.src = audioUrl;
-      await nextAudioRef.current.load();
-      nextAudioRef.current.volume = 0;
-      setNextSongPreloaded(true);
-    } catch (error) {
-      console.error("Erreur lors du préchargement:", error);
-    }
-  };
+  
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -259,99 +356,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentSong]);
 
-  const play = async (song?: Song) => {
-    fadingRef.current = false;
-    
-    if (song && (!currentSong || song.id !== currentSong.id)) {
-      setCurrentSong(song);
-      setNextSongPreloaded(false);
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { error: songError } = await supabase
-            .from('songs')
-            .upsert({
-              id: song.id,
-              title: song.title,
-              artist: song.artist,
-              file_path: song.url,
-              duration: song.duration,
-              image_url: song.imageUrl
-            }, {
-              onConflict: 'id'
-            });
-
-          if (songError) {
-            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
-          }
-
-          await addToHistory(song);
-        }
-
-        const audioUrl = await getAudioFile(song.url);
-        if (!audioUrl) {
-          throw new Error('Fichier audio non trouvé');
-        }
-
-        audioRef.current.volume = 1;
-        nextAudioRef.current.volume = 0;
-        
-        audioRef.current.src = audioUrl;
-        audioRef.current.currentTime = 0;
-        audioRef.current.load();
-        
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-            toast.success(
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
-                <span>
-                  <strong className="block">{song.title}</strong>
-                  <span className="text-sm opacity-75">{song.artist}</span>
-                </span>
-              </div>,
-              {
-                duration: 3000,
-                className: "bg-black/90 border border-white/10",
-              }
-            );
-          }).catch(error => {
-            console.error("Error starting playback:", error);
-            toast.error("Erreur lors de la lecture");
-            setIsPlaying(false);
-          });
-        }
-
-        preloadNextSong();
-      } catch (error) {
-        console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce fichier audio");
-        setCurrentSong(null);
-        setIsPlaying(false);
-      }
-    } else if (audioRef.current) {
-      try {
-        audioRef.current.volume = 1;
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-          }).catch(error => {
-            console.error("Error resuming playback:", error);
-            toast.error("Erreur lors de la reprise de la lecture");
-            setIsPlaying(false);
-          });
-        }
-      } catch (error) {
-        console.error("Error resuming audio:", error);
-        toast.error("Erreur lors de la reprise de la lecture");
-        setIsPlaying(false);
-      }
-    }
-  };
+  
 
   const pause = () => {
     if (audioRef.current) {
@@ -633,7 +638,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.removeEventListener('pause', handlePause);
       audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [repeatMode]);
+  }, [repeatMode, nextSong]);
 
   return (
     <PlayerContext.Provider

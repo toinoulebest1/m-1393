@@ -73,17 +73,22 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  const [i18nInitialized, setI18nInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initI18n = async () => {
-      await i18n.initPromise;
-      setI18nInitialized(true);
+      if (i18n.isInitialized) {
+        setIsLoading(false);
+      } else {
+        i18n.on('initialized', () => {
+          setIsLoading(false);
+        });
+      }
     };
     initI18n();
   }, []);
 
-  if (!i18nInitialized) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
