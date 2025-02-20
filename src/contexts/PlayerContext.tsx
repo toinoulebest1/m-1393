@@ -55,9 +55,9 @@ const globalAudio = new Audio();
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const nextGainNodeRef = useRef<GainNode | null>(null);
+  const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+  const overlapTimeRef = useRef(3); // 3 secondes de fondu enchaîné
+
   const [preferences, setPreferences] = useState({
     crossfadeEnabled: false,
     crossfadeDuration: 0,
@@ -105,71 +105,111 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     loadPreferences();
   }, []);
 
-  const setupAudioContext = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      gainNodeRef.current = audioContextRef.current.createGain();
-      nextGainNodeRef.current = audioContextRef.current.createGain();
-    }
-  };
+  // Précharger la prochaine chanson
+  const preloadNextSong = async () => {
+    if (!currentSong || queue.length === 0) return;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    const nextSong = queue[currentIndex + 1];
+    
+    if (!nextSong) return;
 
-  const crossfade = async (nextSong: Song) => {
     try {
-      setupAudioContext();
-      const audioContext = audioContextRef.current!;
-      const currentGainNode = gainNodeRef.current!;
-      const nextGainNode = nextGainNodeRef.current!;
-
       const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) {
-        throw new Error('Fichier audio non trouvé');
-      }
+      if (!audioUrl) return;
 
       nextAudioRef.current.src = audioUrl;
       await nextAudioRef.current.load();
-
-      const currentSource = audioContext.createMediaElementSource(audioRef.current);
-      const nextSource = audioContext.createMediaElementSource(nextAudioRef.current);
-      
-      currentSource.connect(currentGainNode);
-      nextSource.connect(nextGainNode);
-      currentGainNode.connect(audioContext.destination);
-      nextGainNode.connect(audioContext.destination);
-
-      currentGainNode.gain.value = 1;
-      nextGainNode.gain.value = 0;
-
-      const playPromise = nextAudioRef.current.play();
-      if (playPromise !== undefined) {
-        await playPromise;
-      }
-
-      const duration = preferences.crossfadeDuration;
-      currentGainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
-      nextGainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + duration);
-
-      setTimeout(() => {
-        const tempAudio = audioRef.current;
-        audioRef.current = nextAudioRef.current;
-        nextAudioRef.current = tempAudio;
-        
-        setCurrentSong(nextSong);
-        setIsPlaying(true);
-      }, duration * 1000);
+      nextAudioRef.current.volume = 0;
+      setNextSongPreloaded(true);
     } catch (error) {
-      console.error("Erreur lors du crossfade:", error);
-      play(nextSong);
+      console.error("Erreur lors du préchargement:", error);
     }
   };
 
+  // Gérer le fondu enchaîné
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (!currentSong || !nextSongPreloaded) return;
+
+      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
+      
+      // Commencer le fondu enchaîné 3 secondes avant la fin
+      if (timeLeft <= overlapTimeRef.current && !nextAudioRef.current.playing) {
+        // Démarrer la prochaine musique
+        const playPromise = nextAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Erreur lors du démarrage du fondu:", error);
+          });
+        }
+
+        // Fondu sortant pour la musique actuelle
+        const fadeOutInterval = setInterval(() => {
+          if (audioRef.current.volume > 0.1) {
+            audioRef.current.volume -= 0.1;
+          } else {
+            audioRef.current.volume = 0;
+            clearInterval(fadeOutInterval);
+          }
+        }, 100);
+
+        // Fondu entrant pour la prochaine musique
+        const fadeInInterval = setInterval(() => {
+          if (nextAudioRef.current.volume < 0.9) {
+            nextAudioRef.current.volume += 0.1;
+          } else {
+            nextAudioRef.current.volume = 1;
+            clearInterval(fadeInInterval);
+          }
+        }, 100);
+      }
+    };
+
+    const handleEnded = () => {
+      // Swap des références audio
+      const tempAudio = audioRef.current;
+      audioRef.current = nextAudioRef.current;
+      nextAudioRef.current = tempAudio;
+
+      // Mettre à jour l'état actuel
+      const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+      const nextSong = queue[currentIndex + 1];
+      
+      if (nextSong) {
+        setCurrentSong(nextSong);
+        setNextSongPreloaded(false);
+        // Précharger la prochaine chanson
+        preloadNextSong();
+      } else if (repeatMode === 'all') {
+        play(queue[0]);
+      } else {
+        setIsPlaying(false);
+      }
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      audioRef.current.removeEventListener('ended', handleEnded);
+    };
+  }, [currentSong, nextSongPreloaded, queue]);
+
+  // Précharger la prochaine chanson quand la chanson actuelle change
+  useEffect(() => {
+    if (currentSong) {
+      preloadNextSong();
+    }
+  }, [currentSong]);
+
   const play = async (song?: Song) => {
     if (song && (!currentSong || song.id !== currentSong.id)) {
-      if (preferences.crossfadeEnabled && currentSong && preferences.crossfadeDuration > 0) {
-        await crossfade(song);
-        return;
-      }
-
       setCurrentSong(song);
+      setNextSongPreloaded(false);
 
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -201,6 +241,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
+        audioRef.current.volume = 1;
         audioRef.current.load();
         
         const playPromise = audioRef.current.play();
@@ -226,6 +267,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsPlaying(false);
           });
         }
+
+        // Précharger la prochaine chanson
+        preloadNextSong();
       } catch (error) {
         console.error("Error playing audio:", error);
         toast.error("Impossible de lire ce fichier audio");
