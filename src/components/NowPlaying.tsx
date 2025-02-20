@@ -13,20 +13,22 @@ export const NowPlaying = () => {
     delay: number;
     duration: number;
     rotation: number;
+    bounceHeight: number;
   }>>([]);
 
   const createFloatingHearts = () => {
     const numberOfHearts = 25;
-    const minDuration = 3;
-    const maxDuration = 6;
+    const minDuration = 2;
+    const maxDuration = 4;
     const screenWidth = window.innerWidth;
 
     const newHearts = Array.from({ length: numberOfHearts }, (_, index) => ({
       id: Date.now() + index,
       x: Math.random() * screenWidth,
-      delay: Math.random() * 2, // Délai aléatoire entre 0 et 2s
-      duration: minDuration + Math.random() * (maxDuration - minDuration), // Durée entre 3 et 6s
-      rotation: Math.random() * 360 // Rotation aléatoire
+      delay: Math.random() * 2,
+      duration: minDuration + Math.random() * (maxDuration - minDuration),
+      rotation: Math.random() * 360,
+      bounceHeight: 20 + Math.random() * 60 // Hauteur de rebond aléatoire entre 20 et 80 pixels
     }));
 
     setHearts(prev => [...prev, ...newHearts]);
@@ -35,7 +37,7 @@ export const NowPlaying = () => {
     newHearts.forEach((heart, index) => {
       setTimeout(() => {
         setHearts(prev => prev.filter(h => h.id !== heart.id));
-      }, (5000 + index * 100)); // Commence à supprimer après 5s, avec 100ms entre chaque suppression
+      }, (5000 + index * 100));
     });
   };
 
@@ -67,6 +69,7 @@ export const NowPlaying = () => {
             '--x-offset': `${Math.sin(heart.rotation) * 150}px`,
             '--fall-duration': `${heart.duration}s`,
             '--rotation': `${heart.rotation}deg`,
+            '--bounce-height': `${heart.bounceHeight}px`,
             left: `${heart.x}px`,
             animationDelay: `${heart.delay}s`,
             opacity: 0,

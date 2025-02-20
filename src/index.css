@@ -83,12 +83,18 @@
   10% {
     opacity: 1;
   }
-  90% {
-    opacity: 1;
+  50% {
+    transform: translateY(calc(90vh - var(--bounce-height))) translateX(var(--x-offset)) scale(1) rotate(var(--rotation));
   }
-  100% {
-    transform: translateY(110vh) translateX(var(--x-offset)) scale(0.5) rotate(var(--rotation));
-    opacity: 0;
+  60% {
+    transform: translateY(calc(90vh - calc(var(--bounce-height) / 2))) translateX(calc(var(--x-offset) * 1.2)) scale(0.9) rotate(calc(var(--rotation) * 1.2));
+  }
+  70% {
+    transform: translateY(calc(90vh - calc(var(--bounce-height) / 4))) translateX(calc(var(--x-offset) * 1.4)) scale(0.8) rotate(calc(var(--rotation) * 1.4));
+  }
+  80%, 100% {
+    transform: translateY(90vh) translateX(calc(var(--x-offset) * 1.5)) scale(0.7) rotate(calc(var(--rotation) * 1.5));
+    opacity: 1;
   }
 }
 
@@ -96,7 +102,7 @@
   position: fixed;
   pointer-events: none;
   will-change: transform;
-  animation: floating-hearts var(--fall-duration) ease-in forwards;
+  animation: floating-hearts var(--fall-duration) cubic-bezier(.25,.46,.45,.94) forwards;
   z-index: 50;
 }
 
