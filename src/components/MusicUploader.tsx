@@ -1,10 +1,102 @@
-import { Upload } from "lucide-react";
+import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useState } from "react";
+
+interface ReportDialogProps {
+  songTitle: string;
+  songArtist: string;
+  songId: string;
+}
+
+const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState<string>("");
+
+  const handleReport = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Vous devez être connecté pour signaler un problème");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('song_reports')
+        .insert({
+          song_id: songId,
+          user_id: session.user.id,
+          reason: reason,
+          status: 'pending'
+        });
+
+      if (error) {
+        console.error("Erreur lors du signalement:", error);
+        toast.error("Une erreur est survenue lors du signalement");
+        return;
+      }
+
+      toast.success("Merci pour votre signalement");
+    } catch (error) {
+      console.error("Erreur lors du signalement:", error);
+      toast.error("Une erreur est survenue lors du signalement");
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="hover:text-red-500">
+          <Flag className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Signaler un problème</DialogTitle>
+          <DialogDescription>
+            {songTitle} - {songArtist}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup onValueChange={setReason}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="poor_quality" id="poor_quality" />
+              <Label htmlFor="poor_quality">Qualité audio médiocre</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
+              <Label htmlFor="wrong_metadata">Métadonnées incorrectes</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
+              <Label htmlFor="corrupted_file">Fichier corrompu</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="other" id="other" />
+              <Label htmlFor="other">Autre problème</Label>
+            </div>
+          </RadioGroup>
+          <Button onClick={handleReport}>Envoyer le signalement</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export const MusicUploader = () => {
   const { t } = useTranslation();
@@ -177,15 +269,7 @@ export const MusicUploader = () => {
         }
       }
 
-      console.log("Informations finales de la chanson:", {
-        artist,
-        title,
-        imageUrl,
-        duration: formatDuration(duration),
-        bitrate
-      });
-
-      return {
+      const song = {
         id: fileId,
         title,
         artist,
@@ -194,6 +278,11 @@ export const MusicUploader = () => {
         imageUrl: imageUrl,
         bitrate: bitrate
       };
+
+      // Ajout du bouton de signalement à l'interface
+      console.log("Chanson traitée avec succès:", song);
+
+      return song;
 
     } catch (error) {
       console.error("Erreur lors du traitement du fichier:", error);
