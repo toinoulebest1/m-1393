@@ -17,10 +17,31 @@ export const MusicUploader = () => {
   };
 
   const formatBitrate = (size: number, duration: number) => {
-    // Calculer le bitrate approximatif à partir de la taille du fichier et de sa durée
     const bitsPerSecond = (size * 8) / duration;
     const kbps = Math.round(bitsPerSecond / 1000);
     return `${kbps} kbps`;
+  };
+
+  const parseFileName = (fileName: string) => {
+    // Enlever l'extension du fichier
+    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+    
+    // Rechercher le format "Artiste - Titre"
+    const match = nameWithoutExt.match(/^(.*?)\s*-\s*(.*)$/);
+    
+    if (match) {
+      // Si on trouve le format "Artiste - Titre"
+      return {
+        artist: match[1].trim(),
+        title: match[2].trim()
+      };
+    }
+    
+    // Si on ne trouve pas le format, retourner le nom complet comme titre
+    return {
+      artist: "Unknown Artist",
+      title: nameWithoutExt.trim()
+    };
   };
 
   const generateUUID = () => {
@@ -40,7 +61,6 @@ export const MusicUploader = () => {
     try {
       await storeAudioFile(fileId, file);
 
-      // Créer un blob URL pour le fichier audio
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio(audioUrl);
       
@@ -54,31 +74,38 @@ export const MusicUploader = () => {
         });
       });
 
-      // Calculer le bitrate à partir de la taille du fichier et de sa durée
       const bitrate = formatBitrate(file.size, duration);
       console.log("Taille du fichier:", file.size, "bytes");
       console.log("Durée:", duration, "secondes");
       console.log("Bitrate calculé:", bitrate);
 
-      // Nettoyer l'URL du blob
       URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
+      let { artist, title } = parseFileName(file.name);
+
       try {
         const metadata = await mm.parseBlob(file);
+        // Utiliser les métadonnées si disponibles
+        if (metadata.common.artist) {
+          artist = metadata.common.artist;
+        }
+        if (metadata.common.title) {
+          title = metadata.common.title;
+        }
         if (metadata.common.picture && metadata.common.picture.length > 0) {
           const picture = metadata.common.picture[0];
           const blob = new Blob([picture.data], { type: picture.format });
           imageUrl = URL.createObjectURL(blob);
         }
       } catch (metadataError) {
-        console.warn("Impossible de lire les métadonnées de l'image:", metadataError);
+        console.warn("Impossible de lire les métadonnées:", metadataError);
       }
 
       return {
         id: fileId,
-        title: file.name.replace(/\.[^/.]+$/, ""),
-        artist: "Unknown Artist",
+        title,
+        artist,
         duration: formatDuration(duration),
         url: fileId,
         imageUrl: imageUrl,
