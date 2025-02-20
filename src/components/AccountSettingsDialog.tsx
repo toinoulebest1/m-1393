@@ -1,11 +1,115 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserCog } from "lucide-react";
+import { UserCog, Upload, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export const AccountSettingsDialog = () => {
   const { t } = useTranslation();
+  const [username, setUsername] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (profile) {
+        setUsername(profile.username || '');
+        setAvatarUrl(profile.avatar_url);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      toast.error("Erreur lors du chargement du profil");
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: username,
+        })
+        .eq('id', session.user.id);
+
+      if (error) throw error;
+
+      toast.success("Profil mis à jour avec succès");
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error("Erreur lors de la mise à jour du profil");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${session.user.id}/${crypto.randomUUID()}.${fileExt}`;
+
+      // Upload the file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update the profile with the new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_url: publicUrl,
+        })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl);
+      toast.success("Avatar mis à jour avec succès");
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error("Erreur lors du téléchargement de l'avatar");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <Dialog>
@@ -15,16 +119,88 @@ export const AccountSettingsDialog = () => {
           size="icon"
           className="text-spotify-neutral hover:text-white hover:bg-white/5"
         >
-          <UserCog className="w-5 h-5" />
+          {avatarUrl ? (
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={avatarUrl} alt="Avatar" />
+              <AvatarFallback><UserCog className="w-5 h-5" /></AvatarFallback>
+            </Avatar>
+          ) : (
+            <UserCog className="w-5 h-5" />
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-spotify-dark text-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Paramètres du compte</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-4">
-          {/* Ici nous pouvons ajouter plus de paramètres du compte plus tard */}
-          <p className="text-spotify-neutral">Paramètres du compte à venir...</p>
+        <div className="space-y-6 mt-4">
+          <div className="flex flex-col items-center space-y-4">
+            <Avatar className="w-24 h-24">
+              <AvatarImage src={avatarUrl || undefined} alt="Avatar" />
+              <AvatarFallback><UserCog className="w-12 h-12" /></AvatarFallback>
+            </Avatar>
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+                id="avatar-upload"
+                disabled={isUploading}
+              />
+              <label htmlFor="avatar-upload">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isUploading}
+                  className="cursor-pointer"
+                  asChild
+                >
+                  <span>
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Téléchargement...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Changer l'avatar
+                      </>
+                    )}
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="username" className="text-sm font-medium text-spotify-neutral">
+              Nom d'utilisateur
+            </label>
+            <Input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="bg-white/5 border-white/10 text-white"
+              placeholder="Entrez votre nom d'utilisateur"
+            />
+          </div>
+
+          <Button
+            onClick={handleUpdateProfile}
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Mise à jour...
+              </>
+            ) : (
+              "Enregistrer les modifications"
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
