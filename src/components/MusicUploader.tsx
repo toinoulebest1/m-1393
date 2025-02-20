@@ -47,11 +47,8 @@ export const MusicUploader = () => {
     try {
       const query = encodeURIComponent(`${artist} ${title}`);
       console.log("Recherche Deezer pour:", { artist, title });
-      const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`, {
-        headers: {
-          'Origin': window.location.origin
-        }
-      });
+      
+      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
       
       if (!response.ok) {
         console.error("Erreur API Deezer:", response.status);
@@ -72,6 +69,29 @@ export const MusicUploader = () => {
       return null;
     } catch (error) {
       console.error("Erreur lors de la recherche Deezer:", error);
+      try {
+        const query = encodeURIComponent(`${artist} ${title}`);
+        const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`, {
+          headers: {
+            'Origin': window.location.origin
+          }
+        });
+        
+        if (!response.ok) {
+          console.error("Erreur API Deezer (second essai):", response.status);
+          return null;
+        }
+
+        const data = await response.json();
+        if (data.data && data.data.length > 0) {
+          const track = data.data[0];
+          if (track.album?.cover_xl) {
+            return track.album.cover_xl;
+          }
+        }
+      } catch (retryError) {
+        console.error("Erreur lors de la seconde tentative:", retryError);
+      }
       return null;
     }
   };
