@@ -1,6 +1,6 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Download, Music2, LogOut } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -24,8 +24,7 @@ export const Sidebar = () => {
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
-    { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/downloads", icon: Download, label: t('common.downloads') }
+    { to: "/top100", icon: Trophy, label: t('common.top100') }
   ];
 
   const handleLanguageChange = (value: string) => {
