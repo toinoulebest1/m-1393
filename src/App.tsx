@@ -52,7 +52,6 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
       console.log("Auth state changed:", event);
       setIsAuthenticated(!!session);
       if (event === 'SIGNED_OUT') {
-        // Clear any application cache/state here
         queryClient.clear();
       }
     });
