@@ -1,3 +1,4 @@
+
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -18,6 +19,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState } from "react";
 
+// Définir une interface pour le rapport
+interface SongReport {
+  song_id: string;
+  user_id: string;
+  reason: string;
+  status: 'pending' | 'resolved' | 'rejected';
+}
+
 interface ReportDialogProps {
   songTitle: string;
   songArtist: string;
@@ -36,14 +45,16 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
+      const report: SongReport = {
+        song_id: songId,
+        user_id: session.user.id,
+        reason: reason,
+        status: 'pending'
+      };
+
       const { error } = await supabase
         .from('song_reports')
-        .insert({
-          song_id: songId,
-          user_id: session.user.id,
-          reason: reason,
-          status: 'pending'
-        });
+        .insert(report as any); // Utiliser any comme contournement temporaire
 
       if (error) {
         console.error("Erreur lors du signalement:", error);
