@@ -1,3 +1,4 @@
+
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -37,7 +38,6 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
-      // Vérifier si un signalement existe déjà
       const { data: existingReports } = await supabase
         .from('song_reports')
         .select('id')
@@ -300,29 +300,6 @@ const processAudioFile = async (file: File) => {
   }
 };
 
-const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-
-  console.log("Nombre de fichiers sélectionnés:", files.length);
-  toast.info(`Traitement de ${files.length} fichier(s)...`);
-
-  const processedSongs = await Promise.all(
-    Array.from(files).map(processAudioFile)
-  );
-
-  const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
-  console.log("Chansons valides traitées:", validSongs);
-
-  if (validSongs.length > 0) {
-    validSongs.forEach(song => {
-      addToQueue(song);
-    });
-    setUploadedSongs(validSongs);
-    toast.success(t('common.fileSelected', { count: validSongs.length }));
-  }
-};
-
 export const MusicUploader = () => {
   const { t } = useTranslation();
   const { addToQueue } = usePlayer();
@@ -331,6 +308,29 @@ export const MusicUploader = () => {
     title: string;
     artist?: string;
   }>>([]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    console.log("Nombre de fichiers sélectionnés:", files.length);
+    toast.info(`Traitement de ${files.length} fichier(s)...`);
+
+    const processedSongs = await Promise.all(
+      Array.from(files).map(processAudioFile)
+    );
+
+    const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
+    console.log("Chansons valides traitées:", validSongs);
+
+    if (validSongs.length > 0) {
+      validSongs.forEach(song => {
+        addToQueue(song);
+      });
+      setUploadedSongs(validSongs);
+      toast.success(t('common.fileSelected', { count: validSongs.length }));
+    }
+  };
 
   return (
     <div className="p-4 space-y-4">
