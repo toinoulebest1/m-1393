@@ -1,7 +1,8 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
-import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
+import { Award, Play, Heart, Trash2, ShieldCheck, FileText, Flag } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -18,6 +19,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface FavoriteStat {
   songId: string;
@@ -31,6 +42,123 @@ interface FavoriteStat {
     duration: string;
   };
 }
+
+interface ReportDialogProps {
+  songTitle: string;
+  songArtist: string;
+  songId: string;
+}
+
+const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
+  const [reason, setReason] = useState<string>("");
+  const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleReport = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous devez être connecté pour signaler un problème"
+        });
+        return;
+      }
+
+      const { data: existingReports } = await supabase
+        .from('song_reports')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', session.user.id)
+        .eq('status', 'pending');
+
+      if (existingReports && existingReports.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Vous avez déjà signalé cette chanson"
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('song_reports')
+        .insert({
+          song_id: songId,
+          user_id: session.user.id,
+          reason: reason,
+          status: 'pending'
+        });
+
+      if (error) {
+        console.error("Erreur lors du signalement:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Une erreur est survenue lors du signalement"
+        });
+        return;
+      }
+
+      toast({
+        title: "Succès",
+        description: "Merci pour votre signalement"
+      });
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Erreur lors du signalement:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Une erreur est survenue lors du signalement"
+      });
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          className="opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500"
+        >
+          <Flag className="h-5 w-5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Signaler un problème</DialogTitle>
+          <DialogDescription>
+            {songTitle} - {songArtist}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup onValueChange={setReason}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="poor_quality" id="poor_quality" />
+              <Label htmlFor="poor_quality">Qualité audio médiocre</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
+              <Label htmlFor="wrong_metadata">Métadonnées incorrectes</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
+              <Label htmlFor="corrupted_file">Fichier corrompu</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="other" id="other" />
+              <Label htmlFor="other">Autre problème</Label>
+            </div>
+          </RadioGroup>
+          <Button onClick={handleReport}>Envoyer le signalement</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
 
@@ -454,6 +582,11 @@ const Top100 = () => {
                       >
                         <FileText className="w-5 h-5" />
                       </Button>
+                      <ReportDialog
+                        songTitle={stat.song.title}
+                        songArtist={stat.song.artist}
+                        songId={stat.songId}
+                      />
                       {isAdmin && (
                         <Button
                           variant="ghost"
