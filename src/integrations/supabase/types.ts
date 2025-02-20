@@ -298,7 +298,10 @@ export type Database = {
           created_at: string | null
           id: string
           reason: string
+          reporter_username: string | null
+          song_artist: string | null
           song_id: string | null
+          song_title: string | null
           status: string | null
           user_id: string | null
         }
@@ -306,7 +309,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           reason: string
+          reporter_username?: string | null
+          song_artist?: string | null
           song_id?: string | null
+          song_title?: string | null
           status?: string | null
           user_id?: string | null
         }
@@ -314,7 +320,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           reason?: string
+          reporter_username?: string | null
+          song_artist?: string | null
           song_id?: string | null
+          song_title?: string | null
           status?: string | null
           user_id?: string | null
         }
