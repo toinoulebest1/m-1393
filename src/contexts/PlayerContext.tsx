@@ -83,7 +83,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           .select(`
             id,
             played_at,
-            songs:songs (
+            songs (
               id,
               title,
               artist,
@@ -149,6 +149,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          const { error: songError } = await supabase
+            .from('songs')
+            .upsert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration
+            }, {
+              onConflict: 'id'
+            });
+
+          if (songError) {
+            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
+          }
+
           const { error: historyError } = await supabase
             .from('play_history')
             .insert({
