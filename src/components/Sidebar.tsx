@@ -1,5 +1,6 @@
+
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -7,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
+import { useState, useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -19,6 +21,24 @@ export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
+    };
+
+    checkAdminStatus();
+  }, []);
 
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
@@ -26,6 +46,11 @@ export const Sidebar = () => {
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') }
   ];
+
+  // Ajouter le lien vers les signalements pour les admins
+  if (isAdmin) {
+    links.push({ to: "/reports", icon: Flag, label: "Signalements" });
+  }
 
   const handleLanguageChange = (value: string) => {
     i18n.changeLanguage(value);
