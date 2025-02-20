@@ -17,27 +17,26 @@ export const NowPlaying = () => {
   }>>([]);
 
   const createFloatingHearts = () => {
-    const numberOfHearts = 50; // Augmenté à 50 cœurs
-    const minDuration = 1.5; // Durée minimale réduite
-    const maxDuration = 3; // Durée maximale réduite
+    const numberOfHearts = 50;
+    const minDuration = 1.5;
+    const maxDuration = 3;
     const screenWidth = window.innerWidth;
 
     const newHearts = Array.from({ length: numberOfHearts }, (_, index) => ({
       id: Date.now() + index,
       x: Math.random() * screenWidth,
-      delay: Math.random() * 1.5, // Délai réduit pour une meilleure distribution
+      delay: Math.random() * 1.5,
       duration: minDuration + Math.random() * (maxDuration - minDuration),
-      rotation: Math.random() * 720 - 360, // Rotation entre -360 et 360 degrés
-      bounceHeight: 30 + Math.random() * 100 // Hauteur de rebond entre 30 et 130 pixels
+      rotation: Math.random() * 720 - 360,
+      bounceHeight: 30 + Math.random() * 100
     }));
 
     setHearts(prev => [...prev, ...newHearts]);
 
-    // Suppression progressive des cœurs
     newHearts.forEach((heart, index) => {
       setTimeout(() => {
         setHearts(prev => prev.filter(h => h.id !== heart.id));
-      }, (5000 + index * 50)); // Réduit l'intervalle entre les suppressions
+      }, (5000 + index * 50));
     });
   };
 
@@ -50,8 +49,8 @@ export const NowPlaying = () => {
     toast.success(
       <div className="flex items-center space-x-2">
         <Heart className={cn(
-          "w-4 h-4 animate-scale-in",
-          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500"
+          "w-4 h-4",
+          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500 animate-scale-in"
         )} />
         <span>{isFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
       </div>
@@ -60,13 +59,12 @@ export const NowPlaying = () => {
 
   return (
     <div className="flex-1 p-8">
-      {/* Cœurs flottants */}
       {hearts.map(heart => (
         <Heart
           key={heart.id}
           className="floating-heart text-red-500 fill-red-500 w-6 h-6"
           style={{
-            '--x-offset': `${Math.sin(heart.rotation) * 200}px`, // Augmenté pour plus de mouvement horizontal
+            '--x-offset': `${Math.sin(heart.rotation) * 200}px`,
             '--fall-duration': `${heart.duration}s`,
             '--rotation': `${heart.rotation}deg`,
             '--bounce-height': `${heart.bounceHeight}px`,
@@ -150,7 +148,7 @@ export const NowPlaying = () => {
                     className={cn(
                       "w-5 h-5 transition-all duration-300 group-hover:scale-110",
                       favorites.some(s => s.id === song.id)
-                        ? "text-red-500 fill-red-500 animate-scale-in"
+                        ? "text-red-500 fill-red-500"
                         : "text-spotify-neutral"
                     )}
                   />
