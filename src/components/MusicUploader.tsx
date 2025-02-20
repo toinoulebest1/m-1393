@@ -18,6 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
+interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  duration: string;
+  url: string;
+  bitrate?: string;
+}
+
 interface ReportDialogProps {
   songTitle: string;
   songArtist: string;
@@ -32,6 +41,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.error("Utilisateur non connecté");
         return;
       }
 
@@ -43,6 +53,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         .eq('status', 'pending');
 
       if (existingReports && existingReports.length > 0) {
+        console.log("Un signalement existe déjà pour cette chanson");
         return;
       }
 
@@ -60,6 +71,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
+      console.log("Signalement envoyé avec succès");
       setIsOpen(false);
     } catch (error) {
       console.error("Erreur lors du signalement:", error);
