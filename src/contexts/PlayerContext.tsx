@@ -31,6 +31,7 @@ interface PlayerContextType {
   favorites: Song[];
   searchQuery: string;
   favoriteStats: FavoriteStat[];
+  playbackRate: number;
   play: (song?: Song) => void;
   pause: () => void;
   setVolume: (volume: number) => void;
@@ -43,10 +44,10 @@ interface PlayerContextType {
   toggleFavorite: (song: Song) => void;
   removeFavorite: (songId: string) => void;
   setSearchQuery: (query: string) => void;
+  setPlaybackRate: (rate: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
-
 const globalAudio = new Audio();
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -66,12 +67,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const savedStats = localStorage.getItem('favoriteStats');
     return savedStats ? JSON.parse(savedStats) : [];
   });
+  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
 
   useEffect(() => {
     console.log("Initializing audio with volume:", volume);
     audioRef.current.volume = volume / 100;
   }, []);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
 
   const play = async (song?: Song) => {
     console.log("Play function called with song:", song);
@@ -372,6 +380,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const updatePlaybackRate = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+      toast.success(`Vitesse de lecture : ${rate}x`);
+    }
+  };
+
   useEffect(() => {
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
@@ -436,6 +452,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         favorites,
         searchQuery,
         favoriteStats,
+        playbackRate,
         play,
         pause,
         setVolume: updateVolume,
@@ -448,6 +465,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFavorite,
         removeFavorite,
         setSearchQuery,
+        setPlaybackRate: updatePlaybackRate,
       }}
     >
       {children}
