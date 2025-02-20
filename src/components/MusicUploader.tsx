@@ -18,6 +18,15 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 
+interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  duration: string;
+  url: string;
+  bitrate?: string;
+}
+
 interface ReportDialogProps {
   songTitle: string;
   songArtist: string;
@@ -111,26 +120,24 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
   );
 };
 
-const processAudioFile = async (file: File) => {
+const processAudioFile = async (file: File): Promise<Song | null> => {
   try {
-    // On utilise l'API Audio native au lieu de music-metadata-browser
     const audioElement = document.createElement('audio');
     const objectUrl = URL.createObjectURL(file);
     
-    return new Promise((resolve, reject) => {
+    return new Promise<Song>((resolve, reject) => {
       audioElement.onloadedmetadata = async () => {
         URL.revokeObjectURL(objectUrl);
-
-        // Stockage du fichier
+        
         const filePath = await storeAudioFile(file.name, file);
         
-        const song = {
+        const song: Song = {
           id: file.name,
-          title: file.name.replace(/\.[^/.]+$/, ""), // Retire l'extension
+          title: file.name.replace(/\.[^/.]+$/, ""),
           artist: "Unknown Artist",
           duration: String(audioElement.duration),
           url: file.name,
-          bitrate: "320 kbps", // Valeur par défaut
+          bitrate: "320 kbps",
         };
         
         resolve(song);
@@ -153,14 +160,7 @@ const processAudioFile = async (file: File) => {
 export const MusicUploader = () => {
   const { t } = useTranslation();
   const { addToQueue } = usePlayer();
-  const [uploadedSongs, setUploadedSongs] = useState<Array<{
-    id: string;
-    title: string;
-    artist: string;
-    duration: string;
-    url: string;
-    bitrate?: string;
-  }>>([]);
+  const [uploadedSongs, setUploadedSongs] = useState<Song[]>([]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -174,7 +174,7 @@ export const MusicUploader = () => {
         Array.from(files).map(processAudioFile)
       );
 
-      const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
+      const validSongs = processedSongs.filter((song): song is Song => song !== null);
       console.log("Chansons valides traitées:", validSongs);
 
       if (validSongs.length > 0) {
@@ -211,7 +211,7 @@ export const MusicUploader = () => {
               <div className="flex-1">
                 <h3 className="text-sm font-medium">{song.title}</h3>
                 <p className="text-xs text-gray-400">{song.artist}</p>
-                <p className="text-xs text-gray-500">{song.bitrate || "320 kbps"}</p>
+                <p className="text-xs text-gray-500">{song.bitrate}</p>
               </div>
               <div className="flex items-center space-x-2">
                 <ReportDialog
