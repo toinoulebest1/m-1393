@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { getAudioFile, storeAudioFile } from '@/utils/storage';
+import { getAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Song {
@@ -80,62 +80,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
-  useEffect(() => {
-    const loadPreferences = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const { data } = await supabase
-          .from('music_preferences')
-          .select('crossfade_enabled, crossfade_duration')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        if (data) {
-          setPreferences({
-            crossfadeEnabled: data.crossfade_enabled,
-            crossfadeDuration: data.crossfade_duration,
-          });
-          overlapTimeRef.current = data.crossfade_duration;
-          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des préférences:", error);
-      }
-    };
-
-    loadPreferences();
-    
-    const preferenceChannel = supabase
-      .channel('music_preferences_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'music_preferences'
-        },
-        (payload) => {
-          const newData = payload.new as any;
-          if (newData.crossfade_duration !== undefined) {
-            overlapTimeRef.current = newData.crossfade_duration;
-            setPreferences(prev => ({
-              ...prev,
-              crossfadeDuration: newData.crossfade_duration,
-              crossfadeEnabled: newData.crossfade_enabled
-            }));
-            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      preferenceChannel.unsubscribe();
-    };
-  }, []);
-
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -154,6 +98,100 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setNextSongPreloaded(true);
     } catch (error) {
       console.error("Erreur lors du préchargement:", error);
+    }
+  };
+
+  const play = async (song?: Song) => {
+    fadingRef.current = false;
+    
+    if (song && (!currentSong || song.id !== currentSong.id)) {
+      setCurrentSong(song);
+      setNextSongPreloaded(false);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { error: songError } = await supabase
+            .from('songs')
+            .upsert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration,
+              image_url: song.imageUrl
+            }, {
+              onConflict: 'id'
+            });
+
+          if (songError) {
+            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
+          }
+
+          await addToHistory(song);
+        }
+
+        const audioUrl = await getAudioFile(song.url);
+        if (!audioUrl) {
+          throw new Error('Fichier audio non trouvé');
+        }
+
+        audioRef.current.volume = 1;
+        nextAudioRef.current.volume = 0;
+        
+        audioRef.current.src = audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.load();
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+            toast.success(
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
+                <span>
+                  <strong className="block">{song.title}</strong>
+                  <span className="text-sm opacity-75">{song.artist}</span>
+                </span>
+              </div>,
+              {
+                duration: 3000,
+                className: "bg-black/90 border border-white/10",
+              }
+            );
+          }).catch(error => {
+            console.error("Error starting playback:", error);
+            toast.error("Erreur lors de la lecture");
+            setIsPlaying(false);
+          });
+        }
+
+        preloadNextSong();
+      } catch (error) {
+        console.error("Error playing audio:", error);
+        toast.error("Impossible de lire ce fichier audio");
+        setCurrentSong(null);
+        setIsPlaying(false);
+      }
+    } else if (audioRef.current) {
+      try {
+        audioRef.current.volume = 1;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error resuming playback:", error);
+            toast.error("Erreur lors de la reprise de la lecture");
+            setIsPlaying(false);
+          });
+        }
+      } catch (error) {
+        console.error("Error resuming audio:", error);
+        toast.error("Erreur lors de la reprise de la lecture");
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -251,107 +289,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
-
-  useEffect(() => {
-    if (currentSong) {
-      preloadNextSong();
-    }
-  }, [currentSong]);
-
-  const play = async (song?: Song) => {
-    fadingRef.current = false;
-    
-    if (song && (!currentSong || song.id !== currentSong.id)) {
-      setCurrentSong(song);
-      setNextSongPreloaded(false);
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { error: songError } = await supabase
-            .from('songs')
-            .upsert({
-              id: song.id,
-              title: song.title,
-              artist: song.artist,
-              file_path: song.url,
-              duration: song.duration,
-              image_url: song.imageUrl
-            }, {
-              onConflict: 'id'
-            });
-
-          if (songError) {
-            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
-          }
-
-          await addToHistory(song);
-        }
-
-        const audioUrl = await getAudioFile(song.url);
-        if (!audioUrl) {
-          throw new Error('Fichier audio non trouvé');
-        }
-
-        audioRef.current.volume = 1;
-        nextAudioRef.current.volume = 0;
-        
-        audioRef.current.src = audioUrl;
-        audioRef.current.currentTime = 0;
-        audioRef.current.load();
-        
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-            toast.success(
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
-                <span>
-                  <strong className="block">{song.title}</strong>
-                  <span className="text-sm opacity-75">{song.artist}</span>
-                </span>
-              </div>,
-              {
-                duration: 3000,
-                className: "bg-black/90 border border-white/10",
-              }
-            );
-          }).catch(error => {
-            console.error("Error starting playback:", error);
-            toast.error("Erreur lors de la lecture");
-            setIsPlaying(false);
-          });
-        }
-
-        preloadNextSong();
-      } catch (error) {
-        console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce fichier audio");
-        setCurrentSong(null);
-        setIsPlaying(false);
-      }
-    } else if (audioRef.current) {
-      try {
-        audioRef.current.volume = 1;
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-          }).catch(error => {
-            console.error("Error resuming playback:", error);
-            toast.error("Erreur lors de la reprise de la lecture");
-            setIsPlaying(false);
-          });
-        }
-      } catch (error) {
-        console.error("Error resuming audio:", error);
-        toast.error("Erreur lors de la reprise de la lecture");
-        setIsPlaying(false);
-      }
-    }
-  };
+  }, [currentSong, nextSongPreloaded, queue, repeatMode]);
 
   const pause = () => {
     if (audioRef.current) {
