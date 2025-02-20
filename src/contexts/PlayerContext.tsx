@@ -11,6 +11,7 @@ interface Song {
   duration: string;
   url: string;
   imageUrl?: string;
+  bitrate?: string;
 }
 
 interface FavoriteStat {

@@ -1,3 +1,4 @@
+
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -13,6 +14,11 @@ export const MusicUploader = () => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatBitrate = (bitrate?: number) => {
+    if (!bitrate) return 'N/A';
+    return `${Math.round(bitrate / 1000)} kbps`;
   };
 
   const generateUUID = () => {
@@ -59,13 +65,17 @@ export const MusicUploader = () => {
           imageUrl = URL.createObjectURL(blob);
         }
 
+        const bitrate = metadata.format.bitrate;
+        console.log("Bitrate détecté:", bitrate);
+
         return {
           id,
           title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
           artist: metadata.common.artist || "Unknown Artist",
           duration: formattedDuration,
           url: id,
-          imageUrl: imageUrl
+          imageUrl: imageUrl,
+          bitrate: formatBitrate(bitrate)
         };
 
       } catch (metadataError) {
@@ -77,7 +87,8 @@ export const MusicUploader = () => {
           artist: "Unknown Artist",
           duration: formattedDuration,
           url: id,
-          imageUrl: "https://picsum.photos/240/240"
+          imageUrl: "https://picsum.photos/240/240",
+          bitrate: 'N/A'
         };
       }
 
@@ -100,7 +111,7 @@ export const MusicUploader = () => {
     );
 
     const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
-    console.log("Chansons valides traitées:", validSongs.length);
+    console.log("Chansons valides traitées:", validSongs);
 
     if (validSongs.length > 0) {
       validSongs.forEach(song => addToQueue(song));

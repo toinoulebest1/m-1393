@@ -15,7 +15,6 @@ export const NowPlaying = () => {
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Vérifier l'état des téléchargements pour chaque chanson
     const checkOfflineStatus = async () => {
       const states: Record<string, boolean> = {};
       for (const song of queue) {
@@ -76,6 +75,7 @@ export const NowPlaying = () => {
           </h1>
           <p className="text-spotify-neutral">
             {currentSong?.artist || 'No artist'} • {currentSong?.duration || '0:00'}
+            {currentSong?.bitrate && ` • ${currentSong.bitrate}`}
           </p>
         </div>
       </div>
