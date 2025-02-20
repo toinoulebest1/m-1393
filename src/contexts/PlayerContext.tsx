@@ -101,8 +101,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const play = async (song?: Song) => {
+  const cleanupFade = () => {
+    if (fadeIntervalRef.current) {
+      clearInterval(fadeIntervalRef.current);
+      fadeIntervalRef.current = null;
+    }
     fadingRef.current = false;
+  };
+
+  const play = async (song?: Song) => {
+    cleanupFade();
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
@@ -136,7 +144,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
-        audioRef.current.volume = 1;
+        if (!fadingRef.current) {
+          audioRef.current.volume = volume / 100;
+        }
         nextAudioRef.current.volume = 0;
         
         audioRef.current.src = audioUrl;
@@ -176,7 +186,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } else if (audioRef.current) {
       try {
-        audioRef.current.volume = 1;
+        if (!fadingRef.current) {
+          audioRef.current.volume = volume / 100;
+        }
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
@@ -193,14 +205,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsPlaying(false);
       }
     }
-  };
-
-  const cleanupFade = () => {
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    fadingRef.current = false;
   };
 
   useEffect(() => {
@@ -227,29 +231,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             let currentStep = 0;
 
-            cleanupFade();
             fadeIntervalRef.current = setInterval(() => {
               currentStep++;
               
               if (currentStep <= steps) {
-                const outVolume = Math.max(0, 1 - (currentStep * volumeStep));
-                const inVolume = Math.min(1, currentStep * volumeStep);
+                const outVolume = Math.max(0, (volume / 100) * (1 - (currentStep * volumeStep)));
+                const inVolume = Math.min(volume / 100, (volume / 100) * (currentStep * volumeStep));
 
-                if (audioRef.current) {
-                  audioRef.current.volume = outVolume;
-                  console.log("Volume sortant:", outVolume);
-                }
-                if (nextAudioRef.current) {
-                  nextAudioRef.current.volume = inVolume;
-                  console.log("Volume entrant:", inVolume);
-                }
+                audioRef.current.volume = outVolume;
+                nextAudioRef.current.volume = inVolume;
+                console.log("Volumes:", { out: outVolume, in: inVolume });
               } else {
                 cleanupFade();
                 
-                if (audioRef.current) {
-                  audioRef.current.pause();
-                  audioRef.current.currentTime = 0;
-                }
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
 
                 const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
                 const nextSong = queue[currentIndex + 1];
@@ -289,8 +285,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           play(nextSong);
         } else if (repeatMode === 'all') {
           play(queue[0]);
-        } else {
-          setIsPlaying(false);
         }
       }
     };
@@ -314,7 +308,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled, preferences.crossfadeDuration]);
+  }, [currentSong, nextSongPreloaded, queue, repeatMode, preferences.crossfadeEnabled, preferences.crossfadeDuration, volume]);
 
   const pause = () => {
     if (audioRef.current) {
