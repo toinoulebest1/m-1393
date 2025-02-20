@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Music2, Languages, Settings2, Clock } from "lucide-react";
+import { Music2, Languages, Settings2, Clock, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +27,8 @@ export const MusicPreferences = () => {
     totalListeningTime: 0,
     tracksPlayed: 0,
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchPreferences();
@@ -36,6 +37,7 @@ export const MusicPreferences = () => {
 
   const fetchPreferences = async () => {
     try {
+      setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
@@ -48,6 +50,7 @@ export const MusicPreferences = () => {
       if (error) throw error;
 
       if (data) {
+        console.log('Loaded preferences:', data);
         setPreferences({
           crossfadeEnabled: data.crossfade_enabled || false,
           crossfadeDuration: data.crossfade_duration || 0,
@@ -55,18 +58,27 @@ export const MusicPreferences = () => {
           preferredLanguages: data.preferred_languages || [],
         });
       } else {
-        // Si aucune préférence n'existe, on en crée une avec les valeurs par défaut
+        // Création des préférences par défaut
+        const defaultPreferences = {
+          user_id: session.user.id,
+          crossfade_enabled: false,
+          crossfade_duration: 0,
+          audio_quality: 'high',
+          preferred_languages: []
+        };
+
         const { error: insertError } = await supabase
           .from('music_preferences')
-          .insert([{
-            user_id: session.user.id,
-            crossfade_enabled: false,
-            crossfade_duration: 0,
-            audio_quality: 'high',
-            preferred_languages: []
-          }]);
+          .insert([defaultPreferences]);
         
         if (insertError) throw insertError;
+        
+        setPreferences({
+          crossfadeEnabled: false,
+          crossfadeDuration: 0,
+          audioQuality: 'high',
+          preferredLanguages: [],
+        });
       }
     } catch (error) {
       console.error('Error fetching preferences:', error);
@@ -103,14 +115,20 @@ export const MusicPreferences = () => {
 
   const savePreferences = async () => {
     try {
-      setIsLoading(true);
+      setIsSaving(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Vous devez être connecté pour effectuer cette action");
         return;
       }
 
-      console.log('Saving preferences:', preferences); // Debug log
+      console.log('Saving preferences:', {
+        user_id: session.user.id,
+        crossfade_enabled: preferences.crossfadeEnabled,
+        crossfade_duration: preferences.crossfadeDuration,
+        audio_quality: preferences.audioQuality,
+        preferred_languages: preferences.preferredLanguages,
+      });
 
       const { error } = await supabase
         .from('music_preferences')
@@ -125,12 +143,12 @@ export const MusicPreferences = () => {
       if (error) throw error;
 
       toast.success("Préférences sauvegardées avec succès");
-      await fetchPreferences(); // Recharger les données après la sauvegarde
+      await fetchPreferences();
     } catch (error) {
       console.error('Error saving preferences:', error);
       toast.error("Erreur lors de la sauvegarde des préférences");
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -139,6 +157,14 @@ export const MusicPreferences = () => {
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -213,10 +239,17 @@ export const MusicPreferences = () => {
 
             <Button 
               onClick={savePreferences} 
-              disabled={isLoading}
+              disabled={isSaving}
               className="w-full"
             >
-              Sauvegarder les préférences
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sauvegarde...
+                </>
+              ) : (
+                "Sauvegarder les préférences"
+              )}
             </Button>
           </div>
         </CardContent>
