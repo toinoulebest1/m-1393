@@ -10,7 +10,16 @@ export const NowPlaying = () => {
 
   const handleFavorite = (song: any) => {
     toggleFavorite(song);
-    toast.success(`${favorites.some(s => s.id === song.id) ? 'Retiré des' : 'Ajouté aux'} favoris`);
+    const isFavorite = favorites.some(s => s.id === song.id);
+    toast.success(
+      <div className="flex items-center space-x-2">
+        <Heart className={cn(
+          "w-4 h-4 animate-scale-in",
+          isFavorite ? "text-red-500 fill-red-500" : "text-spotify-neutral"
+        )} />
+        <span>{isFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
+      </div>
+    );
   };
 
   return (
@@ -80,19 +89,19 @@ export const NowPlaying = () => {
                   <span className="text-sm">{song.bitrate || "320 kbps"}</span>
                 </div>
 
-                {/* Bouton favoris */}
+                {/* Bouton favoris avec animation */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleFavorite(song);
                   }}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors group"
                 >
                   <Heart
                     className={cn(
-                      "w-5 h-5 transition-colors",
+                      "w-5 h-5 transition-all duration-300 group-hover:scale-110",
                       favorites.some(s => s.id === song.id)
-                        ? "text-red-500 fill-red-500"
+                        ? "text-red-500 fill-red-500 animate-scale-in"
                         : "text-spotify-neutral"
                     )}
                   />
