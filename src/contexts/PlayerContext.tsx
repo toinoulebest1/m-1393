@@ -56,12 +56,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  const overlapTimeRef = useRef(3); // 3 secondes de fondu enchaîné
+  const overlapTimeRef = useRef(3);
   const fadingRef = useRef(false);
 
   const [preferences, setPreferences] = useState({
     crossfadeEnabled: false,
-    crossfadeDuration: 0,
+    crossfadeDuration: 3,
   });
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -80,6 +80,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
+  // Charger et synchroniser les préférences
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -97,6 +98,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             crossfadeEnabled: data.crossfade_enabled,
             crossfadeDuration: data.crossfade_duration,
           });
+          // Mettre à jour la durée du fondu
+          overlapTimeRef.current = data.crossfade_duration;
+          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
         }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
@@ -104,6 +108,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     loadPreferences();
+    
+    // Mettre en place un écouteur pour les changements de préférences
+    const preferenceChannel = supabase
+      .channel('music_preferences_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'music_preferences'
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData.crossfade_duration !== undefined) {
+            overlapTimeRef.current = newData.crossfade_duration;
+            setPreferences(prev => ({
+              ...prev,
+              crossfadeDuration: newData.crossfade_duration,
+              crossfadeEnabled: newData.crossfade_enabled
+            }));
+            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      preferenceChannel.unsubscribe();
+    };
   }, []);
 
   const preloadNextSong = async () => {
