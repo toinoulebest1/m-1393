@@ -1,22 +1,10 @@
-
-import { Upload, Flag } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { toast } from "sonner";
 
 interface Song {
   id: string;
@@ -27,108 +15,10 @@ interface Song {
   bitrate?: string;
 }
 
-interface ReportDialogProps {
-  songTitle: string;
-  songArtist: string;
-  songId: string;
-}
-
-const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
-  const [reason, setReason] = useState<string>("");
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleReport = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error("Utilisateur non connecté");
-        return;
-      }
-
-      const { data: existingReports } = await supabase
-        .from('song_reports')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', session.user.id)
-        .eq('status', 'pending');
-
-      if (existingReports && existingReports.length > 0) {
-        console.log("Un signalement existe déjà pour cette chanson");
-        return;
-      }
-
-      const { error } = await supabase
-        .from('song_reports')
-        .insert({
-          song_id: songId,
-          user_id: session.user.id,
-          reason: reason,
-          status: 'pending'
-        });
-
-      if (error) {
-        console.error("Erreur lors du signalement:", error);
-        return;
-      }
-
-      console.log("Signalement envoyé avec succès");
-      setIsOpen(false);
-    } catch (error) {
-      console.error("Erreur lors du signalement:", error);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-spotify-neutral hover:text-white">
-          <Flag className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Signaler un problème</DialogTitle>
-          <DialogDescription>
-            {songTitle} - {songArtist}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <RadioGroup onValueChange={setReason}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="poor_quality" id="poor_quality" />
-              <Label htmlFor="poor_quality">Qualité audio médiocre</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
-              <Label htmlFor="wrong_metadata">Métadonnées incorrectes</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
-              <Label htmlFor="corrupted_file">Fichier corrompu</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="other" id="other" />
-              <Label htmlFor="other">Autre problème</Label>
-            </div>
-          </RadioGroup>
-          <Button onClick={handleReport}>Envoyer le signalement</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 export const MusicUploader = () => {
   const { t } = useTranslation();
   const { addToQueue } = usePlayer();
-  const [uploadedSongs, setUploadedSongs] = useState<Array<{
-    id: string;
-    title: string;
-    artist: string;
-    duration: string;
-    url: string;
-    bitrate?: string;
-  }>>([]);
+  const [uploadedSongs, setUploadedSongs] = useState<Song[]>([]);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -362,13 +252,6 @@ export const MusicUploader = () => {
                 <h3 className="text-sm font-medium">{song.title}</h3>
                 <p className="text-xs text-gray-400">{song.artist}</p>
                 <p className="text-xs text-gray-500">{song.duration} - {song.bitrate}</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <ReportDialog
-                  songTitle={song.title}
-                  songArtist={song.artist}
-                  songId={song.id}
-                />
               </div>
             </div>
           ))}
