@@ -293,41 +293,6 @@ export type Database = {
         }
         Relationships: []
       }
-      song_reports: {
-        Row: {
-          created_at: string | null
-          id: string
-          reason: string
-          song_id: string | null
-          status: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          reason: string
-          song_id?: string | null
-          status?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          reason?: string
-          song_id?: string | null
-          status?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "song_reports_song_id_fkey"
-            columns: ["song_id"]
-            isOneToOne: false
-            referencedRelation: "songs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       songs: {
         Row: {
           artist: string | null

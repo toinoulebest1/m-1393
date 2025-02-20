@@ -1,115 +1,9 @@
 
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Flag } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
-interface ReportDialogProps {
-  songTitle: string;
-  songArtist: string;
-  songId: string;
-}
-
-const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
-  const [reason, setReason] = useState<string>("");
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleReport = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Vous devez être connecté pour signaler un problème");
-        return;
-      }
-
-      const { data: existingReports } = await supabase
-        .from('song_reports')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', session.user.id)
-        .eq('status', 'pending');
-
-      if (existingReports && existingReports.length > 0) {
-        toast.error("Vous avez déjà signalé cette chanson");
-        return;
-      }
-
-      const { error } = await supabase
-        .from('song_reports')
-        .insert({
-          song_id: songId,
-          user_id: session.user.id,
-          reason: reason,
-          status: 'pending'
-        });
-
-      if (error) {
-        console.error("Erreur lors du signalement:", error);
-        toast.error("Une erreur est survenue lors du signalement");
-        return;
-      }
-
-      toast.success("Merci pour votre signalement");
-      setIsOpen(false);
-    } catch (error) {
-      console.error("Erreur lors du signalement:", error);
-      toast.error("Une erreur est survenue lors du signalement");
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-spotify-neutral hover:text-white">
-          <Flag className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Signaler un problème</DialogTitle>
-          <DialogDescription>
-            {songTitle} - {songArtist}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <RadioGroup onValueChange={setReason}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="poor_quality" id="poor_quality" />
-              <Label htmlFor="poor_quality">Qualité audio médiocre</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
-              <Label htmlFor="wrong_metadata">Métadonnées incorrectes</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
-              <Label htmlFor="corrupted_file">Fichier corrompu</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="other" id="other" />
-              <Label htmlFor="other">Autre problème</Label>
-            </div>
-          </RadioGroup>
-          <Button onClick={handleReport}>Envoyer le signalement</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 export const Player = () => {
   const { 
@@ -214,26 +108,19 @@ export const Player = () => {
                     {currentSong.artist}
                   </p>
                 </div>
-                <div className="flex items-center ml-4 space-x-2">
-                  <button
-                    onClick={handleFavorite}
-                    className="p-2 hover:bg-white/5 rounded-full transition-colors"
-                  >
-                    <Heart
-                      className={cn(
-                        "w-5 h-5 transition-all duration-300",
-                        favorites.some(s => s.id === currentSong.id)
-                          ? "text-red-500 fill-red-500"
-                          : "text-spotify-neutral hover:text-white"
-                      )}
-                    />
-                  </button>
-                  <ReportDialog
-                    songTitle={currentSong.title}
-                    songArtist={currentSong.artist}
-                    songId={currentSong.id}
+                <button
+                  onClick={handleFavorite}
+                  className="ml-4 p-2 hover:bg-white/5 rounded-full transition-colors"
+                >
+                  <Heart
+                    className={cn(
+                      "w-5 h-5 transition-all duration-300",
+                      favorites.some(s => s.id === currentSong.id)
+                        ? "text-red-500 fill-red-500"
+                        : "text-spotify-neutral hover:text-white"
+                    )}
                   />
-                </div>
+                </button>
               </>
             )}
           </div>

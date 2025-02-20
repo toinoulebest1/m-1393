@@ -3,7 +3,6 @@ import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
-import { MusicUploader } from "@/components/MusicUploader";
 
 const Index = () => {
   return (
@@ -25,9 +24,6 @@ const Index = () => {
               </div>
             </div>
           </div>
-        </div>
-        <div className="fixed top-4 left-[300px] z-50">
-          <MusicUploader />
         </div>
         <Player />
       </div>
