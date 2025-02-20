@@ -66,8 +66,13 @@ export const MusicUploader = () => {
 
   const searchDeezerCoverHash = async (artist: string, title: string): Promise<string | null> => {
     try {
+      // Utilisation de l'API publique avec CORS
       const query = encodeURIComponent(`${artist} ${title}`);
-      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
+      const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`, {
+        headers: {
+          'Origin': window.location.origin
+        }
+      });
       
       if (!response.ok) {
         console.error("Erreur API Deezer:", response.status);
@@ -78,10 +83,10 @@ export const MusicUploader = () => {
       
       if (data.data && data.data.length > 0) {
         const track = data.data[0];
-        if (track.album?.cover) {
+        if (track.album?.cover_xl) {
           // Extrait le hash de l'URL de la pochette
-          const coverUrl = track.album.cover;
-          const hash = coverUrl.split('/').pop();
+          const coverUrl = track.album.cover_xl;
+          const hash = coverUrl.split('/').slice(-2)[0];
           console.log("Hash de pochette trouvé:", hash);
           return hash;
         }
