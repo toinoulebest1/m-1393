@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -48,13 +47,27 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        console.error("Erreur lors de la récupération du profil:", profileError);
+        return;
+      }
+
       const { error } = await supabase
         .from('song_reports')
         .insert({
           song_id: songId,
           user_id: session.user.id,
           reason: reason,
-          status: 'pending'
+          status: 'pending',
+          reporter_username: profileData?.username || session.user.email,
+          song_title: songTitle,
+          song_artist: songArtist
         });
 
       if (error) {
@@ -72,7 +85,14 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-spotify-neutral hover:text-white">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-spotify-neutral hover:text-white"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <Flag className="h-4 w-4" />
         </Button>
       </DialogTrigger>
@@ -120,6 +140,60 @@ export const NowPlaying = () => {
     rotation: number;
     bounceHeight: number;
   }>>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
+    };
+
+    checkAdminStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('reports')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'song_reports'
+        },
+        (payload: any) => {
+          const newReport = payload.new;
+          toast.info(
+            <div className="space-y-2">
+              <p className="font-medium">Nouveau signalement</p>
+              <p className="text-sm">
+                <span className="text-spotify-accent">{newReport.reporter_username}</span> a signalé la chanson
+              </p>
+              <p className="text-sm font-medium">{newReport.song_title} - {newReport.song_artist}</p>
+              <p className="text-sm text-gray-400">Motif : {newReport.reason}</p>
+            </div>,
+            {
+              duration: 10000,
+            }
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -134,11 +208,10 @@ export const NowPlaying = () => {
 
       const colorThief = new ColorThief();
       const color = colorThief.getColor(img);
-      // Augmenter la saturation de la couleur pour un effet plus visible
       const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2), // Augmenter le rouge
-        Math.min(255, color[1] * 1.2), // Augmenter le vert
-        Math.min(255, color[2] * 1.2)  // Augmenter le bleu
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
       ];
       setDominantColor(saturatedColor);
     } catch (error) {
