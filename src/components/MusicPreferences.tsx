@@ -43,28 +43,30 @@ export const MusicPreferences = () => {
         .from('music_preferences')
         .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Si aucune préférence n'existe, on en crée une
-          const { error: insertError } = await supabase
-            .from('music_preferences')
-            .insert([{ user_id: session.user.id }]);
-          
-          if (insertError) throw insertError;
-        } else {
-          throw error;
-        }
-      }
+      if (error) throw error;
 
       if (data) {
         setPreferences({
-          crossfadeEnabled: data.crossfade_enabled,
-          crossfadeDuration: data.crossfade_duration,
-          audioQuality: data.audio_quality,
+          crossfadeEnabled: data.crossfade_enabled || false,
+          crossfadeDuration: data.crossfade_duration || 0,
+          audioQuality: data.audio_quality || 'high',
           preferredLanguages: data.preferred_languages || [],
         });
+      } else {
+        // Si aucune préférence n'existe, on en crée une avec les valeurs par défaut
+        const { error: insertError } = await supabase
+          .from('music_preferences')
+          .insert([{
+            user_id: session.user.id,
+            crossfade_enabled: false,
+            crossfade_duration: 0,
+            audio_quality: 'high',
+            preferred_languages: []
+          }]);
+        
+        if (insertError) throw insertError;
       }
     } catch (error) {
       console.error('Error fetching preferences:', error);
@@ -83,14 +85,14 @@ export const MusicPreferences = () => {
         .from('listening_stats')
         .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
       if (data) {
         setStats({
-          totalListeningTime: data.total_listening_time,
-          tracksPlayed: data.tracks_played,
+          totalListeningTime: data.total_listening_time || 0,
+          tracksPlayed: data.tracks_played || 0,
         });
       }
     } catch (error) {
@@ -103,7 +105,12 @@ export const MusicPreferences = () => {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        toast.error("Vous devez être connecté pour effectuer cette action");
+        return;
+      }
+
+      console.log('Saving preferences:', preferences); // Debug log
 
       const { error } = await supabase
         .from('music_preferences')
@@ -118,6 +125,7 @@ export const MusicPreferences = () => {
       if (error) throw error;
 
       toast.success("Préférences sauvegardées avec succès");
+      await fetchPreferences(); // Recharger les données après la sauvegarde
     } catch (error) {
       console.error('Error saving preferences:', error);
       toast.error("Erreur lors de la sauvegarde des préférences");
