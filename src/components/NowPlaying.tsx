@@ -52,9 +52,10 @@ export const NowPlaying = () => {
         </div>
         
         <div className="bg-white/5 backdrop-blur-lg rounded-xl shadow-xl">
-          <div className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
+          <div className="grid grid-cols-[1fr,1fr,auto,auto] gap-4 p-4 text-spotify-neutral text-sm border-b border-white/10">
             <div className="font-medium">TITLE</div>
             <div className="font-medium">ARTIST</div>
+            <div className="font-medium">BITRATE</div>
             <div className="flex items-center">
               <Clock className="w-4 h-4" />
             </div>
@@ -62,7 +63,7 @@ export const NowPlaying = () => {
           {filteredQueue.map((song, index) => (
             <div
               key={song.id}
-              className="grid grid-cols-[1fr,1fr,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white group"
+              className="grid grid-cols-[1fr,1fr,auto,auto] gap-4 p-4 hover:bg-white/10 transition-all text-spotify-neutral hover:text-white group"
             >
               <div 
                 className="flex items-center space-x-3 cursor-pointer"
@@ -72,6 +73,7 @@ export const NowPlaying = () => {
                 <span>{song.title}</span>
               </div>
               <div>{song.artist}</div>
+              <div>{song.bitrate || 'N/A'}</div>
               <div>{song.duration}</div>
             </div>
           ))}
