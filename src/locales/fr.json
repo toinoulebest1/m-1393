@@ -25,6 +25,7 @@
     "duration": "Durée",
     "downloadedAt": "Téléchargé le",
     "lastPlayed": "Dernière lecture",
-    "history": "Historique"
+    "history": "Historique",
+    "accountSettings": "Paramètres du compte"
   }
 }

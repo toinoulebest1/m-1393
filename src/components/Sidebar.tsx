@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
+import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import {
   Select,
   SelectContent,
@@ -92,7 +93,8 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <div className="pt-4 border-t border-white/10">
+      <div className="pt-4 space-y-2 border-t border-white/10">
+        <AccountSettingsDialog />
         <Button
           variant="ghost"
           className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"

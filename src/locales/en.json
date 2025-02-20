@@ -25,6 +25,7 @@
     "duration": "Duration",
     "downloadedAt": "Downloaded on",
     "lastPlayed": "Last played",
-    "history": "History"
+    "history": "History",
+    "accountSettings": "Account Settings"
   }
 }
