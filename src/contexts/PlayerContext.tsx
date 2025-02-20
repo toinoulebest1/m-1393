@@ -105,7 +105,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     loadPreferences();
   }, []);
 
-  // Précharger la prochaine chanson
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -127,7 +126,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Gérer le fondu enchaîné
   useEffect(() => {
     if (!audioRef.current) return;
 
@@ -136,9 +134,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
-      // Commencer le fondu enchaîné 3 secondes avant la fin
-      if (timeLeft <= overlapTimeRef.current && !nextAudioRef.current.playing) {
-        // Démarrer la prochaine musique
+      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
         const playPromise = nextAudioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(error => {
@@ -146,7 +142,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         }
 
-        // Fondu sortant pour la musique actuelle
         const fadeOutInterval = setInterval(() => {
           if (audioRef.current.volume > 0.1) {
             audioRef.current.volume -= 0.1;
@@ -156,7 +151,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }, 100);
 
-        // Fondu entrant pour la prochaine musique
         const fadeInInterval = setInterval(() => {
           if (nextAudioRef.current.volume < 0.9) {
             nextAudioRef.current.volume += 0.1;
@@ -169,19 +163,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleEnded = () => {
-      // Swap des références audio
       const tempAudio = audioRef.current;
       audioRef.current = nextAudioRef.current;
       nextAudioRef.current = tempAudio;
 
-      // Mettre à jour l'état actuel
       const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
       const nextSong = queue[currentIndex + 1];
       
       if (nextSong) {
         setCurrentSong(nextSong);
         setNextSongPreloaded(false);
-        // Précharger la prochaine chanson
         preloadNextSong();
       } else if (repeatMode === 'all') {
         play(queue[0]);
@@ -199,7 +190,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong, nextSongPreloaded, queue]);
 
-  // Précharger la prochaine chanson quand la chanson actuelle change
   useEffect(() => {
     if (currentSong) {
       preloadNextSong();
@@ -268,7 +258,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         }
 
-        // Précharger la prochaine chanson
         preloadNextSong();
       } catch (error) {
         console.error("Error playing audio:", error);
