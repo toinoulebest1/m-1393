@@ -1,4 +1,4 @@
-<lov-codelov-code>
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -58,4 +58,3 @@ export const NowPlaying = () => {
     </div>
   );
 };
-</lov-code>
