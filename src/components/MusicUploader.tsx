@@ -1,3 +1,4 @@
+
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -47,29 +48,44 @@ export const MusicUploader = () => {
     try {
       console.log("Recherche sur Deezer pour:", { artist, title });
       
+      // 1. D'abord chercher la chanson
       const query = encodeURIComponent(`${artist} ${title}`);
-      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
+      const searchResponse = await fetch(`https://api.deezer.com/search?q=${query}`);
       
-      if (!response.ok) {
-        console.error("Erreur API Deezer:", response.status);
+      if (!searchResponse.ok) {
+        console.error("Erreur API Deezer (recherche):", searchResponse.status);
         return null;
       }
 
-      const data = await response.json();
-      console.log("Réponse Deezer:", data);
+      const searchData = await searchResponse.json();
+      console.log("Réponse recherche Deezer:", searchData);
 
-      if (data.data && data.data.length > 0) {
-        // On prend la première correspondance
-        const track = data.data[0];
-        if (track.album?.cover_xl) {
-          console.log("Image XL trouvée:", track.album.cover_xl);
-          return track.album.cover_xl;
-        } else if (track.album?.cover_big) {
-          console.log("Image Big trouvée:", track.album.cover_big);
-          return track.album.cover_big;
-        } else if (track.album?.cover_medium) {
-          console.log("Image Medium trouvée:", track.album.cover_medium);
-          return track.album.cover_medium;
+      if (searchData.data && searchData.data.length > 0) {
+        const track = searchData.data[0];
+        const albumId = track.album?.id;
+
+        if (albumId) {
+          // 2. Si on a un ID d'album, récupérer les détails de l'album
+          console.log("ID Album trouvé:", albumId);
+          const albumResponse = await fetch(`https://api.deezer.com/album/${albumId}`);
+          
+          if (albumResponse.ok) {
+            const albumData = await albumResponse.json();
+            console.log("Détails album Deezer:", albumData);
+
+            if (albumData.cover_xl) {
+              console.log("Image XL trouvée:", albumData.cover_xl);
+              return albumData.cover_xl;
+            } else if (albumData.cover_big) {
+              console.log("Image Big trouvée:", albumData.cover_big);
+              return albumData.cover_big;
+            } else if (albumData.cover_medium) {
+              console.log("Image Medium trouvée:", albumData.cover_medium);
+              return albumData.cover_medium;
+            }
+          } else {
+            console.error("Erreur API Deezer (album):", albumResponse.status);
+          }
         }
       }
 
