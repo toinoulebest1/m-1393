@@ -17,18 +17,18 @@ export const NowPlaying = () => {
   }>>([]);
 
   const createFloatingHearts = () => {
-    const numberOfHearts = 25;
-    const minDuration = 2;
-    const maxDuration = 4;
+    const numberOfHearts = 50; // Augmenté à 50 cœurs
+    const minDuration = 1.5; // Durée minimale réduite
+    const maxDuration = 3; // Durée maximale réduite
     const screenWidth = window.innerWidth;
 
     const newHearts = Array.from({ length: numberOfHearts }, (_, index) => ({
       id: Date.now() + index,
       x: Math.random() * screenWidth,
-      delay: Math.random() * 2,
+      delay: Math.random() * 1.5, // Délai réduit pour une meilleure distribution
       duration: minDuration + Math.random() * (maxDuration - minDuration),
-      rotation: Math.random() * 360,
-      bounceHeight: 20 + Math.random() * 60 // Hauteur de rebond aléatoire entre 20 et 80 pixels
+      rotation: Math.random() * 720 - 360, // Rotation entre -360 et 360 degrés
+      bounceHeight: 30 + Math.random() * 100 // Hauteur de rebond entre 30 et 130 pixels
     }));
 
     setHearts(prev => [...prev, ...newHearts]);
@@ -37,7 +37,7 @@ export const NowPlaying = () => {
     newHearts.forEach((heart, index) => {
       setTimeout(() => {
         setHearts(prev => prev.filter(h => h.id !== heart.id));
-      }, (5000 + index * 100));
+      }, (5000 + index * 50)); // Réduit l'intervalle entre les suppressions
     });
   };
 
@@ -66,7 +66,7 @@ export const NowPlaying = () => {
           key={heart.id}
           className="floating-heart text-red-500 fill-red-500 w-6 h-6"
           style={{
-            '--x-offset': `${Math.sin(heart.rotation) * 150}px`,
+            '--x-offset': `${Math.sin(heart.rotation) * 200}px`, // Augmenté pour plus de mouvement horizontal
             '--fall-duration': `${heart.duration}s`,
             '--rotation': `${heart.rotation}deg`,
             '--bounce-height': `${heart.bounceHeight}px`,
