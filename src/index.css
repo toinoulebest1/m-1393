@@ -74,3 +74,21 @@
 .animate-gradient {
   animation: gradient 3s linear infinite;
 }
+
+@keyframes floating-hearts {
+  0% {
+    transform: translateY(0) translateX(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) translateX(var(--x-offset)) scale(0) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.floating-heart {
+  position: fixed;
+  pointer-events: none;
+  animation: floating-hearts 3s ease-out forwards;
+}
+

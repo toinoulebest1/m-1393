@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { Music, Clock, Signal, Heart } from "lucide-react";
@@ -7,15 +7,31 @@ import { toast } from "sonner";
 
 export const NowPlaying = () => {
   const { queue, currentSong, favorites, toggleFavorite } = usePlayer();
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; delay: number }>>([]);
+
+  const createFloatingHearts = () => {
+    const newHearts = Array.from({ length: 10 }, (_, index) => ({
+      id: Date.now() + index,
+      x: Math.random() * 200 - 100, // Valeur aléatoire entre -100 et 100
+      delay: Math.random() * 0.5 // Délai aléatoire entre 0 et 0.5s
+    }));
+    setHearts(prev => [...prev, ...newHearts]);
+    setTimeout(() => {
+      setHearts(prev => prev.filter(heart => !newHearts.find(n => n.id === heart.id)));
+    }, 3000);
+  };
 
   const handleFavorite = (song: any) => {
-    toggleFavorite(song);
     const isFavorite = favorites.some(s => s.id === song.id);
+    if (!isFavorite) {
+      createFloatingHearts();
+    }
+    toggleFavorite(song);
     toast.success(
       <div className="flex items-center space-x-2">
         <Heart className={cn(
           "w-4 h-4 animate-scale-in",
-          isFavorite ? "text-red-500 fill-red-500" : "text-spotify-neutral"
+          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500"
         )} />
         <span>{isFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
       </div>
@@ -24,6 +40,19 @@ export const NowPlaying = () => {
 
   return (
     <div className="flex-1 p-8">
+      {/* Cœurs flottants */}
+      {hearts.map(heart => (
+        <Heart
+          key={heart.id}
+          className="floating-heart text-red-500 fill-red-500 w-6 h-6"
+          style={{
+            '--x-offset': `${heart.x}px`,
+            left: `${50 + Math.random() * 20}%`,
+            animationDelay: `${heart.delay}s`
+          } as React.CSSProperties}
+        />
+      ))}
+
       <div className="flex items-center space-x-2 mb-4 p-3 border-2 border-spotify-accent rounded-lg w-fit">
         <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
         <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
@@ -41,7 +70,6 @@ export const NowPlaying = () => {
                 : "bg-transparent"
             )}
           >
-            {/* Animation multicolore pour la chanson en cours */}
             {currentSong?.id === song.id && (
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] opacity-20" 
@@ -53,7 +81,6 @@ export const NowPlaying = () => {
               </div>
             )}
             
-            {/* Contenu de la chanson */}
             <div className="relative z-10 flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <img
@@ -75,27 +102,23 @@ export const NowPlaying = () => {
                 </div>
               </div>
 
-              {/* Informations supplémentaires */}
               <div className="flex items-center space-x-6">
-                {/* Durée */}
                 <div className="flex items-center space-x-1 text-spotify-neutral">
                   <Clock className="w-4 h-4" />
                   <span className="text-sm">{song.duration || "0:00"}</span>
                 </div>
 
-                {/* Bitrate */}
                 <div className="flex items-center space-x-1 text-spotify-neutral">
                   <Signal className="w-4 h-4" />
                   <span className="text-sm">{song.bitrate || "320 kbps"}</span>
                 </div>
 
-                {/* Bouton favoris avec animation */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleFavorite(song);
                   }}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors group"
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
                 >
                   <Heart
                     className={cn(
