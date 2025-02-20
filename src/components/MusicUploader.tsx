@@ -1,3 +1,4 @@
+
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -36,14 +37,18 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
         return;
       }
 
-      const { data, error: rpcError } = await supabase.rpc('create_song_report', {
-        p_song_id: songId,
-        p_user_id: session.user.id,
-        p_reason: reason
-      });
+      // Exécuter la requête SQL directement
+      const { error } = await supabase
+        .from('song_reports')
+        .insert({
+          song_id: songId,
+          user_id: session.user.id,
+          reason: reason,
+          status: 'pending'
+        });
 
-      if (rpcError) {
-        console.error("Erreur lors du signalement:", rpcError);
+      if (error) {
+        console.error("Erreur lors du signalement:", error);
         toast.error("Une erreur est survenue lors du signalement");
         return;
       }
