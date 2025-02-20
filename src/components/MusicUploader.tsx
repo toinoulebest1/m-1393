@@ -48,19 +48,18 @@ export const MusicUploader = () => {
       const query = encodeURIComponent(`${artist} ${title}`);
       console.log("Recherche Deezer pour:", { artist, title });
       
-      const { data: deezerData, error } = await supabase.functions.invoke('deezer-proxy', {
-        body: { query }
-      });
-
-      if (error) {
-        console.error("Erreur API Deezer:", error);
+      const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`);
+      
+      if (!response.ok) {
+        console.error("Erreur API Deezer:", response.status);
         return null;
       }
 
-      console.log("Résultat de la recherche Deezer:", deezerData);
+      const data = await response.json();
+      console.log("Résultat de la recherche Deezer:", data);
       
-      if (deezerData.data && deezerData.data.length > 0) {
-        const track = deezerData.data[0];
+      if (data.data && data.data.length > 0) {
+        const track = data.data[0];
         if (track.album?.cover_xl) {
           console.log("Pochette trouvée:", track.album.cover_xl);
           return track.album.cover_xl;
