@@ -98,7 +98,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (playPromise !== undefined) {
           playPromise.then(() => {
             setIsPlaying(true);
-            toast.success(`Lecture de ${song.title}`);
+            // Ajout de l'animation toast avec une icône de musique
+            toast.success(
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
+                <span>
+                  <strong className="block">{song.title}</strong>
+                  <span className="text-sm opacity-75">{song.artist}</span>
+                </span>
+              </div>,
+              {
+                duration: 3000,
+                className: "bg-black/90 border border-white/10",
+              }
+            );
           }).catch(error => {
             console.error("Error starting playback:", error);
             toast.error("Erreur lors de la lecture");
