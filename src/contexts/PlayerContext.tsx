@@ -89,7 +89,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               title,
               artist,
               duration,
-              file_path
+              file_path,
+              image_url
             )
           `)
           .eq('user_id', session.user.id)
@@ -108,7 +109,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             title: item.songs.title,
             artist: item.songs.artist,
             duration: item.songs.duration,
-            url: item.songs.file_path
+            url: item.songs.file_path,
+            imageUrl: item.songs.image_url
           }));
           setHistory(formattedHistory);
         }
