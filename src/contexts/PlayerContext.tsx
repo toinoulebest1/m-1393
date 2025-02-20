@@ -177,30 +177,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         }
 
-        const steps = 100; // Nombre de pas pour le fondu
-        const intervalTime = (overlapTimeRef.current * 1000) / steps; // Temps entre chaque pas en ms
-        const volumeStep = 1 / steps; // Changement de volume à chaque pas
+        const steps = 100;
+        const intervalTime = (overlapTimeRef.current * 1000) / steps;
+        const volumeStep = 1 / steps;
 
         let currentOutVolume = 1;
-        const fadeOutInterval = setInterval(() => {
-          if (currentOutVolume > 0) {
-            currentOutVolume -= volumeStep;
-            audioRef.current.volume = Math.max(0, currentOutVolume);
-          } else {
-            audioRef.current.volume = 0;
-            clearInterval(fadeOutInterval);
-          }
-        }, intervalTime);
-
         let currentInVolume = 0;
-        const fadeInInterval = setInterval(() => {
-          if (currentInVolume < 1) {
-            currentInVolume += volumeStep;
-            nextAudioRef.current.volume = Math.min(1, currentInVolume);
-          } else {
-            nextAudioRef.current.volume = 1;
-            clearInterval(fadeInInterval);
+
+        const fadeInterval = setInterval(() => {
+          if (currentOutVolume > 0 || currentInVolume < 1) {
+            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+            currentInVolume = Math.min(1, currentInVolume + volumeStep);
             
+            if (audioRef.current) audioRef.current.volume = currentOutVolume;
+            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+          } else {
+            clearInterval(fadeInterval);
+            
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+            }
+
             const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
             const nextSong = queue[currentIndex + 1];
             if (nextSong) {
@@ -215,12 +213,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               fadingRef.current = false;
               
               preloadNextSong();
-              
-              const updateProgress = () => {
-                const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-                setProgress(percentage);
-              };
-              audioRef.current.addEventListener('timeupdate', updateProgress);
             }
           }
         }, intervalTime);
@@ -253,11 +245,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audioRef.current.addEventListener('ended', handleEnded);
 
     return () => {
-      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-      audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
-      audioRef.current.removeEventListener('ended', handleEnded);
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
     };
-  }, [currentSong, nextSongPreloaded, queue]);
+  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
 
   useEffect(() => {
     if (currentSong) {
