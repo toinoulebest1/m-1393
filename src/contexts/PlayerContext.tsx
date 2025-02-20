@@ -177,18 +177,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         }
 
+        const steps = 100; // Nombre de pas pour le fondu
+        const intervalTime = (overlapTimeRef.current * 1000) / steps; // Temps entre chaque pas en ms
+        const volumeStep = 1 / steps; // Changement de volume à chaque pas
+
+        let currentOutVolume = 1;
         const fadeOutInterval = setInterval(() => {
-          if (audioRef.current.volume > 0.1) {
-            audioRef.current.volume -= 0.1;
+          if (currentOutVolume > 0) {
+            currentOutVolume -= volumeStep;
+            audioRef.current.volume = Math.max(0, currentOutVolume);
           } else {
             audioRef.current.volume = 0;
             clearInterval(fadeOutInterval);
           }
-        }, 100);
+        }, intervalTime);
 
+        let currentInVolume = 0;
         const fadeInInterval = setInterval(() => {
-          if (nextAudioRef.current.volume < 0.9) {
-            nextAudioRef.current.volume += 0.1;
+          if (currentInVolume < 1) {
+            currentInVolume += volumeStep;
+            nextAudioRef.current.volume = Math.min(1, currentInVolume);
           } else {
             nextAudioRef.current.volume = 1;
             clearInterval(fadeInInterval);
@@ -215,7 +223,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               audioRef.current.addEventListener('timeupdate', updateProgress);
             }
           }
-        }, 100);
+        }, intervalTime);
       }
     };
 
