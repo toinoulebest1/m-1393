@@ -18,7 +18,8 @@ export const MusicUploader = () => {
 
   const formatBitrate = (bitrate?: number) => {
     if (!bitrate) return 'N/A';
-    return `${Math.round(bitrate / 1000)} kbps`;
+    const kbps = Math.round(bitrate / 1000);
+    return `${kbps} kbps`;
   };
 
   const generateUUID = () => {
@@ -37,65 +38,60 @@ export const MusicUploader = () => {
       const id = generateUUID();
       await storeAudioFile(id, file);
       
-      const audio = new Audio(URL.createObjectURL(file));
-      
-      const getDuration = new Promise<number>((resolve, reject) => {
-        audio.addEventListener('loadedmetadata', () => {
-          console.log("Durée audio détectée:", audio.duration);
-          resolve(audio.duration);
-        });
-        
-        audio.addEventListener('error', (e) => {
-          console.error("Erreur lors du chargement de l'audio:", e);
-          reject(new Error("Erreur lors du chargement de l'audio"));
-        });
-      });
+      const metadata = await mm.parseBlob(file);
+      console.log("Métadonnées extraites:", metadata);
 
-      const duration = await getDuration;
+      const duration = metadata.format.duration || 0;
       const formattedDuration = formatDuration(duration);
 
-      try {
-        const metadata = await mm.parseBlob(file);
-        console.log("Métadonnées extraites:", metadata);
-
-        let imageUrl = "https://picsum.photos/240/240";
-        if (metadata.common.picture && metadata.common.picture.length > 0) {
-          const picture = metadata.common.picture[0];
-          const blob = new Blob([picture.data], { type: picture.format });
-          imageUrl = URL.createObjectURL(blob);
-        }
-
-        const bitrate = metadata.format.bitrate;
-        console.log("Bitrate détecté:", bitrate);
-
-        return {
-          id,
-          title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-          artist: metadata.common.artist || "Unknown Artist",
-          duration: formattedDuration,
-          url: id,
-          imageUrl: imageUrl,
-          bitrate: formatBitrate(bitrate)
-        };
-
-      } catch (metadataError) {
-        console.warn("Erreur métadonnées, utilisation des valeurs par défaut:", metadataError);
-        
-        return {
-          id,
-          title: file.name.replace(/\.[^/.]+$/, ""),
-          artist: "Unknown Artist",
-          duration: formattedDuration,
-          url: id,
-          imageUrl: "https://picsum.photos/240/240",
-          bitrate: 'N/A'
-        };
+      let imageUrl = "https://picsum.photos/240/240";
+      if (metadata.common.picture && metadata.common.picture.length > 0) {
+        const picture = metadata.common.picture[0];
+        const blob = new Blob([picture.data], { type: picture.format });
+        imageUrl = URL.createObjectURL(blob);
       }
+
+      const bitrate = metadata.format.bitrate;
+      const formattedBitrate = formatBitrate(bitrate);
+      console.log("Bitrate détecté:", formattedBitrate);
+
+      return {
+        id,
+        title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
+        artist: metadata.common.artist || "Unknown Artist",
+        duration: formattedDuration,
+        url: id,
+        imageUrl: imageUrl,
+        bitrate: formattedBitrate
+      };
 
     } catch (error) {
       console.error("Erreur lors du traitement du fichier:", error);
-      toast.error(`Erreur lors du traitement de ${file.name}`);
-      return null;
+      
+      // Fallback à la méthode audio pour obtenir au moins la durée
+      try {
+        const audio = new Audio(URL.createObjectURL(file));
+        const duration = await new Promise<number>((resolve, reject) => {
+          audio.addEventListener('loadedmetadata', () => {
+            resolve(audio.duration);
+          });
+          audio.addEventListener('error', reject);
+        });
+
+        return {
+          id: generateUUID(),
+          title: file.name.replace(/\.[^/.]+$/, ""),
+          artist: "Unknown Artist",
+          duration: formatDuration(duration),
+          url: id,
+          imageUrl: "https://picsum.photos/240/240",
+          bitrate: formatBitrate(0)
+        };
+      } catch (audioError) {
+        console.error("Erreur lors du traitement audio:", audioError);
+        toast.error(`Erreur lors du traitement de ${file.name}`);
+        return null;
+      }
     }
   };
 
