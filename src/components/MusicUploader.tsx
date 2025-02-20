@@ -1,11 +1,9 @@
-
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
-import LastFM from 'lastfm-node-client';
 import { supabase } from "@/integrations/supabase/client";
 
 export const MusicUploader = () => {
@@ -47,65 +45,38 @@ export const MusicUploader = () => {
 
   const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
     try {
-      console.log("Recherche sur Last.fm pour:", { artist, title });
+      console.log("Recherche sur Deezer pour:", { artist, title });
       
-      const { data: secretData, error: secretError } = await supabase
-        .from('secrets')
-        .select('value')
-        .eq('name', 'LASTFM_API_KEY')
-        .maybeSingle();
-
-      // Debug de la réponse de Supabase
-      console.log("Réponse Supabase pour la clé Last.fm:", { secretData, secretError });
-
-      if (secretError || !secretData?.value) {
-        console.warn("Impossible de récupérer la clé API Last.fm:", secretError);
+      const query = encodeURIComponent(`${artist} ${title}`);
+      const response = await fetch(`https://api.deezer.com/search?q=${query}`);
+      
+      if (!response.ok) {
+        console.error("Erreur API Deezer:", response.status);
         return null;
       }
 
-      const apiKey = secretData.value;
-      console.log("Clé Last.fm récupérée, vérification:", apiKey ? "Clé présente" : "Clé manquante");
+      const data = await response.json();
+      console.log("Réponse Deezer:", data);
 
-      const lastfm = new LastFM(apiKey);
-      
-      try {
-        const response = await lastfm.track.getInfo({
-          artist,
-          track: title,
-          autocorrect: 1
-        });
-
-        console.log("Réponse Last.fm brute:", JSON.stringify(response, null, 2));
-
-        if (response?.track?.album?.image) {
-          const images = response.track.album.image;
-          console.log("Images disponibles:", JSON.stringify(images, null, 2));
-          
-          // Recherche de l'image la plus grande
-          const largeImage = images.find(img => img.size === 'extralarge') || 
-                           images.find(img => img.size === 'large') ||
-                           images[images.length - 1];
-
-          if (largeImage?.['#text']) {
-            console.log("Image sélectionnée:", largeImage['#text']);
-            return largeImage['#text'];
-          }
+      if (data.data && data.data.length > 0) {
+        // On prend la première correspondance
+        const track = data.data[0];
+        if (track.album?.cover_xl) {
+          console.log("Image XL trouvée:", track.album.cover_xl);
+          return track.album.cover_xl;
+        } else if (track.album?.cover_big) {
+          console.log("Image Big trouvée:", track.album.cover_big);
+          return track.album.cover_big;
+        } else if (track.album?.cover_medium) {
+          console.log("Image Medium trouvée:", track.album.cover_medium);
+          return track.album.cover_medium;
         }
-
-        console.log("Structure de la réponse Last.fm:", {
-          hasTrack: !!response?.track,
-          hasAlbum: !!response?.track?.album,
-          hasImages: !!response?.track?.album?.image
-        });
-
-        console.log("Aucune image trouvée dans la réponse Last.fm");
-        return null;
-      } catch (lastfmError) {
-        console.error("Erreur lors de l'appel à l'API Last.fm:", lastfmError);
-        return null;
       }
+
+      console.log("Aucune image trouvée sur Deezer");
+      return null;
     } catch (error) {
-      console.error("Erreur détaillée Last.fm:", error);
+      console.error("Erreur lors de la recherche Deezer:", error);
       return null;
     }
   };
@@ -204,15 +175,15 @@ export const MusicUploader = () => {
         }
       }
 
-      // Si pas de pochette dans les métadonnées, essayer Last.fm
+      // Si pas de pochette dans les métadonnées, essayer Deezer
       if (imageUrl === "https://picsum.photos/240/240") {
-        console.log("Tentative de récupération de pochette via Last.fm");
-        const lastfmArt = await fetchAlbumArt(artist, title);
-        if (lastfmArt) {
-          console.log("Pochette Last.fm trouvée:", lastfmArt);
-          imageUrl = lastfmArt;
+        console.log("Tentative de récupération de pochette via Deezer");
+        const deezerArt = await fetchAlbumArt(artist, title);
+        if (deezerArt) {
+          console.log("Pochette Deezer trouvée:", deezerArt);
+          imageUrl = deezerArt;
         } else {
-          console.log("Aucune pochette trouvée sur Last.fm");
+          console.log("Aucune pochette trouvée sur Deezer");
         }
       }
 
