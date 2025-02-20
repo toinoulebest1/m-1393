@@ -57,6 +57,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const overlapTimeRef = useRef(3); // 3 secondes de fondu enchaîné
+  const fadingRef = useRef(false);
 
   const [preferences, setPreferences] = useState({
     crossfadeEnabled: false,
@@ -130,15 +131,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!audioRef.current) return;
 
     const handleTimeUpdate = () => {
-      if (!currentSong || !nextSongPreloaded) return;
+      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
       if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
+        fadingRef.current = true;
+
+        nextAudioRef.current.currentTime = 0;
         const playPromise = nextAudioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(error => {
             console.error("Erreur lors du démarrage du fondu:", error);
+            fadingRef.current = false;
           });
         }
 
@@ -157,27 +162,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           } else {
             nextAudioRef.current.volume = 1;
             clearInterval(fadeInInterval);
+            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+            const nextSong = queue[currentIndex + 1];
+            if (nextSong) {
+              setCurrentSong(nextSong);
+              const tempAudio = audioRef.current;
+              audioRef.current = nextAudioRef.current;
+              nextAudioRef.current = tempAudio;
+              setNextSongPreloaded(false);
+              fadingRef.current = false;
+              preloadNextSong();
+            }
           }
         }, 100);
       }
     };
 
     const handleEnded = () => {
-      const tempAudio = audioRef.current;
-      audioRef.current = nextAudioRef.current;
-      nextAudioRef.current = tempAudio;
-
-      const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-      const nextSong = queue[currentIndex + 1];
-      
-      if (nextSong) {
-        setCurrentSong(nextSong);
-        setNextSongPreloaded(false);
-        preloadNextSong();
-      } else if (repeatMode === 'all') {
-        play(queue[0]);
-      } else {
-        setIsPlaying(false);
+      if (!fadingRef.current) {
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          play(nextSong);
+        } else if (repeatMode === 'all') {
+          play(queue[0]);
+        } else {
+          setIsPlaying(false);
+        }
       }
     };
 
