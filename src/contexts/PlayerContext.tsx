@@ -209,6 +209,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentSong]);
 
   const play = async (song?: Song) => {
+    fadingRef.current = false;
+    
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
       setNextSongPreloaded(false);
@@ -241,9 +243,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
+        audioRef.current.volume = 1;
+        nextAudioRef.current.volume = 0;
+        
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
-        audioRef.current.volume = 1;
         audioRef.current.load();
         
         const playPromise = audioRef.current.play();
@@ -279,6 +283,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } else if (audioRef.current) {
       try {
+        audioRef.current.volume = 1;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
@@ -330,6 +335,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const nextSong = () => {
+    fadingRef.current = false;
+    nextAudioRef.current.volume = 0;
+    audioRef.current.volume = 1;
+    
     const next = getNextSong();
     if (next) {
       play(next);
@@ -339,6 +348,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const previousSong = () => {
+    fadingRef.current = false;
+    nextAudioRef.current.volume = 0;
+    audioRef.current.volume = 1;
+    
     const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
     if (currentIndex > 0) {
       play(queue[currentIndex - 1]);
