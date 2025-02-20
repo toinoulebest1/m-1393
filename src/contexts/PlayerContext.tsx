@@ -159,7 +159,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               title: song.title,
               artist: song.artist,
               file_path: song.url,
-              duration: song.duration
+              duration: song.duration,
+              image_url: song.imageUrl
             }, {
               onConflict: 'id'
             });
@@ -168,21 +169,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error("Erreur lors de l'enregistrement de la chanson:", songError);
           }
 
-          const { error: historyError } = await supabase
-            .from('play_history')
-            .insert({
-              user_id: session.user.id,
-              song_id: song.id
-            });
-
-          if (historyError) {
-            console.error("Erreur lors de l'enregistrement dans l'historique:", historyError);
-          } else {
-            setHistory(prev => {
-              const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
-              return newHistory;
-            });
-          }
+          await addToHistory(song);
         }
 
         const audioUrl = await getAudioFile(song.url);
