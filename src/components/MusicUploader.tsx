@@ -16,9 +16,10 @@ export const MusicUploader = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const formatBitrate = (bitrate?: number) => {
-    if (!bitrate) return 'N/A';
-    const kbps = Math.round(bitrate / 1000);
+  const formatBitrate = (size: number, duration: number) => {
+    // Calculer le bitrate approximatif à partir de la taille du fichier et de sa durée
+    const bitsPerSecond = (size * 8) / duration;
+    const kbps = Math.round(bitsPerSecond / 1000);
     return `${kbps} kbps`;
   };
 
@@ -34,65 +35,60 @@ export const MusicUploader = () => {
       return null;
     }
 
-    const fileId = generateUUID(); // Générer l'ID en dehors du bloc try
+    const fileId = generateUUID();
 
     try {
       await storeAudioFile(fileId, file);
-      
-      const metadata = await mm.parseBlob(file);
-      console.log("Métadonnées extraites:", metadata);
 
-      const duration = metadata.format.duration || 0;
-      const formattedDuration = formatDuration(duration);
+      // Créer un blob URL pour le fichier audio
+      const audioUrl = URL.createObjectURL(file);
+      const audio = new Audio(audioUrl);
+      
+      const duration = await new Promise<number>((resolve, reject) => {
+        audio.addEventListener('loadedmetadata', () => {
+          resolve(audio.duration);
+        });
+        audio.addEventListener('error', (e) => {
+          console.error("Erreur lors du chargement de l'audio:", e);
+          reject(e);
+        });
+      });
+
+      // Calculer le bitrate à partir de la taille du fichier et de sa durée
+      const bitrate = formatBitrate(file.size, duration);
+      console.log("Taille du fichier:", file.size, "bytes");
+      console.log("Durée:", duration, "secondes");
+      console.log("Bitrate calculé:", bitrate);
+
+      // Nettoyer l'URL du blob
+      URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
-      if (metadata.common.picture && metadata.common.picture.length > 0) {
-        const picture = metadata.common.picture[0];
-        const blob = new Blob([picture.data], { type: picture.format });
-        imageUrl = URL.createObjectURL(blob);
+      try {
+        const metadata = await mm.parseBlob(file);
+        if (metadata.common.picture && metadata.common.picture.length > 0) {
+          const picture = metadata.common.picture[0];
+          const blob = new Blob([picture.data], { type: picture.format });
+          imageUrl = URL.createObjectURL(blob);
+        }
+      } catch (metadataError) {
+        console.warn("Impossible de lire les métadonnées de l'image:", metadataError);
       }
-
-      const bitrate = metadata.format.bitrate;
-      const formattedBitrate = formatBitrate(bitrate);
-      console.log("Bitrate détecté:", formattedBitrate);
 
       return {
         id: fileId,
-        title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-        artist: metadata.common.artist || "Unknown Artist",
-        duration: formattedDuration,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        artist: "Unknown Artist",
+        duration: formatDuration(duration),
         url: fileId,
         imageUrl: imageUrl,
-        bitrate: formattedBitrate
+        bitrate: bitrate
       };
 
     } catch (error) {
       console.error("Erreur lors du traitement du fichier:", error);
-      
-      // Fallback à la méthode audio pour obtenir au moins la durée
-      try {
-        const audio = new Audio(URL.createObjectURL(file));
-        const duration = await new Promise<number>((resolve, reject) => {
-          audio.addEventListener('loadedmetadata', () => {
-            resolve(audio.duration);
-          });
-          audio.addEventListener('error', reject);
-        });
-
-        return {
-          id: fileId,
-          title: file.name.replace(/\.[^/.]+$/, ""),
-          artist: "Unknown Artist",
-          duration: formatDuration(duration),
-          url: fileId,
-          imageUrl: "https://picsum.photos/240/240",
-          bitrate: formatBitrate(0)
-        };
-      } catch (audioError) {
-        console.error("Erreur lors du traitement audio:", audioError);
-        toast.error(`Erreur lors du traitement de ${file.name}`);
-        return null;
-      }
+      toast.error(`Erreur lors du traitement de ${file.name}`);
+      return null;
     }
   };
 
