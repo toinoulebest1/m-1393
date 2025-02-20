@@ -40,19 +40,24 @@ export const NowPlaying = () => {
     });
   };
 
-  const handleFavorite = (song: any) => {
-    const isFavorite = favorites.some(s => s.id === song.id);
-    if (!isFavorite) {
+  const handleFavorite = async (song: any) => {
+    const wasFavorite = favorites.some(s => s.id === song.id);
+    
+    // On toggle d'abord le favori
+    await toggleFavorite(song);
+    
+    // Si ce n'était pas un favori avant (donc on l'ajoute), on lance l'animation
+    if (!wasFavorite) {
       createFloatingHearts();
     }
-    toggleFavorite(song);
+
     toast.success(
       <div className="flex items-center space-x-2">
         <Heart className={cn(
           "w-4 h-4",
-          isFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500"
+          wasFavorite ? "text-spotify-neutral" : "text-red-500 fill-red-500"
         )} />
-        <span>{isFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
+        <span>{wasFavorite ? 'Retiré des' : 'Ajouté aux'} favoris</span>
       </div>
     );
   };
@@ -84,79 +89,83 @@ export const NowPlaying = () => {
       </div>
 
       <div className="space-y-2">
-        {queue.map((song) => (
-          <div
-            key={song.id}
-            className={cn(
-              "p-4 rounded-lg transition-all duration-300",
-              currentSong?.id === song.id 
-                ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                : "bg-transparent"
-            )}
-          >
-            {currentSong?.id === song.id && (
-              <div className="absolute inset-0 z-0 overflow-hidden">
-                <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] opacity-20" 
-                  style={{
-                    backgroundSize: '200% 200%',
-                    animation: 'gradient 3s linear infinite',
-                  }}
-                />
-              </div>
-            )}
-            
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <img
-                  src={song.imageUrl || "https://picsum.photos/56/56"}
-                  alt="Album art"
-                  className={cn(
-                    "w-14 h-14 rounded-lg shadow-lg",
-                    currentSong?.id === song.id && "animate-pulse"
-                  )}
-                />
-                <div>
-                  <h3 className={cn(
-                    "font-medium",
-                    currentSong?.id === song.id ? "text-white" : "text-spotify-neutral"
-                  )}>
-                    {song.title}
-                  </h3>
-                  <p className="text-sm text-spotify-neutral">{song.artist}</p>
+        {queue.map((song) => {
+          const isFavorite = favorites.some(s => s.id === song.id);
+          
+          return (
+            <div
+              key={song.id}
+              className={cn(
+                "p-4 rounded-lg transition-all duration-300",
+                currentSong?.id === song.id 
+                  ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                  : "bg-transparent"
+              )}
+            >
+              {currentSong?.id === song.id && (
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                  <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] opacity-20" 
+                    style={{
+                      backgroundSize: '200% 200%',
+                      animation: 'gradient 3s linear infinite',
+                    }}
+                  />
                 </div>
-              </div>
-
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center space-x-1 text-spotify-neutral">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm">{song.duration || "0:00"}</span>
-                </div>
-
-                <div className="flex items-center space-x-1 text-spotify-neutral">
-                  <Signal className="w-4 h-4" />
-                  <span className="text-sm">{song.bitrate || "320 kbps"}</span>
-                </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFavorite(song);
-                  }}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                >
-                  <Heart
+              )}
+              
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <img
+                    src={song.imageUrl || "https://picsum.photos/56/56"}
+                    alt="Album art"
                     className={cn(
-                      "w-5 h-5 transition-all duration-300 group-hover:scale-110",
-                      favorites.some(s => s.id === song.id)
-                        ? "text-red-500 fill-red-500"
-                        : "text-spotify-neutral hover:text-white"
+                      "w-14 h-14 rounded-lg shadow-lg",
+                      currentSong?.id === song.id && "animate-pulse"
                     )}
                   />
-                </button>
+                  <div>
+                    <h3 className={cn(
+                      "font-medium",
+                      currentSong?.id === song.id ? "text-white" : "text-spotify-neutral"
+                    )}>
+                      {song.title}
+                    </h3>
+                    <p className="text-sm text-spotify-neutral">{song.artist}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-1 text-spotify-neutral">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm">{song.duration || "0:00"}</span>
+                  </div>
+
+                  <div className="flex items-center space-x-1 text-spotify-neutral">
+                    <Signal className="w-4 h-4" />
+                    <span className="text-sm">{song.bitrate || "320 kbps"}</span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFavorite(song);
+                    }}
+                    className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                  >
+                    <Heart
+                      className={cn(
+                        "w-5 h-5 transition-all duration-300 group-hover:scale-110",
+                        isFavorite
+                          ? "text-red-500 fill-red-500"
+                          : "text-spotify-neutral hover:text-white"
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

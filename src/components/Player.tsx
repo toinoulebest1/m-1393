@@ -113,7 +113,7 @@ export const Player = () => {
                 >
                   <Heart
                     className={cn(
-                      "w-5 h-5",
+                      "w-5 h-5 transition-all duration-300",
                       favorites.some(s => s.id === currentSong.id)
                         ? "text-red-500 fill-red-500"
                         : "text-spotify-neutral hover:text-white"
