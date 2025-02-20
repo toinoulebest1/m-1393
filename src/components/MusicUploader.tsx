@@ -1,4 +1,3 @@
-
 import { Upload, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -39,13 +38,13 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
       }
 
       const { error } = await supabase
-        .from('songs')
-        .update({
-          report_reason: reason,
-          reported_by: session.user.id,
-          reported_at: new Date().toISOString()
-        })
-        .eq('id', songId);
+        .from('song_reports')
+        .insert({
+          song_id: songId,
+          user_id: session.user.id,
+          reason: reason,
+          status: 'pending'
+        });
 
       if (error) {
         console.error("Erreur lors du signalement:", error);
