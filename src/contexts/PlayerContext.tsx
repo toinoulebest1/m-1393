@@ -80,7 +80,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
-  // Charger et synchroniser les préférences
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -98,7 +97,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             crossfadeEnabled: data.crossfade_enabled,
             crossfadeDuration: data.crossfade_duration,
           });
-          // Mettre à jour la durée du fondu
           overlapTimeRef.current = data.crossfade_duration;
           console.log('Durée du fondu mise à jour:', data.crossfade_duration);
         }
@@ -109,7 +107,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     loadPreferences();
     
-    // Mettre en place un écouteur pour les changements de préférences
     const preferenceChannel = supabase
       .channel('music_preferences_changes')
       .on(
@@ -195,16 +192,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           } else {
             nextAudioRef.current.volume = 1;
             clearInterval(fadeInInterval);
+            
             const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
             const nextSong = queue[currentIndex + 1];
             if (nextSong) {
               setCurrentSong(nextSong);
+              
               const tempAudio = audioRef.current;
               audioRef.current = nextAudioRef.current;
               nextAudioRef.current = tempAudio;
+              
+              setProgress(0);
               setNextSongPreloaded(false);
               fadingRef.current = false;
+              
               preloadNextSong();
+              
+              const updateProgress = () => {
+                const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+                setProgress(percentage);
+              };
+              audioRef.current.addEventListener('timeupdate', updateProgress);
             }
           }
         }, 100);
@@ -213,6 +221,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handleEnded = () => {
       if (!fadingRef.current) {
+        setProgress(0);
         const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
         const nextSong = queue[currentIndex + 1];
         
@@ -226,11 +235,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
+    const handleTimeUpdateProgress = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
     audioRef.current.addEventListener('ended', handleEnded);
 
     return () => {
       audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
       audioRef.current.removeEventListener('ended', handleEnded);
     };
   }, [currentSong, nextSongPreloaded, queue]);
