@@ -47,17 +47,20 @@ export const MusicUploader = () => {
 
   const fetchAlbumArt = async (artist: string, title: string): Promise<string | null> => {
     try {
+      console.log("Recherche sur Last.fm pour:", { artist, title });
+      
       const { data, error } = await supabase
         .from('secrets')
         .select('value')
         .eq('name', 'LASTFM_API_KEY')
-        .single();
+        .maybeSingle();
 
       if (error || !data?.value) {
         console.warn("Impossible de récupérer la clé API Last.fm:", error);
         return null;
       }
 
+      console.log("Clé Last.fm récupérée, appel de l'API");
       const lastfm = new LastFM(data.value);
       
       const response = await lastfm.track.getInfo({
@@ -66,40 +69,64 @@ export const MusicUploader = () => {
         autocorrect: 1
       });
 
+      console.log("Réponse Last.fm:", response);
+
       if (response?.track?.album?.image) {
         const images = response.track.album.image;
+        console.log("Images disponibles:", images);
+        
         // Recherche de l'image la plus grande
         const largeImage = images.find(img => img.size === 'extralarge') || 
                          images.find(img => img.size === 'large') ||
                          images[images.length - 1];
-        return largeImage?.['#text'] || null;
+
+        if (largeImage?.['#text']) {
+          console.log("Image sélectionnée:", largeImage['#text']);
+          return largeImage['#text'];
+        }
       }
+      console.log("Aucune image trouvée dans la réponse Last.fm");
       return null;
     } catch (error) {
-      console.warn("Impossible de récupérer la pochette depuis Last.fm:", error);
+      console.error("Erreur détaillée Last.fm:", error);
       return null;
     }
   };
 
   const extractMetadata = async (file: File) => {
     try {
-      console.log("Extraction des métadonnées pour:", file.name);
+      console.log("Tentative d'extraction des métadonnées pour:", file.name);
       const metadata = await mm.parseBlob(file);
-      console.log("Métadonnées extraites:", metadata.common);
+      console.log("Métadonnées extraites avec succès:", metadata.common);
       
+      if (!metadata.common.picture || metadata.common.picture.length === 0) {
+        console.log("Pas de pochette dans les métadonnées");
+        return {
+          artist: metadata.common.artist,
+          title: metadata.common.title,
+          picture: undefined
+        };
+      }
+
+      const picture = metadata.common.picture[0];
+      console.log("Pochette trouvée dans les métadonnées:", {
+        format: picture.format,
+        taille: picture.data.length
+      });
+
       return {
         artist: metadata.common.artist || undefined,
         title: metadata.common.title || undefined,
-        picture: metadata.common.picture && metadata.common.picture.length > 0 ? metadata.common.picture[0] : undefined
+        picture: picture
       };
     } catch (error) {
-      console.warn("Erreur lors de l'extraction des métadonnées:", error);
+      console.error("Erreur détaillée lors de l'extraction des métadonnées:", error);
       return null;
     }
   };
 
   const processAudioFile = async (file: File) => {
-    console.log("Traitement du fichier:", file.name);
+    console.log("Début du traitement pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
       console.warn("Fichier non audio ignoré:", file.name);
@@ -125,41 +152,60 @@ export const MusicUploader = () => {
       });
 
       const bitrate = formatBitrate(file.size, duration);
-      console.log("Taille du fichier:", file.size, "bytes");
-      console.log("Durée:", duration, "secondes");
-      console.log("Bitrate calculé:", bitrate);
+      console.log("Informations du fichier:", {
+        taille: file.size,
+        duree: duration,
+        bitrate: bitrate
+      });
 
       URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
       let { artist, title } = parseFileName(file.name);
+      console.log("Informations extraites du nom:", { artist, title });
 
       // Tentative d'extraction des métadonnées
       const metadataResult = await extractMetadata(file);
       if (metadataResult) {
-        if (metadataResult.artist) artist = metadataResult.artist;
-        if (metadataResult.title) title = metadataResult.title;
+        if (metadataResult.artist) {
+          console.log("Artiste trouvé dans les métadonnées:", metadataResult.artist);
+          artist = metadataResult.artist;
+        }
+        if (metadataResult.title) {
+          console.log("Titre trouvé dans les métadonnées:", metadataResult.title);
+          title = metadataResult.title;
+        }
         
         if (metadataResult.picture) {
           try {
             const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
             imageUrl = URL.createObjectURL(blob);
-            console.log("Pochette extraite des métadonnées");
+            console.log("Pochette créée depuis les métadonnées");
           } catch (error) {
-            console.warn("Erreur lors de la création de la pochette depuis les métadonnées:", error);
+            console.error("Erreur lors de la création du blob:", error);
           }
         }
       }
 
       // Si pas de pochette dans les métadonnées, essayer Last.fm
       if (imageUrl === "https://picsum.photos/240/240") {
-        console.log("Recherche de pochette sur Last.fm pour:", artist, "-", title);
+        console.log("Tentative de récupération de pochette via Last.fm");
         const lastfmArt = await fetchAlbumArt(artist, title);
         if (lastfmArt) {
-          console.log("Pochette trouvée sur Last.fm");
+          console.log("Pochette Last.fm trouvée:", lastfmArt);
           imageUrl = lastfmArt;
+        } else {
+          console.log("Aucune pochette trouvée sur Last.fm");
         }
       }
+
+      console.log("Informations finales de la chanson:", {
+        artist,
+        title,
+        imageUrl,
+        duration: formatDuration(duration),
+        bitrate
+      });
 
       return {
         id: fileId,
