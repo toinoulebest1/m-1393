@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -71,7 +72,7 @@ const Favorites = () => {
         if (isPlaying) {
           pause();
         } else {
-          play();
+          play(currentSong); // On passe la chanson courante pour reprendre la lecture
         }
         return;
       }
