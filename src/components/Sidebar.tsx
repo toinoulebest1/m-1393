@@ -67,7 +67,7 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-screen z-50">
+    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50"> {/* Ajusté la hauteur pour tenir compte du Player */}
       <div className="mb-8">
         <div className="flex items-center gap-2">
           <Music2 className="w-8 h-8 text-spotify-accent" />
@@ -93,8 +93,8 @@ export const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="flex-1">
-        <div className="mt-8 space-y-4 border-t border-white/10 pt-4">
+      <div className="flex-1 flex flex-col min-h-0"> {/* Ajout de min-h-0 pour gérer le scroll */}
+        <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
           <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
             <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
               <SelectValue placeholder="Langue" />
@@ -113,17 +113,17 @@ export const Sidebar = () => {
 
           <MusicUploader />
         </div>
-      </div>
 
-      <div className="pt-4 border-t border-white/10">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
-          onClick={handleLogout}
-        >
-          <LogOut className="w-5 h-5 mr-2" />
-          <span>{t('common.logout')}</span>
-        </Button>
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-5 h-5 mr-2" />
+            <span>{t('common.logout')}</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
