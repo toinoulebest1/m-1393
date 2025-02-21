@@ -957,47 +957,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong]);
 
-  return (
-    <PlayerContext.Provider value={{
-      currentSong,
-      isPlaying,
-      progress,
-      volume,
-      queue,
-      shuffleMode,
-      repeatMode,
-      favorites,
-      searchQuery,
-      favoriteStats,
-      playbackRate,
-      history,
-      setHistory,
-      play,
-      pause,
-      setVolume: updateVolume,
-      setProgress: updateProgress,
-      nextSong,
-      previousSong,
-      addToQueue,
-      toggleShuffle,
-      toggleRepeat,
-      toggleFavorite,
-      removeFavorite,
-      setSearchQuery,
-      setPlaybackRate: updatePlaybackRate,
-      setQueue,
-    }}>
-      {children}
-    </PlayerContext.Provider>
-  );
-};
+  const getRandomSong = async () => {
+    try {
+      const { data: songs } = await supabase
+        .from('songs')
+        .select('*')
+        .order('created_at');
 
-export const usePlayer = () => {
-  const context = useContext(PlayerContext);
-  if (!context) {
-    throw new Error('usePlayer must be used within a PlayerProvider');
-  }
-  return context;
-};
+      if (songs && songs.length > 0) {
+        const randomIndex = Math.floor(Math.random() * songs.length);
+        const randomSong = songs[randomIndex];
+        return {
+          id: randomSong.id,
+          title: randomSong.title,
+          artist: randomSong.artist || '',
+          duration: randomSong.duration || '0:00',
+          url: randomSong.file_path,
+          imageUrl: randomSong.image_url,
+          bitrate: '320 kbps'
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de la récupération d'une chanson aléatoire:", error);
+      return null;
+    }
+  };
 
-export default PlayerProvider;
+  const handleEnded = async () => {
+    if (!currentSong) return;
+
+    // Obtenir une nouvelle chanson aléatoire
+    const randomSong = await getRandomSong();
+    if (randomSong) {
+      // Ajouter la chanson à la file d'attente et la jouer
+      setQueue(prev => [...prev, randomSong]);
+      play(randomSong);
+      toast.success(`Lecture automatique : ${randomSong.title}`);
+    }
+  };
