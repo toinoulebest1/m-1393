@@ -30,10 +30,11 @@ interface FavoriteStat {
     artist: string;
     url: string;
     duration: string;
+    image_url?: string;
   };
 }
 
-const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=64&h=64&fit=crop&auto=format";
+const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
 const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
@@ -107,7 +108,6 @@ const Top100 = () => {
       try {
         console.log("Fetching favorite stats...");
         
-        // First, get the list of hidden song IDs
         const { data: hiddenSongsData } = await supabase
           .from('hidden_songs')
           .select('song_id');
@@ -115,7 +115,6 @@ const Top100 = () => {
         const hiddenSongIds = hiddenSongsData?.map(hs => hs.song_id) || [];
         console.log("Hidden song IDs:", hiddenSongIds);
 
-        // Then fetch favorite stats excluding hidden songs
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
@@ -128,7 +127,8 @@ const Top100 = () => {
               artist,
               file_path,
               created_at,
-              duration
+              duration,
+              image_url
             )
           `)
           .not('song_id', 'in', `(${hiddenSongIds.join(',')})`)
@@ -161,7 +161,8 @@ const Top100 = () => {
                 title: stat.songs.title,
                 artist: stat.songs.artist || '',
                 url: stat.songs.file_path,
-                duration: stat.songs.duration || "0:00"
+                duration: stat.songs.duration || "0:00",
+                image_url: stat.songs.image_url
               }
             };
           } else {
@@ -406,7 +407,7 @@ const Top100 = () => {
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <img
-                        src={PLACEHOLDER_IMAGE}
+                        src={stat.song.image_url || PLACEHOLDER_IMAGE}
                         alt={stat.song.title}
                         className="w-12 h-12 rounded-md object-cover"
                       />
