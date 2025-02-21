@@ -62,17 +62,23 @@ const History = () => {
       }
 
       if (historyData) {
-        const formattedHistory = historyData.map(item => ({
-          id: item.songs.id,
-          title: item.songs.title,
-          artist: item.songs.artist || '',
-          duration: item.songs.duration || '0:00',
-          url: item.songs.file_path,
-          imageUrl: item.songs.image_url,
-          bitrate: '320 kbps',
-          playedAt: item.played_at
-        }));
+        const uniqueSongs = new Map();
+        historyData.forEach(item => {
+          if (!uniqueSongs.has(item.songs.id)) {
+            uniqueSongs.set(item.songs.id, {
+              id: item.songs.id,
+              title: item.songs.title,
+              artist: item.songs.artist || '',
+              duration: item.songs.duration || '0:00',
+              url: item.songs.file_path,
+              imageUrl: item.songs.image_url,
+              bitrate: '320 kbps',
+              playedAt: item.played_at
+            });
+          }
+        });
 
+        const formattedHistory = Array.from(uniqueSongs.values());
         setHistory(formattedHistory);
       }
     } catch (error) {
