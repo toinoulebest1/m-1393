@@ -4,7 +4,7 @@ import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal, Music } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
@@ -14,6 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 interface Song {
@@ -24,9 +25,23 @@ interface Song {
   url: string;
   file_path: string;
   imageUrl?: string;
+  genre?: string;
 }
 
-type SearchFilter = "all" | "title" | "artist";
+type SearchFilter = "all" | "title" | "artist" | "genre";
+
+const GENRES = [
+  "Pop",
+  "Rock",
+  "Hip-Hop",
+  "R&B",
+  "Jazz",
+  "Électronique",
+  "Classique",
+  "Folk",
+  "Metal",
+  "Reggae"
+];
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,6 +51,7 @@ const Search = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [songToReport, setSongToReport] = useState<Song | null>(null);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
+  const [selectedGenre, setSelectedGenre] = useState<string>("");
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -70,9 +86,15 @@ const Search = () => {
     }
   }, [currentSong?.imageUrl]);
 
+  useEffect(() => {
+    if (searchFilter === "genre" && selectedGenre) {
+      handleSearch("");
+    }
+  }, [selectedGenre, searchFilter]);
+
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    if (!query.trim()) {
+    if (!query.trim() && searchFilter !== "genre") {
       setResults([]);
       return;
     }
@@ -86,6 +108,9 @@ const Search = () => {
           break;
         case "artist":
           queryFilter = `artist.ilike.%${query}%`;
+          break;
+        case "genre":
+          queryFilter = `genre.eq.${selectedGenre}`;
           break;
         default:
           queryFilter = `title.ilike.%${query}%,artist.ilike.%${query}%`;
@@ -115,7 +140,8 @@ const Search = () => {
             duration: current.duration || '0:00',
             url: current.file_path,
             file_path: current.file_path,
-            imageUrl: current.image_url
+            imageUrl: current.image_url,
+            genre: current.genre
           });
         }
         return acc;
@@ -140,31 +166,69 @@ const Search = () => {
               <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
               <Input
                 type="text"
-                placeholder="Rechercher une chanson ou un artiste..."
+                placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="pl-10 bg-background/50"
+                disabled={searchFilter === "genre"}
               />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md bg-background/50 hover:bg-background/70 transition-colors">
                 <SlidersHorizontal className="h-5 w-5" />
                 <span className="text-sm">
-                  {searchFilter === "all" ? "Tout" : searchFilter === "title" ? "Titre" : "Artiste"}
+                  {searchFilter === "all" ? "Tout" : 
+                   searchFilter === "title" ? "Titre" : 
+                   searchFilter === "artist" ? "Artiste" : "Genre"}
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setSearchFilter("all")}>
+                <DropdownMenuItem onClick={() => {
+                  setSearchFilter("all");
+                  setSelectedGenre("");
+                }}>
                   Tout
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSearchFilter("title")}>
+                <DropdownMenuItem onClick={() => {
+                  setSearchFilter("title");
+                  setSelectedGenre("");
+                }}>
                   Titre
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSearchFilter("artist")}>
+                <DropdownMenuItem onClick={() => {
+                  setSearchFilter("artist");
+                  setSelectedGenre("");
+                }}>
                   Artiste
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
+                  <Music className="h-4 w-4 mr-2" />
+                  Genre musical
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {searchFilter === "genre" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md bg-background/50 hover:bg-background/70 transition-colors">
+                  <Music className="h-5 w-5" />
+                  <span className="text-sm">
+                    {selectedGenre || "Sélectionner un genre"}
+                  </span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {GENRES.map((genre) => (
+                    <DropdownMenuItem 
+                      key={genre}
+                      onClick={() => setSelectedGenre(genre)}
+                    >
+                      {genre}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {isLoading ? (
