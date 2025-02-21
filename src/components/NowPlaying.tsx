@@ -291,14 +291,14 @@ export const NowPlaying = () => {
         {`
           @keyframes float-up {
             0% {
-              transform: translate(0, 0) scale(${heart.scale}) rotate(${heart.rotation}deg);
+              transform: translate(0, 0);
               opacity: 0;
             }
             10% {
               opacity: 1;
             }
             100% {
-              transform: translate(${-50 + Math.random() * 100}px, -${window.innerHeight}px) scale(${heart.scale}) rotate(${heart.rotation + Math.random() * 360}deg);
+              transform: translate(${-50 + Math.random() * 100}px, -${window.innerHeight}px);
               opacity: 0;
             }
           }
