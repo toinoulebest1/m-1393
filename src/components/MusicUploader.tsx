@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -143,6 +142,27 @@ export const MusicUploader = () => {
     }
   };
 
+  const checkIfSongExists = async (artist: string, title: string): Promise<boolean> => {
+    try {
+      const { data: existingSongs, error } = await supabase
+        .from('songs')
+        .select('id')
+        .ilike('artist', artist)
+        .ilike('title', title)
+        .limit(1);
+
+      if (error) {
+        console.error("Erreur lors de la vérification de la chanson:", error);
+        return false;
+      }
+
+      return existingSongs && existingSongs.length > 0;
+    } catch (error) {
+      console.error("Erreur lors de la vérification de la chanson:", error);
+      return false;
+    }
+  };
+
   const processAudioFile = async (file: File) => {
     console.log("Début du traitement pour:", file.name);
     
@@ -154,6 +174,20 @@ export const MusicUploader = () => {
     const fileId = generateUUID();
 
     try {
+      let { artist, title } = parseFileName(file.name);
+      const metadataResult = await extractMetadata(file);
+      
+      if (metadataResult) {
+        if (metadataResult.artist) artist = metadataResult.artist;
+        if (metadataResult.title) title = metadataResult.title;
+      }
+
+      const songExists = await checkIfSongExists(artist, title);
+      if (songExists) {
+        toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
+        return null;
+      }
+
       console.log("Stockage du fichier audio:", fileId);
       setUploadProgress(0);
       setIsUploading(true);
@@ -173,7 +207,7 @@ export const MusicUploader = () => {
       setUploadProgress(100);
 
       const audioUrl = URL.createObjectURL(file);
-      const audio = new Audio(audioUrl);
+      const audio = new Audio();
       
       const duration = await new Promise<number>((resolve, reject) => {
         audio.addEventListener('loadedmetadata', () => {
@@ -183,6 +217,7 @@ export const MusicUploader = () => {
           console.error("Erreur lors du chargement de l'audio:", e);
           reject(e);
         });
+        audio.src = audioUrl;
       });
 
       const bitrate = formatBitrate(file.size, duration);
@@ -195,28 +230,14 @@ export const MusicUploader = () => {
       URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
-      let { artist, title } = parseFileName(file.name);
-      console.log("Informations extraites du nom:", { artist, title });
-
-      const metadataResult = await extractMetadata(file);
-      if (metadataResult) {
-        if (metadataResult.artist) {
-          console.log("Artiste trouvé dans les métadonnées:", metadataResult.artist);
-          artist = metadataResult.artist;
-        }
-        if (metadataResult.title) {
-          console.log("Titre trouvé dans les métadonnées:", metadataResult.title);
-          title = metadataResult.title;
-        }
-        
-        if (metadataResult.picture) {
-          try {
-            const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
-            imageUrl = URL.createObjectURL(blob);
-            console.log("Pochette créée depuis les métadonnées");
-          } catch (error) {
-            console.error("Erreur lors de la création du blob:", error);
-          }
+      
+      if (metadataResult?.picture) {
+        try {
+          const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
+          imageUrl = URL.createObjectURL(blob);
+          console.log("Pochette créée depuis les métadonnées");
+        } catch (error) {
+          console.error("Erreur lors de la création du blob:", error);
         }
       }
 
