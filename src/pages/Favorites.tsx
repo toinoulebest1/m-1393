@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -8,14 +7,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ColorThief from 'colorthief';
 import React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 
 const Favorites = () => {
@@ -25,7 +16,6 @@ const Favorites = () => {
     play, 
     currentSong, 
     isPlaying, 
-    addToQueue,
     removeFavorite,
     queue,
     pause,
@@ -73,7 +63,7 @@ const Favorites = () => {
         if (isPlaying) {
           pause();
         } else {
-          play(song);
+          play();
         }
         return;
       }
@@ -81,14 +71,14 @@ const Favorites = () => {
       // On trouve l'index de la chanson sélectionnée
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
       
-      // On crée une nouvelle file d'attente à partir de cet index
-      const newQueue = favorites.slice(songIndex);
+      // On crée une nouvelle file d'attente à partir de la liste complète des favoris
+      const newQueue = [...favorites];
       
       // On met à jour la file d'attente complète
       setQueue(newQueue);
       
       // On joue la chanson sélectionnée
-      await play(newQueue[0]);
+      await play(newQueue[songIndex]);
       
       toast.success(`Lecture de ${song.title}`);
     } catch (error) {
@@ -102,7 +92,7 @@ const Favorites = () => {
     // On met toute la liste des favoris dans la file d'attente
     setQueue(favorites);
     // On joue la première chanson
-    handlePlay(favorites[0]);
+    play(favorites[0]);
   };
 
   const handleShufflePlay = () => {
@@ -112,7 +102,7 @@ const Favorites = () => {
     // On met la liste mélangée dans la file d'attente
     setQueue(shuffledFavorites);
     // On joue la première chanson de la liste mélangée
-    handlePlay(shuffledFavorites[0]);
+    play(shuffledFavorites[0]);
   };
 
   const handleRemoveFavorite = async (song: any) => {
