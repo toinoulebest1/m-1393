@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -158,7 +157,7 @@ const Search = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-spotify-dark">
+    <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex-1 ml-64 p-8 pb-32">
         <div className="max-w-3xl mx-auto">
@@ -170,12 +169,12 @@ const Search = () => {
                 placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 bg-background/50"
+                className="pl-10"
                 disabled={searchFilter === "genre"}
               />
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md bg-background/50 hover:bg-background/70 transition-colors">
+              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
                 <SlidersHorizontal className="h-5 w-5" />
                 <span className="text-sm">
                   {searchFilter === "all" ? "Tout" : 
@@ -212,7 +211,7 @@ const Search = () => {
 
             {searchFilter === "genre" && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md bg-background/50 hover:bg-background/70 transition-colors">
+                <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
                   <Music className="h-5 w-5" />
                   <span className="text-sm">
                     {selectedGenre || "Sélectionner un genre"}
@@ -251,75 +250,39 @@ const Search = () => {
                   transform: isCurrentSong ? 'scale(1.05)' : 'scale(1)',
                 } : {};
 
-                const containerGlowStyle = isCurrentSong && dominantColor ? {
-                  boxShadow: `
-                    0 0 15px 2px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                    0 0 30px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                  `,
-                  background: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)`,
-                } : {};
-
                 return (
                   <div
                     key={song.id}
                     className={cn(
-                      "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
-                      isCurrentSong 
-                        ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                        : "bg-transparent"
+                      "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer",
+                      isCurrentSong ? "bg-white/5" : "hover:bg-white/5"
                     )}
                     style={{ 
                       animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
                       opacity: 0,
-                      ...containerGlowStyle
                     }}
                     onClick={() => play(song)}
                   >
-                    {isCurrentSong && (
-                      <div className="absolute inset-0 z-0 overflow-hidden">
-                        <div 
-                          className="absolute inset-0 animate-gradient opacity-30" 
-                          style={{
-                            backgroundSize: '200% 200%',
-                            animation: 'gradient 3s linear infinite',
-                            background: dominantColor 
-                              ? `linear-gradient(45deg, 
-                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
-                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
-                                )`
-                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                          }}
-                        />
-                      </div>
-                    )}
-
                     <div className="relative z-10 flex items-center justify-between w-full">
                       <div className="flex items-center flex-1">
                         <div 
-                          className={cn(
-                            "relative overflow-hidden rounded-md transition-all duration-500",
-                            isCurrentSong ? "shadow-2xl" : "group-hover:shadow-xl"
-                          )}
+                          className="relative overflow-hidden rounded-md"
                           style={glowStyle}
                         >
                           <img
                             src={song.imageUrl || "https://picsum.photos/56/56"}
                             alt={song.title}
-                            className={cn(
-                              "w-14 h-14 object-cover rounded-md transition-all duration-500",
-                              isCurrentSong ? "scale-105 [animation:pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]" : "group-hover:scale-105"
-                            )}
+                            className="w-14 h-14 object-cover rounded-md"
                           />
-                          <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
                         </div>
                         <div className="ml-4">
                           <h3 className={cn(
-                            "font-medium transition-colors",
-                            isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                            "font-medium",
+                            isCurrentSong ? "text-white" : "text-spotify-neutral group-hover:text-white"
                           )}>
                             {song.title}
                           </h3>
-                          <p className="text-sm text-spotify-neutral group-hover:text-white/80 transition-colors duration-300">
+                          <p className="text-sm text-spotify-neutral group-hover:text-white/80">
                             {song.artist}
                           </p>
                         </div>
@@ -342,7 +305,7 @@ const Search = () => {
                               e.stopPropagation();
                               toggleFavorite(song);
                             }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                            className="p-2 hover:bg-white/5 rounded-full transition-colors"
                           >
                             <Heart
                               className={cn(
