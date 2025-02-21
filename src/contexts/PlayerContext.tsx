@@ -1,4 +1,3 @@
-<lov-code>
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
@@ -997,3 +996,4 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <PlayerContext.Provider value={{
       currentSong,
       isPlaying,
+      progress,
