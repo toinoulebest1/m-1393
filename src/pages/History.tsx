@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -26,7 +25,7 @@ import { useEffect, useState } from "react";
 
 const History = () => {
   const { t } = useTranslation();
-  const { history, play, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
+  const { history, play, pause, isPlaying, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [songToReport, setSongToReport] = React.useState<any>(null);
@@ -171,6 +170,19 @@ const History = () => {
     }
   };
 
+  const handlePlay = (song: any) => {
+    if (currentSong?.id === song.id) {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+      return;
+    }
+
+    play(song);
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -250,7 +262,7 @@ const History = () => {
                       ? "relative bg-white/5 shadow-lg overflow-hidden" 
                       : "bg-transparent"
                   )}
-                  onClick={() => play(song)}
+                  onClick={() => handlePlay(song)}
                 >
                   {isCurrentSong && (
                     <div className="absolute inset-0 z-0 overflow-hidden">
