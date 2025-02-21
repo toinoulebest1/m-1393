@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -25,17 +24,25 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingRole, setIsCheckingRole] = useState(true);
+  const [updateLoading, setUpdateLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const checkUserRole = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
-          const { data: roles } = await supabase
+          const { data: roles, error: rolesError } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', session.user.id)
             .single();
+          
+          if (rolesError) {
+            console.error("Erreur lors de la vérification du rôle:", rolesError);
+            toast.error("Erreur lors de la vérification du rôle");
+            setIsAdmin(false);
+            return;
+          }
           
           setIsAdmin(roles?.role === 'admin');
         }
@@ -59,6 +66,7 @@ const Reports = () => {
           .order('created_at', { ascending: false });
 
         if (error) {
+          console.error("Erreur lors du chargement des signalements:", error);
           toast.error("Erreur lors du chargement des signalements");
           return;
         }
@@ -74,7 +82,6 @@ const Reports = () => {
 
     fetchReports();
 
-    // Configuration du canal de temps réel pour les mises à jour
     const channel = supabase
       .channel('reports_changes')
       .on(
@@ -84,7 +91,8 @@ const Reports = () => {
           schema: 'public',
           table: 'song_reports'
         },
-        () => {
+        (payload) => {
+          console.log("Changement détecté:", payload);
           fetchReports();
         }
       )
@@ -97,20 +105,33 @@ const Reports = () => {
 
   const handleUpdateStatus = async (reportId: string, newStatus: 'resolved' | 'rejected') => {
     try {
-      const { error } = await supabase
+      setUpdateLoading(reportId);
+      console.log("Mise à jour du signalement:", reportId, "avec le statut:", newStatus);
+
+      const { data, error } = await supabase
         .from('song_reports')
         .update({ status: newStatus })
-        .eq('id', reportId);
+        .eq('id', reportId)
+        .select()
+        .single();
 
       if (error) {
+        console.error("Erreur lors de la mise à jour:", error);
         toast.error("Erreur lors de la mise à jour du signalement");
         return;
       }
 
+      console.log("Mise à jour réussie:", data);
       toast.success(`Signalement ${newStatus === 'resolved' ? 'résolu' : 'rejeté'} avec succès`);
+      
+      setReports(reports.map(report => 
+        report.id === reportId ? { ...report, status: newStatus } : report
+      ));
     } catch (error) {
       console.error("Erreur:", error);
       toast.error("Erreur lors de la mise à jour du signalement");
+    } finally {
+      setUpdateLoading(null);
     }
   };
 
@@ -202,18 +223,20 @@ const Reports = () => {
                                 size="sm"
                                 className="text-green-500 hover:text-green-600 hover:bg-green-500/10"
                                 onClick={() => handleUpdateStatus(report.id, 'resolved')}
+                                disabled={updateLoading === report.id}
                               >
                                 <CheckCircle className="w-4 h-4 mr-1" />
-                                Accepter
+                                {updateLoading === report.id ? 'En cours...' : 'Accepter'}
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                                 onClick={() => handleUpdateStatus(report.id, 'rejected')}
+                                disabled={updateLoading === report.id}
                               >
                                 <XCircle className="w-4 h-4 mr-1" />
-                                Rejeter
+                                {updateLoading === report.id ? 'En cours...' : 'Rejeter'}
                               </Button>
                             </div>
                           </TableCell>
