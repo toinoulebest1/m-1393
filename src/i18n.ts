@@ -1,4 +1,3 @@
-
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -42,7 +41,9 @@ i18n
             "confirmDeleteHistoryMessage": "Are you sure you want to delete your entire listening history? This action cannot be undone.",
             "cancel": "Cancel",
             "delete": "Delete",
-            "loading": "Loading..."
+            "loading": "Loading...",
+            "changeAvatar": "Change avatar",
+            "uploading": "Uploading..."
           }
         }
       },
@@ -82,7 +83,9 @@ i18n
             "confirmDeleteHistoryMessage": "Êtes-vous sûr de vouloir supprimer tout votre historique d'écoute ? Cette action est irréversible.",
             "cancel": "Annuler",
             "delete": "Supprimer",
-            "loading": "Chargement..."
+            "loading": "Chargement...",
+            "changeAvatar": "Changer l'avatar",
+            "uploading": "Téléchargement..."
           }
         }
       }
