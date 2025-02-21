@@ -3,13 +3,41 @@ import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const [username, setUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        setUsername(profile.username);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
-      <div className="flex-1 ml-64"> {/* Ajout de ml-64 pour compenser la largeur de la sidebar */}
-        <div className="absolute top-4 right-4 z-50">
+      <div className="flex-1 ml-64">
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+          {username && (
+            <span className="text-spotify-neutral hover:text-white transition-colors">
+              {username}
+            </span>
+          )}
           <AccountSettingsDialog />
         </div>
         <NowPlaying />
