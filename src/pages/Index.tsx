@@ -3,16 +3,20 @@ import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
+import { ReportSongDialog } from "@/components/ReportSongDialog";
+import { useState } from "react";
 
 const Index = () => {
+  const [songToReport, setSongToReport] = useState<any>(null);
+
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
-      <div className="flex-1 ml-64"> {/* Ajout de ml-64 pour compenser la largeur de la sidebar */}
+      <div className="flex-1 ml-64">
         <div className="absolute top-4 right-4 z-50">
           <AccountSettingsDialog />
         </div>
-        <NowPlaying />
+        <NowPlaying onReport={(song) => setSongToReport(song)} />
         <div id="next-song-alert" className="fixed bottom-28 right-4 z-50 transition-all duration-300 opacity-0 translate-y-2">
           <div className="bg-black/90 border border-white/10 rounded-lg p-4 shadow-lg">
             <div className="flex items-center space-x-2">
@@ -26,6 +30,11 @@ const Index = () => {
           </div>
         </div>
         <Player />
+        
+        <ReportSongDialog
+          song={songToReport}
+          onClose={() => setSongToReport(null)}
+        />
       </div>
     </div>
   );
