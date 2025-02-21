@@ -25,10 +25,8 @@ const GENRES = [
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState(() => {
-    // Récupérer la dernière recherche du localStorage
     const savedSearch = localStorage.getItem('lastSearch') || "";
     if (savedSearch) {
-      // Si une recherche existe, on l'exécute immédiatement
       setTimeout(() => handleSearch(savedSearch), 0);
     }
     return savedSearch;
@@ -46,7 +44,6 @@ const Search = () => {
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
 
-  // Sauvegarder les filtres quand ils changent
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
   }, [searchFilter]);
@@ -90,7 +87,6 @@ const Search = () => {
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    // Sauvegarder la recherche dans le localStorage
     localStorage.setItem('lastSearch', query);
     
     if (query.length < 2 && searchFilter !== "genre") {
@@ -157,10 +153,10 @@ const Search = () => {
   }, [selectedGenre, searchFilter]);
 
   return (
-    <div className="flex min-h-screen relative overflow-hidden">
+    <div className="flex min-h-screen relative">
       <Sidebar />
-      <div className="flex-1 ml-64 p-8 pb-32 flex justify-center">
-        <div className="w-full max-w-4xl">
+      <div className="flex-1 ml-64 p-8 pb-32">
+        <div className="w-full">
           <style>
             {`
             @keyframes pulse-glow {
