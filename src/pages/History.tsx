@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,6 @@ import {
 import { useEffect, useState } from "react";
 
 const History = () => {
-  const { t } = useTranslation();
   const { 
     history, 
     play, 
@@ -190,8 +190,8 @@ const History = () => {
       return;
     }
 
-    const updatedQueue = [song, ...history.filter(s => s.id !== song.id)];
-    setQueue(updatedQueue);
+    // On met uniquement la chanson sélectionnée dans la queue
+    setQueue([song]);
     
     play(song);
   };
