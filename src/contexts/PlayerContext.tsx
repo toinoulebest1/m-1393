@@ -157,7 +157,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  preloadNextSong = async () => {
+  const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
@@ -361,50 +361,63 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Écouter les changements en temps réel des favoris
   useEffect(() => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const setupRealtimeFavorites = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-    console.log("Mise en place de l'écoute des favoris en temps réel");
+      console.log("Mise en place de l'écoute des favoris en temps réel");
 
-    const channel = supabase
-      .channel('favorite_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Écoute tous les événements (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'favorite_stats',
-          filter: `user_id=eq.${session.user.id}`
-        },
-        async (payload) => {
-          console.log("Changement détecté dans les favoris:", payload);
+      const channel = supabase
+        .channel('favorite_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Écoute tous les événements (INSERT, UPDATE, DELETE)
+            schema: 'public',
+            table: 'favorite_stats',
+            filter: `user_id=eq.${session.user.id}`
+          },
+          async (payload) => {
+            console.log("Changement détecté dans les favoris:", payload);
 
-          // Rafraîchir la liste des favoris
-          const { data: songIds } = await supabase
-            .from('favorite_stats')
-            .select('song_id')
-            .eq('user_id', session.user.id);
+            // Rafraîchir la liste des favoris
+            const { data: songIds } = await supabase
+              .from('favorite_stats')
+              .select('song_id')
+              .eq('user_id', session.user.id);
 
-          if (songIds) {
-            const { data: favoriteSongs } = await supabase
-              .from('songs')
-              .select('*')
-              .in('id', songIds.map(row => row.song_id));
+            if (songIds) {
+              const { data: favoriteSongs } = await supabase
+                .from('songs')
+                .select('*')
+                .in('id', songIds.map(row => row.song_id));
 
-            if (favoriteSongs) {
-              console.log("Mise à jour des favoris:", favoriteSongs);
-              setFavorites(favoriteSongs);
+              if (favoriteSongs) {
+                console.log("Mise à jour des favoris:", favoriteSongs);
+                // Mapper les données pour correspondre au type Song
+                const mappedSongs: Song[] = favoriteSongs.map(song => ({
+                  id: song.id,
+                  title: song.title,
+                  artist: song.artist || '',
+                  duration: song.duration || '0:00',
+                  url: song.file_path,
+                  imageUrl: song.image_url
+                }));
+                setFavorites(mappedSongs);
+              }
             }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    // Nettoyage lors du démontage du composant
-    return () => {
-      console.log("Nettoyage de l'écoute des favoris");
-      supabase.removeChannel(channel);
+      // Nettoyage lors du démontage du composant
+      return () => {
+        console.log("Nettoyage de l'écoute des favoris");
+        supabase.removeChannel(channel);
+      };
     };
+
+    setupRealtimeFavorites();
   }, []); // Exécuté une seule fois au montage du composant
 
   const pause = () => {
