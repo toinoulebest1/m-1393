@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -28,7 +29,7 @@ export const MusicUploader = () => {
       if (!uploadToastId) {
         const id = toast.loading("Upload en cours...", {
           description: `${uploadProgress}%`
-        });
+        }).toString();  // Convertir explicitement en string
         setUploadToastId(id);
       } else {
         toast.loading("Upload en cours...", {
