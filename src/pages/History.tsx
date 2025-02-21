@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -213,27 +212,27 @@ const History = () => {
                 className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
               >
                 <Trash2 className="w-5 h-5" />
-                <span>Supprimer l'historique</span>
+                <span>{t('common.deleteHistory')}</span>
               </button>
             </AlertDialogTrigger>
             <AlertDialogContent className="bg-spotify-dark border-spotify-light">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-white">
-                  Supprimer l'historique ?
+                  {t('common.confirmDeleteHistory')}
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-spotify-neutral">
-                  Êtes-vous sûr de vouloir supprimer tout votre historique d'écoute ? Cette action est irréversible.
+                  {t('common.confirmDeleteHistoryMessage')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
-                  Annuler
+                  {t('common.cancel')}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={clearHistory}
                   className="bg-red-500 hover:bg-red-600 text-white"
                 >
-                  Supprimer
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -243,16 +242,16 @@ const History = () => {
         <div className="space-y-2">
           {isLoading ? (
             <p className="text-spotify-neutral text-center py-8">
-              Chargement de l'historique...
+              {t('common.loading')}
             </p>
           ) : history.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
               <Music className="w-16 h-16 text-spotify-neutral opacity-50" />
               <p className="text-spotify-neutral text-lg">
-                Votre historique d'écoute est vide
+                {t('common.emptyHistory')}
               </p>
               <p className="text-spotify-neutral text-sm">
-                Écoutez de la musique pour commencer à construire votre historique
+                {t('common.startListening')}
               </p>
             </div>
           ) : (
@@ -379,4 +378,3 @@ const History = () => {
 };
 
 export default History;
-

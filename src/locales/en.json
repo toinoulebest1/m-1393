@@ -26,6 +26,13 @@
     "downloadedAt": "Downloaded on",
     "lastPlayed": "Last played",
     "history": "History",
-    "accountSettings": "Account Settings"
+    "accountSettings": "Account Settings",
+    "emptyHistory": "Your listening history is empty",
+    "startListening": "Listen to music to start building your history",
+    "deleteHistory": "Delete history",
+    "confirmDeleteHistory": "Delete history?",
+    "confirmDeleteHistoryMessage": "Are you sure you want to delete your entire listening history? This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete"
   }
 }
