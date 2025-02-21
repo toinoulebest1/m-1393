@@ -171,10 +171,11 @@ const Search = () => {
         transcribeRef.current = await pipeline(
           "automatic-speech-recognition",
           "onnx-community/whisper-tiny.en",
-          { device: "cpu" }
+          { device: "wasm" }
         );
       } catch (error) {
         console.error("Erreur lors de l'initialisation du modèle:", error);
+        toast.error("Erreur lors de l'initialisation du modèle de reconnaissance vocale");
       }
     };
 
