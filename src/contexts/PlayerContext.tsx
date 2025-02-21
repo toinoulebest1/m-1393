@@ -60,9 +60,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fadingRef = useRef(false);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const [currentSong, setCurrentSong] = useState<Song | null>(() => {
+    const savedSong = localStorage.getItem('currentSong');
+    return savedSong ? JSON.parse(savedSong) : null;
+  });
+
+  const [savedProgress, setSavedProgress] = useState(() => {
+    const saved = localStorage.getItem('audioProgress');
+    return saved ? parseFloat(saved) : 0;
+  });
+
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(savedProgress);
   const [volume, setVolume] = useState(70);
   const [queue, setQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
@@ -79,6 +88,49 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     crossfadeEnabled: false,
     crossfadeDuration: 3,
   });
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (audioRef.current && !isNaN(audioRef.current.currentTime)) {
+        localStorage.setItem('audioProgress', audioRef.current.currentTime.toString());
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    const restorePlayback = async () => {
+      const savedSong = localStorage.getItem('currentSong');
+      const savedProgress = localStorage.getItem('audioProgress');
+      
+      if (savedSong) {
+        const song = JSON.parse(savedSong);
+        try {
+          const audioUrl = await getAudioFile(song.url);
+          if (!audioUrl) return;
+
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+          
+          if (savedProgress) {
+            audioRef.current.currentTime = parseFloat(savedProgress);
+          }
+          
+          setCurrentSong(song);
+        } catch (error) {
+          console.error("Erreur lors de la restauration de la lecture:", error);
+          localStorage.removeItem('currentSong');
+          localStorage.removeItem('audioProgress');
+        }
+      }
+    };
+
+    restorePlayback();
+  }, []);
 
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
