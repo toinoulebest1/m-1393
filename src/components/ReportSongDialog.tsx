@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Flag } from "lucide-react";
+import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -79,6 +79,14 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
   return (
     <AlertDialog open={!!song} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent className="max-w-[400px] p-6 gap-0">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Fermer</span>
+        </button>
+
         <AlertDialogHeader className="mb-3">
           <AlertDialogTitle className="text-lg font-semibold">
             Signaler un problème
