@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
@@ -294,7 +295,7 @@ const Top100 = () => {
         .slice(songIndex + 1)
         .map(stat => ({
           ...stat.song,
-          url: stat.song.file_path,
+          url: stat.song.url, // Utiliser url au lieu de file_path
           imageUrl: stat.song.image_url,
           duration: stat.song.duration,
           title: stat.song.title,
