@@ -36,9 +36,8 @@ const Index = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${supabase.auth.getSession().then(({ data }) => data.session?.user?.id)}`
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new.username !== username) {
             setUsername(payload.new.username);
           }
@@ -50,7 +49,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [username]);
+  }, []);
 
   return (
     <div className="flex min-h-screen relative">
