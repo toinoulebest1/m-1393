@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -73,6 +74,7 @@ const Reports = () => {
 
     fetchReports();
 
+    // Configuration du canal de temps réel pour les mises à jour
     const channel = supabase
       .channel('reports_changes')
       .on(
