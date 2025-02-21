@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
-import { Music, Clock, Signal, Heart, Trash2 } from "lucide-react";
+import { Music, Clock, Signal, Heart, Trash2, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ColorThief from 'colorthief';
 import { Sidebar } from "@/components/Sidebar";
@@ -10,6 +9,7 @@ import { Player } from "@/components/Player";
 import { getAudioFile } from '@/utils/storage';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ReportSongDialog } from "@/components/ReportSongDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,7 @@ const History = () => {
   const { history, play, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [songToReport, setSongToReport] = React.useState<any>(null);
 
   const loadHistory = async () => {
     try {
@@ -85,7 +86,6 @@ const History = () => {
   useEffect(() => {
     loadHistory();
 
-    // Configuration de la souscription en temps réel
     const channel = supabase
       .channel('play_history_changes')
       .on(
@@ -97,13 +97,11 @@ const History = () => {
         },
         async (payload) => {
           console.log('Changement détecté dans play_history:', payload);
-          // Recharger l'historique quand il y a des changements
           await loadHistory();
         }
       )
       .subscribe();
 
-    // Nettoyage de la souscription
     return () => {
       channel.unsubscribe();
     };
@@ -315,6 +313,16 @@ const History = () => {
                           )}
                         />
                       </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSongToReport(song);
+                        }}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                      >
+                        <Flag className="w-5 h-5 text-spotify-neutral group-hover:text-white transition-all duration-300 group-hover:scale-110" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -324,6 +332,11 @@ const History = () => {
         </div>
       </div>
       <Player />
+      
+      <ReportSongDialog
+        song={songToReport}
+        onClose={() => setSongToReport(null)}
+      />
     </div>
   );
 };
