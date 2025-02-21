@@ -26,7 +26,31 @@ const Index = () => {
     };
 
     fetchProfile();
-  }, []);
+
+    // Abonnement aux changements en temps réel
+    const channel = supabase
+      .channel('profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${supabase.auth.getSession().then(({ data }) => data.session?.user?.id)}`
+        },
+        (payload) => {
+          if (payload.new.username !== username) {
+            setUsername(payload.new.username);
+          }
+        }
+      )
+      .subscribe();
+
+    // Nettoyage de l'abonnement
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [username]);
 
   return (
     <div className="flex min-h-screen relative">
