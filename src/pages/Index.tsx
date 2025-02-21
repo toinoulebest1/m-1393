@@ -8,7 +8,7 @@ const Index = () => {
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
-      <div className="flex-1">
+      <div className="flex-1 ml-64"> {/* Ajout de ml-64 pour compenser la largeur de la sidebar */}
         <div className="absolute top-4 right-4 z-50">
           <AccountSettingsDialog />
         </div>
