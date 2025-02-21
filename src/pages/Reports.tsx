@@ -150,6 +150,19 @@ const Reports = () => {
     }
   };
 
+  const getTabColor = (tab: 'pending' | 'resolved' | 'rejected', isActive: boolean) => {
+    switch (tab) {
+      case 'pending':
+        return isActive ? 'bg-yellow-500/20 text-yellow-500' : 'text-yellow-500 hover:bg-yellow-500/10';
+      case 'resolved':
+        return isActive ? 'bg-green-500/20 text-green-500' : 'text-green-500 hover:bg-green-500/10';
+      case 'rejected':
+        return isActive ? 'bg-red-500/20 text-red-500' : 'text-red-500 hover:bg-red-500/10';
+      default:
+        return '';
+    }
+  };
+
   if (isCheckingRole) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-spotify-dark">
@@ -183,8 +196,14 @@ const Reports = () => {
           </div>
           <div className="p-6 pt-0">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
-              <TabsList className="grid w-full grid-cols-3 mb-4">
-                <TabsTrigger value="pending" className="relative">
+              <TabsList className="grid w-full grid-cols-3 mb-4 bg-transparent gap-2">
+                <TabsTrigger 
+                  value="pending" 
+                  className={cn(
+                    "relative data-[state=active]:shadow-none border border-yellow-500/20",
+                    getTabColor('pending', activeTab === 'pending')
+                  )}
+                >
                   En attente
                   {pendingCount > 0 && (
                     <Badge variant="secondary" className="ml-2 bg-yellow-500/10 text-yellow-500">
@@ -192,7 +211,13 @@ const Reports = () => {
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="resolved" className="relative">
+                <TabsTrigger 
+                  value="resolved" 
+                  className={cn(
+                    "relative data-[state=active]:shadow-none border border-green-500/20",
+                    getTabColor('resolved', activeTab === 'resolved')
+                  )}
+                >
                   Acceptés
                   {resolvedCount > 0 && (
                     <Badge variant="secondary" className="ml-2 bg-green-500/10 text-green-500">
@@ -200,7 +225,13 @@ const Reports = () => {
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="rejected" className="relative">
+                <TabsTrigger 
+                  value="rejected" 
+                  className={cn(
+                    "relative data-[state=active]:shadow-none border border-red-500/20",
+                    getTabColor('rejected', activeTab === 'rejected')
+                  )}
+                >
                   Rejetés
                   {rejectedCount > 0 && (
                     <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500">
