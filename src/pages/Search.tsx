@@ -157,12 +157,6 @@ const Search = () => {
               100% { background-position: 0% 50%; }
             }
 
-            @keyframes fade-out {
-              0% { opacity: 0; }
-              10% { opacity: 1; }
-              100% { opacity: 0; }
-            }
-
             .animate-gradient {
               background-size: 200% 200%;
               animation: gradient 3s linear infinite;
@@ -343,7 +337,7 @@ const Search = () => {
                           <span className="text-sm">{song.bitrate || "320 kbps"}</span>
                         </div>
 
-                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="flex items-center space-x-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
