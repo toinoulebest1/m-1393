@@ -132,7 +132,7 @@ const ReportDialog = ({ songTitle, songArtist, songId }: ReportDialogProps) => {
 
 export const NowPlaying = () => {
   const { t } = useTranslation();
-  const { queue, currentSong, favorites, toggleFavorite, play } = usePlayer();
+  const { queue, currentSong, favorites, toggleFavorite, play, pause, isPlaying } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [hearts, setHearts] = useState<Array<{ 
     id: number; 
@@ -270,6 +270,18 @@ export const NowPlaying = () => {
     );
   };
 
+  const handlePlayPause = (song: any) => {
+    if (currentSong?.id === song.id) {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    } else {
+      play(song);
+    }
+  };
+
   return (
     <div className="flex min-h-screen relative">
       <div className="flex-1 p-8 relative overflow-hidden">
@@ -344,7 +356,7 @@ export const NowPlaying = () => {
                     ? "relative bg-white/5 shadow-lg overflow-hidden" 
                     : "bg-transparent"
                 )}
-                onClick={() => play(song)}
+                onClick={() => handlePlayPause(song)}
               >
                 {isCurrentSong && (
                   <div className="absolute inset-0 z-0 overflow-hidden">
