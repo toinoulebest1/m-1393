@@ -1,3 +1,4 @@
+<lov-code>
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
@@ -857,22 +858,70 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentSong]);
 
+  const getRandomSong = async () => {
+    try {
+      const { data: songs } = await supabase
+        .from('songs')
+        .select('*')
+        .order('created_at');
+
+      if (songs && songs.length > 0) {
+        const randomIndex = Math.floor(Math.random() * songs.length);
+        const randomSong = songs[randomIndex];
+        return {
+          id: randomSong.id,
+          title: randomSong.title,
+          artist: randomSong.artist || '',
+          duration: randomSong.duration || '0:00',
+          url: randomSong.file_path,
+          imageUrl: randomSong.image_url,
+          bitrate: '320 kbps'
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de la récupération d'une chanson aléatoire:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
       setIsPlaying(false);
     };
 
-    const handleEnded = () => {
-      if (repeatMode === 'one') {
-        audioRef.current.currentTime = 0;
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-          });
+    const handleEnded = async () => {
+      if (!currentSong) return;
+
+      if (startTime !== null) {
+        accumulatedTime += (Date.now() - startTime) / 1000;
+      }
+      if (accumulatedTime > 0) {
+        await updateListeningStats(currentSong, Math.round(accumulatedTime));
+      }
+      accumulatedTime = 0;
+      startTime = null;
+
+      // Si la file d'attente est vide ou ne contient qu'une seule chanson
+      if (queue.length <= 1) {
+        const randomSong = await getRandomSong();
+        if (randomSong) {
+          setQueue(prev => [...prev, randomSong]);
+          toast.success(`Ajout aléatoire : ${randomSong.title}`);
         }
-      } else {
-        nextSong();
+      }
+
+      if (!fadingRef.current) {
+        setProgress(0);
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          play(nextSong);
+        } else if (repeatMode === 'all') {
+          play(queue[0]);
+        }
       }
     };
 
@@ -902,7 +951,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.removeEventListener('pause', handlePause);
       audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [repeatMode, nextSong]);
+  }, [repeatMode, nextSong, queue, currentSong, getRandomSong, play]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -925,17 +974,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    const handleEnded = async () => {
-      if (startTime !== null) {
-        accumulatedTime += (Date.now() - startTime) / 1000;
-      }
-      if (currentSong && accumulatedTime > 0) {
-        await updateListeningStats(currentSong, Math.round(accumulatedTime));
-      }
-      accumulatedTime = 0;
-      startTime = null;
-    };
-
     const handleSeeked = () => {
       if (!audioRef.current.paused) {
         startTime = Date.now();
@@ -944,14 +982,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('pause', handlePause);
-    audioRef.current.addEventListener('ended', handleEnded);
     audioRef.current.addEventListener('seeked', handleSeeked);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('pause', handlePause);
-        audioRef.current.removeEventListener('ended', handleEnded);
         audioRef.current.removeEventListener('seeked', handleSeeked);
       }
     };
@@ -961,43 +997,3 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <PlayerContext.Provider value={{
       currentSong,
       isPlaying,
-      progress,
-      volume,
-      queue,
-      shuffleMode,
-      repeatMode,
-      favorites,
-      searchQuery,
-      favoriteStats,
-      playbackRate,
-      history,
-      setHistory,
-      play,
-      pause,
-      setVolume: updateVolume,
-      setProgress: updateProgress,
-      nextSong,
-      previousSong,
-      addToQueue,
-      toggleShuffle,
-      toggleRepeat,
-      toggleFavorite,
-      removeFavorite,
-      setSearchQuery,
-      setPlaybackRate: updatePlaybackRate,
-      setQueue,
-    }}>
-      {children}
-    </PlayerContext.Provider>
-  );
-};
-
-export const usePlayer = () => {
-  const context = useContext(PlayerContext);
-  if (!context) {
-    throw new Error('usePlayer must be used within a PlayerProvider');
-  }
-  return context;
-};
-
-export default PlayerProvider;
