@@ -43,20 +43,32 @@ const handler = async (req: Request): Promise<Response> => {
     // Fin de la journée (23:59:59)
     const endOfDay = new Date(reportDate.setHours(23, 59, 59, 999));
 
-    // Purger les anciens signalements résolus ou rejetés (plus vieux que 30 jours)
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const { data: deleteData, error: deleteError } = await supabaseClient
+    // Purger les signalements selon le mode
+    let deleteQuery = supabaseClient
       .from('song_reports')
       .delete()
-      .lt('created_at', thirtyDaysAgo.toISOString())
       .in('status', ['resolved', 'rejected']);
 
-    if (deleteError) {
-      console.error("Erreur lors de la purge des anciens signalements:", deleteError);
+    if (isTest) {
+      // En mode test, on purge les signalements résolus/rejetés d'aujourd'hui
+      deleteQuery = deleteQuery
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString());
+      console.log("Mode test: purge des signalements résolus/rejetés d'aujourd'hui");
     } else {
-      console.log("Purge des anciens signalements effectuée avec succès");
+      // En production, on purge les signalements de plus de 30 jours
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      deleteQuery = deleteQuery.lt('created_at', thirtyDaysAgo.toISOString());
+      console.log("Mode production: purge des signalements de plus de 30 jours");
+    }
+
+    const { data: deleteData, error: deleteError } = await deleteQuery;
+
+    if (deleteError) {
+      console.error("Erreur lors de la purge des signalements:", deleteError);
+    } else {
+      console.log("Purge des signalements effectuée avec succès");
     }
 
     // Récupérer les statistiques
@@ -125,7 +137,9 @@ const handler = async (req: Request): Promise<Response> => {
 
           <p style="color: #666; font-size: 14px; text-align: center;">
             Ce rapport contient les statistiques des signalements ${isTest ? "d'aujourd'hui" : "de la journée du " + date}.<br>
-            Une purge automatique des signalements résolus et rejetés de plus de 30 jours a été effectuée.
+            ${isTest 
+              ? "Une purge des signalements résolus et rejetés d'aujourd'hui a été effectuée." 
+              : "Une purge automatique des signalements résolus et rejetés de plus de 30 jours a été effectuée."}
           </p>
         </div>
       `,
