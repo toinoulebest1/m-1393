@@ -33,6 +33,7 @@ interface PlayerContextType {
   favoriteStats: FavoriteStat[];
   playbackRate: number;
   history: Song[];
+  setQueue: (songs: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
   pause: () => void;
@@ -760,6 +761,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeFavorite,
         setSearchQuery,
         setPlaybackRate: updatePlaybackRate,
+        setQueue,
       }}
     >
       {children}
