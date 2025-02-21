@@ -268,15 +268,26 @@ const Search = () => {
               </div>
 
               <Button
-                variant="outline"
+                variant="voice"
                 size="icon"
                 className={cn(
-                  "w-10 h-10 rounded-full",
-                  isRecording && "bg-red-500 hover:bg-red-600 text-white animate-pulse"
+                  "relative w-10 h-10 rounded-full overflow-hidden",
+                  isRecording && [
+                    "animate-pulse",
+                    "before:absolute before:inset-0 before:bg-red-500/20 before:animate-ping",
+                    "after:absolute after:inset-0 after:bg-red-500/40 after:animate-pulse",
+                  ]
                 )}
                 onClick={toggleRecording}
+                aria-label={isRecording ? "Arrêter l'enregistrement" : "Commencer l'enregistrement"}
               >
-                <Mic className="h-5 w-5" />
+                <Mic className={cn(
+                  "h-5 w-5 transition-all duration-300",
+                  isRecording && "text-red-500 animate-bounce"
+                )} />
+                {isRecording && (
+                  <span className="absolute inset-0 border-4 border-red-500 rounded-full animate-[spin_3s_linear_infinite]" />
+                )}
               </Button>
 
               <DropdownMenu>
