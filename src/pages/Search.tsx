@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
 import { ReportSongDialog } from "@/components/ReportSongDialog";
-import { pipeline } from "@huggingface/transformers";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,10 +45,7 @@ const Search = () => {
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const transcribeRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -166,73 +162,54 @@ const Search = () => {
   }, [selectedGenre, searchFilter]);
 
   useEffect(() => {
-    const initTranscriber = async () => {
-      try {
-        transcribeRef.current = await pipeline(
-          "automatic-speech-recognition",
-          "onnx-community/whisper-tiny.en",
-          { device: "wasm" }
-        );
-      } catch (error) {
-        console.error("Erreur lors de l'initialisation du modèle:", error);
-        toast.error("Erreur lors de l'initialisation du modèle de reconnaissance vocale");
+    if (typeof window !== 'undefined' && 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'fr-FR';
+
+      recognitionRef.current.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        setSearchQuery(text);
+        handleSearch(text);
+        toast.success('Recherche vocale effectuée');
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Erreur de reconnaissance vocale:', event.error);
+        toast.error('Erreur lors de la reconnaissance vocale');
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    } else {
+      toast.error('La reconnaissance vocale n\'est pas supportée par votre navigateur');
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
       }
     };
-
-    initTranscriber();
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      toast.error('La reconnaissance vocale n\'est pas supportée');
+      return;
+    }
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        try {
-          setIsProcessing(true);
-          const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          
-          if (transcribeRef.current) {
-            const result = await transcribeRef.current(audioBlob);
-            if (result?.text) {
-              setSearchQuery(result.text);
-              handleSearch(result.text);
-              toast.success('Recherche vocale effectuée');
-            }
-          } else {
-            toast.error('Le modèle de reconnaissance vocale n\'est pas initialisé');
-          }
-        } catch (error) {
-          console.error('Erreur:', error);
-          toast.error('Erreur lors de la transcription vocale');
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-
-      mediaRecorder.start();
+    if (isRecording) {
+      recognitionRef.current.stop();
+      toast.info('Arrêt de l\'enregistrement...');
+    } else {
+      recognitionRef.current.start();
       setIsRecording(true);
       toast.info('Enregistrement en cours...');
-    } catch (error) {
-      console.error('Erreur:', error);
-      toast.error('Erreur lors de l\'accès au microphone');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      toast.info('Traitement en cours...');
     }
   };
 
@@ -290,11 +267,9 @@ const Search = () => {
                 size="icon"
                 className={cn(
                   "w-10 h-10 rounded-full",
-                  isRecording && "bg-red-500 hover:bg-red-600 text-white",
-                  isProcessing && "bg-yellow-500 hover:bg-yellow-600 text-white"
+                  isRecording && "bg-red-500 hover:bg-red-600 text-white animate-pulse"
                 )}
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isProcessing}
+                onClick={toggleRecording}
               >
                 <Mic className="h-5 w-5" />
               </Button>
