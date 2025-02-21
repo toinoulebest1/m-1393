@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
 import { ReportSongDialog } from "@/components/ReportSongDialog";
+import { pipeline } from "@huggingface/transformers";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,8 +46,10 @@ const Search = () => {
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const transcribeRef = useRef<any>(null);
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -162,6 +165,22 @@ const Search = () => {
     }
   }, [selectedGenre, searchFilter]);
 
+  useEffect(() => {
+    const initTranscriber = async () => {
+      try {
+        transcribeRef.current = await pipeline(
+          "automatic-speech-recognition",
+          "onnx-community/whisper-tiny.en",
+          { device: "cpu" }
+        );
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation du modèle:", error);
+      }
+    };
+
+    initTranscriber();
+  }, []);
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -176,37 +195,26 @@ const Search = () => {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          try {
-            const base64Audio = (reader.result as string).split(',')[1];
-            
-            const response = await fetch('https://pwknncursthenghqgevl.supabase.co/functions/v1/voice-to-text', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({ audio: base64Audio }),
-            });
-
-            if (!response.ok) {
-              throw new Error('Erreur lors de la transcription');
-            }
-
-            const { text } = await response.json();
-            if (text) {
-              setSearchQuery(text);
-              handleSearch(text);
+        try {
+          setIsProcessing(true);
+          const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          
+          if (transcribeRef.current) {
+            const result = await transcribeRef.current(audioBlob);
+            if (result?.text) {
+              setSearchQuery(result.text);
+              handleSearch(result.text);
               toast.success('Recherche vocale effectuée');
             }
-          } catch (error) {
-            console.error('Erreur:', error);
-            toast.error('Erreur lors de la transcription vocale');
+          } else {
+            toast.error('Le modèle de reconnaissance vocale n\'est pas initialisé');
           }
-        };
+        } catch (error) {
+          console.error('Erreur:', error);
+          toast.error('Erreur lors de la transcription vocale');
+        } finally {
+          setIsProcessing(false);
+        }
       };
 
       mediaRecorder.start();
@@ -223,7 +231,7 @@ const Search = () => {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
-      toast.info('Enregistrement terminé, traitement en cours...');
+      toast.info('Traitement en cours...');
     }
   };
 
@@ -281,9 +289,11 @@ const Search = () => {
                 size="icon"
                 className={cn(
                   "w-10 h-10 rounded-full",
-                  isRecording && "bg-red-500 hover:bg-red-600 text-white"
+                  isRecording && "bg-red-500 hover:bg-red-600 text-white",
+                  isProcessing && "bg-yellow-500 hover:bg-yellow-600 text-white"
                 )}
                 onClick={isRecording ? stopRecording : startRecording}
+                disabled={isProcessing}
               >
                 <Mic className="h-5 w-5" />
               </Button>
