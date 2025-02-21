@@ -1,14 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
+import { ReportSongDialog } from "@/components/ReportSongDialog";
 
 interface Song {
   id: string;
@@ -26,6 +26,7 @@ const Search = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { play, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [songToReport, setSongToReport] = useState<Song | null>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -228,24 +229,32 @@ const Search = () => {
                           <span className="text-sm">320 kbps</span>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(song);
-                            }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                          >
-                            <Heart
-                              className={cn(
-                                "w-5 h-5 transition-all duration-300 hover:scale-110",
-                                isFavorite
-                                  ? "text-red-500 fill-red-500"
-                                  : "text-spotify-neutral hover:text-white"
-                              )}
-                            />
-                          </button>
+                        <div 
+                          className="flex items-center space-x-1 text-spotify-neutral cursor-pointer hover:text-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSongToReport(song);
+                          }}
+                        >
+                          <Flag className="w-4 h-4" />
                         </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(song);
+                          }}
+                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                        >
+                          <Heart
+                            className={cn(
+                              "w-5 h-5 transition-all duration-300 hover:scale-110",
+                              isFavorite
+                                ? "text-red-500 fill-red-500"
+                                : "text-spotify-neutral hover:text-white"
+                            )}
+                          />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -264,6 +273,10 @@ const Search = () => {
         </div>
       </div>
       <Player />
+      <ReportSongDialog
+        song={songToReport}
+        onClose={() => setSongToReport(null)}
+      />
     </div>
   );
 };
