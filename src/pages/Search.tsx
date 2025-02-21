@@ -49,7 +49,7 @@ const Search = () => {
         title: song.title,
         artist: song.artist || '',
         duration: song.duration || '0:00',
-        url: song.file_path, // Utiliser file_path comme url
+        url: song.file_path,
         file_path: song.file_path,
         image_url: song.image_url
       }));
@@ -88,8 +88,11 @@ const Search = () => {
               {results.map((song, index) => (
                 <div
                   key={song.id}
-                  className={`group flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer opacity-0 animate-[fadeIn_0.3s_ease-out_forwards]`}
-                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="group flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
+                  style={{ 
+                    animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                    opacity: 0
+                  }}
                   onClick={() => play(song)}
                 >
                   <div className="flex items-center flex-1">
