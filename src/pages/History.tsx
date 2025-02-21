@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -173,7 +174,7 @@ const History = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 ml-64">
+      <div className="flex-1 ml-64 p-8 pb-32">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
             <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
