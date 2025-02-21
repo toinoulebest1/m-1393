@@ -439,7 +439,7 @@ const Top100 = () => {
                 return (
                   <TableRow
                     key={stat.songId}
-                    className={`group hover:bg-white/10 transition-all duration-300 cursor-pointer border-white/5 ${
+                    className={`group hover:bg-white/5 transition-all duration-300 cursor-pointer border-white/5 ${
                       isCurrentSong ? 'bg-white/5' : ''
                     }`}
                     onClick={() => handlePlay(stat.song)}
@@ -459,14 +459,12 @@ const Top100 = () => {
                         <img
                           src={stat.song.image_url || PLACEHOLDER_IMAGE}
                           alt={stat.song.title}
-                          className={`w-12 h-12 rounded-md object-cover transition-transform duration-300 ${
+                          className={`w-12 h-12 rounded-md object-cover hover-scale transition-transform duration-300 ${
                             isCurrentSong ? 'scale-105' : 'group-hover:scale-105'
                           }`}
                           style={glowStyle}
                         />
-                        <span className={`font-medium transition-colors duration-300 ${
-                          isCurrentSong ? 'text-spotify-accent' : 'text-white group-hover:text-spotify-accent'
-                        }`}>
+                        <span className="font-medium story-link">
                           {stat.song.title}
                         </span>
                       </div>
@@ -479,7 +477,7 @@ const Top100 = () => {
                     </TableCell>
                     <TableCell className="text-spotify-neutral">
                       <div className="flex items-center space-x-2">
-                        <Heart className={`w-4 h-4 transition-transform duration-300 ${
+                        <Heart className={`w-4 h-4 transition-all duration-300 pulse ${
                           isCurrentSong ? 'scale-110' : ''
                         } text-spotify-accent fill-spotify-accent`} />
                         <span>{stat.count || 0}</span>
@@ -490,9 +488,7 @@ const Top100 = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`${
-                            isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                          } hover:bg-white/10 transition-all duration-300`}
+                          className="hover-scale transition-all duration-300 hover:bg-white/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePlay(stat.song);
@@ -503,9 +499,7 @@ const Top100 = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`${
-                            isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                          } hover:bg-white/10 transition-all duration-300`}
+                          className="hover-scale transition-all duration-300 hover:bg-white/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedSong({
@@ -521,9 +515,7 @@ const Top100 = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`${
-                              isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                            } hover:bg-red-500/10 text-red-500 transition-all duration-300`}
+                            className="hover-scale transition-all duration-300 hover:bg-red-500/10 text-red-500"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(stat.songId);
