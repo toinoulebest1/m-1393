@@ -29,6 +29,64 @@ const History = () => {
   const { t } = useTranslation();
   const { history, play, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  const loadHistory = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: historyData, error: historyError } = await supabase
+        .from('play_history')
+        .select(`
+          song_id,
+          played_at,
+          songs (
+            id,
+            title,
+            artist,
+            file_path,
+            duration,
+            image_url
+          )
+        `)
+        .eq('user_id', session.user.id)
+        .order('played_at', { ascending: false });
+
+      if (historyError) {
+        console.error("Erreur lors du chargement de l'historique:", historyError);
+        toast.error("Erreur lors du chargement de l'historique");
+        return;
+      }
+
+      if (historyData) {
+        const formattedHistory = historyData.map(item => ({
+          id: item.songs.id,
+          title: item.songs.title,
+          artist: item.songs.artist || '',
+          duration: item.songs.duration || '0:00',
+          url: item.songs.file_path,
+          imageUrl: item.songs.image_url,
+          bitrate: '320 kbps',
+          playedAt: item.played_at
+        }));
+
+        setHistory(formattedHistory);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'historique:", error);
+      toast.error("Erreur lors du chargement de l'historique");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -133,7 +191,11 @@ const History = () => {
         </div>
 
         <div className="space-y-2">
-          {history.length === 0 ? (
+          {isLoading ? (
+            <p className="text-spotify-neutral text-center py-8">
+              Chargement de l'historique...
+            </p>
+          ) : history.length === 0 ? (
             <p className="text-spotify-neutral text-center py-8">
               {t('Aucune musique écoutée récemment')}
             </p>
