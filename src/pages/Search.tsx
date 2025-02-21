@@ -218,45 +218,32 @@ const Search = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-6">
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{song.duration || "0:00"}</span>
-                        </div>
-
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
-                          <Signal className="w-4 h-4" />
-                          <span className="text-sm">320 kbps</span>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(song);
-                            }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                          >
-                            <Heart
-                              className={cn(
-                                "w-5 h-5 transition-all duration-300 hover:scale-110",
-                                isFavorite
-                                  ? "text-red-500 fill-red-500"
-                                  : "text-spotify-neutral hover:text-white"
-                              )}
-                            />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSongToReport(song);
-                            }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                            title="Signaler cette chanson"
-                          >
-                            <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
-                          </button>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(song);
+                          }}
+                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                        >
+                          <Heart
+                            className={cn(
+                              "w-5 h-5 transition-all duration-300 hover:scale-110",
+                              isFavorite
+                                ? "text-red-500 fill-red-500"
+                                : "text-spotify-neutral hover:text-white"
+                            )}
+                          />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSongToReport(song);
+                          }}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-2 rounded-full transition-colors"
+                        >
+                          <Flag className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
