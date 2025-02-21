@@ -129,7 +129,7 @@ const Favorites = () => {
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
               <Heart className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
-              <p className="text-spotify-neutral text-lg">{t('no_favorites')}</p>
+              <p className="text-spotify-neutral text-lg">{t('common.noFavorites')}</p>
             </div>
           </div>
         </div>
