@@ -77,15 +77,78 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const fadingRef = useRef(false);
 
-  const play = (song?: Song) => {
-    if (song) {
+  const play = async (song?: Song) => {
+    fadingRef.current = false;
+    
+    if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
-      setIsPlaying(true);
-      audioRef.current.src = song.url;
-      audioRef.current.play();
-    } else {
-      setIsPlaying(true);
-      audioRef.current.play();
+      setNextSongPreloaded(false);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { error: songError } = await supabase
+            .from('songs')
+            .upsert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration,
+              image_url: song.imageUrl
+            }, {
+              onConflict: 'id'
+            });
+
+          if (songError) {
+            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
+          }
+
+          await addToHistory(song);
+        }
+
+        const audioUrl = await getAudioFile(song.url);
+        if (!audioUrl) {
+          throw new Error('Fichier audio non trouvé');
+        }
+
+        audioRef.current.volume = volume / 100;
+        nextAudioRef.current.volume = 0;
+        
+        audioRef.current.src = audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.load();
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error starting playback:", error);
+            setIsPlaying(false);
+          });
+        }
+      } catch (error) {
+        console.error("Error playing audio:", error);
+        setCurrentSong(null);
+        setIsPlaying(false);
+      }
+    } else if (audioRef.current) {
+      try {
+        audioRef.current.volume = volume / 100;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error resuming playback:", error);
+            setIsPlaying(false);
+          });
+        }
+      } catch (error) {
+        console.error("Error resuming audio:", error);
+        setIsPlaying(false);
+      }
     }
   };
 
