@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
+import { AdBanner } from "./AdBanner";
 import { useState, useEffect } from "react";
 import {
   Select,
@@ -113,6 +114,8 @@ export const Sidebar = () => {
           <ThemeToggle />
 
           <MusicUploader />
+          
+          <AdBanner />
         </div>
 
         <div className="mt-4 border-t border-white/10 pt-4">
