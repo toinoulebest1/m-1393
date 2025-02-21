@@ -407,100 +407,93 @@ const Top100 = () => {
           
           <div className="flex items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
-              <Award className="w-8 h-8 text-spotify-accent animate-pulse" />
-              <h1 className="text-2xl font-bold">Top 100 Communautaire</h1>
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
+                <Award className="w-10 h-10 text-white animate-scale-in" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <h1 className="text-4xl font-bold text-white tracking-tight">Top 100</h1>
+                <p className="text-spotify-neutral">{favoriteStats.length} morceaux</p>
+              </div>
             </div>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-white/5 border-white/5">
-                <TableHead className="text-spotify-neutral">#</TableHead>
-                <TableHead className="text-spotify-neutral">Titre</TableHead>
-                <TableHead className="text-spotify-neutral">Artiste</TableHead>
-                <TableHead className="text-spotify-neutral">Durée</TableHead>
-                <TableHead className="text-spotify-neutral">Favoris</TableHead>
-                <TableHead className="text-spotify-neutral">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {favoriteStats.map((stat, index) => {
-                const isCurrentSong = currentSong?.id === stat.song.id;
-                const glowStyle = isCurrentSong && dominantColor ? {
-                  boxShadow: `
-                    0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                    0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                    0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                  `,
-                  transition: 'box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out',
-                  transform: 'scale(1.02)',
-                } : {};
+          <div className="space-y-2">
+            {favoriteStats.map((stat, index) => {
+              const isCurrentSong = currentSong?.id === stat.song.id;
+              const glowStyle = isCurrentSong && dominantColor ? {
+                boxShadow: `
+                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                `,
+                transition: 'box-shadow 0.3s ease-in-out',
+                transform: 'scale(1.02)',
+              } : {};
 
-                return (
-                  <TableRow
-                    key={stat.songId}
-                    className={`group hover:bg-white/5 transition-all duration-300 cursor-pointer border-white/5 ${
-                      isCurrentSong ? 'bg-white/5' : ''
-                    }`}
-                    onClick={() => handlePlay(stat.song)}
-                  >
-                    <TableCell className="font-medium text-white">
-                      {isCurrentSong && isPlaying ? (
-                        <div className="relative flex items-center justify-center w-4 h-4">
-                          <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-spotify-accent opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-spotify-accent"></span>
-                        </div>
-                      ) : (
-                        <span className="opacity-50">{index + 1}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="relative">
-                          <img
-                            src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                            alt={stat.song.title}
-                            className={`w-12 h-12 rounded-md object-cover transition-all duration-300 ${
-                              isCurrentSong ? 'scale-105' : 'group-hover:scale-105'
-                            }`}
-                            style={glowStyle}
-                          />
-                          {isCurrentSong && (
-                            <div className="absolute inset-0 bg-black bg-opacity-40 rounded-md flex items-center justify-center">
-                              <div className="relative flex items-center justify-center w-6 h-6">
-                                <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-spotify-accent opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-spotify-accent"></span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={`font-medium transition-colors duration-300 ${
-                            isCurrentSong ? 'text-spotify-accent' : 'text-white group-hover:text-spotify-accent'
-                          }`}>
-                            {stat.song.title}
-                          </span>
-                          <span className="text-sm text-spotify-neutral group-hover:text-white transition-colors duration-300">
-                            {stat.song.artist}
-                          </span>
-                        </div>
+              return (
+                <div
+                  key={stat.songId}
+                  className={cn(
+                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                    isCurrentSong 
+                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                      : "bg-transparent"
+                  )}
+                  onClick={() => handlePlay(stat.song)}
+                >
+                  {isCurrentSong && (
+                    <div className="absolute inset-0 z-0 overflow-hidden">
+                      <div 
+                        className="absolute inset-0 animate-gradient opacity-20" 
+                        style={{
+                          backgroundSize: '200% 200%',
+                          animation: 'gradient 3s linear infinite',
+                          background: dominantColor 
+                            ? `linear-gradient(45deg, 
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                              )`
+                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={stat.song.image_url || PLACEHOLDER_IMAGE}
+                        alt={`Pochette de ${stat.song.title}`}
+                        className={cn(
+                          "w-14 h-14 rounded-lg shadow-lg object-cover",
+                          isCurrentSong && "animate-pulse"
+                        )}
+                        style={glowStyle}
+                        loading="lazy"
+                      />
+                      <div>
+                        <h3 className={cn(
+                          "font-medium transition-colors",
+                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                        )}>
+                          {stat.song.title}
+                        </h3>
+                        <p className="text-sm text-spotify-neutral">{stat.song.artist}</p>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-spotify-neutral group-hover:text-white transition-colors duration-300">
-                      {stat.song.artist}
-                    </TableCell>
-                    <TableCell className="text-spotify-neutral group-hover:text-white transition-colors duration-300">
-                      {formatDuration(stat.song.duration)}
-                    </TableCell>
-                    <TableCell className="text-spotify-neutral">
+                    </div>
+
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-1 text-spotify-neutral">
+                        <span className="text-sm">{formatDuration(stat.song.duration)}</span>
+                      </div>
+
                       <div className="flex items-center space-x-2">
-                        <Heart className={`w-4 h-4 transition-all duration-300 ${
+                        <Heart className={`w-4 h-4 text-spotify-accent fill-spotify-accent ${
                           isCurrentSong ? 'scale-110' : ''
-                        } text-spotify-accent fill-spotify-accent`} />
-                        <span className="group-hover:text-white transition-colors duration-300">{stat.count || 0}</span>
+                        } transition-transform duration-300`} />
+                        <span className="text-sm">{stat.count || 0}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
+
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="ghost"
@@ -542,12 +535,12 @@ const Top100 = () => {
                           </Button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
       <Player />
