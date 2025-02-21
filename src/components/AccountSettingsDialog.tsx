@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UserCog, Upload, Loader2, Clock, CalendarDays } from "lucide-react";
@@ -22,6 +21,10 @@ export const AccountSettingsDialog = () => {
   const [signupDate, setSignupDate] = useState<string | null>(null);
   const [lastLogins, setLastLogins] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -150,7 +153,7 @@ export const AccountSettingsDialog = () => {
       </DialogTrigger>
       <DialogContent className="bg-spotify-dark text-white max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Paramètres du compte</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{t('common.accountSettings')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 mt-4">
           <div className="flex flex-col items-center space-y-4">
@@ -179,12 +182,12 @@ export const AccountSettingsDialog = () => {
                     {isUploading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Téléchargement...
+                        {t('common.uploading')}
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4 mr-2" />
-                        Changer l'avatar
+                        {t('common.changeAvatar')}
                       </>
                     )}
                   </span>
