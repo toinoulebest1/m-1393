@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,13 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -124,10 +116,10 @@ const Reports = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background/95">
       <Sidebar />
-      <div className="flex-1 ml-64 p-8">
-        <div className="rounded-lg border border-border bg-background/50 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+      <div className="flex-1 ml-64 p-8 bg-background">
+        <div className="rounded-lg border border-border bg-card text-card-foreground shadow">
           <div className="flex flex-col space-y-1.5 p-6">
             <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
               Signalements
@@ -142,29 +134,29 @@ const Reports = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
               </div>
             ) : (
-              <div className="rounded-lg border border-border">
+              <div className="rounded-lg border border-border bg-card">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-muted/50">
-                      <TableHead>Date</TableHead>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead>Chanson</TableHead>
-                      <TableHead>Motif</TableHead>
-                      <TableHead>Statut</TableHead>
-                      {isAdmin && <TableHead>Actions</TableHead>}
+                      <TableHead className="text-foreground">Date</TableHead>
+                      <TableHead className="text-foreground">Utilisateur</TableHead>
+                      <TableHead className="text-foreground">Chanson</TableHead>
+                      <TableHead className="text-foreground">Motif</TableHead>
+                      <TableHead className="text-foreground">Statut</TableHead>
+                      {isAdmin && <TableHead className="text-foreground">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {reports.map((report) => (
                       <TableRow key={report.id} className="border-border hover:bg-muted/50">
-                        <TableCell>
+                        <TableCell className="text-foreground">
                           {format(new Date(report.created_at), 'Pp', { locale: fr })}
                         </TableCell>
-                        <TableCell>{report.reporter_username}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-foreground">{report.reporter_username}</TableCell>
+                        <TableCell className="text-foreground">
                           {report.song_title} - {report.song_artist}
                         </TableCell>
-                        <TableCell>{report.reason}</TableCell>
+                        <TableCell className="text-foreground">{report.reason}</TableCell>
                         <TableCell>
                           <Badge 
                             variant="secondary"
