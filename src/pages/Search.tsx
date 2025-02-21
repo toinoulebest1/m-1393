@@ -191,6 +191,11 @@ const Search = () => {
                           <span className="text-sm">{song.duration || "0:00"}</span>
                         </div>
 
+                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                          <Signal className="w-4 h-4" />
+                          <span className="text-sm">320 kbps</span>
+                        </div>
+
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={(e) => {
