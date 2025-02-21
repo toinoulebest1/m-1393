@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,10 +117,10 @@ const Reports = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-background/95">
+    <div className="flex min-h-screen bg-spotify-dark">
       <Sidebar />
-      <div className="flex-1 ml-64 p-8 bg-background">
-        <div className="rounded-lg border border-border bg-card text-card-foreground shadow">
+      <div className="flex-1 ml-64 p-8 bg-spotify-dark">
+        <div className="rounded-lg border border-border bg-spotify-dark/50 text-card-foreground shadow-lg">
           <div className="flex flex-col space-y-1.5 p-6">
             <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
               Signalements
@@ -134,7 +135,7 @@ const Reports = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-card">
+              <div className="rounded-lg border border-border bg-spotify-dark">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-muted/50">
@@ -148,7 +149,7 @@ const Reports = () => {
                   </TableHeader>
                   <TableBody>
                     {reports.map((report) => (
-                      <TableRow key={report.id} className="border-border hover:bg-muted/50">
+                      <TableRow key={report.id} className="border-border hover:bg-spotify-dark">
                         <TableCell className="text-foreground">
                           {format(new Date(report.created_at), 'Pp', { locale: fr })}
                         </TableCell>
