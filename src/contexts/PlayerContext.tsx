@@ -258,6 +258,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextSong = () => {
     if (!currentSong || queue.length === 0) return;
     
+    // Réinitialiser le fondu sonore
+    fadingRef.current = false;
+    if (nextAudioRef.current) {
+      nextAudioRef.current.volume = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = 1;
+    }
+    
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
     if (currentIndex === -1) return;
     
@@ -271,6 +280,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const previousSong = () => {
     if (!currentSong || queue.length === 0) return;
+    
+    // Réinitialiser le fondu sonore
+    fadingRef.current = false;
+    if (nextAudioRef.current) {
+      nextAudioRef.current.volume = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = 1;
+    }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
     if (currentIndex === -1) return;
