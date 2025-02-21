@@ -124,10 +124,10 @@ const Reports = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1 ml-64 p-8">
-        <Card>
+        <Card className="border-border">
           <CardHeader>
             <CardTitle>Signalements</CardTitle>
             <CardDescription>
@@ -137,13 +137,13 @@ const Reports = () => {
           <CardContent>
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
               </div>
             ) : (
-              <div className="rounded-lg border">
+              <div className="rounded-lg border border-border">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="border-border hover:bg-muted/50">
                       <TableHead>Date</TableHead>
                       <TableHead>Utilisateur</TableHead>
                       <TableHead>Chanson</TableHead>
@@ -154,7 +154,7 @@ const Reports = () => {
                   </TableHeader>
                   <TableBody>
                     {reports.map((report) => (
-                      <TableRow key={report.id}>
+                      <TableRow key={report.id} className="border-border hover:bg-muted/50">
                         <TableCell>
                           {format(new Date(report.created_at), 'Pp', { locale: fr })}
                         </TableCell>
