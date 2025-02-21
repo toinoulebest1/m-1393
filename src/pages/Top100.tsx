@@ -273,16 +273,34 @@ const Top100 = () => {
         return;
       }
 
-      await play(song);
-      console.log("Lecture démarrée:", song.title);
-      if (song.image_url) {
-        await extractDominantColor(song.image_url);
+      const songWithImage = {
+        ...song,
+        url: song.url,
+        imageUrl: song.image_url,
+        duration: song.duration,
+        title: song.title,
+        artist: song.artist,
+        id: song.id
+      };
+
+      await play(songWithImage);
+      console.log("Lecture démarrée:", songWithImage.title);
+      if (songWithImage.imageUrl) {
+        await extractDominantColor(songWithImage.imageUrl);
       }
       
       const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
       const remainingSongs = favoriteStats
         .slice(songIndex + 1)
-        .map(stat => stat.song);
+        .map(stat => ({
+          ...stat.song,
+          url: stat.song.file_path,
+          imageUrl: stat.song.image_url,
+          duration: stat.song.duration,
+          title: stat.song.title,
+          artist: stat.song.artist,
+          id: stat.song.id
+        }));
       
       console.log("Ajout à la file d'attente:", remainingSongs);
       
