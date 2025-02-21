@@ -54,34 +54,22 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // Vérifier d'abord si le fichier existe
-    const { data: fileExists } = await supabase.storage
-      .from('audio')
-      .list('', {
-        search: path
-      });
-
-    if (!fileExists || fileExists.length === 0) {
-      console.error("Fichier non trouvé dans le stockage:", path);
-      throw new Error("Fichier audio non trouvé");
-    }
-
-    // Générer une URL signée valide pendant 1 heure
-    const { data, error } = await supabase.storage
-      .from('audio')
-      .createSignedUrl(path, 3600); // 3600 secondes = 1 heure
+    // Appeler la fonction Edge pour obtenir le flux audio sécurisé
+    const { data, error } = await supabase.functions.invoke('stream-audio', {
+      body: { path }
+    });
 
     if (error) {
       console.error("Erreur lors de la récupération du fichier:", error);
       throw error;
     }
 
-    if (!data?.signedUrl) {
-      throw new Error("URL signée non générée");
+    if (!data?.url) {
+      throw new Error("URL de streaming non générée");
     }
 
-    console.log("Signed URL generated successfully:", data.signedUrl);
-    return data.signedUrl;
+    console.log("Streaming URL generated successfully");
+    return data.url;
   } catch (error) {
     console.error("Erreur lors de la récupération du fichier:", error);
     throw error;
