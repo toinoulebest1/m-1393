@@ -43,34 +43,6 @@ const handler = async (req: Request): Promise<Response> => {
     // Fin de la journée (23:59:59)
     const endOfDay = new Date(reportDate.setHours(23, 59, 59, 999));
 
-    // Purger les signalements selon le mode
-    let deleteQuery = supabaseClient
-      .from('song_reports')
-      .delete()
-      .in('status', ['resolved', 'rejected']);
-
-    if (isTest) {
-      // En mode test, on purge les signalements résolus/rejetés d'aujourd'hui
-      deleteQuery = deleteQuery
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-      console.log("Mode test: purge des signalements résolus/rejetés d'aujourd'hui");
-    } else {
-      // En production, on purge les signalements de plus de 30 jours
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      deleteQuery = deleteQuery.lt('created_at', thirtyDaysAgo.toISOString());
-      console.log("Mode production: purge des signalements de plus de 30 jours");
-    }
-
-    const { data: deleteData, error: deleteError } = await deleteQuery;
-
-    if (deleteError) {
-      console.error("Erreur lors de la purge des signalements:", deleteError);
-    } else {
-      console.log("Purge des signalements effectuée avec succès");
-    }
-
     // Récupérer les statistiques
     const { data: stats, error: statsError } = await supabaseClient
       .from('song_reports')
@@ -96,6 +68,7 @@ const handler = async (req: Request): Promise<Response> => {
       day: 'numeric'
     });
 
+    // Envoyer l'email avant la purge
     const { data: emailResponse, error: emailError } = await resend.emails.send({
       from: "Rapports de Signalements <onboarding@resend.dev>",
       to: "saumonlol5@gmail.com",
@@ -138,8 +111,8 @@ const handler = async (req: Request): Promise<Response> => {
           <p style="color: #666; font-size: 14px; text-align: center;">
             Ce rapport contient les statistiques des signalements ${isTest ? "d'aujourd'hui" : "de la journée du " + date}.<br>
             ${isTest 
-              ? "Une purge des signalements résolus et rejetés d'aujourd'hui a été effectuée." 
-              : "Une purge automatique des signalements résolus et rejetés de plus de 30 jours a été effectuée."}
+              ? "Une purge des signalements résolus et rejetés d'aujourd'hui va être effectuée dans quelques secondes." 
+              : "Une purge automatique des signalements résolus et rejetés de plus de 30 jours va être effectuée dans quelques secondes."}
           </p>
         </div>
       `,
@@ -150,6 +123,37 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log("Email envoyé avec succès:", emailResponse);
+
+    // Attendre 1 seconde avant la purge
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Purger les signalements selon le mode
+    let deleteQuery = supabaseClient
+      .from('song_reports')
+      .delete()
+      .in('status', ['resolved', 'rejected']);
+
+    if (isTest) {
+      // En mode test, on purge les signalements résolus/rejetés d'aujourd'hui
+      deleteQuery = deleteQuery
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString());
+      console.log("Mode test: purge des signalements résolus/rejetés d'aujourd'hui");
+    } else {
+      // En production, on purge les signalements de plus de 30 jours
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      deleteQuery = deleteQuery.lt('created_at', thirtyDaysAgo.toISOString());
+      console.log("Mode production: purge des signalements de plus de 30 jours");
+    }
+
+    const { data: deleteData, error: deleteError } = await deleteQuery;
+
+    if (deleteError) {
+      console.error("Erreur lors de la purge des signalements:", deleteError);
+    } else {
+      console.log("Purge des signalements effectuée avec succès");
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
