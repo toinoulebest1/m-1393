@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Navigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -23,18 +23,26 @@ const Reports = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
 
   useEffect(() => {
     const checkUserRole = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single();
-        
-        setIsAdmin(roles?.role === 'admin');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          setIsAdmin(roles?.role === 'admin');
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification du rôle:", error);
+        setIsAdmin(false);
+      } finally {
+        setIsCheckingRole(false);
       }
     };
 
@@ -116,6 +124,19 @@ const Reports = () => {
         return 'bg-gray-500/10 text-gray-500';
     }
   };
+
+  if (isCheckingRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-spotify-dark">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    toast.error("Accès non autorisé");
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="flex min-h-screen bg-spotify-dark">
