@@ -157,7 +157,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const preloadNextSong = async () => {
+  preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
@@ -358,6 +358,54 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       preloadNextSong();
     }
   }, [currentSong]);
+
+  // Écouter les changements en temps réel des favoris
+  useEffect(() => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    console.log("Mise en place de l'écoute des favoris en temps réel");
+
+    const channel = supabase
+      .channel('favorite_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Écoute tous les événements (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'favorite_stats',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        async (payload) => {
+          console.log("Changement détecté dans les favoris:", payload);
+
+          // Rafraîchir la liste des favoris
+          const { data: songIds } = await supabase
+            .from('favorite_stats')
+            .select('song_id')
+            .eq('user_id', session.user.id);
+
+          if (songIds) {
+            const { data: favoriteSongs } = await supabase
+              .from('songs')
+              .select('*')
+              .in('id', songIds.map(row => row.song_id));
+
+            if (favoriteSongs) {
+              console.log("Mise à jour des favoris:", favoriteSongs);
+              setFavorites(favoriteSongs);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Nettoyage lors du démontage du composant
+    return () => {
+      console.log("Nettoyage de l'écoute des favoris");
+      supabase.removeChannel(channel);
+    };
+  }, []); // Exécuté une seule fois au montage du composant
 
   const pause = () => {
     if (audioRef.current) {
