@@ -8,11 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
+
+      setUserId(session.user.id);
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -38,7 +41,8 @@ const Index = () => {
           table: 'profiles',
         },
         (payload: any) => {
-          if (payload.new.username !== username) {
+          // Ne mettre à jour que si le changement concerne l'utilisateur actuel
+          if (payload.new.id === userId && payload.new.username !== username) {
             setUsername(payload.new.username);
           }
         }
@@ -49,7 +53,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId]); // Ajout de userId comme dépendance
 
   return (
     <div className="flex min-h-screen relative">
