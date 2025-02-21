@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,7 @@ export const MusicUploader = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadToastId, setUploadToastId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragCounter, setDragCounter] = useState(0);
 
   useEffect(() => {
     if (isUploading && uploadProgress > 0) {
@@ -274,55 +276,91 @@ export const MusicUploader = () => {
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    setDragCounter(0);
     setIsDragging(false);
 
-    const items = Array.from(e.dataTransfer.items);
-    const files: File[] = [];
+    // Vérifier si nous avons des fichiers
+    if (e.dataTransfer.items) {
+      const items = Array.from(e.dataTransfer.items);
+      const files: File[] = [];
 
-    const processEntry = async (entry: FileSystemEntry) => {
-      if (entry.isFile) {
-        const file = await new Promise<File>((resolve) => {
-          (entry as FileSystemFileEntry).file(resolve);
-        });
-        if (file.type.startsWith('audio/')) {
-          files.push(file);
+      const processEntry = async (entry: FileSystemEntry | null) => {
+        if (!entry) return;
+        
+        if (entry.isFile) {
+          const file = await new Promise<File>((resolve) => {
+            (entry as FileSystemFileEntry).file(resolve);
+          });
+          if (file.type.startsWith('audio/')) {
+            files.push(file);
+          }
+        } else if (entry.isDirectory) {
+          const reader = (entry as FileSystemDirectoryEntry).createReader();
+          try {
+            const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+              reader.readEntries((entries) => resolve(entries), reject);
+            });
+            await Promise.all(entries.map(processEntry));
+          } catch (error) {
+            console.error("Erreur lors de la lecture du dossier:", error);
+          }
         }
-      } else if (entry.isDirectory) {
-        const reader = (entry as FileSystemDirectoryEntry).createReader();
-        const entries = await new Promise<FileSystemEntry[]>((resolve) => {
-          reader.readEntries(resolve);
-        });
-        await Promise.all(entries.map(processEntry));
+      };
+
+      try {
+        await Promise.all(
+          items
+            .map(item => item.webkitGetAsEntry())
+            .filter((entry): entry is FileSystemEntry => entry !== null)
+            .map(processEntry)
+        );
+
+        if (files.length > 0) {
+          await processFiles(files);
+        } else {
+          // Essayer de récupérer les fichiers directement si la méthode webkitGetAsEntry a échoué
+          const directFiles = Array.from(e.dataTransfer.files);
+          if (directFiles.length > 0) {
+            await processFiles(directFiles);
+          } else {
+            toast.error("Aucun fichier audio trouvé dans le dossier");
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du traitement des fichiers:", error);
+        toast.error("Erreur lors du traitement des fichiers");
       }
-    };
-
-    await Promise.all(
-      items
-        .filter(item => item.webkitGetAsEntry())
-        .map(item => processEntry(item.webkitGetAsEntry()!))
-    );
-
-    if (files.length > 0) {
-      await processFiles(files);
-    } else {
-      toast.error("Aucun fichier audio trouvé dans le dossier");
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    setDragCounter(prev => prev + 1);
     setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    e.stopPropagation();
+    setDragCounter(prev => prev - 1);
+    if (dragCounter - 1 === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     await processFiles(files);
+    // Réinitialiser l'input pour permettre de sélectionner le même dossier plusieurs fois
+    event.target.value = '';
   };
 
   return (
@@ -333,6 +371,7 @@ export const MusicUploader = () => {
       )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
     >
       <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
@@ -349,7 +388,13 @@ export const MusicUploader = () => {
         />
       </label>
       {isDragging && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm">
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <p className="text-white text-lg font-medium">
             Déposez vos fichiers ici
           </p>
