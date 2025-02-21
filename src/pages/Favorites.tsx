@@ -60,7 +60,6 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
-      // Si la chanson est déjà en cours de lecture, on met en pause
       if (currentSong?.id === song.id) {
         if (isPlaying) {
           pause();
@@ -70,19 +69,15 @@ const Favorites = () => {
         return;
       }
 
-      // On annule le debounce précédent s'il existe
       if (debounceTimeout.current) {
         window.clearTimeout(debounceTimeout.current);
       }
 
-      // On crée une nouvelle file d'attente à partir de la liste complète des favoris
       const newQueue = [...favorites];
       setQueue(newQueue);
       
-      // On trouve l'index de la chanson sélectionnée
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
       
-      // On met un petit délai avant de lancer la lecture
       debounceTimeout.current = window.setTimeout(async () => {
         await play(newQueue[songIndex]);
         toast.success(`Lecture de ${song.title}`);
@@ -143,7 +138,7 @@ const Favorites = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden ml-64">
         <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
           <div className="flex items-center space-x-6 mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
