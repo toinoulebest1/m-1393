@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -191,9 +190,7 @@ const History = () => {
       return;
     }
 
-    // On met uniquement la chanson sélectionnée dans la queue
     setQueue([song]);
-    
     play(song);
   };
 
