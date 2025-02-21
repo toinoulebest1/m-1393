@@ -39,9 +39,7 @@ const Search = () => {
       const { data, error } = await supabase
         .from('songs')
         .select('*')
-        .filter(
-          `lower(title) like '%${searchTerm}%' or lower(artist) like '%${searchTerm}%'`
-        )
+        .or(`title.ilike.%${searchTerm}%,artist.ilike.%${searchTerm}%`)
         .order('title', { ascending: true });
 
       if (error) {
