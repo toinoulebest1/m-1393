@@ -153,11 +153,11 @@ const Reports = () => {
   const getTabColor = (tab: 'pending' | 'resolved' | 'rejected', isActive: boolean) => {
     switch (tab) {
       case 'pending':
-        return isActive ? 'bg-yellow-500/20 text-yellow-500' : 'text-yellow-500 hover:bg-yellow-500/10';
+        return isActive ? 'bg-yellow-500/20 text-yellow-500 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-500' : 'text-yellow-500 hover:bg-yellow-500/10';
       case 'resolved':
-        return isActive ? 'bg-green-500/20 text-green-500' : 'text-green-500 hover:bg-green-500/10';
+        return isActive ? 'bg-green-500/20 text-green-500 data-[state=active]:bg-green-500/20 data-[state=active]:text-green-500' : 'text-green-500 hover:bg-green-500/10';
       case 'rejected':
-        return isActive ? 'bg-red-500/20 text-red-500' : 'text-red-500 hover:bg-red-500/10';
+        return isActive ? 'bg-red-500/20 text-red-500 data-[state=active]:bg-red-500/20 data-[state=active]:text-red-500' : 'text-red-500 hover:bg-red-500/10';
       default:
         return '';
     }
@@ -200,7 +200,7 @@ const Reports = () => {
                 <TabsTrigger 
                   value="pending" 
                   className={cn(
-                    "relative data-[state=active]:shadow-none border border-yellow-500/20",
+                    "relative data-[state=active]:shadow-none border border-yellow-500/20 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-500",
                     getTabColor('pending', activeTab === 'pending')
                   )}
                 >
@@ -214,7 +214,7 @@ const Reports = () => {
                 <TabsTrigger 
                   value="resolved" 
                   className={cn(
-                    "relative data-[state=active]:shadow-none border border-green-500/20",
+                    "relative data-[state=active]:shadow-none border border-green-500/20 data-[state=active]:bg-green-500/20 data-[state=active]:text-green-500",
                     getTabColor('resolved', activeTab === 'resolved')
                   )}
                 >
@@ -228,7 +228,7 @@ const Reports = () => {
                 <TabsTrigger 
                   value="rejected" 
                   className={cn(
-                    "relative data-[state=active]:shadow-none border border-red-500/20",
+                    "relative data-[state=active]:shadow-none border border-red-500/20 data-[state=active]:bg-red-500/20 data-[state=active]:text-red-500",
                     getTabColor('rejected', activeTab === 'rejected')
                   )}
                 >
