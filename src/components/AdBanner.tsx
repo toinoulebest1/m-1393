@@ -1,42 +1,33 @@
 
-import React from 'react';
-import { ExternalLink, Music, DollarSign, Crown } from 'lucide-react';
+import React, { useEffect } from 'react';
+
+declare global {
+  interface Window {
+    adsbygoogle: any[];
+  }
+}
 
 export const AdBanner = () => {
+  useEffect(() => {
+    try {
+      if (window.adsbygoogle) {
+        window.adsbygoogle.push({});
+      }
+    } catch (err) {
+      console.error('Erreur AdSense:', err);
+    }
+  }, []);
+
   return (
-    <div className="p-4 bg-gradient-to-r from-black to-[#FF9900] rounded-lg mx-2 text-white shadow-lg hover:scale-102 transition-all duration-300">
-      <a 
-        href="https://www.amazon.fr/music/unlimited?tag=spotifyclone-21" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="flex flex-col items-center text-center space-y-3"
-      >
-        <div className="font-bold text-lg">Amazon Music Unlimited</div>
-        
-        <div className="flex flex-col gap-2 w-full">
-          <div className="flex items-center gap-2 text-sm">
-            <Music className="w-4 h-4" />
-            <span>90 millions de titres en HD</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Crown className="w-4 h-4" />
-            <span>Audio Spatial & Dolby Atmos</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <DollarSign className="w-4 h-4" />
-            <span>Offre spéciale étudiants</span>
-          </div>
-        </div>
-
-        <div className="bg-[#FF9900] text-black font-semibold px-4 py-2 rounded-full mt-2 flex items-center gap-2">
-          30 jours gratuits
-          <ExternalLink className="w-4 h-4" />
-        </div>
-
-        <div className="text-xs opacity-75 mt-1">
-          *Puis 9,99€/mois sans engagement
-        </div>
-      </a>
+    <div className="p-4 mx-2">
+      <ins
+        className="adsbygoogle"
+        style={{ display: 'block' }}
+        data-ad-client="ca-pub-VOTRE_ID_CLIENT" // Remplacez par votre ID client
+        data-ad-slot="VOTRE_ID_SLOT" // Remplacez par votre ID de slot
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
     </div>
   );
 };
