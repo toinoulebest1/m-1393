@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
@@ -356,8 +357,8 @@ const Top100 = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
+      <div className="flex-1 overflow-hidden ml-64">
+        <div className="p-6 animate-fade-in">
           {isAdmin && (
             <Alert className="border-spotify-accent bg-spotify-accent/10">
               <ShieldCheck className="h-5 w-5 text-spotify-accent" />
