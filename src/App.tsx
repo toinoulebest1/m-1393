@@ -11,6 +11,7 @@ import Favorites from "./pages/Favorites";
 import History from "./pages/History";
 import Top100 from "./pages/Top100";
 import Reports from "./pages/Reports";
+import Search from "./pages/Search";
 import Auth from "./pages/Auth";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
@@ -149,6 +150,14 @@ const App = () => {
                     element={
                       <PrivateRoute>
                         <Reports />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/search"
+                    element={
+                      <PrivateRoute>
+                        <Search />
                       </PrivateRoute>
                     }
                   />
