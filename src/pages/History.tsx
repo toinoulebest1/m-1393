@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { NowPlaying } from "@/components/NowPlaying";
 import { useEffect, useState } from "react";
-import { Play, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
