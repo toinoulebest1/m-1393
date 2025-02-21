@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
 import ColorThief from 'colorthief';
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
