@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +6,7 @@ import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Song {
   id: string;
@@ -23,13 +23,14 @@ export const MusicUploader = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadToastId, setUploadToastId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (isUploading && uploadProgress > 0) {
       if (!uploadToastId) {
         const id = toast.loading("Upload en cours...", {
           description: `${uploadProgress}%`
-        }).toString();  // Convertir explicitement en string
+        }).toString();
         setUploadToastId(id);
       } else {
         toast.loading("Upload en cours...", {
@@ -249,14 +250,18 @@ export const MusicUploader = () => {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const processFiles = async (files: FileList | File[]) => {
+    const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+    
+    if (audioFiles.length === 0) {
+      toast.error("Aucun fichier audio trouvé");
+      return;
+    }
 
-    console.log("Nombre de fichiers sélectionnés:", files.length);
+    console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
 
     const processedSongs = await Promise.all(
-      Array.from(files).map(processAudioFile)
+      audioFiles.map(processAudioFile)
     );
 
     const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
@@ -267,8 +272,69 @@ export const MusicUploader = () => {
     }
   };
 
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const items = Array.from(e.dataTransfer.items);
+    const files: File[] = [];
+
+    const processEntry = async (entry: FileSystemEntry) => {
+      if (entry.isFile) {
+        const file = await new Promise<File>((resolve) => {
+          (entry as FileSystemFileEntry).file(resolve);
+        });
+        if (file.type.startsWith('audio/')) {
+          files.push(file);
+        }
+      } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const entries = await new Promise<FileSystemEntry[]>((resolve) => {
+          reader.readEntries(resolve);
+        });
+        await Promise.all(entries.map(processEntry));
+      }
+    };
+
+    await Promise.all(
+      items
+        .filter(item => item.webkitGetAsEntry())
+        .map(item => processEntry(item.webkitGetAsEntry()!))
+    );
+
+    if (files.length > 0) {
+      await processFiles(files);
+    } else {
+      toast.error("Aucun fichier audio trouvé dans le dossier");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    await processFiles(files);
+  };
+
   return (
-    <div className="p-4">
+    <div 
+      className={cn(
+        "p-4 relative transition-all duration-300",
+        isDragging && "bg-white/5 rounded-lg"
+      )}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
       <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
         <Upload className="w-5 h-5" />
         <span>{t('common.upload')}</span>
@@ -276,10 +342,19 @@ export const MusicUploader = () => {
           type="file"
           accept="audio/*"
           multiple
+          webkitdirectory=""
+          directory=""
           className="hidden"
           onChange={handleFileUpload}
         />
       </label>
+      {isDragging && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm">
+          <p className="text-white text-lg font-medium">
+            Déposez vos fichiers ici
+          </p>
+        </div>
+      )}
     </div>
   );
 };
