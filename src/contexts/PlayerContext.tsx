@@ -132,6 +132,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     restorePlayback();
   }, []);
 
+  useEffect(() => {
+    if (currentSong) {
+      localStorage.setItem('currentSong', JSON.stringify(currentSong));
+    }
+  }, [currentSong]);
+
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -292,6 +298,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
+      localStorage.setItem('currentSong', JSON.stringify(song)); // Sauvegarde immédiate
       setNextSongPreloaded(false);
 
       try {
@@ -338,6 +345,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (error) {
         console.error("Error playing audio:", error);
         setCurrentSong(null);
+        localStorage.removeItem('currentSong'); // Nettoyage en cas d'erreur
         setIsPlaying(false);
       }
     } else if (audioRef.current) {
