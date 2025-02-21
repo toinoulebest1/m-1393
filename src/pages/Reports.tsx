@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -119,7 +120,7 @@ const Reports = () => {
   return (
     <div className="flex min-h-screen bg-spotify-dark">
       <Sidebar />
-      <div className="flex-1 ml-64 p-8 bg-spotify-dark">
+      <div className="flex-1 ml-64 p-8 pb-32 bg-spotify-dark">
         <div className="rounded-lg border border-border bg-spotify-dark/50 text-card-foreground shadow-lg">
           <div className="flex flex-col space-y-1.5 p-6">
             <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
@@ -203,6 +204,7 @@ const Reports = () => {
           </div>
         </div>
       </div>
+      <Player />
     </div>
   );
 };
