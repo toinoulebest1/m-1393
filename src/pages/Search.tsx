@@ -4,11 +4,17 @@ import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart, Flag } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
 import { ReportSongDialog } from "@/components/ReportSongDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Song {
   id: string;
@@ -20,6 +26,8 @@ interface Song {
   imageUrl?: string;
 }
 
+type SearchFilter = "all" | "title" | "artist";
+
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<Song[]>([]);
@@ -27,6 +35,7 @@ const Search = () => {
   const { play, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [songToReport, setSongToReport] = useState<Song | null>(null);
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -70,10 +79,22 @@ const Search = () => {
 
     setIsLoading(true);
     try {
+      let queryFilter = "";
+      switch (searchFilter) {
+        case "title":
+          queryFilter = `title.ilike.%${query}%`;
+          break;
+        case "artist":
+          queryFilter = `artist.ilike.%${query}%`;
+          break;
+        default:
+          queryFilter = `title.ilike.%${query}%,artist.ilike.%${query}%`;
+      }
+
       const { data, error } = await supabase
         .from('songs')
         .select('*')
-        .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
+        .or(queryFilter)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -114,15 +135,36 @@ const Search = () => {
       <Sidebar />
       <div className="flex-1 ml-64 p-8 pb-32">
         <div className="max-w-3xl mx-auto">
-          <div className="relative mb-8">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-            <Input
-              type="text"
-              placeholder="Rechercher une chanson ou un artiste..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 bg-background/50"
-            />
+          <div className="flex gap-4 mb-8">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+              <Input
+                type="text"
+                placeholder="Rechercher une chanson ou un artiste..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10 bg-background/50"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md bg-background/50 hover:bg-background/70 transition-colors">
+                <SlidersHorizontal className="h-5 w-5" />
+                <span className="text-sm">
+                  {searchFilter === "all" ? "Tout" : searchFilter === "title" ? "Titre" : "Artiste"}
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => setSearchFilter("all")}>
+                  Tout
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSearchFilter("title")}>
+                  Titre
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSearchFilter("artist")}>
+                  Artiste
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {isLoading ? (
@@ -269,7 +311,7 @@ const Search = () => {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground animate-fade-in">
-              Commencez à taper pour rechercher des chansons...
+              Commencez �� taper pour rechercher des chansons...
             </div>
           )}
         </div>
