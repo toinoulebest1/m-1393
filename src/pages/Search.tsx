@@ -33,33 +33,17 @@ const Search = () => {
 
     setIsLoading(true);
     try {
-      console.log("Recherche en cours pour:", query);
-      const searchTerm = query.toLowerCase(); // Convertir la recherche en minuscules
-      
       const { data, error } = await supabase
         .from('songs')
         .select('*')
-        .or(`title.ilike.%${searchTerm}%,artist.ilike.%${searchTerm}%`)
+        .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
         .order('title', { ascending: true });
 
       if (error) {
         throw error;
       }
 
-      console.log("Résultats reçus:", data);
-
-      // Mapper les données pour correspondre à l'interface Song
-      const mappedSongs: Song[] = (data || []).map(song => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist || '',
-        duration: song.duration || '0:00',
-        url: song.file_path,
-        file_path: song.file_path,
-        image_url: song.image_url
-      }));
-
-      setResults(mappedSongs);
+      setResults(data || []);
     } catch (error) {
       console.error("Erreur lors de la recherche:", error);
       toast.error("Erreur lors de la recherche");
@@ -90,37 +74,27 @@ const Search = () => {
             </div>
           ) : results.length > 0 ? (
             <div className="space-y-2">
-              {results.map((song, index) => (
+              {results.map((song) => (
                 <div
                   key={song.id}
-                  className="group flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-colors animate-fade-in"
-                  style={{ 
-                    animationDelay: `${index * 50}ms`,
-                    opacity: 0,
-                    animation: 'fade-in 0.3s ease-out forwards'
-                  }}
+                  className="flex items-center justify-between p-4 rounded-lg hover:bg-background/50 transition-colors"
                 >
                   <div className="flex items-center flex-1">
-                    <div className="relative overflow-hidden rounded-md group-hover:shadow-xl transition-shadow duration-300">
+                    {song.image_url && (
                       <img
-                        src={song.image_url || "https://picsum.photos/56/56"}
+                        src={song.image_url}
                         alt={song.title}
-                        className="w-14 h-14 object-cover rounded-md transform transition-transform duration-300 group-hover:scale-105"
+                        className="w-12 h-12 rounded-md object-cover mr-4"
                       />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity duration-300" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="font-medium text-white group-hover:text-spotify-accent transition-colors duration-300">
-                        {song.title}
-                      </h3>
-                      <p className="text-sm text-spotify-neutral group-hover:text-white/80 transition-colors duration-300">
-                        {song.artist}
-                      </p>
+                    )}
+                    <div>
+                      <h3 className="font-medium">{song.title}</h3>
+                      <p className="text-sm text-muted-foreground">{song.artist}</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => play(song)}
-                    className="ml-4 p-2 rounded-full bg-spotify-accent opacity-0 group-hover:opacity-100 hover:scale-105 hover:bg-spotify-accent/90 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0"
+                    onClick={() => play({ ...song, url: song.file_path })}
+                    className="ml-4 p-2 rounded-full hover:bg-background transition-colors"
                   >
                     ▶
                   </button>
