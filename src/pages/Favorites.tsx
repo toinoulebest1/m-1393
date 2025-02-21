@@ -22,6 +22,8 @@ const Favorites = () => {
     setQueue 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
+  const [isChanging, setIsChanging] = React.useState(false);
+  const changeTimeoutRef = React.useRef<number | null>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -58,6 +60,9 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
+      // Si un changement est déjà en cours, on ignore
+      if (isChanging) return;
+
       // Si la chanson est déjà en cours de lecture, on met en pause
       if (currentSong?.id === song.id) {
         if (isPlaying) {
@@ -66,6 +71,14 @@ const Favorites = () => {
           play();
         }
         return;
+      }
+
+      // On indique qu'un changement est en cours
+      setIsChanging(true);
+
+      // On annule tout timeout précédent
+      if (changeTimeoutRef.current) {
+        window.clearTimeout(changeTimeoutRef.current);
       }
       
       // On trouve l'index de la chanson sélectionnée
@@ -81,27 +94,29 @@ const Favorites = () => {
       await play(newQueue[songIndex]);
       
       toast.success(`Lecture de ${song.title}`);
+
+      // On réinitialise l'état de changement après un court délai
+      changeTimeoutRef.current = window.setTimeout(() => {
+        setIsChanging(false);
+      }, 500); // 500ms de délai minimum entre les changements
+
     } catch (error) {
       console.error("Error playing song:", error);
       toast.error("Erreur lors de la lecture de la musique");
+      setIsChanging(false);
     }
   };
 
   const handlePlayAll = () => {
-    if (favorites.length === 0) return;
-    // On met toute la liste des favoris dans la file d'attente
+    if (favorites.length === 0 || isChanging) return;
     setQueue(favorites);
-    // On joue la première chanson
     play(favorites[0]);
   };
 
   const handleShufflePlay = () => {
-    if (favorites.length === 0) return;
-    // On crée une version mélangée de la liste des favoris
+    if (favorites.length === 0 || isChanging) return;
     const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
-    // On met la liste mélangée dans la file d'attente
     setQueue(shuffledFavorites);
-    // On joue la première chanson de la liste mélangée
     play(shuffledFavorites[0]);
   };
 
@@ -114,6 +129,14 @@ const Favorites = () => {
       toast.error("Erreur lors de la suppression du favori");
     }
   };
+
+  React.useEffect(() => {
+    return () => {
+      if (changeTimeoutRef.current) {
+        window.clearTimeout(changeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (favorites.length === 0) {
     return (
