@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getAudioFile } from '@/utils/storage';
@@ -153,27 +154,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const pause = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     setIsPlaying(false);
-    audioRef.current.pause();
   };
 
   const nextSong = () => {
     if (queue.length > 0) {
-      setCurrentSong(queue[0]);
-      setIsPlaying(true);
-      audioRef.current.src = queue[0].url;
-      audioRef.current.play();
-      setQueue(queue.slice(1));
+      const nextSong = queue[0];
+      const newQueue = queue.slice(1);
+      setQueue(newQueue);
+      play(nextSong);
     }
   };
 
   const previousSong = () => {
-    if (queue.length > 0) {
-      setCurrentSong(queue[queue.length - 1]);
-      setIsPlaying(true);
-      audioRef.current.src = queue[queue.length - 1].url;
-      audioRef.current.play();
-      setQueue(queue.slice(0, -1));
+    if (history.length > 1) {
+      const previousSong = history[1]; // Get the second song in history (current song is first)
+      setHistory(prev => prev.slice(1)); // Remove the current song from history
+      play(previousSong);
     }
   };
 
@@ -182,17 +182,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleShuffle = () => {
-    setShuffleMode(!shuffleMode);
+    setShuffleMode(prev => !prev);
   };
 
   const toggleRepeat = () => {
-    if (repeatMode === 'none') {
-      setRepeatMode('one');
-    } else if (repeatMode === 'one') {
-      setRepeatMode('all');
-    } else {
-      setRepeatMode('none');
-    }
+    setRepeatMode(current => {
+      if (current === 'none') return 'one';
+      if (current === 'one') return 'all';
+      return 'none';
+    });
   };
 
   const toggleFavorite = (song: Song) => {
@@ -207,10 +205,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const removeFavorite = (songId: string) => {
     setFavorites(prev => prev.filter(f => f.id !== songId));
-  };
-
-  const setSearchQuery = (query: string) => {
-    setSearchQuery(query);
   };
 
   const updateVolume = (newVolume: number) => {
