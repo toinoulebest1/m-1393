@@ -80,6 +80,319 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
 
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data } = await supabase
+          .from('music_preferences')
+          .select('crossfade_enabled, crossfade_duration')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (data) {
+          setPreferences({
+            crossfadeEnabled: data.crossfade_enabled,
+            crossfadeDuration: data.crossfade_duration,
+          });
+          overlapTimeRef.current = data.crossfade_duration;
+          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    };
+
+    loadPreferences();
+    
+    const preferenceChannel = supabase
+      .channel('music_preferences_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'music_preferences'
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData.crossfade_duration !== undefined) {
+            overlapTimeRef.current = newData.crossfade_duration;
+            setPreferences(prev => ({
+              ...prev,
+              crossfadeDuration: newData.crossfade_duration,
+              crossfadeEnabled: newData.crossfade_enabled
+            }));
+            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      preferenceChannel.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        console.log("Chargement initial des favoris");
+
+        const { data: favStats, error: favError } = await supabase
+          .from('favorite_stats')
+          .select('song_id')
+          .eq('user_id', session.user.id);
+
+        if (favError) {
+          console.error("Erreur lors du chargement des favoris:", favError);
+          return;
+        }
+
+        if (favStats && favStats.length > 0) {
+          const { data: favoriteSongs, error: songsError } = await supabase
+            .from('songs')
+            .select('*')
+            .in('id', favStats.map(row => row.song_id));
+
+          if (songsError) {
+            console.error("Erreur lors du chargement des chansons favorites:", songsError);
+            return;
+          }
+
+          if (favoriteSongs) {
+            console.log("Favoris chargés:", favoriteSongs);
+            const mappedSongs: Song[] = favoriteSongs.map(song => ({
+              id: song.id,
+              title: song.title,
+              artist: song.artist || '',
+              duration: song.duration || '0:00',
+              url: song.file_path,
+              imageUrl: song.image_url,
+              bitrate: '320 kbps'
+            }));
+            setFavorites(mappedSongs);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des favoris:", error);
+      }
+    };
+
+    loadFavorites();
+  }, []); // Charger les favoris au montage du composant
+
+  useEffect(() => {
+    const setupRealtimeFavorites = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        console.log("Mise en place de l'écoute des favoris en temps réel");
+
+        const channel = supabase
+          .channel('favorite_changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'favorite_stats',
+              filter: `user_id=eq.${session.user.id}`
+            },
+            async (payload) => {
+              console.log("Changement détecté dans les favoris:", payload);
+
+              const { data: favStats } = await supabase
+                .from('favorite_stats')
+                .select('song_id')
+                .eq('user_id', session.user.id);
+
+              if (favStats && favStats.length > 0) {
+                const { data: favoriteSongs } = await supabase
+                  .from('songs')
+                  .select('*')
+                  .in('id', favStats.map(row => row.song_id));
+
+                if (favoriteSongs) {
+                  console.log("Mise à jour des favoris:", favoriteSongs);
+                  const mappedSongs: Song[] = favoriteSongs.map(song => ({
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist || '',
+                    duration: song.duration || '0:00',
+                    url: song.file_path,
+                    imageUrl: song.image_url,
+                    bitrate: '320 kbps'
+                  }));
+                  setFavorites(mappedSongs);
+                }
+              } else {
+                setFavorites([]);
+              }
+            }
+          )
+          .subscribe();
+
+        return () => {
+          console.log("Nettoyage de l'écoute des favoris");
+          supabase.removeChannel(channel);
+        };
+      } catch (error) {
+        console.error("Erreur lors de la configuration de l'écoute en temps réel:", error);
+      }
+    };
+
+    setupRealtimeFavorites();
+  }, []); // Exécuté une seule fois au montage du composant
+
+  const preloadNextSong = async () => {
+    if (!currentSong || queue.length === 0) return;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    const nextSong = queue[currentIndex + 1];
+    
+    if (!nextSong) return;
+
+    try {
+      const audioUrl = await getAudioFile(nextSong.url);
+      if (!audioUrl) return;
+
+      nextAudioRef.current.src = audioUrl;
+      await nextAudioRef.current.load();
+      nextAudioRef.current.volume = 0;
+      setNextSongPreloaded(true);
+    } catch (error) {
+      console.error("Erreur lors du préchargement:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
+
+      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
+      
+      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
+        fadingRef.current = true;
+
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          const alertElement = document.getElementById('next-song-alert');
+          const titleElement = document.getElementById('next-song-title');
+          const artistElement = document.getElementById('next-song-artist');
+
+          if (alertElement && titleElement && artistElement) {
+            titleElement.textContent = nextSong.title;
+            artistElement.textContent = nextSong.artist;
+            alertElement.classList.remove('opacity-0', 'translate-y-2');
+            alertElement.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+              alertElement.classList.add('opacity-0', 'translate-y-2');
+              alertElement.classList.remove('opacity-100', 'translate-y-0');
+            }, 3000);
+          }
+        }
+
+        nextAudioRef.current.currentTime = 0;
+        const playPromise = nextAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Erreur lors du démarrage du fondu:", error);
+            fadingRef.current = false;
+          });
+        }
+
+        const steps = 100;
+        const intervalTime = (overlapTimeRef.current * 1000) / steps;
+        const volumeStep = 1 / steps;
+
+        let currentOutVolume = 1;
+        let currentInVolume = 0;
+
+        const fadeInterval = setInterval(() => {
+          if (currentOutVolume > 0 || currentInVolume < 1) {
+            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+            currentInVolume = Math.min(1, currentInVolume + volumeStep);
+            
+            if (audioRef.current) audioRef.current.volume = currentOutVolume;
+            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+          } else {
+            clearInterval(fadeInterval);
+            
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+            }
+
+            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+            const nextSong = queue[currentIndex + 1];
+            if (nextSong) {
+              setCurrentSong(nextSong);
+              
+              const tempAudio = audioRef.current;
+              audioRef.current = nextAudioRef.current;
+              nextAudioRef.current = tempAudio;
+              
+              setProgress(0);
+              setNextSongPreloaded(false);
+              fadingRef.current = false;
+              
+              preloadNextSong();
+            }
+          }
+        }, intervalTime);
+      }
+    };
+
+    const handleEnded = () => {
+      if (!fadingRef.current) {
+        setProgress(0);
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          play(nextSong);
+        } else if (repeatMode === 'all') {
+          play(queue[0]);
+        }
+      }
+    };
+
+    const handleTimeUpdateProgress = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+    };
+  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
+
+  useEffect(() => {
+    if (currentSong) {
+      preloadNextSong();
+    }
+  }, [currentSong]);
+
   const play = async (song?: Song) => {
     fadingRef.current = false;
     
@@ -156,269 +469,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
   };
-
-  const preloadNextSong = async () => {
-    if (!currentSong || queue.length === 0) return;
-    
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    const nextSong = queue[currentIndex + 1];
-    
-    if (!nextSong) return;
-
-    try {
-      const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) return;
-
-      nextAudioRef.current.src = audioUrl;
-      await nextAudioRef.current.load();
-      nextAudioRef.current.volume = 0;
-      setNextSongPreloaded(true);
-    } catch (error) {
-      console.error("Erreur lors du préchargement:", error);
-    }
-  };
-
-  useEffect(() => {
-    const loadPreferences = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const { data } = await supabase
-          .from('music_preferences')
-          .select('crossfade_enabled, crossfade_duration')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        if (data) {
-          setPreferences({
-            crossfadeEnabled: data.crossfade_enabled,
-            crossfadeDuration: data.crossfade_duration,
-          });
-          overlapTimeRef.current = data.crossfade_duration;
-          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des préférences:", error);
-      }
-    };
-
-    loadPreferences();
-    
-    const preferenceChannel = supabase
-      .channel('music_preferences_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'music_preferences'
-        },
-        (payload) => {
-          const newData = payload.new as any;
-          if (newData.crossfade_duration !== undefined) {
-            overlapTimeRef.current = newData.crossfade_duration;
-            setPreferences(prev => ({
-              ...prev,
-              crossfadeDuration: newData.crossfade_duration,
-              crossfadeEnabled: newData.crossfade_enabled
-            }));
-            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      preferenceChannel.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const handleTimeUpdate = () => {
-      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
-
-      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
-      
-      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
-        fadingRef.current = true;
-
-        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-        const nextSong = queue[currentIndex + 1];
-        
-        if (nextSong) {
-          // Afficher l'alerte de prochaine chanson
-          const alertElement = document.getElementById('next-song-alert');
-          const titleElement = document.getElementById('next-song-title');
-          const artistElement = document.getElementById('next-song-artist');
-
-          if (alertElement && titleElement && artistElement) {
-            titleElement.textContent = nextSong.title;
-            artistElement.textContent = nextSong.artist;
-            alertElement.classList.remove('opacity-0', 'translate-y-2');
-            alertElement.classList.add('opacity-100', 'translate-y-0');
-
-            // Cacher l'alerte après 3 secondes
-            setTimeout(() => {
-              alertElement.classList.add('opacity-0', 'translate-y-2');
-              alertElement.classList.remove('opacity-100', 'translate-y-0');
-            }, 3000);
-          }
-        }
-
-        nextAudioRef.current.currentTime = 0;
-        const playPromise = nextAudioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error("Erreur lors du démarrage du fondu:", error);
-            fadingRef.current = false;
-          });
-        }
-
-        const steps = 100;
-        const intervalTime = (overlapTimeRef.current * 1000) / steps;
-        const volumeStep = 1 / steps;
-
-        let currentOutVolume = 1;
-        let currentInVolume = 0;
-
-        const fadeInterval = setInterval(() => {
-          if (currentOutVolume > 0 || currentInVolume < 1) {
-            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
-            currentInVolume = Math.min(1, currentInVolume + volumeStep);
-            
-            if (audioRef.current) audioRef.current.volume = currentOutVolume;
-            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
-          } else {
-            clearInterval(fadeInterval);
-            
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-            }
-
-            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-            const nextSong = queue[currentIndex + 1];
-            if (nextSong) {
-              setCurrentSong(nextSong);
-              
-              const tempAudio = audioRef.current;
-              audioRef.current = nextAudioRef.current;
-              nextAudioRef.current = tempAudio;
-              
-              setProgress(0);
-              setNextSongPreloaded(false);
-              fadingRef.current = false;
-              
-              preloadNextSong();
-            }
-          }
-        }, intervalTime);
-      }
-    };
-
-    const handleEnded = () => {
-      if (!fadingRef.current) {
-        setProgress(0);
-        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-        const nextSong = queue[currentIndex + 1];
-        
-        if (nextSong) {
-          play(nextSong);
-        } else if (repeatMode === 'all') {
-          play(queue[0]);
-        } else {
-          setIsPlaying(false);
-        }
-      }
-    };
-
-    const handleTimeUpdateProgress = () => {
-      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-      setProgress(percentage);
-    };
-
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
-    audioRef.current.addEventListener('ended', handleEnded);
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
-        audioRef.current.removeEventListener('ended', handleEnded);
-      }
-    };
-  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
-
-  useEffect(() => {
-    if (currentSong) {
-      preloadNextSong();
-    }
-  }, [currentSong]);
-
-  // Écouter les changements en temps réel des favoris
-  useEffect(() => {
-    const setupRealtimeFavorites = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      console.log("Mise en place de l'écoute des favoris en temps réel");
-
-      const channel = supabase
-        .channel('favorite_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Écoute tous les événements (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'favorite_stats',
-            filter: `user_id=eq.${session.user.id}`
-          },
-          async (payload) => {
-            console.log("Changement détecté dans les favoris:", payload);
-
-            // Rafraîchir la liste des favoris
-            const { data: songIds } = await supabase
-              .from('favorite_stats')
-              .select('song_id')
-              .eq('user_id', session.user.id);
-
-            if (songIds) {
-              const { data: favoriteSongs } = await supabase
-                .from('songs')
-                .select('*')
-                .in('id', songIds.map(row => row.song_id));
-
-              if (favoriteSongs) {
-                console.log("Mise à jour des favoris:", favoriteSongs);
-                // Mapper les données pour correspondre au type Song
-                const mappedSongs: Song[] = favoriteSongs.map(song => ({
-                  id: song.id,
-                  title: song.title,
-                  artist: song.artist || '',
-                  duration: song.duration || '0:00',
-                  url: song.file_path,
-                  imageUrl: song.image_url
-                }));
-                setFavorites(mappedSongs);
-              }
-            }
-          }
-        )
-        .subscribe();
-
-      // Nettoyage lors du démontage du composant
-      return () => {
-        console.log("Nettoyage de l'écoute des favoris");
-        supabase.removeChannel(channel);
-      };
-    };
-
-    setupRealtimeFavorites();
-  }, []); // Exécuté une seule fois au montage du composant
 
   const pause = () => {
     if (audioRef.current) {
