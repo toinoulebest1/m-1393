@@ -247,15 +247,15 @@ const Search = () => {
                             />
                           </button>
 
-                          <div 
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setSongToReport(song);
                             }}
+                            className="p-2 hover:bg-white/5 rounded-full transition-colors"
                           >
                             <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
-                          </div>
+                          </button>
                         </div>
                       </div>
                     </div>
