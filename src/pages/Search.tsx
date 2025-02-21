@@ -129,29 +129,38 @@ const Search = () => {
                     0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
                     0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
                   `,
-                  transition: 'box-shadow 0.3s ease-in-out',
-                  transform: 'scale(1.02)',
+                  transition: 'all 0.3s ease-in-out',
+                  transform: isCurrentSong ? 'scale(1.05)' : 'scale(1)',
+                } : {};
+
+                const containerGlowStyle = isCurrentSong && dominantColor ? {
+                  boxShadow: `
+                    0 0 15px 2px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                    0 0 30px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                  `,
+                  background: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)`,
                 } : {};
 
                 return (
                   <div
                     key={song.id}
                     className={cn(
-                      "group flex items-center justify-between p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                      "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
                       isCurrentSong 
                         ? "relative bg-white/5 shadow-lg overflow-hidden" 
                         : "bg-transparent"
                     )}
                     style={{ 
                       animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                      opacity: 0
+                      opacity: 0,
+                      ...containerGlowStyle
                     }}
                     onClick={() => play(song)}
                   >
                     {isCurrentSong && (
                       <div className="absolute inset-0 z-0 overflow-hidden">
                         <div 
-                          className="absolute inset-0 animate-gradient opacity-20" 
+                          className="absolute inset-0 animate-gradient opacity-30" 
                           style={{
                             backgroundSize: '200% 200%',
                             animation: 'gradient 3s linear infinite',
@@ -168,15 +177,20 @@ const Search = () => {
 
                     <div className="relative z-10 flex items-center justify-between w-full">
                       <div className="flex items-center flex-1">
-                        <div className="relative overflow-hidden rounded-md group-hover:shadow-xl transition-all duration-300">
+                        <div 
+                          className={cn(
+                            "relative overflow-hidden rounded-md transition-all duration-500",
+                            isCurrentSong ? "shadow-2xl" : "group-hover:shadow-xl"
+                          )}
+                          style={glowStyle}
+                        >
                           <img
                             src={song.imageUrl || "https://picsum.photos/56/56"}
                             alt={song.title}
                             className={cn(
-                              "w-14 h-14 object-cover rounded-md transform transition-transform duration-300 group-hover:scale-105",
-                              isCurrentSong && "animate-pulse"
+                              "w-14 h-14 object-cover rounded-md transition-all duration-500",
+                              isCurrentSong ? "scale-105" : "group-hover:scale-105"
                             )}
-                            style={glowStyle}
                           />
                           <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
                         </div>
