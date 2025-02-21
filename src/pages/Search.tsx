@@ -34,10 +34,14 @@ const Search = () => {
     setIsLoading(true);
     try {
       console.log("Recherche en cours pour:", query);
+      const searchTerm = query.toLowerCase(); // Convertir la recherche en minuscules
+      
       const { data, error } = await supabase
         .from('songs')
         .select('*')
-        .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
+        .filter(
+          `lower(title) like '%${searchTerm}%' or lower(artist) like '%${searchTerm}%'`
+        )
         .order('title', { ascending: true });
 
       if (error) {
