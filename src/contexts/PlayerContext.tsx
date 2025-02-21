@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
@@ -146,8 +145,64 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const updateListeningStats = async (song: Song) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: existingStats, error: statsError } = await supabase
+        .from('listening_stats')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (statsError && statsError.code !== 'PGRST116') {
+        console.error("Erreur lors de la récupération des statistiques:", statsError);
+        return;
+      }
+
+      const currentHour = new Date().getHours();
+      const currentPeriod = `${currentHour}:00-${currentHour + 1}:00`;
+      
+      let peakHours = existingStats?.peak_hours || {};
+      peakHours[currentPeriod] = (peakHours[currentPeriod] || 0) + 1;
+
+      const favoritePeriods = Object.entries(peakHours)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 5)
+        .map(([period, count]) => ({
+          period,
+          count
+        }));
+
+      if (!existingStats) {
+        await supabase
+          .from('listening_stats')
+          .insert({
+            user_id: session.user.id,
+            total_listening_time: song.duration ? parseInt(song.duration) : 0,
+            tracks_played: 1,
+            peak_hours: peakHours,
+            favorite_periods: favoritePeriods
+          });
+      } else {
+        const duration = song.duration ? parseInt(song.duration) : 0;
+        await supabase
+          .from('listening_stats')
+          .update({
+            total_listening_time: existingStats.total_listening_time + duration,
+            tracks_played: existingStats.tracks_played + 1,
+            peak_hours: peakHours,
+            favorite_periods: favoritePeriods
+          })
+          .eq('user_id', session.user.id);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des statistiques:", error);
+    }
+  };
+
   const play = async (song?: Song) => {
-    // Si une lecture est déjà en cours, on l'annule
     if (fadingRef.current) {
       console.log("Une transition est déjà en cours, annulation...");
       if (nextAudioRef.current) {
@@ -157,7 +212,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       fadingRef.current = false;
     }
 
-    // On s'assure que le volume est réinitialisé
     if (audioRef.current) {
       audioRef.current.volume = 1;
     }
@@ -189,7 +243,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error("Erreur lors de l'enregistrement de la chanson:", songError);
           }
 
-          await addToHistory(song);
+          await Promise.all([
+            addToHistory(song),
+            updateListeningStats(song)
+          ]);
         }
 
         const audioUrl = await getAudioFile(song.url);
@@ -271,7 +328,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextSong = () => {
     if (!currentSong || queue.length === 0) return;
     
-    // Réinitialiser le fondu sonore
     fadingRef.current = false;
     if (nextAudioRef.current) {
       nextAudioRef.current.volume = 0;
@@ -294,7 +350,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const previousSong = () => {
     if (!currentSong || queue.length === 0) return;
     
-    // Réinitialiser le fondu sonore
     fadingRef.current = false;
     if (nextAudioRef.current) {
       nextAudioRef.current.volume = 0;
