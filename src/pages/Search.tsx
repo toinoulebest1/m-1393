@@ -33,6 +33,7 @@ const Search = () => {
 
     setIsLoading(true);
     try {
+      console.log("Recherche en cours pour:", query);
       const { data, error } = await supabase
         .from('songs')
         .select('*')
@@ -42,6 +43,8 @@ const Search = () => {
       if (error) {
         throw error;
       }
+
+      console.log("Résultats reçus:", data);
 
       // Mapper les données pour correspondre à l'interface Song
       const mappedSongs: Song[] = (data || []).map(song => ({
