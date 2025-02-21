@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -29,16 +28,6 @@ export const Player = () => {
     if (!currentSong) return "0:00";
     
     try {
-      const savedCurrentTime = localStorage.getItem('audioProgress');
-      if (savedCurrentTime) {
-        const currentTime = parseFloat(savedCurrentTime);
-        if (!isNaN(currentTime)) {
-          const currentMinutes = Math.floor(currentTime / 60);
-          const currentSeconds = Math.floor(currentTime % 60);
-          return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
-        }
-      }
-
       if (currentSong.duration && currentSong.duration.includes(':')) {
         const [minutes, seconds] = currentSong.duration.split(':').map(Number);
         if (isNaN(minutes) || isNaN(seconds)) return "0:00";
