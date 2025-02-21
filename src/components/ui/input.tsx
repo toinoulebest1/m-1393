@@ -9,7 +9,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         type={type}
         className={cn(
           "flex h-10 w-full rounded-md border border-input bg-secondary/50 px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm transition-all duration-300",
-          "bg-gradient-to-r from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20 animate-gradient bg-[length:200%_200%]",
+          "bg-gradient-to-r from-violet-500/50 via-fuchsia-500/50 to-cyan-500/50 animate-gradient bg-[length:200%_200%]",
           className
         )}
         ref={ref}
