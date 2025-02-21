@@ -169,9 +169,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .from('listening_stats')
         .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (statsError && statsError.code !== 'PGRST116') {
+      if (statsError) {
         console.error("Erreur lors de la récupération des statistiques:", statsError);
         return;
       }
@@ -254,18 +254,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               file_path: song.url,
               duration: song.duration,
               image_url: song.imageUrl
-            }, {
-              onConflict: 'id'
             });
 
           if (songError) {
             console.error("Erreur lors de l'enregistrement de la chanson:", songError);
           }
 
-          await Promise.all([
-            addToHistory(song),
-            updateListeningStats(song, calculateDurationInSeconds(song.duration))
-          ]);
+          await addToHistory(song);
         }
 
         const audioUrl = await getAudioFile(song.url);
