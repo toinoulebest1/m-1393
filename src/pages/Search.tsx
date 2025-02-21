@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -375,7 +376,7 @@ const Search = () => {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground animate-fade-in">
-              Commencez �� taper pour rechercher des chansons...
+              Commencez à taper pour rechercher des chansons...
             </div>
           )}
         </div>
