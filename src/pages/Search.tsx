@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -96,9 +97,44 @@ const Search = () => {
   }, [selectedGenre, searchFilter]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen relative overflow-hidden">
       <Sidebar />
       <div className="flex-1 ml-64 p-8 pb-32">
+        <style>
+          {`
+            @keyframes float-up {
+              0% {
+                transform: translate(0, 0);
+                opacity: 0;
+              }
+              10% {
+                opacity: 1;
+              }
+              100% {
+                transform: translate(${-50 + Math.random() * 100}px, -${window.innerHeight}px);
+                opacity: 0;
+              }
+            }
+
+            @keyframes gradient {
+              0% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+
+            @keyframes fade-out {
+              0% { opacity: 0; }
+              10% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+
+            .animate-gradient {
+              background-size: 200% 200%;
+              animation: gradient 3s linear infinite;
+            }
+          `}
+        </style>
+
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-4 mb-8">
             <div className="relative flex-1">
@@ -194,7 +230,8 @@ const Search = () => {
                     key={song.id}
                     className={cn(
                       "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer",
-                      isCurrentSong ? "bg-white/5" : "hover:bg-white/5"
+                      isCurrentSong ? "bg-white/5 backdrop-blur-sm" : "hover:bg-white/5",
+                      "transform hover:scale-[1.02] hover:-translate-y-0.5 transition-transform duration-300"
                     )}
                     style={{ 
                       animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
@@ -202,49 +239,82 @@ const Search = () => {
                     }}
                     onClick={() => handlePlay(song)}
                   >
-                    <div className="relative z-10 flex items-center justify-between w-full">
+                    {isCurrentSong && (
+                      <div className="absolute inset-0 z-0 overflow-hidden rounded-lg">
+                        <div 
+                          className="absolute inset-0 animate-gradient opacity-20" 
+                          style={{
+                            backgroundSize: '200% 200%',
+                            animation: 'gradient 3s linear infinite',
+                            background: dominantColor 
+                              ? `linear-gradient(45deg, 
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                                )`
+                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="relative z-10 flex items-center justify-between w-full group">
                       <div className="flex items-center flex-1">
                         <div 
-                          className="relative overflow-hidden rounded-md"
+                          className={cn(
+                            "relative overflow-hidden rounded-md transform transition-transform duration-300",
+                            isCurrentSong ? "scale-105" : "group-hover:scale-105"
+                          )}
                           style={glowStyle}
                         >
                           <img
                             src={song.imageUrl || "https://picsum.photos/56/56"}
                             alt={song.title}
-                            className="w-14 h-14 object-cover rounded-md"
+                            className={cn(
+                              "w-14 h-14 object-cover rounded-md",
+                              isCurrentSong && "animate-pulse"
+                            )}
                           />
                         </div>
                         <div className="ml-4">
                           <h3 className={cn(
-                            "font-medium",
-                            isCurrentSong ? "text-white" : "text-spotify-neutral group-hover:text-white"
+                            "font-medium transform transition-all duration-300",
+                            isCurrentSong ? "text-white scale-105" : "text-spotify-neutral group-hover:text-white group-hover:scale-105"
                           )}>
                             {song.title}
                           </h3>
-                          <p className="text-sm text-spotify-neutral group-hover:text-white/80">
+                          <p className={cn(
+                            "text-sm transition-all duration-300",
+                            isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                          )}>
                             {song.artist}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center space-x-6">
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                        <div className={cn(
+                          "flex items-center space-x-1",
+                          isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                        )}>
                           <Clock className="w-4 h-4" />
                           <span className="text-sm">{song.duration || "0:00"}</span>
                         </div>
 
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                        <div className={cn(
+                          "flex items-center space-x-1",
+                          isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                        )}>
                           <Signal className="w-4 h-4" />
-                          <span className="text-sm">320 kbps</span>
+                          <span className="text-sm">{song.bitrate || "320 kbps"}</span>
                         </div>
 
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleFavorite(song);
                             }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                            className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
                           >
                             <Heart
                               className={cn(
@@ -261,7 +331,7 @@ const Search = () => {
                               e.stopPropagation();
                               setSongToReport(song);
                             }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                            className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
                           >
                             <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
                           </button>
