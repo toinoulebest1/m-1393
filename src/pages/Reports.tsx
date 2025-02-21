@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { CheckCircle, XCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Reports = () => {
   const [reports, setReports] = useState<any[]>([]);
@@ -25,6 +26,7 @@ const Reports = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [updateLoading, setUpdateLoading] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'resolved' | 'rejected'>('pending');
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -161,6 +163,11 @@ const Reports = () => {
     return <Navigate to="/" replace />;
   }
 
+  const filteredReports = reports.filter(report => report.status === activeTab);
+  const pendingCount = reports.filter(report => report.status === 'pending').length;
+  const resolvedCount = reports.filter(report => report.status === 'resolved').length;
+  const rejectedCount = reports.filter(report => report.status === 'rejected').length;
+
   return (
     <div className="flex min-h-screen bg-spotify-dark">
       <Sidebar />
@@ -175,78 +182,115 @@ const Reports = () => {
             </p>
           </div>
           <div className="p-6 pt-0">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-border bg-spotify-dark">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border hover:bg-muted/50">
-                      <TableHead className="text-foreground">Date</TableHead>
-                      <TableHead className="text-foreground">Utilisateur</TableHead>
-                      <TableHead className="text-foreground">Chanson</TableHead>
-                      <TableHead className="text-foreground">Motif</TableHead>
-                      <TableHead className="text-foreground">Statut</TableHead>
-                      {isAdmin && <TableHead className="text-foreground">Actions</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reports.map((report) => (
-                      <TableRow key={report.id} className="border-border hover:bg-spotify-dark">
-                        <TableCell className="text-foreground">
-                          {format(new Date(report.created_at), 'Pp', { locale: fr })}
-                        </TableCell>
-                        <TableCell className="text-foreground">{report.reporter_username}</TableCell>
-                        <TableCell className="text-foreground">
-                          {report.song_title} - {report.song_artist}
-                        </TableCell>
-                        <TableCell className="text-foreground">{report.reason}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="secondary"
-                            className={cn(
-                              "capitalize",
-                              getStatusColor(report.status)
-                            )}
-                          >
-                            {report.status === 'pending' ? 'En attente' : 
-                             report.status === 'resolved' ? 'Résolu' : 'Rejeté'}
-                          </Badge>
-                        </TableCell>
-                        {isAdmin && report.status === 'pending' && (
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-green-500 hover:text-green-600 hover:bg-green-500/10"
-                                onClick={() => handleUpdateStatus(report.id, 'resolved')}
-                                disabled={updateLoading === report.id}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                {updateLoading === report.id ? 'En cours...' : 'Accepter'}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                onClick={() => handleUpdateStatus(report.id, 'rejected')}
-                                disabled={updateLoading === report.id}
-                              >
-                                <XCircle className="w-4 h-4 mr-1" />
-                                {updateLoading === report.id ? 'En cours...' : 'Rejeter'}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+              <TabsList className="grid w-full grid-cols-3 mb-4">
+                <TabsTrigger value="pending" className="relative">
+                  En attente
+                  {pendingCount > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-yellow-500/10 text-yellow-500">
+                      {pendingCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="resolved" className="relative">
+                  Acceptés
+                  {resolvedCount > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-green-500/10 text-green-500">
+                      {resolvedCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="rejected" className="relative">
+                  Rejetés
+                  {rejectedCount > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500">
+                      {rejectedCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-spotify-dark">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-muted/50">
+                        <TableHead className="text-foreground">Date</TableHead>
+                        <TableHead className="text-foreground">Utilisateur</TableHead>
+                        <TableHead className="text-foreground">Chanson</TableHead>
+                        <TableHead className="text-foreground">Motif</TableHead>
+                        <TableHead className="text-foreground">Statut</TableHead>
+                        {isAdmin && activeTab === 'pending' && <TableHead className="text-foreground">Actions</TableHead>}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredReports.map((report) => (
+                        <TableRow key={report.id} className="border-border hover:bg-spotify-dark">
+                          <TableCell className="text-foreground">
+                            {format(new Date(report.created_at), 'Pp', { locale: fr })}
+                          </TableCell>
+                          <TableCell className="text-foreground">{report.reporter_username}</TableCell>
+                          <TableCell className="text-foreground">
+                            {report.song_title} - {report.song_artist}
+                          </TableCell>
+                          <TableCell className="text-foreground">{report.reason}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="secondary"
+                              className={cn(
+                                "capitalize",
+                                getStatusColor(report.status)
+                              )}
+                            >
+                              {report.status === 'pending' ? 'En attente' : 
+                               report.status === 'resolved' ? 'Résolu' : 'Rejeté'}
+                            </Badge>
+                          </TableCell>
+                          {isAdmin && report.status === 'pending' && (
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                  onClick={() => handleUpdateStatus(report.id, 'resolved')}
+                                  disabled={updateLoading === report.id}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  {updateLoading === report.id ? 'En cours...' : 'Accepter'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                  onClick={() => handleUpdateStatus(report.id, 'rejected')}
+                                  disabled={updateLoading === report.id}
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  {updateLoading === report.id ? 'En cours...' : 'Rejeter'}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                      {filteredReports.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            Aucun signalement {activeTab === 'pending' ? 'en attente' : 
+                                            activeTab === 'resolved' ? 'accepté' : 'rejeté'}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </Tabs>
           </div>
         </div>
       </div>
