@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -111,50 +110,15 @@ const Reports = () => {
       setUpdateLoading(reportId);
       console.log("Mise à jour du signalement:", reportId, "avec le statut:", newStatus);
 
-      // On récupère d'abord le signalement actuel pour avoir ses informations
-      const { data: currentReport, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('song_reports')
-        .select('*')
+        .update({ status: newStatus })
         .eq('id', reportId)
-        .single();
-
-      if (fetchError) {
-        console.error("Erreur lors de la récupération du signalement:", fetchError);
-        toast.error("Erreur lors de la récupération du signalement");
-        return;
-      }
-
-      // On supprime d'abord l'ancien signalement
-      const { error: deleteError } = await supabase
-        .from('song_reports')
-        .delete()
-        .eq('id', reportId);
-
-      if (deleteError) {
-        console.error("Erreur lors de la suppression:", deleteError);
-        toast.error("Erreur lors de la mise à jour du signalement");
-        return;
-      }
-
-      // Puis on crée un nouveau signalement avec le nouveau statut
-      const { data, error: insertError } = await supabase
-        .from('song_reports')
-        .insert([
-          {
-            song_id: currentReport.song_id,
-            user_id: currentReport.user_id,
-            song_title: currentReport.song_title,
-            song_artist: currentReport.song_artist,
-            reason: currentReport.reason,
-            status: newStatus,
-            reporter_username: currentReport.reporter_username
-          }
-        ])
         .select()
         .single();
 
-      if (insertError) {
-        console.error("Erreur lors de l'insertion:", insertError);
+      if (error) {
+        console.error("Erreur lors de la mise à jour:", error);
         toast.error("Erreur lors de la mise à jour du signalement");
         return;
       }
