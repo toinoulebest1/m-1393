@@ -25,6 +25,7 @@ import {
 import { useEffect, useState } from "react";
 
 const History = () => {
+  const { t } = useTranslation();
   const { 
     history, 
     play, 
@@ -204,7 +205,7 @@ const History = () => {
           <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
             <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
             <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
-              {t('Historique de lecture')}
+              {t('common.history')}
             </h2>
           </div>
 
@@ -248,7 +249,7 @@ const History = () => {
             </p>
           ) : history.length === 0 ? (
             <p className="text-spotify-neutral text-center py-8">
-              {t('Aucune musique écoutée récemment')}
+              {t('common.noHistory')}
             </p>
           ) : (
             history.map((song) => {
