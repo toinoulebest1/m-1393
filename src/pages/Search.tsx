@@ -43,7 +43,18 @@ const Search = () => {
         throw error;
       }
 
-      setResults(data || []);
+      // Mapper les données pour correspondre à l'interface Song
+      const mappedSongs: Song[] = (data || []).map(song => ({
+        id: song.id,
+        title: song.title,
+        artist: song.artist || '',
+        duration: song.duration || '0:00',
+        url: song.file_path, // Utiliser file_path comme url
+        file_path: song.file_path,
+        image_url: song.image_url
+      }));
+
+      setResults(mappedSongs);
     } catch (error) {
       console.error("Erreur lors de la recherche:", error);
       toast.error("Erreur lors de la recherche");
