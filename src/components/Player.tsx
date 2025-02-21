@@ -29,7 +29,6 @@ export const Player = () => {
     if (!currentSong) return "0:00";
     
     try {
-      // Si la durée est au format mm:ss
       if (currentSong.duration && currentSong.duration.includes(':')) {
         const [minutes, seconds] = currentSong.duration.split(':').map(Number);
         if (isNaN(minutes) || isNaN(seconds)) return "0:00";
@@ -41,7 +40,7 @@ export const Player = () => {
         
         return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
       }
-      // Si la durée est en secondes
+      
       const duration = parseFloat(currentSong.duration);
       if (isNaN(duration)) return "0:00";
       
@@ -60,14 +59,12 @@ export const Player = () => {
     if (!duration) return "0:00";
     
     try {
-      // Si la durée est déjà au format mm:ss
       if (duration.includes(':')) {
         const [minutes, seconds] = duration.split(':').map(Number);
         if (isNaN(minutes) || isNaN(seconds)) return "0:00";
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
       }
       
-      // Si la durée est en secondes
       const durationInSeconds = parseFloat(duration);
       if (isNaN(durationInSeconds)) return "0:00";
       
@@ -89,7 +86,7 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-95 border-t border-white/5 p-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-95 border-t border-white/5 p-4 z-50">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center flex-1 min-w-0">
