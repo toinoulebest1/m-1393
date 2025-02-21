@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -21,9 +22,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 
 const History = () => {
   const { t } = useTranslation();
@@ -86,6 +84,29 @@ const History = () => {
 
   useEffect(() => {
     loadHistory();
+
+    // Configuration de la souscription en temps réel
+    const channel = supabase
+      .channel('play_history_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'play_history'
+        },
+        async (payload) => {
+          console.log('Changement détecté dans play_history:', payload);
+          // Recharger l'historique quand il y a des changements
+          await loadHistory();
+        }
+      )
+      .subscribe();
+
+    // Nettoyage de la souscription
+    return () => {
+      channel.unsubscribe();
+    };
   }, []);
 
   const extractDominantColor = async (imageUrl: string) => {
