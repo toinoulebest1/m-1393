@@ -163,7 +163,7 @@ const Search = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       
       if (SpeechRecognitionAPI) {
         recognitionRef.current = new SpeechRecognitionAPI();
