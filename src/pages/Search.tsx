@@ -255,16 +255,49 @@ const Search = () => {
 
           <div className="mb-8">
             <div className="flex gap-4 mb-8">
-              <div className="relative flex-1">
-                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+              <div className="relative flex-1 group">
+                <SearchIcon className={cn(
+                  "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 transition-all duration-300",
+                  "group-focus-within:text-primary group-hover:text-primary",
+                  "group-focus-within:scale-110 group-hover:scale-110"
+                )} />
                 <Input
                   type="text"
                   placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10"
+                  className={cn(
+                    "pl-10 transition-all duration-300",
+                    "border-2 focus:border-primary",
+                    "shadow-sm hover:shadow-md focus:shadow-lg",
+                    "transform-gpu",
+                    "animate-fade-in",
+                    "bg-gradient-to-r from-transparent via-transparent to-transparent",
+                    "hover:bg-gradient-to-r hover:from-purple-50 hover:via-indigo-50 hover:to-purple-50",
+                    "focus:bg-gradient-to-r focus:from-purple-50 focus:via-indigo-50 focus:to-purple-50",
+                    "dark:hover:from-purple-900/10 dark:hover:via-indigo-900/10 dark:hover:to-purple-900/10",
+                    "dark:focus:from-purple-900/10 dark:focus:via-indigo-900/10 dark:focus:to-purple-900/10"
+                  )}
+                  style={{
+                    backgroundSize: '200% 100%',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.backgroundPosition = '100% 0';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.backgroundPosition = '0 0';
+                  }}
                   disabled={searchFilter === "genre"}
                 />
+                <div className={cn(
+                  "absolute inset-0 pointer-events-none",
+                  "opacity-0 group-focus-within:opacity-100",
+                  "transition-all duration-500",
+                  "rounded-md",
+                  "bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10",
+                  "animate-gradient",
+                  "group-focus-within:animate-[glow_1.5s_ease-in-out_infinite]"
+                )} />
               </div>
 
               <Button
