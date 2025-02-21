@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
@@ -356,7 +357,7 @@ const Top100 = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden ml-64">
         <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
           {isAdmin && (
             <Alert className="border-spotify-accent bg-spotify-accent/10">

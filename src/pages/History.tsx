@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -21,6 +20,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { NowPlaying } from "@/components/NowPlaying";
+import { useEffect, useState } from "react";
+import { Play, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const History = () => {
   const { t } = useTranslation();
@@ -87,7 +92,7 @@ const History = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 p-8">
+      <div className="flex-1 ml-64">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
             <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
@@ -237,6 +242,7 @@ const History = () => {
           )}
         </div>
       </div>
+      <NowPlaying />
       <Player />
     </div>
   );
