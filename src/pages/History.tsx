@@ -25,7 +25,17 @@ import { useEffect, useState } from "react";
 
 const History = () => {
   const { t } = useTranslation();
-  const { history, play, pause, isPlaying, favorites, toggleFavorite, setHistory, currentSong } = usePlayer();
+  const { 
+    history, 
+    play, 
+    pause, 
+    isPlaying, 
+    favorites, 
+    toggleFavorite, 
+    setHistory, 
+    currentSong,
+    setQueue 
+  } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [songToReport, setSongToReport] = React.useState<any>(null);
@@ -180,6 +190,9 @@ const History = () => {
       return;
     }
 
+    const updatedQueue = [song, ...history.filter(s => s.id !== song.id)];
+    setQueue(updatedQueue);
+    
     play(song);
   };
 
