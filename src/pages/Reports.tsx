@@ -127,14 +127,16 @@ const Reports = () => {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1 ml-64 p-8">
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle>Signalements</CardTitle>
-            <CardDescription>
+        <div className="rounded-lg border border-border bg-background/50 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+          <div className="flex flex-col space-y-1.5 p-6">
+            <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
+              Signalements
+            </h3>
+            <p className="text-sm text-muted-foreground">
               Gérez les signalements de contenu inapproprié
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="p-6 pt-0">
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
@@ -205,8 +207,8 @@ const Reports = () => {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
