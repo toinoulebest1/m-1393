@@ -15,24 +15,36 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+interface RequestPayload {
+  isTest?: boolean;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Calculer les dates pour hier
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
+    // Vérifier si c'est un test
+    const payload: RequestPayload = await req.json().catch(() => ({}));
+    const isTest = payload.isTest === true;
+
+    // Calculer les dates
+    const now = new Date();
+    const reportDate = new Date(now);
     
-    // Début de la journée d'hier (00:00:00)
-    const startOfYesterday = new Date(yesterday.setHours(0, 0, 0, 0));
-    // Fin de la journée d'hier (23:59:59)
-    const endOfYesterday = new Date(yesterday.setHours(23, 59, 59, 999));
+    if (!isTest) {
+      // En production, on regarde les stats d'hier
+      reportDate.setDate(reportDate.getDate() - 1);
+    }
+    
+    // Début de la journée (00:00:00)
+    const startOfDay = new Date(reportDate.setHours(0, 0, 0, 0));
+    // Fin de la journée (23:59:59)
+    const endOfDay = new Date(reportDate.setHours(23, 59, 59, 999));
 
     // Purger les anciens signalements résolus ou rejetés (plus vieux que 30 jours)
-    const thirtyDaysAgo = new Date();
+    const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const { data: deleteData, error: deleteError } = await supabaseClient
@@ -47,12 +59,12 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Purge des anciens signalements effectuée avec succès");
     }
 
-    // Récupérer les statistiques d'hier
+    // Récupérer les statistiques
     const { data: stats, error: statsError } = await supabaseClient
       .from('song_reports')
       .select('status')
-      .gte('created_at', startOfYesterday.toISOString())
-      .lte('created_at', endOfYesterday.toISOString())
+      .gte('created_at', startOfDay.toISOString())
+      .lte('created_at', endOfDay.toISOString())
       .in('status', ['pending', 'resolved', 'rejected']);
 
     if (statsError) {
@@ -64,8 +76,8 @@ const handler = async (req: Request): Promise<Response> => {
     const rejected = stats.filter(r => r.status === 'rejected').length;
     const total = stats.length;
 
-    // Date d'hier pour l'affichage
-    const date = yesterday.toLocaleDateString('fr-FR', {
+    // Date pour l'affichage
+    const date = reportDate.toLocaleDateString('fr-FR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -75,11 +87,11 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: emailResponse, error: emailError } = await resend.emails.send({
       from: "Rapports de Signalements <onboarding@resend.dev>",
       to: "saumonlol5@gmail.com",
-      subject: "Rapport des Signalements du " + date,
+      subject: `Rapport des Signalements du ${date}${isTest ? ' (TEST)' : ''}`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-            Rapport des Signalements
+            Rapport des Signalements${isTest ? ' (TEST)' : ''}
           </h1>
           
           <p style="color: #666;">
@@ -112,7 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           <p style="color: #666; font-size: 14px; text-align: center;">
-            Ce rapport contient les statistiques des signalements de la journée du ${date}.<br>
+            Ce rapport contient les statistiques des signalements ${isTest ? "d'aujourd'hui" : "de la journée du " + date}.<br>
             Une purge automatique des signalements résolus et rejetés de plus de 30 jours a été effectuée.
           </p>
         </div>

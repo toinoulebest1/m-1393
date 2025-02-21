@@ -142,7 +142,9 @@ const Reports = () => {
   const handleSendTestReport = async () => {
     try {
       setSendingTestReport(true);
-      const { data, error } = await supabase.functions.invoke('send-weekly-reports');
+      const { data, error } = await supabase.functions.invoke('send-weekly-reports', {
+        body: { isTest: true }
+      });
       
       if (error) {
         console.error("Erreur lors de l'envoi du rapport test:", error);
