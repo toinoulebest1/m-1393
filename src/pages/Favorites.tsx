@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -138,8 +139,8 @@ const Favorites = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-hidden ml-64">
-        <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex items-center space-x-6 mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
               <Heart className="w-10 h-10 text-white animate-scale-in" />
@@ -270,3 +271,4 @@ const Favorites = () => {
 };
 
 export default Favorites;
+
