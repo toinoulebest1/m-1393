@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,14 @@ const Search = () => {
       setDominantColor(null);
     }
   };
+
+  useEffect(() => {
+    if (currentSong?.image_url && !currentSong.image_url.includes('picsum.photos')) {
+      extractDominantColor(currentSong.image_url);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.image_url]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
