@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UserCog, Upload, Loader2, Clock, CalendarDays } from "lucide-react";
@@ -173,9 +174,9 @@ export const AccountSettingsDialog = () => {
               <label htmlFor="avatar-upload">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   disabled={isUploading}
-                  className="cursor-pointer"
+                  className="cursor-pointer bg-spotify-accent hover:bg-spotify-accent/80"
                   asChild
                 >
                   <span>
