@@ -149,10 +149,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           .select('song_id')
           .eq('user_id', session.user.id);
 
-        if (favError) {
-          console.error("Erreur lors du chargement des favoris:", favError);
-          return;
-        }
+        if (favError) throw favError;
 
         if (favStats && favStats.length > 0) {
           const { data: favoriteSongs, error: songsError } = await supabase
@@ -160,10 +157,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             .select('*')
             .in('id', favStats.map(row => row.song_id));
 
-          if (songsError) {
-            console.error("Erreur lors du chargement des chansons favorites:", songsError);
-            return;
-          }
+          if (songsError) throw songsError;
 
           if (favoriteSongs) {
             console.log("Favoris chargés:", favoriteSongs);
@@ -185,7 +179,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     loadFavorites();
-  }, []); // Charger les favoris au montage du composant
+  }, []);
 
   useEffect(() => {
     const setupRealtimeFavorites = async () => {
@@ -249,7 +243,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setupRealtimeFavorites();
-  }, []); // Exécuté une seule fois au montage du composant
+  }, []);
 
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
