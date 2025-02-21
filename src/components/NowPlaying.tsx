@@ -150,24 +150,43 @@ export const NowPlaying = () => {
       img.crossOrigin = 'Anonymous';
       
       await new Promise((resolve, reject) => {
-        img.onload = resolve;
+        img.onload = () => {
+          try {
+            const colorThief = new ColorThief();
+            const color = colorThief.getColor(img);
+            const saturatedColor: [number, number, number] = [
+              Math.min(255, color[0] * 1.4),
+              Math.min(255, color[1] * 1.4),
+              Math.min(255, color[2] * 1.4)
+            ];
+            setDominantColor(saturatedColor);
+            resolve(true);
+          } catch (error) {
+            console.error('Erreur ColorThief:', error);
+            reject(error);
+          }
+        };
         img.onerror = reject;
-        img.src = imageUrl;
+        
+        img.src = `${imageUrl}${imageUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
       });
-
-      const colorThief = new ColorThief();
-      const color = colorThief.getColor(img);
-      const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2),
-        Math.min(255, color[1] * 1.2),
-        Math.min(255, color[2] * 1.2)
-      ];
-      setDominantColor(saturatedColor);
     } catch (error) {
       console.error('Erreur lors de l\'extraction de la couleur:', error);
       setDominantColor(null);
     }
   };
+
+  useEffect(() => {
+    const initColor = async () => {
+      if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+        await extractDominantColor(currentSong.imageUrl);
+      } else {
+        setDominantColor(null);
+      }
+    };
+
+    initColor();
+  }, [currentSong?.imageUrl]);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -221,14 +240,6 @@ export const NowPlaying = () => {
       supabase.removeChannel(channel);
     };
   }, [isAdmin]);
-
-  useEffect(() => {
-    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
-      extractDominantColor(currentSong.imageUrl);
-    } else {
-      setDominantColor(null);
-    }
-  }, [currentSong?.imageUrl]);
 
   const createFloatingHearts = () => {
     const numberOfHearts = 15;
@@ -339,11 +350,11 @@ export const NowPlaying = () => {
             const isCurrentSong = currentSong?.id === song.id;
             const glowStyle = isCurrentSong && dominantColor ? {
               boxShadow: `
-                0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                0 0 15px 8px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4),
+                0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                0 0 45px 22px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
               `,
-              transition: 'box-shadow 0.3s ease-in-out',
+              transition: 'box-shadow 0.5s ease-in-out, transform 0.3s ease-in-out',
               transform: 'scale(1.02)',
             } : {};
             
@@ -382,7 +393,7 @@ export const NowPlaying = () => {
                       src={song.imageUrl || "https://picsum.photos/56/56"}
                       alt={t('common.track')}
                       className={cn(
-                        "w-14 h-14 rounded-lg shadow-lg",
+                        "w-14 h-14 rounded-lg shadow-lg object-cover",
                         isCurrentSong && "animate-pulse"
                       )}
                       style={glowStyle}
