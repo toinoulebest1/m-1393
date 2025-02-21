@@ -110,9 +110,7 @@ const handler = async (req: Request): Promise<Response> => {
 
           <p style="color: #666; font-size: 14px; text-align: center;">
             Ce rapport contient les statistiques des signalements ${isTest ? "d'aujourd'hui" : "de la journée du " + date}.<br>
-            ${isTest 
-              ? "Une purge des signalements résolus et rejetés d'aujourd'hui va être effectuée dans quelques secondes." 
-              : "Une purge automatique des signalements résolus et rejetés de plus de 30 jours va être effectuée dans quelques secondes."}
+            Une purge des signalements résolus et rejetés de cette journée va être effectuée dans quelques secondes.
           </p>
         </div>
       `,
@@ -127,25 +125,13 @@ const handler = async (req: Request): Promise<Response> => {
     // Attendre 1 seconde avant la purge
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Purger les signalements selon le mode
-    let deleteQuery = supabaseClient
+    // Purger les signalements de la journée uniquement
+    const deleteQuery = supabaseClient
       .from('song_reports')
       .delete()
-      .in('status', ['resolved', 'rejected']);
-
-    if (isTest) {
-      // En mode test, on purge les signalements résolus/rejetés d'aujourd'hui
-      deleteQuery = deleteQuery
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-      console.log("Mode test: purge des signalements résolus/rejetés d'aujourd'hui");
-    } else {
-      // En production, on purge les signalements de plus de 30 jours
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      deleteQuery = deleteQuery.lt('created_at', thirtyDaysAgo.toISOString());
-      console.log("Mode production: purge des signalements de plus de 30 jours");
-    }
+      .in('status', ['resolved', 'rejected'])
+      .gte('created_at', startOfDay.toISOString())
+      .lte('created_at', endOfDay.toISOString());
 
     const { data: deleteData, error: deleteError } = await deleteQuery;
 
