@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,53 +78,55 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
 
   return (
     <AlertDialog open={!!song} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent className="max-w-sm">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Signaler un problème</AlertDialogTitle>
-          <AlertDialogDescription className="text-base">
+      <AlertDialogContent className="max-w-[400px] p-6 gap-0">
+        <AlertDialogHeader className="mb-3">
+          <AlertDialogTitle className="text-lg font-semibold">
+            Signaler un problème
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-gray-400 mt-1">
             {song?.title} - {song?.artist}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="py-4">
+        <div className="py-2">
           <RadioGroup
             value={reason}
             onValueChange={(value) => setReason(value as ReportReason)}
             className="gap-3"
           >
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3 [&>span]:text-sm">
               <RadioGroupItem value="audio_quality" id="audio_quality" />
-              <Label htmlFor="audio_quality" className="text-base font-normal">
+              <Label htmlFor="audio_quality" className="text-sm font-normal">
                 Qualité audio médiocre
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3 [&>span]:text-sm">
               <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
-              <Label htmlFor="wrong_metadata" className="text-base font-normal">
+              <Label htmlFor="wrong_metadata" className="text-sm font-normal">
                 Métadonnées incorrectes
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3 [&>span]:text-sm">
               <RadioGroupItem value="corrupted_file" id="corrupted_file" />
-              <Label htmlFor="corrupted_file" className="text-base font-normal">
+              <Label htmlFor="corrupted_file" className="text-sm font-normal">
                 Fichier corrompu
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3 [&>span]:text-sm">
               <RadioGroupItem value="other" id="other" />
-              <Label htmlFor="other" className="text-base font-normal">
+              <Label htmlFor="other" className="text-sm font-normal">
                 Autre problème
               </Label>
             </div>
           </RadioGroup>
         </div>
 
-        <AlertDialogFooter>
+        <AlertDialogFooter className="mt-6">
           <Button
             variant="default"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-normal h-9"
           >
             {isSubmitting ? "En cours..." : "Envoyer le signalement"}
           </Button>
