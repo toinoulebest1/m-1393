@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -160,9 +159,10 @@ const Search = () => {
   return (
     <div className="flex min-h-screen relative overflow-hidden">
       <Sidebar />
-      <div className="flex-1 ml-64 p-8 pb-32">
-        <style>
-          {`
+      <div className="flex-1 ml-64 p-8 pb-32 flex justify-center">
+        <div className="w-full max-w-4xl">
+          <style>
+            {`
             @keyframes pulse-glow {
               0%, 100% {
                 transform: scale(1);
@@ -189,219 +189,220 @@ const Search = () => {
               animation: pulse-glow 3s ease-in-out infinite;
             }
           `}
-        </style>
+          </style>
 
-        <div className="max-w-3xl mx-auto">
-          <div className="flex gap-4 mb-8">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input
-                type="text"
-                placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10"
-                disabled={searchFilter === "genre"}
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
-                <SlidersHorizontal className="h-5 w-5" />
-                <span className="text-sm">
-                  {searchFilter === "all" ? "Tout" : 
-                   searchFilter === "title" ? "Titre" : 
-                   searchFilter === "artist" ? "Artiste" : "Genre"}
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => {
-                  setSearchFilter("all");
-                  setSelectedGenre("");
-                }}>
-                  Tout
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  setSearchFilter("title");
-                  setSelectedGenre("");
-                }}>
-                  Titre
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  setSearchFilter("artist");
-                  setSelectedGenre("");
-                }}>
-                  Artiste
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
-                  <Music className="h-4 w-4 mr-2" />
-                  Genre musical
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {searchFilter === "genre" && (
+          <div className="mb-8">
+            <div className="flex gap-4 mb-8">
+              <div className="relative flex-1">
+                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+                <Input
+                  type="text"
+                  placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10"
+                  disabled={searchFilter === "genre"}
+                />
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
-                  <Music className="h-5 w-5" />
+                  <SlidersHorizontal className="h-5 w-5" />
                   <span className="text-sm">
-                    {selectedGenre || "Sélectionner un genre"}
+                    {searchFilter === "all" ? "Tout" : 
+                     searchFilter === "title" ? "Titre" : 
+                     searchFilter === "artist" ? "Artiste" : "Genre"}
                   </span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {GENRES.map((genre) => (
-                    <DropdownMenuItem 
-                      key={genre}
-                      onClick={() => setSelectedGenre(genre)}
-                    >
-                      {genre}
-                    </DropdownMenuItem>
-                  ))}
+                  <DropdownMenuItem onClick={() => {
+                    setSearchFilter("all");
+                    setSelectedGenre("");
+                  }}>
+                    Tout
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setSearchFilter("title");
+                    setSelectedGenre("");
+                  }}>
+                    Titre
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setSearchFilter("artist");
+                    setSelectedGenre("");
+                  }}>
+                    Artiste
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
+                    <Music className="h-4 w-4 mr-2" />
+                    Genre musical
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              {searchFilter === "genre" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
+                    <Music className="h-5 w-5" />
+                    <span className="text-sm">
+                      {selectedGenre || "Sélectionner un genre"}
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {GENRES.map((genre) => (
+                      <DropdownMenuItem 
+                        key={genre}
+                        onClick={() => setSelectedGenre(genre)}
+                      >
+                        {genre}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
-          ) : results.length > 0 ? (
-            <div className="space-y-2">
-              {results.map((song, index) => {
-                const isFavorite = favorites.some(s => s.id === song.id);
-                const isCurrentSong = currentSong?.id === song.id;
-                const glowStyle = isCurrentSong && dominantColor ? {
-                  "--glow-shadow": `
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              </div>
+            ) : results.length > 0 ? (
+              <div className="space-y-2">
+                {results.map((song, index) => {
+                  const isFavorite = favorites.some(s => s.id === song.id);
+                  const isCurrentSong = currentSong?.id === song.id;
+                  const glowStyle = isCurrentSong && dominantColor ? {
+                    "--glow-shadow": `
                     0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
                     0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
                     0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
                   `,
-                } as React.CSSProperties : {};
+                  } as React.CSSProperties : {};
 
-                return (
-                  <div
-                    key={song.id}
-                    className={cn(
-                      "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer",
-                      isCurrentSong ? "bg-white/5 backdrop-blur-sm" : "hover:bg-white/5",
-                      "transform hover:scale-[1.02] hover:-translate-y-0.5 transition-transform duration-300"
-                    )}
-                    style={{ 
-                      animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                      opacity: 0,
-                    }}
-                    onClick={() => handlePlay(song)}
-                  >
-                    {isCurrentSong && (
-                      <div className="absolute inset-0 z-0 overflow-hidden rounded-lg">
-                        <div 
-                          className="absolute inset-0 animate-gradient opacity-20" 
-                          style={{
-                            backgroundSize: '200% 200%',
-                            animation: 'gradient 3s linear infinite',
-                            background: dominantColor 
-                              ? `linear-gradient(45deg, 
+                  return (
+                    <div
+                      key={song.id}
+                      className={cn(
+                        "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer",
+                        isCurrentSong ? "bg-white/5 backdrop-blur-sm" : "hover:bg-white/5",
+                        "transform hover:scale-[1.02] hover:-translate-y-0.5 transition-transform duration-300"
+                      )}
+                      style={{ 
+                        animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                        opacity: 0,
+                      }}
+                      onClick={() => handlePlay(song)}
+                    >
+                      {isCurrentSong && (
+                        <div className="absolute inset-0 z-0 overflow-hidden rounded-lg">
+                          <div 
+                            className="absolute inset-0 animate-gradient opacity-20" 
+                            style={{
+                              backgroundSize: '200% 200%',
+                              animation: 'gradient 3s linear infinite',
+                              background: dominantColor 
+                                ? `linear-gradient(45deg, 
                                   rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
                                   rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
                                 )`
-                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="relative z-10 flex items-center justify-between w-full group">
-                      <div className="flex items-center flex-1">
-                        <div 
-                          className={cn(
-                            "relative overflow-hidden rounded-md transition-transform duration-300",
-                            isCurrentSong && "animate-pulse-glow"
-                          )}
-                          style={glowStyle}
-                        >
-                          <img
-                            src={song.imageUrl || "https://picsum.photos/56/56"}
-                            alt={song.title}
-                            className="w-14 h-14 object-cover rounded-md"
+                                : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                            }}
                           />
                         </div>
-                        <div className="ml-4">
-                          <h3 className={cn(
-                            "font-medium transform transition-all duration-300",
-                            isCurrentSong ? "text-white scale-105" : "text-spotify-neutral group-hover:text-white group-hover:scale-105"
-                          )}>
-                            {song.title}
-                          </h3>
-                          <p className={cn(
-                            "text-sm transition-all duration-300",
+                      )}
+
+                      <div className="relative z-10 flex items-center justify-between w-full group">
+                        <div className="flex items-center flex-1">
+                          <div 
+                            className={cn(
+                              "relative overflow-hidden rounded-md transition-transform duration-300",
+                              isCurrentSong && "animate-pulse-glow"
+                            )}
+                            style={glowStyle}
+                          >
+                            <img
+                              src={song.imageUrl || "https://picsum.photos/56/56"}
+                              alt={song.title}
+                              className="w-14 h-14 object-cover rounded-md"
+                            />
+                          </div>
+                          <div className="ml-4">
+                            <h3 className={cn(
+                              "font-medium transform transition-all duration-300",
+                              isCurrentSong ? "text-white scale-105" : "text-spotify-neutral group-hover:text-white group-hover:scale-105"
+                            )}>
+                              {song.title}
+                            </h3>
+                            <p className={cn(
+                              "text-sm transition-all duration-300",
+                              isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                            )}>
+                              {song.artist}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-6">
+                          <div className={cn(
+                            "flex items-center space-x-1",
                             isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
                           )}>
-                            {song.artist}
-                          </p>
-                        </div>
-                      </div>
+                            <Clock className="w-4 h-4" />
+                            <span className="text-sm">{song.duration || "0:00"}</span>
+                          </div>
 
-                      <div className="flex items-center space-x-6">
-                        <div className={cn(
-                          "flex items-center space-x-1",
-                          isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
-                        )}>
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{song.duration || "0:00"}</span>
-                        </div>
+                          <div className={cn(
+                            "flex items-center space-x-1",
+                            isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                          )}>
+                            <Signal className="w-4 h-4" />
+                            <span className="text-sm">{song.bitrate || "320 kbps"}</span>
+                          </div>
 
-                        <div className={cn(
-                          "flex items-center space-x-1",
-                          isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
-                        )}>
-                          <Signal className="w-4 h-4" />
-                          <span className="text-sm">{song.bitrate || "320 kbps"}</span>
-                        </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(song);
+                              }}
+                              className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
+                            >
+                              <Heart
+                                className={cn(
+                                  "w-5 h-5 transition-all duration-300 hover:scale-110",
+                                  isFavorite
+                                    ? "text-red-500 fill-red-500"
+                                    : "text-spotify-neutral hover:text-white"
+                                )}
+                              />
+                            </button>
 
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(song);
-                            }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
-                          >
-                            <Heart
-                              className={cn(
-                                "w-5 h-5 transition-all duration-300 hover:scale-110",
-                                isFavorite
-                                  ? "text-red-500 fill-red-500"
-                                  : "text-spotify-neutral hover:text-white"
-                              )}
-                            />
-                          </button>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSongToReport(song);
-                            }}
-                            className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
-                          >
-                            <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
-                          </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSongToReport(song);
+                              }}
+                              className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
+                            >
+                              <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : searchQuery ? (
-            <div className="text-center py-12 text-muted-foreground animate-fade-in">
-              Aucun résultat trouvé pour "{searchQuery}"
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground animate-fade-in">
-              Commencez à taper pour rechercher des chansons...
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            ) : searchQuery ? (
+              <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                Aucun résultat trouvé pour "{searchQuery}"
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                Commencez à taper pour rechercher des chansons...
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <Player />
