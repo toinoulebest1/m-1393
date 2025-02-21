@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
@@ -255,24 +256,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const nextSong = () => {
-    fadingRef.current = false;
-    nextAudioRef.current.volume = 0;
-    audioRef.current.volume = 1;
+    if (!currentSong || queue.length === 0) return;
     
-    const next = getNextSong();
-    if (next) {
-      play(next);
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    if (currentIndex === -1) return;
+    
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < queue.length) {
+      play(queue[nextIndex]);
     } else if (repeatMode === 'all') {
       play(queue[0]);
     }
   };
 
   const previousSong = () => {
-    fadingRef.current = false;
-    nextAudioRef.current.volume = 0;
-    audioRef.current.volume = 1;
+    if (!currentSong || queue.length === 0) return;
     
-    const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    if (currentIndex === -1) return;
+    
     if (currentIndex > 0) {
       play(queue[currentIndex - 1]);
     }
@@ -776,3 +778,5 @@ export const usePlayer = () => {
   }
   return context;
 };
+
+export default PlayerProvider;
