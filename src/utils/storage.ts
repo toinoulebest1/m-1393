@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
@@ -53,7 +54,7 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // First check if the file exists
+    // Vérifier d'abord si le fichier existe
     const { data: fileExists } = await supabase.storage
       .from('audio')
       .list('', {
@@ -65,9 +66,10 @@ export const getAudioFile = async (path: string) => {
       throw new Error("Fichier audio non trouvé");
     }
 
+    // Générer une URL signée valide pendant 1 heure
     const { data, error } = await supabase.storage
       .from('audio')
-      .createSignedUrl(path, 3600);
+      .createSignedUrl(path, 3600); // 3600 secondes = 1 heure
 
     if (error) {
       console.error("Erreur lors de la récupération du fichier:", error);
