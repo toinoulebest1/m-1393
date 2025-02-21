@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -33,6 +32,39 @@ const Search = () => {
   const [songToReport, setSongToReport] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+
+  const extractDominantColor = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
+      ];
+      setDominantColor(saturatedColor);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
+
+  useEffect(() => {
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -85,6 +117,9 @@ const Search = () => {
   };
 
   const handlePlay = (song: any) => {
+    if (song.imageUrl && !song.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(song.imageUrl);
+    }
     const updatedQueue = [song, ...results.filter(s => s.id !== song.id)];
     setQueue(updatedQueue);
     play(song);
