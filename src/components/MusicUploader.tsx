@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -7,7 +6,6 @@ import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
 
 interface Song {
   id: string;
@@ -23,6 +21,28 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadToastId, setUploadToastId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isUploading && uploadProgress > 0) {
+      if (!uploadToastId) {
+        const id = toast.loading("Upload en cours...", {
+          description: `${uploadProgress}%`
+        });
+        setUploadToastId(id);
+      } else {
+        toast.loading("Upload en cours...", {
+          id: uploadToastId,
+          description: `${uploadProgress}%`
+        });
+      }
+    } else if (!isUploading && uploadToastId) {
+      toast.success("Upload terminé!", {
+        id: uploadToastId
+      });
+      setUploadToastId(null);
+    }
+  }, [uploadProgress, isUploading]);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -123,7 +143,7 @@ export const MusicUploader = () => {
     console.log("Début du traitement pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
-      console.warn("Fichier non audio ignoré:", file.name);
+      toast.error("Type de fichier non supporté");
       return null;
     }
 
@@ -134,7 +154,6 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Simuler la progression de l'upload
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           const newProgress = prev + 5;
@@ -222,6 +241,7 @@ export const MusicUploader = () => {
 
     } catch (error) {
       console.error("Erreur lors du traitement du fichier:", error);
+      toast.error("Erreur lors de l'upload du fichier");
       setIsUploading(false);
       setUploadProgress(0);
       return null;
@@ -247,7 +267,7 @@ export const MusicUploader = () => {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4">
       <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
         <Upload className="w-5 h-5" />
         <span>{t('common.upload')}</span>
@@ -259,12 +279,6 @@ export const MusicUploader = () => {
           onChange={handleFileUpload}
         />
       </label>
-      {isUploading && (
-        <div className="space-y-2">
-          <Progress value={uploadProgress} className="w-full" />
-          <p className="text-sm text-spotify-neutral">{uploadProgress}%</p>
-        </div>
-      )}
     </div>
   );
 };
