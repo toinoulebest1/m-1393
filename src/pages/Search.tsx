@@ -138,24 +138,17 @@ const Search = () => {
   };
 
   const handlePlay = (song: any) => {
-    // Si on clique sur la musique en cours de lecture
     if (currentSong?.id === song.id) {
-      // Si la musique est en cours de lecture, on la met en pause
       if (isPlaying) {
         pause();
       } else {
-        // Sinon, on reprend la lecture
         play();
       }
       return;
     }
 
-    // Si c'est une nouvelle musique
-    if (song.imageUrl && !song.imageUrl.includes('picsum.photos')) {
-      extractDominantColor(song.imageUrl);
-    }
-    const updatedQueue = [song, ...results.filter(s => s.id !== song.id)];
-    setQueue(updatedQueue);
+    setQueue([song]);
+    
     play(song);
   };
 
