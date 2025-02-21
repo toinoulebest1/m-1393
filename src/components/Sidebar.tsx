@@ -47,7 +47,6 @@ export const Sidebar = () => {
     { to: "/top100", icon: Trophy, label: t('common.top100') }
   ];
 
-  // Ajouter le lien vers les signalements pour les admins
   if (isAdmin) {
     links.push({ to: "/reports", icon: Flag, label: "Signalements" });
   }
@@ -68,7 +67,7 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 bg-spotify-dark p-6 flex flex-col h-screen">
+    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-screen z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
           <Music2 className="w-8 h-8 text-spotify-accent" />
