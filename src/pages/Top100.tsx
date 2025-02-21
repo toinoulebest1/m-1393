@@ -541,6 +541,7 @@ const Top100 = () => {
                         >
                           <FileText className="w-5 h-5" />
                         </Button>
+                        {/* Afficher le bouton de suppression uniquement pour les administrateurs */}
                         {isAdmin && (
                           <Button
                             variant="ghost"
