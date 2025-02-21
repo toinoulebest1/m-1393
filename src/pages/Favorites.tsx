@@ -23,7 +23,7 @@ const Favorites = () => {
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isChanging, setIsChanging] = React.useState(false);
-  const changeTimeoutRef = React.useRef<number | null>(null);
+  const debounceTimeout = React.useRef<number | null>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -60,9 +60,6 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
-      // Si un changement est déjà en cours, on ignore
-      if (isChanging) return;
-
       // Si la chanson est déjà en cours de lecture, on met en pause
       if (currentSong?.id === song.id) {
         if (isPlaying) {
@@ -73,37 +70,27 @@ const Favorites = () => {
         return;
       }
 
-      // On indique qu'un changement est en cours
-      setIsChanging(true);
-
-      // On annule tout timeout précédent
-      if (changeTimeoutRef.current) {
-        window.clearTimeout(changeTimeoutRef.current);
+      // On annule le debounce précédent s'il existe
+      if (debounceTimeout.current) {
+        window.clearTimeout(debounceTimeout.current);
       }
+
+      // On crée une nouvelle file d'attente à partir de la liste complète des favoris
+      const newQueue = [...favorites];
+      setQueue(newQueue);
       
       // On trouve l'index de la chanson sélectionnée
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
       
-      // On crée une nouvelle file d'attente à partir de la liste complète des favoris
-      const newQueue = [...favorites];
-      
-      // On met à jour la file d'attente complète
-      setQueue(newQueue);
-      
-      // On joue la chanson sélectionnée
-      await play(newQueue[songIndex]);
-      
-      toast.success(`Lecture de ${song.title}`);
-
-      // On réinitialise l'état de changement après un court délai
-      changeTimeoutRef.current = window.setTimeout(() => {
-        setIsChanging(false);
-      }, 500); // 500ms de délai minimum entre les changements
+      // On met un petit délai avant de lancer la lecture
+      debounceTimeout.current = window.setTimeout(async () => {
+        await play(newQueue[songIndex]);
+        toast.success(`Lecture de ${song.title}`);
+      }, 100);
 
     } catch (error) {
       console.error("Error playing song:", error);
       toast.error("Erreur lors de la lecture de la musique");
-      setIsChanging(false);
     }
   };
 
@@ -132,8 +119,8 @@ const Favorites = () => {
 
   React.useEffect(() => {
     return () => {
-      if (changeTimeoutRef.current) {
-        window.clearTimeout(changeTimeoutRef.current);
+      if (debounceTimeout.current) {
+        window.clearTimeout(debounceTimeout.current);
       }
     };
   }, []);

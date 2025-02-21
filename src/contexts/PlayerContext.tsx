@@ -147,7 +147,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const play = async (song?: Song) => {
-    fadingRef.current = false;
+    // Si une lecture est déjà en cours, on l'annule
+    if (fadingRef.current) {
+      console.log("Une transition est déjà en cours, annulation...");
+      if (nextAudioRef.current) {
+        nextAudioRef.current.pause();
+        nextAudioRef.current.currentTime = 0;
+      }
+      fadingRef.current = false;
+    }
+
+    // On s'assure que le volume est réinitialisé
+    if (audioRef.current) {
+      audioRef.current.volume = 1;
+    }
+    if (nextAudioRef.current) {
+      nextAudioRef.current.volume = 0;
+    }
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setCurrentSong(song);
@@ -181,9 +197,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
-        audioRef.current.volume = 1;
-        nextAudioRef.current.volume = 0;
-        
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
         audioRef.current.load();
