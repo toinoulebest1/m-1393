@@ -189,7 +189,7 @@ const Search = () => {
                             alt={song.title}
                             className={cn(
                               "w-14 h-14 object-cover rounded-md transition-all duration-500",
-                              isCurrentSong ? "scale-105 animate-pulse" : "group-hover:scale-105"
+                              isCurrentSong ? "scale-105 [animation:pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]" : "group-hover:scale-105"
                             )}
                           />
                           <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
