@@ -137,17 +137,14 @@ const Search = () => {
       <div className="flex-1 ml-64 p-8 pb-32">
         <style>
           {`
-            @keyframes float-up {
-              0% {
-                transform: translate(0, 0);
-                opacity: 0;
+            @keyframes pulse-glow {
+              0%, 100% {
+                transform: scale(1);
+                box-shadow: none;
               }
-              10% {
-                opacity: 1;
-              }
-              100% {
-                transform: translate(${-50 + Math.random() * 100}px, -${window.innerHeight}px);
-                opacity: 0;
+              50% {
+                transform: scale(1.05);
+                box-shadow: var(--glow-shadow);
               }
             }
 
@@ -160,6 +157,10 @@ const Search = () => {
             .animate-gradient {
               background-size: 200% 200%;
               animation: gradient 3s linear infinite;
+            }
+
+            .animate-pulse-glow {
+              animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             }
           `}
         </style>
@@ -245,14 +246,12 @@ const Search = () => {
                 const isFavorite = favorites.some(s => s.id === song.id);
                 const isCurrentSong = currentSong?.id === song.id;
                 const glowStyle = isCurrentSong && dominantColor ? {
-                  boxShadow: `
+                  "--glow-shadow": `
                     0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
                     0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
                     0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
                   `,
-                  transition: 'all 0.3s ease-in-out',
-                  transform: isCurrentSong ? 'scale(1.05)' : 'scale(1)',
-                } : {};
+                } as React.CSSProperties : {};
 
                 return (
                   <div
@@ -290,18 +289,15 @@ const Search = () => {
                       <div className="flex items-center flex-1">
                         <div 
                           className={cn(
-                            "relative overflow-hidden rounded-md transform transition-transform duration-300",
-                            isCurrentSong ? "scale-105" : "group-hover:scale-105"
+                            "relative overflow-hidden rounded-md transition-transform duration-300",
+                            isCurrentSong && "animate-pulse-glow"
                           )}
                           style={glowStyle}
                         >
                           <img
                             src={song.imageUrl || "https://picsum.photos/56/56"}
                             alt={song.title}
-                            className={cn(
-                              "w-14 h-14 object-cover rounded-md",
-                              isCurrentSong && "animate-pulse"
-                            )}
+                            className="w-14 h-14 object-cover rounded-md"
                           />
                         </div>
                         <div className="ml-4">
