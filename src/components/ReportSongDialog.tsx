@@ -1,5 +1,4 @@
 
-```typescript
 import { useState } from "react";
 import {
   AlertDialog,
@@ -159,4 +158,3 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
     </AlertDialog>
   );
 };
-```
