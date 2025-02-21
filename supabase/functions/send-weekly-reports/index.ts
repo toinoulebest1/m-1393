@@ -21,9 +21,21 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Calculer les dates pour hier
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    // Début de la journée d'hier (00:00:00)
+    const startOfYesterday = new Date(yesterday.setHours(0, 0, 0, 0));
+    // Fin de la journée d'hier (23:59:59)
+    const endOfYesterday = new Date(yesterday.setHours(23, 59, 59, 999));
+
     const { data: stats, error: statsError } = await supabaseClient
       .from('song_reports')
       .select('status')
+      .gte('created_at', startOfYesterday.toISOString())
+      .lte('created_at', endOfYesterday.toISOString())
       .in('status', ['pending', 'resolved', 'rejected']);
 
     if (statsError) {
@@ -35,7 +47,8 @@ const handler = async (req: Request): Promise<Response> => {
     const rejected = stats.filter(r => r.status === 'rejected').length;
     const total = stats.length;
 
-    const date = new Date().toLocaleDateString('fr-FR', {
+    // Date d'hier pour l'affichage
+    const date = yesterday.toLocaleDateString('fr-FR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -45,15 +58,15 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: emailResponse, error: emailError } = await resend.emails.send({
       from: "Rapports de Signalements <onboarding@resend.dev>",
       to: "saumonlol5@gmail.com",
-      subject: "Rapport Quotidien des Signalements",
+      subject: "Rapport des Signalements du " + date,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-            Rapport Quotidien des Signalements
+            Rapport des Signalements
           </h1>
           
           <p style="color: #666;">
-            Rapport généré le ${date}
+            Statistiques du ${date}
           </p>
 
           <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -82,7 +95,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           <p style="color: #666; font-size: 14px; text-align: center;">
-            Ce rapport est généré automatiquement chaque jour.
+            Ce rapport contient les statistiques des signalements de la journée du ${date}.
           </p>
         </div>
       `,
