@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
@@ -10,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
+import ColorThief from 'colorthief';
 import {
   Table,
   TableBody,
@@ -42,6 +42,40 @@ const Top100 = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+
+  const extractDominantColor = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
+      ];
+      setDominantColor(saturatedColor);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
+
+  useEffect(() => {
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('unsplash.com')) {
+      extractDominantColor(currentSong.imageUrl);
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -240,6 +274,9 @@ const Top100 = () => {
 
       await play(song);
       console.log("Lecture démarrée:", song.title);
+      if (song.image_url) {
+        await extractDominantColor(song.image_url);
+      }
       
       const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
       const remainingSongs = favoriteStats
@@ -370,7 +407,7 @@ const Top100 = () => {
           
           <div className="flex items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
-              <Award className="w-8 h-8 text-spotify-accent" />
+              <Award className="w-8 h-8 text-spotify-accent animate-pulse" />
               <h1 className="text-2xl font-bold">Top 100 Communautaire</h1>
             </div>
           </div>
@@ -387,91 +424,119 @@ const Top100 = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {favoriteStats.map((stat, index) => (
-                <TableRow
-                  key={stat.songId}
-                  className="group hover:bg-white/10 transition-colors cursor-pointer border-white/5"
-                  onClick={() => handlePlay(stat.song)}
-                >
-                  <TableCell className="font-medium text-white">
-                    {currentSong?.id === stat.song.id && isPlaying ? (
-                      <div className="w-4 h-4 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotify-accent opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-spotify-accent"></span>
+              {favoriteStats.map((stat, index) => {
+                const isCurrentSong = currentSong?.id === stat.song.id;
+                const glowStyle = isCurrentSong && dominantColor ? {
+                  boxShadow: `
+                    0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                    0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                    0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                  `,
+                  transition: 'box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out',
+                  transform: 'scale(1.02)',
+                } : {};
+
+                return (
+                  <TableRow
+                    key={stat.songId}
+                    className={`group hover:bg-white/10 transition-all duration-300 cursor-pointer border-white/5 ${
+                      isCurrentSong ? 'bg-white/5' : ''
+                    }`}
+                    onClick={() => handlePlay(stat.song)}
+                  >
+                    <TableCell className="font-medium text-white">
+                      {isCurrentSong && isPlaying ? (
+                        <div className="w-4 h-4 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotify-accent opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-4 w-4 bg-spotify-accent"></span>
+                        </div>
+                      ) : (
+                        index + 1
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={stat.song.image_url || PLACEHOLDER_IMAGE}
+                          alt={stat.song.title}
+                          className={`w-12 h-12 rounded-md object-cover transition-transform duration-300 ${
+                            isCurrentSong ? 'scale-105' : 'group-hover:scale-105'
+                          }`}
+                          style={glowStyle}
+                        />
+                        <span className={`font-medium transition-colors duration-300 ${
+                          isCurrentSong ? 'text-spotify-accent' : 'text-white group-hover:text-spotify-accent'
+                        }`}>
+                          {stat.song.title}
+                        </span>
                       </div>
-                    ) : (
-                      index + 1
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                        alt={stat.song.title}
-                        className="w-12 h-12 rounded-md object-cover"
-                      />
-                      <span className="font-medium text-white">
-                        {stat.song.title}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-spotify-neutral">
-                    {stat.song.artist}
-                  </TableCell>
-                  <TableCell className="text-spotify-neutral">
-                    {formatDuration(stat.song.duration)}
-                  </TableCell>
-                  <TableCell className="text-spotify-neutral">
-                    <div className="flex items-center space-x-2">
-                      <Heart className="w-4 h-4 text-spotify-accent fill-spotify-accent" />
-                      <span>{stat.count || 0}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 hover:bg-white/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlay(stat.song);
-                        }}
-                      >
-                        <Play className="w-5 h-5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 hover:bg-white/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedSong({
-                            id: stat.song.id,
-                            title: stat.song.title,
-                            artist: stat.song.artist,
-                          });
-                        }}
-                      >
-                        <FileText className="w-5 h-5" />
-                      </Button>
-                      {isAdmin && (
+                    </TableCell>
+                    <TableCell className="text-spotify-neutral">
+                      {stat.song.artist}
+                    </TableCell>
+                    <TableCell className="text-spotify-neutral">
+                      {formatDuration(stat.song.duration)}
+                    </TableCell>
+                    <TableCell className="text-spotify-neutral">
+                      <div className="flex items-center space-x-2">
+                        <Heart className={`w-4 h-4 transition-transform duration-300 ${
+                          isCurrentSong ? 'scale-110' : ''
+                        } text-spotify-accent fill-spotify-accent`} />
+                        <span>{stat.count || 0}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500"
+                          className={`${
+                            isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          } hover:bg-white/10 transition-all duration-300`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(stat.songId);
+                            handlePlay(stat.song);
                           }}
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Play className="w-5 h-5" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`${
+                            isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          } hover:bg-white/10 transition-all duration-300`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSong({
+                              id: stat.song.id,
+                              title: stat.song.title,
+                              artist: stat.song.artist,
+                            });
+                          }}
+                        >
+                          <FileText className="w-5 h-5" />
+                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`${
+                              isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            } hover:bg-red-500/10 text-red-500 transition-all duration-300`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(stat.songId);
+                            }}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
