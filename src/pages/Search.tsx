@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal, Music } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal, Music, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 const GENRES = [
   "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
@@ -43,6 +44,9 @@ const Search = () => {
   const [songToReport, setSongToReport] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -158,6 +162,71 @@ const Search = () => {
     }
   }, [selectedGenre, searchFilter]);
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          try {
+            const base64Audio = (reader.result as string).split(',')[1];
+            
+            const response = await fetch('https://pwknncursthenghqgevl.supabase.co/functions/v1/voice-to-text', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({ audio: base64Audio }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Erreur lors de la transcription');
+            }
+
+            const { text } = await response.json();
+            if (text) {
+              setSearchQuery(text);
+              handleSearch(text);
+              toast.success('Recherche vocale effectuée');
+            }
+          } catch (error) {
+            console.error('Erreur:', error);
+            toast.error('Erreur lors de la transcription vocale');
+          }
+        };
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.info('Enregistrement en cours...');
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast.error('Erreur lors de l\'accès au microphone');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      toast.info('Enregistrement terminé, traitement en cours...');
+    }
+  };
+
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
@@ -206,6 +275,19 @@ const Search = () => {
                   disabled={searchFilter === "genre"}
                 />
               </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "w-10 h-10 rounded-full",
+                  isRecording && "bg-red-500 hover:bg-red-600 text-white"
+                )}
+                onClick={isRecording ? stopRecording : startRecording}
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
                   <SlidersHorizontal className="h-5 w-5" />
