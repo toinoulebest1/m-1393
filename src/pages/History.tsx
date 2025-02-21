@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -245,9 +246,15 @@ const History = () => {
               Chargement de l'historique...
             </p>
           ) : history.length === 0 ? (
-            <p className="text-spotify-neutral text-center py-8">
-              {t('common.noHistory')}
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
+              <Music className="w-16 h-16 text-spotify-neutral opacity-50" />
+              <p className="text-spotify-neutral text-lg">
+                Votre historique d'écoute est vide
+              </p>
+              <p className="text-spotify-neutral text-sm">
+                Écoutez de la musique pour commencer à construire votre historique
+              </p>
+            </div>
           ) : (
             history.map((song) => {
               const isFavorite = favorites.some(s => s.id === song.id);
@@ -372,3 +379,4 @@ const History = () => {
 };
 
 export default History;
+
