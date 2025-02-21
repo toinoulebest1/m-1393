@@ -125,10 +125,12 @@ const Favorites = () => {
     return (
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
-            <Heart className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
-            <p className="text-spotify-neutral text-lg">{t('no_favorites')}</p>
+        <div className="flex-1 ml-64">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
+              <Heart className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
+              <p className="text-spotify-neutral text-lg">{t('no_favorites')}</p>
+            </div>
           </div>
         </div>
         <Player />
@@ -139,8 +141,8 @@ const Favorites = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="flex-1 ml-64">
+        <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
           <div className="flex items-center space-x-6 mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
               <Heart className="w-10 h-10 text-white animate-scale-in" />
@@ -271,4 +273,3 @@ const Favorites = () => {
 };
 
 export default Favorites;
-
