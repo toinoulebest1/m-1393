@@ -110,7 +110,17 @@ const Reports = () => {
   const handleUpdateStatus = async (reportId: string, newStatus: 'resolved' | 'rejected') => {
     try {
       setUpdateLoading(reportId);
-      console.log("Mise à jour du signalement:", reportId, "avec le statut:", newStatus);
+
+      const { data: report } = await supabase
+        .from('song_reports')
+        .select('song_id')
+        .eq('id', reportId)
+        .single();
+
+      if (!report?.song_id) {
+        toast.error("ID de la chanson introuvable");
+        return;
+      }
 
       const { data, error } = await supabase
         .from('song_reports')
@@ -370,3 +380,4 @@ const Reports = () => {
 };
 
 export default Reports;
+
