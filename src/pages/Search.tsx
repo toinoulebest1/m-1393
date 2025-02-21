@@ -17,144 +17,83 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  duration: string;
-  url: string;
-  file_path: string;
-  imageUrl?: string;
-  genre?: string;
-}
-
-type SearchFilter = "all" | "title" | "artist" | "genre";
-
 const GENRES = [
-  "Pop",
-  "Rock",
-  "Hip-Hop",
-  "R&B",
-  "Jazz",
-  "Électronique",
-  "Classique",
-  "Folk",
-  "Metal",
-  "Reggae"
+  "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
+  "Classique", "R&B", "Folk", "Blues", "Country",
+  "Reggae", "Metal", "Soul", "Funk", "Dance"
 ];
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<Song[]>([]);
+  const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { play, currentSong, favorites, toggleFavorite } = usePlayer();
+  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre">("all");
+  const [selectedGenre, setSelectedGenre] = useState("");
+  const [songToReport, setSongToReport] = useState<any>(null);
+  const { play, setQueue, queue, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
-  const [songToReport, setSongToReport] = useState<Song | null>(null);
-  const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
-  const [selectedGenre, setSelectedGenre] = useState<string>("");
-
-  const extractDominantColor = async (imageUrl: string) => {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const colorThief = new ColorThief();
-      const color = colorThief.getColor(img);
-      const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2),
-        Math.min(255, color[1] * 1.2),
-        Math.min(255, color[2] * 1.2)
-      ];
-      setDominantColor(saturatedColor);
-    } catch (error) {
-      console.error('Erreur lors de l\'extraction de la couleur:', error);
-      setDominantColor(null);
-    }
-  };
-
-  useEffect(() => {
-    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
-      extractDominantColor(currentSong.imageUrl);
-    } else {
-      setDominantColor(null);
-    }
-  }, [currentSong?.imageUrl]);
-
-  useEffect(() => {
-    if (searchFilter === "genre" && selectedGenre) {
-      handleSearch("");
-    }
-  }, [selectedGenre, searchFilter]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    if (!query.trim() && searchFilter !== "genre") {
+    if (query.length < 2 && searchFilter !== "genre") {
       setResults([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      let queryFilter = "";
-      switch (searchFilter) {
-        case "title":
-          queryFilter = `title.ilike.%${query}%`;
-          break;
-        case "artist":
-          queryFilter = `artist.ilike.%${query}%`;
-          break;
-        case "genre":
-          queryFilter = `genre.eq.${selectedGenre}`;
-          break;
-        default:
-          queryFilter = `title.ilike.%${query}%,artist.ilike.%${query}%`;
+      let queryBuilder = supabase
+        .from('songs')
+        .select('*');
+
+      if (searchFilter === "title") {
+        queryBuilder = queryBuilder.ilike('title', `%${query}%`);
+      } else if (searchFilter === "artist") {
+        queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
+      } else if (searchFilter === "genre") {
+        if (selectedGenre) {
+          queryBuilder = queryBuilder.eq('genre', selectedGenre);
+        }
+      } else {
+        queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
       }
 
-      const { data, error } = await supabase
-        .from('songs')
-        .select('*')
-        .or(queryFilter)
-        .order('created_at', { ascending: false });
+      const { data, error } = await queryBuilder;
 
       if (error) {
         throw error;
       }
 
-      const uniqueSongs = data.reduce((acc: Song[], current) => {
-        const key = `${current.title.toLowerCase()}-${(current.artist || '').toLowerCase()}`;
-        const existingSong = acc.find(song => 
-          `${song.title.toLowerCase()}-${(song.artist || '').toLowerCase()}` === key
-        );
-        
-        if (!existingSong) {
-          acc.push({
-            id: current.id,
-            title: current.title,
-            artist: current.artist || '',
-            duration: current.duration || '0:00',
-            url: current.file_path,
-            file_path: current.file_path,
-            imageUrl: current.image_url,
-            genre: current.genre
-          });
-        }
-        return acc;
-      }, []);
+      const formattedResults = data.map(song => ({
+        id: song.id,
+        title: song.title,
+        artist: song.artist || '',
+        duration: song.duration || '0:00',
+        url: song.file_path,
+        imageUrl: song.image_url,
+        bitrate: '320 kbps'
+      }));
 
-      setResults(uniqueSongs);
+      setResults(formattedResults);
     } catch (error) {
-      console.error("Erreur lors de la recherche:", error);
+      console.error('Erreur de recherche:', error);
       toast.error("Erreur lors de la recherche");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handlePlay = (song: any) => {
+    const updatedQueue = [song, ...results.filter(s => s.id !== song.id)];
+    setQueue(updatedQueue);
+    play(song);
+  };
+
+  useEffect(() => {
+    if (searchFilter === "genre" && selectedGenre) {
+      handleSearch("");
+    }
+  }, [selectedGenre, searchFilter]);
 
   return (
     <div className="flex min-h-screen">
@@ -261,7 +200,7 @@ const Search = () => {
                       animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
                       opacity: 0,
                     }}
-                    onClick={() => play(song)}
+                    onClick={() => handlePlay(song)}
                   >
                     <div className="relative z-10 flex items-center justify-between w-full">
                       <div className="flex items-center flex-1">
