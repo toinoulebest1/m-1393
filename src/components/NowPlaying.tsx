@@ -135,12 +135,37 @@ export const NowPlaying = () => {
   const [hearts, setHearts] = useState<Array<{ 
     id: number; 
     x: number; 
-    delay: number;
-    duration: number;
+    y: number;
+    scale: number;
     rotation: number;
-    bounceHeight: number;
+    delay: number;
   }>>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const extractDominantColor = async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const color = colorThief.getColor(img);
+      const saturatedColor: [number, number, number] = [
+        Math.min(255, color[0] * 1.2),
+        Math.min(255, color[1] * 1.2),
+        Math.min(255, color[2] * 1.2)
+      ];
+      setDominantColor(saturatedColor);
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction de la couleur:', error);
+      setDominantColor(null);
+    }
+  };
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -195,31 +220,6 @@ export const NowPlaying = () => {
     };
   }, [isAdmin]);
 
-  const extractDominantColor = async (imageUrl: string) => {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const colorThief = new ColorThief();
-      const color = colorThief.getColor(img);
-      const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2),
-        Math.min(255, color[1] * 1.2),
-        Math.min(255, color[2] * 1.2)
-      ];
-      setDominantColor(saturatedColor);
-    } catch (error) {
-      console.error('Erreur lors de l\'extraction de la couleur:', error);
-      setDominantColor(null);
-    }
-  };
-
   useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
       extractDominantColor(currentSong.imageUrl);
@@ -229,26 +229,22 @@ export const NowPlaying = () => {
   }, [currentSong?.imageUrl]);
 
   const createFloatingHearts = () => {
-    const numberOfHearts = 50;
-    const minDuration = 1.5;
-    const maxDuration = 3;
-    const screenWidth = window.innerWidth;
-
+    const numberOfHearts = 15;
     const newHearts = Array.from({ length: numberOfHearts }, (_, index) => ({
       id: Date.now() + index,
-      x: Math.random() * screenWidth,
-      delay: Math.random() * 1.5,
-      duration: minDuration + Math.random() * (maxDuration - minDuration),
-      rotation: Math.random() * 720 - 360,
-      bounceHeight: 30 + Math.random() * 100
+      x: Math.random() * window.innerWidth,
+      y: window.innerHeight,
+      scale: 0.5 + Math.random() * 0.5,
+      rotation: Math.random() * 360,
+      delay: index * 0.1,
     }));
 
     setHearts(prev => [...prev, ...newHearts]);
 
-    newHearts.forEach((heart, index) => {
+    newHearts.forEach(heart => {
       setTimeout(() => {
         setHearts(prev => prev.filter(h => h.id !== heart.id));
-      }, (5000 + index * 50));
+      }, 2000 + heart.delay * 1000);
     });
   };
 
@@ -273,23 +269,47 @@ export const NowPlaying = () => {
   };
 
   return (
-    <div className="flex-1 p-8">
+    <div className="flex-1 p-8 relative overflow-hidden">
       {hearts.map(heart => (
         <Heart
           key={heart.id}
-          className="floating-heart text-red-500 fill-red-500 w-6 h-6"
+          className="absolute text-red-500 fill-red-500 pointer-events-none"
           style={{
-            '--x-offset': `${Math.sin(heart.rotation) * 200}px`,
-            '--fall-duration': `${heart.duration}s`,
-            '--rotation': `${heart.rotation}deg`,
-            '--bounce-height': `${heart.bounceHeight}px`,
             left: `${heart.x}px`,
+            bottom: `${heart.y}px`,
+            transform: `scale(${heart.scale}) rotate(${heart.rotation}deg)`,
+            animation: `
+              float-up 2s ease-out forwards,
+              fade-out 2s ease-out forwards
+            `,
             animationDelay: `${heart.delay}s`,
-            opacity: 0,
-            transform: 'translateY(-10vh)',
-          } as React.CSSProperties}
+          }}
         />
       ))}
+
+      <style>
+        {`
+          @keyframes float-up {
+            0% {
+              transform: translate(0, 0) scale(${heart.scale}) rotate(${heart.rotation}deg);
+              opacity: 0;
+            }
+            10% {
+              opacity: 1;
+            }
+            100% {
+              transform: translate(${-50 + Math.random() * 100}px, -${window.innerHeight}px) scale(${heart.scale}) rotate(${heart.rotation + Math.random() * 360}deg);
+              opacity: 0;
+            }
+          }
+
+          @keyframes fade-out {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            100% { opacity: 0; }
+          }
+        `}
+      </style>
 
       <div className="flex items-center space-x-2 mb-4 p-3 border-2 border-spotify-accent rounded-lg w-fit">
         <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
