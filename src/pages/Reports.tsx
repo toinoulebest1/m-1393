@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -17,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Reports = () => {
@@ -26,6 +27,7 @@ const Reports = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [updateLoading, setUpdateLoading] = useState<string | null>(null);
+  const [sendingTestReport, setSendingTestReport] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'resolved' | 'rejected'>('pending');
 
   useEffect(() => {
@@ -137,6 +139,27 @@ const Reports = () => {
     }
   };
 
+  const handleSendTestReport = async () => {
+    try {
+      setSendingTestReport(true);
+      const { data, error } = await supabase.functions.invoke('send-weekly-reports');
+      
+      if (error) {
+        console.error("Erreur lors de l'envoi du rapport test:", error);
+        toast.error("Erreur lors de l'envoi du rapport test");
+        return;
+      }
+
+      console.log("Rapport test envoyé avec succès:", data);
+      toast.success("Rapport test envoyé avec succès");
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de l'envoi du rapport test");
+    } finally {
+      setSendingTestReport(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -187,12 +210,26 @@ const Reports = () => {
       <div className="flex-1 ml-64 p-8 pb-32 bg-spotify-dark">
         <div className="rounded-lg border border-border bg-spotify-dark/50 text-card-foreground shadow-lg">
           <div className="flex flex-col space-y-1.5 p-6">
-            <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
-              Signalements
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Gérez les signalements de contenu inapproprié
-            </p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
+                  Signalements
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Gérez les signalements de contenu inapproprié
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={handleSendTestReport}
+                disabled={sendingTestReport}
+              >
+                <Mail className="h-4 w-4" />
+                {sendingTestReport ? "Envoi..." : "Tester le rapport"}
+              </Button>
+            </div>
           </div>
           <div className="p-6 pt-0">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
