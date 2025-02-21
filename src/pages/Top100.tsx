@@ -514,45 +514,47 @@ const Top100 = () => {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlay(stat.song);
-                          }}
-                        >
-                          <Play className="w-5 h-5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedSong({
-                              id: stat.song.id,
-                              title: stat.song.title,
-                              artist: stat.song.artist,
-                            });
-                          }}
-                        >
-                          <FileText className="w-5 h-5" />
-                        </Button>
                         {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-destructive/10 text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(stat.songId);
-                            }}
-                            title="Supprimer du Top 100"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePlay(stat.song);
+                              }}
+                            >
+                              <Play className="w-5 h-5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSong({
+                                  id: stat.song.id,
+                                  title: stat.song.title,
+                                  artist: stat.song.artist,
+                                });
+                              }}
+                            >
+                              <FileText className="w-5 h-5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-destructive/10 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(stat.songId);
+                              }}
+                              title="Supprimer du Top 100"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
