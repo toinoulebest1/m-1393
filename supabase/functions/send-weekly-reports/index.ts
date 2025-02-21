@@ -16,13 +16,11 @@ const corsHeaders = {
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  // Gérer les requêtes CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Récupérer les statistiques des signalements
     const { data: stats, error: statsError } = await supabaseClient
       .from('song_reports')
       .select('status')
@@ -32,13 +30,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Erreur lors de la récupération des statistiques: ${statsError.message}`);
     }
 
-    // Calculer les totaux pour chaque statut
     const pending = stats.filter(r => r.status === 'pending').length;
     const resolved = stats.filter(r => r.status === 'resolved').length;
     const rejected = stats.filter(r => r.status === 'rejected').length;
     const total = stats.length;
 
-    // Obtenir la date actuelle formatée
     const date = new Date().toLocaleDateString('fr-FR', {
       weekday: 'long',
       year: 'numeric',
@@ -46,15 +42,14 @@ const handler = async (req: Request): Promise<Response> => {
       day: 'numeric'
     });
 
-    // Envoyer l'email avec les statistiques
     const { data: emailResponse, error: emailError } = await resend.emails.send({
       from: "Rapports de Signalements <onboarding@resend.dev>",
       to: "contact@votredomaine.com", // TODO: Remplacer par votre email
-      subject: "Rapport Hebdomadaire des Signalements",
+      subject: "Rapport Quotidien des Signalements",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-            Rapport Hebdomadaire des Signalements
+            Rapport Quotidien des Signalements
           </h1>
           
           <p style="color: #666;">
@@ -87,7 +82,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           <p style="color: #666; font-size: 14px; text-align: center;">
-            Ce rapport est généré automatiquement chaque semaine.
+            Ce rapport est généré automatiquement chaque jour.
           </p>
         </div>
       `,
