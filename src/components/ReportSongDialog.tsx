@@ -19,19 +19,30 @@ import { toast } from "sonner";
 
 type ReportReason = "offensive_content" | "corrupted_file" | "wrong_metadata" | "other";
 
-interface ReportSongDialogProps {
-  songId: string;
-  songTitle: string;
-  songArtist: string;
+interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  duration: string;
+  url: string;
+  file_path: string;
+  imageUrl?: string;
 }
 
-export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDialogProps) => {
+interface ReportSongDialogProps {
+  song: Song | null;
+  onClose: () => void;
+}
+
+export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState<ReportReason>("offensive_content");
   const [otherReason, setOtherReason] = useState("");
 
   const handleSubmit = async () => {
+    if (!song) return;
+    
     try {
       setIsSubmitting(true);
 
@@ -46,11 +57,11 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
       const { error } = await supabase
         .from('song_reports')
         .insert({
-          song_id: songId,
+          song_id: song.id,
           user_id: session.user.id,
           reporter_username: session.user.email,
-          song_title: songTitle,
-          song_artist: songArtist,
+          song_title: song.title,
+          song_artist: song.artist,
           reason: finalReason,
           status: 'pending'
         });
@@ -63,6 +74,7 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
 
       toast.success("Chanson signalée avec succès");
       setIsOpen(false);
+      onClose();
     } catch (error) {
       console.error("Erreur:", error);
       toast.error("Erreur lors du signalement");
@@ -72,7 +84,10 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+    <AlertDialog open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (!open) onClose();
+    }}>
       <AlertDialogTrigger asChild>
         <Button
           variant="ghost"
@@ -87,7 +102,7 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
         <AlertDialogHeader>
           <AlertDialogTitle>Signaler une chanson</AlertDialogTitle>
           <AlertDialogDescription>
-            Vous êtes sur le point de signaler la chanson "{songTitle}" par {songArtist}.
+            Vous êtes sur le point de signaler la chanson "{song?.title}" par {song?.artist}.
             Veuillez sélectionner la raison du signalement.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -130,7 +145,10 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
         <AlertDialogFooter>
           <Button
             variant="outline"
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              onClose();
+            }}
             disabled={isSubmitting}
           >
             Annuler
@@ -148,4 +166,3 @@ export const ReportSongDialog = ({ songId, songTitle, songArtist }: ReportSongDi
     </AlertDialog>
   );
 };
-
