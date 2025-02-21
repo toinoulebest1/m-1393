@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,7 @@ import * as mm from 'music-metadata-browser';
 import { storeAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 interface Song {
   id: string;
@@ -19,6 +21,8 @@ interface Song {
 export const MusicUploader = () => {
   const { t } = useTranslation();
   const { addToQueue } = usePlayer();
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -79,7 +83,7 @@ export const MusicUploader = () => {
       return null;
     } catch (error) {
       console.error("Erreur lors de la recherche Deezer:", error);
-      return "https://picsum.photos/240/240"; // Fallback en cas d'erreur
+      return "https://picsum.photos/240/240";
     }
   };
 
@@ -127,7 +131,23 @@ export const MusicUploader = () => {
 
     try {
       console.log("Stockage du fichier audio:", fileId);
+      setUploadProgress(0);
+      setIsUploading(true);
+
+      // Simuler la progression de l'upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          if (newProgress >= 90) {
+            clearInterval(progressInterval);
+          }
+          return Math.min(newProgress, 90);
+        });
+      }, 100);
+
       await storeAudioFile(fileId, file);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio(audioUrl);
@@ -187,13 +207,8 @@ export const MusicUploader = () => {
         }
       }
 
-      console.log("Informations finales de la chanson:", {
-        artist,
-        title,
-        imageUrl,
-        duration: formatDuration(duration),
-        bitrate
-      });
+      setIsUploading(false);
+      setUploadProgress(0);
 
       return {
         id: fileId,
@@ -207,6 +222,8 @@ export const MusicUploader = () => {
 
     } catch (error) {
       console.error("Erreur lors du traitement du fichier:", error);
+      setIsUploading(false);
+      setUploadProgress(0);
       return null;
     }
   };
@@ -242,6 +259,12 @@ export const MusicUploader = () => {
           onChange={handleFileUpload}
         />
       </label>
+      {isUploading && (
+        <div className="space-y-2">
+          <Progress value={uploadProgress} className="w-full" />
+          <p className="text-sm text-spotify-neutral">{uploadProgress}%</p>
+        </div>
+      )}
     </div>
   );
 };
