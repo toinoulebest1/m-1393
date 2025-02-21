@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
@@ -454,7 +453,7 @@ const Top100 = () => {
                 <div
                   key={stat.songId}
                   className={cn(
-                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                    "group p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
                     isCurrentSong 
                       ? "relative bg-white/5 shadow-lg overflow-hidden" 
                       : "bg-transparent"
@@ -541,16 +540,16 @@ const Top100 = () => {
                         >
                           <FileText className="w-5 h-5" />
                         </Button>
-                        {/* Afficher le bouton de suppression uniquement pour les administrateurs */}
                         {isAdmin && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-red-500/10 text-red-500"
+                            className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-destructive/10 text-destructive hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(stat.songId);
                             }}
+                            title="Supprimer du Top 100"
                           >
                             <Trash2 className="w-5 h-5" />
                           </Button>
