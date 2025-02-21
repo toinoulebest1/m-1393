@@ -11,14 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
 import ColorThief from 'colorthief';
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
+const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
 interface FavoriteStat {
   songId: string;
@@ -33,8 +27,6 @@ interface FavoriteStat {
     image_url?: string;
   };
 }
-
-const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
 const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
@@ -294,7 +286,7 @@ const Top100 = () => {
         .slice(songIndex + 1)
         .map(stat => ({
           ...stat.song,
-          url: stat.song.url, // Utiliser url au lieu de file_path
+          url: stat.song.url,
           imageUrl: stat.song.image_url,
           duration: stat.song.duration,
           title: stat.song.title,
@@ -324,7 +316,6 @@ const Top100 = () => {
     try {
       console.log("Checking if song is already hidden:", songId);
       
-      // First check if the song is already hidden
       const { data: existingHidden } = await supabase
         .from('hidden_songs')
         .select('id')
@@ -449,6 +440,9 @@ const Top100 = () => {
                 transform: 'scale(1.02)',
               } : {};
 
+              const rankNumber = index + 1;
+              const isTop3 = rankNumber <= 3;
+
               return (
                 <div
                   key={stat.songId}
@@ -480,6 +474,16 @@ const Top100 = () => {
 
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
+                      <div className={cn(
+                        "w-8 h-8 flex items-center justify-center rounded-lg font-bold",
+                        isTop3 ? "bg-gradient-to-br" : "bg-white/5",
+                        rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
+                        rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
+                        rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
+                        !isTop3 && "text-spotify-neutral"
+                      )}>
+                        #{rankNumber}
+                      </div>
                       <img
                         src={stat.song.image_url || PLACEHOLDER_IMAGE}
                         alt={`Pochette de ${stat.song.title}`}
