@@ -88,12 +88,8 @@ const Search = () => {
               {results.map((song, index) => (
                 <div
                   key={song.id}
-                  className="group flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-all duration-300 animate-fade-in cursor-pointer"
-                  style={{ 
-                    animationDelay: `${index * 50}ms`,
-                    opacity: 0,
-                    animation: 'fade-in 0.3s ease-out forwards'
-                  }}
+                  className={`group flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer opacity-0 animate-[fadeIn_0.3s_ease-out_forwards]`}
+                  style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => play(song)}
                 >
                   <div className="flex items-center flex-1">
