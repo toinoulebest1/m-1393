@@ -65,6 +65,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedSong ? JSON.parse(savedSong) : null;
   });
 
+  const [queue, setQueue] = useState<Song[]>(() => {
+    const savedSong = localStorage.getItem('currentSong');
+    return savedSong ? [JSON.parse(savedSong)] : [];
+  });
+
   const [savedProgress, setSavedProgress] = useState(() => {
     const saved = localStorage.getItem('audioProgress');
     return saved ? parseFloat(saved) : 0;
@@ -73,7 +78,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(savedProgress);
   const [volume, setVolume] = useState(70);
-  const [queue, setQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
   const [favorites, setFavorites] = useState<Song[]>([]);
@@ -121,6 +125,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
           
           setCurrentSong(song);
+          setQueue(prevQueue => {
+            if (!prevQueue.some(s => s.id === song.id)) {
+              return [song, ...prevQueue];
+            }
+            return prevQueue;
+          });
         } catch (error) {
           console.error("Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');
