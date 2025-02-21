@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { NowPlaying } from "@/components/NowPlaying";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -242,7 +240,6 @@ const History = () => {
           )}
         </div>
       </div>
-      <NowPlaying />
       <Player />
     </div>
   );
