@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -24,14 +25,36 @@ const GENRES = [
 ];
 
 const Search = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    // Récupérer la dernière recherche du localStorage
+    const savedSearch = localStorage.getItem('lastSearch') || "";
+    if (savedSearch) {
+      // Si une recherche existe, on l'exécute immédiatement
+      setTimeout(() => handleSearch(savedSearch), 0);
+    }
+    return savedSearch;
+  });
+  
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre">("all");
-  const [selectedGenre, setSelectedGenre] = useState("");
+  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre">(() => {
+    return (localStorage.getItem('lastSearchFilter') as "all" | "title" | "artist" | "genre") || "all";
+  });
+  const [selectedGenre, setSelectedGenre] = useState(() => {
+    return localStorage.getItem('lastSelectedGenre') || "";
+  });
   const [songToReport, setSongToReport] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+
+  // Sauvegarder les filtres quand ils changent
+  useEffect(() => {
+    localStorage.setItem('lastSearchFilter', searchFilter);
+  }, [searchFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('lastSelectedGenre', selectedGenre);
+  }, [selectedGenre]);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -68,6 +91,9 @@ const Search = () => {
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
+    // Sauvegarder la recherche dans le localStorage
+    localStorage.setItem('lastSearch', query);
+    
     if (query.length < 2 && searchFilter !== "genre") {
       setResults([]);
       return;
