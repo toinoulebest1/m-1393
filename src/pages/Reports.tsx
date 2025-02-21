@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -110,21 +111,56 @@ const Reports = () => {
       setUpdateLoading(reportId);
       console.log("Mise à jour du signalement:", reportId, "avec le statut:", newStatus);
 
-      const { data, error } = await supabase
+      // On récupère d'abord le signalement actuel pour avoir ses informations
+      const { data: currentReport, error: fetchError } = await supabase
         .from('song_reports')
-        .update({ status: newStatus })
+        .select('*')
         .eq('id', reportId)
+        .single();
+
+      if (fetchError) {
+        console.error("Erreur lors de la récupération du signalement:", fetchError);
+        toast.error("Erreur lors de la récupération du signalement");
+        return;
+      }
+
+      // On supprime d'abord l'ancien signalement
+      const { error: deleteError } = await supabase
+        .from('song_reports')
+        .delete()
+        .eq('id', reportId);
+
+      if (deleteError) {
+        console.error("Erreur lors de la suppression:", deleteError);
+        toast.error("Erreur lors de la mise à jour du signalement");
+        return;
+      }
+
+      // Puis on crée un nouveau signalement avec le nouveau statut
+      const { data, error: insertError } = await supabase
+        .from('song_reports')
+        .insert([
+          {
+            song_id: currentReport.song_id,
+            user_id: currentReport.user_id,
+            song_title: currentReport.song_title,
+            song_artist: currentReport.song_artist,
+            reason: currentReport.reason,
+            status: newStatus,
+            reporter_username: currentReport.reporter_username
+          }
+        ])
         .select()
         .single();
 
-      if (error) {
-        console.error("Erreur lors de la mise à jour:", error);
+      if (insertError) {
+        console.error("Erreur lors de l'insertion:", insertError);
         toast.error("Erreur lors de la mise à jour du signalement");
         return;
       }
 
       console.log("Mise à jour réussie:", data);
-      toast.success(`Signalement ${newStatus === 'resolved' ? 'résolu' : 'rejeté'} avec succès`);
+      toast.success(`Signalement ${newStatus === 'resolved' ? 'accepté' : 'rejeté'} avec succès`);
       
       setReports(reports.map(report => 
         report.id === reportId ? { ...report, status: newStatus } : report
