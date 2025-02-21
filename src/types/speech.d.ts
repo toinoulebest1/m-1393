@@ -1,8 +1,12 @@
 
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
   resultIndex: number;
-  error: any;
 }
 
 interface SpeechRecognitionResultList {
@@ -31,7 +35,7 @@ interface SpeechRecognition extends EventTarget {
   onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
   onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
   onend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
   onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
   onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
   onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
@@ -50,6 +54,8 @@ interface SpeechRecognitionConstructor {
 }
 
 declare global {
-  var SpeechRecognition: SpeechRecognitionConstructor | undefined;
-  var webkitSpeechRecognition: SpeechRecognitionConstructor | undefined;
+  interface Window {
+    SpeechRecognition: SpeechRecognitionConstructor | undefined;
+    webkitSpeechRecognition: SpeechRecognitionConstructor | undefined;
+  }
 }

@@ -162,35 +162,37 @@ const Search = () => {
   }, [selectedGenre, searchFilter]);
 
   useEffect(() => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (typeof window !== 'undefined' && SpeechRecognitionAPI) {
-      recognitionRef.current = new SpeechRecognitionAPI();
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'fr-FR';
+    if (typeof window !== 'undefined') {
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (SpeechRecognitionAPI) {
+        recognitionRef.current = new SpeechRecognitionAPI();
+        if (recognitionRef.current) {
+          recognitionRef.current.continuous = false;
+          recognitionRef.current.interimResults = false;
+          recognitionRef.current.lang = 'fr-FR';
 
-        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-          const text = event.results[0][0].transcript;
-          setSearchQuery(text);
-          handleSearch(text);
-          toast.success('Recherche vocale effectuée');
-          setIsRecording(false);
-        };
+          recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+            const text = event.results[0][0].transcript;
+            setSearchQuery(text);
+            handleSearch(text);
+            toast.success('Recherche vocale effectuée');
+            setIsRecording(false);
+          };
 
-        recognitionRef.current.onerror = (event) => {
-          console.error('Erreur de reconnaissance vocale:', event.error);
-          toast.error('Erreur lors de la reconnaissance vocale');
-          setIsRecording(false);
-        };
+          recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+            console.error('Erreur de reconnaissance vocale:', event.error);
+            toast.error('Erreur lors de la reconnaissance vocale');
+            setIsRecording(false);
+          };
 
-        recognitionRef.current.onend = () => {
-          setIsRecording(false);
-        };
+          recognitionRef.current.onend = () => {
+            setIsRecording(false);
+          };
+        }
+      } else {
+        toast.error('La reconnaissance vocale n\'est pas supportée par votre navigateur');
       }
-    } else {
-      toast.error('La reconnaissance vocale n\'est pas supportée par votre navigateur');
     }
 
     return () => {
