@@ -11,12 +11,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type ReportReason = "offensive_content" | "corrupted_file" | "wrong_metadata" | "other";
+type ReportReason = "audio_quality" | "wrong_metadata" | "corrupted_file" | "other";
 
 interface Song {
   id: string;
@@ -35,8 +35,7 @@ interface ReportSongDialogProps {
 
 export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [reason, setReason] = useState<ReportReason>("offensive_content");
-  const [otherReason, setOtherReason] = useState("");
+  const [reason, setReason] = useState<ReportReason>("audio_quality");
 
   const handleSubmit = async () => {
     if (!song) return;
@@ -50,8 +49,6 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
         return;
       }
 
-      const finalReason = reason === "other" ? otherReason : reason;
-
       const { error } = await supabase
         .from('song_reports')
         .insert({
@@ -60,7 +57,7 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
           reporter_username: session.user.email,
           song_title: song.title,
           song_artist: song.artist,
-          reason: finalReason,
+          reason: reason,
           status: 'pending'
         });
 
@@ -82,65 +79,55 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
 
   return (
     <AlertDialog open={!!song} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
+      <AlertDialogContent className="max-w-sm">
         <AlertDialogHeader>
-          <AlertDialogTitle>Signaler une chanson</AlertDialogTitle>
-          <AlertDialogDescription>
-            Vous êtes sur le point de signaler la chanson "{song?.title}" par {song?.artist}.
-            Veuillez sélectionner la raison du signalement.
+          <AlertDialogTitle>Signaler un problème</AlertDialogTitle>
+          <AlertDialogDescription className="text-base">
+            {song?.title} - {song?.artist}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="grid gap-4 py-4">
-          <Alert>
-            <AlertDescription>
-              Notre équipe examinera votre signalement dans les plus brefs délais.
-            </AlertDescription>
-          </Alert>
-
-          <div className="grid gap-2">
-            <Label htmlFor="reason">Raison du signalement</Label>
-            <select
-              id="reason"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              value={reason}
-              onChange={(e) => setReason(e.target.value as ReportReason)}
-            >
-              <option value="offensive_content">Contenu offensant</option>
-              <option value="corrupted_file">Fichier corrompu</option>
-              <option value="wrong_metadata">Métadonnées incorrectes</option>
-              <option value="other">Autre</option>
-            </select>
-          </div>
-
-          {reason === "other" && (
-            <div className="grid gap-2">
-              <Label htmlFor="otherReason">Précisez la raison</Label>
-              <Input
-                id="otherReason"
-                placeholder="Décrivez la raison du signalement..."
-                value={otherReason}
-                onChange={(e) => setOtherReason(e.target.value)}
-              />
+        <div className="py-4">
+          <RadioGroup
+            value={reason}
+            onValueChange={(value) => setReason(value as ReportReason)}
+            className="gap-3"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="audio_quality" id="audio_quality" />
+              <Label htmlFor="audio_quality" className="text-base font-normal">
+                Qualité audio médiocre
+              </Label>
             </div>
-          )}
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="wrong_metadata" id="wrong_metadata" />
+              <Label htmlFor="wrong_metadata" className="text-base font-normal">
+                Métadonnées incorrectes
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="corrupted_file" id="corrupted_file" />
+              <Label htmlFor="corrupted_file" className="text-base font-normal">
+                Fichier corrompu
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="other" id="other" />
+              <Label htmlFor="other" className="text-base font-normal">
+                Autre problème
+              </Label>
+            </div>
+          </RadioGroup>
         </div>
 
         <AlertDialogFooter>
           <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Annuler
-          </Button>
-          <Button
             variant="default"
             onClick={handleSubmit}
-            disabled={isSubmitting || (reason === "other" && !otherReason.trim())}
-            className="bg-red-500 hover:bg-red-600"
+            disabled={isSubmitting}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
           >
-            {isSubmitting ? "En cours..." : "Signaler"}
+            {isSubmitting ? "En cours..." : "Envoyer le signalement"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
