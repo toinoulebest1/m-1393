@@ -73,23 +73,34 @@ const Search = () => {
         .from('songs')
         .select('*')
         .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
-        .order('title', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      const mappedSongs: Song[] = (data || []).map(song => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist || '',
-        duration: song.duration || '0:00',
-        url: song.file_path,
-        file_path: song.file_path,
-        imageUrl: song.image_url
-      }));
+      // Filtrer les doublons en gardant seulement la version la plus récente
+      const uniqueSongs = data.reduce((acc: Song[], current) => {
+        const key = `${current.title.toLowerCase()}-${(current.artist || '').toLowerCase()}`;
+        const existingSong = acc.find(song => 
+          `${song.title.toLowerCase()}-${(song.artist || '').toLowerCase()}` === key
+        );
+        
+        if (!existingSong) {
+          acc.push({
+            id: current.id,
+            title: current.title,
+            artist: current.artist || '',
+            duration: current.duration || '0:00',
+            url: current.file_path,
+            file_path: current.file_path,
+            imageUrl: current.image_url
+          });
+        }
+        return acc;
+      }, []);
 
-      setResults(mappedSongs);
+      setResults(uniqueSongs);
     } catch (error) {
       console.error("Erreur lors de la recherche:", error);
       toast.error("Erreur lors de la recherche");
