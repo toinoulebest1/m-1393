@@ -1,7 +1,5 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
-import { NowPlaying } from "@/components/NowPlaying";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
@@ -358,7 +356,7 @@ const Top100 = () => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-hidden ml-64">
+      <div className="flex-1 overflow-hidden">
         <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
           {isAdmin && (
             <Alert className="border-spotify-accent bg-spotify-accent/10">
@@ -477,7 +475,6 @@ const Top100 = () => {
           </Table>
         </div>
       </div>
-      <NowPlaying />
       <Player />
       <LyricsModal
         isOpen={!!selectedSong}
