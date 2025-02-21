@@ -1,14 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
+import { ReportSongDialog } from "@/components/ReportSongDialog";
 
 interface Song {
   id: string;
@@ -26,6 +26,7 @@ const Search = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { play, currentSong, favorites, toggleFavorite } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [songToReport, setSongToReport] = useState<Song | null>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -79,7 +80,6 @@ const Search = () => {
         throw error;
       }
 
-      // Filtrer les doublons en gardant seulement la version la plus récente
       const uniqueSongs = data.reduce((acc: Song[], current) => {
         const key = `${current.title.toLowerCase()}-${(current.artist || '').toLowerCase()}`;
         const existingSong = acc.find(song => 
@@ -246,6 +246,16 @@ const Search = () => {
                               )}
                             />
                           </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSongToReport(song);
+                            }}
+                            className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                            title="Signaler cette chanson"
+                          >
+                            <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -265,6 +275,10 @@ const Search = () => {
         </div>
       </div>
       <Player />
+      <ReportSongDialog
+        song={songToReport}
+        onClose={() => setSongToReport(null)}
+      />
     </div>
   );
 };
