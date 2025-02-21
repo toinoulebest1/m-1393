@@ -59,8 +59,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const overlapTimeRef = useRef(3);
   const fadingRef = useRef(false);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  const startTimeRef = useRef<number | null>(null);
-  const accumulatedTimeRef = useRef(0);
   
   const [currentSong, setCurrentSong] = useState<Song | null>(() => {
     const savedSong = localStorage.getItem('currentSong');
@@ -84,159 +82,71 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
   const [favorites, setFavorites] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
+  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>(() => {
+    const savedStats = localStorage.getItem('favoriteStats');
+    return savedStats ? JSON.parse(savedStats) : [];
+  });
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
+  const [preferences, setPreferences] = useState({
+    crossfadeEnabled: false,
+    crossfadeDuration: 3,
+  });
 
-  const handleTimeUpdate = () => {
-    if (!currentSong) return;
-
-    if (startTimeRef.current === null && !audioRef.current?.paused) {
-      startTimeRef.current = Date.now();
-    }
-
-    if (audioRef.current) {
-      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-      setProgress(percentage);
-    }
-  };
-
-  const handlePause = () => {
-    if (startTimeRef.current !== null) {
-      accumulatedTimeRef.current += (Date.now() - startTimeRef.current) / 1000;
-      startTimeRef.current = null;
-    }
-  };
-
-  const handleSeeked = () => {
-    if (!audioRef.current?.paused) {
-      startTimeRef.current = Date.now();
-    }
-  };
-
-  const updateListeningStats = async (song: Song, duration: number) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: existingStats, error: statsError } = await supabase
-        .from('listening_stats')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (statsError) {
-        console.error("Erreur lors de la récupération des statistiques:", statsError);
-        return;
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (audioRef.current && !isNaN(audioRef.current.currentTime)) {
+        localStorage.setItem('audioProgress', audioRef.current.currentTime.toString());
       }
+    };
 
-      const currentHour = new Date().getHours();
-      const currentPeriod = `${currentHour}:00-${currentHour + 1}:00`;
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    const restorePlayback = async () => {
+      const savedSong = localStorage.getItem('currentSong');
+      const savedProgress = localStorage.getItem('audioProgress');
       
-      let peakHours = existingStats?.peak_hours || {};
-      peakHours[currentPeriod] = (peakHours[currentPeriod] || 0) + 1;
+      if (savedSong) {
+        const song = JSON.parse(savedSong);
+        try {
+          const audioUrl = await getAudioFile(song.url);
+          if (!audioUrl) return;
 
-      const favoritePeriods = Object.entries(peakHours)
-        .sort(([, a], [, b]) => (b as number) - (a as number))
-        .slice(0, 5)
-        .map(([period, count]) => ({
-          period,
-          count
-        }));
-
-      const previousTotalTime = existingStats?.total_listening_time || 0;
-      const newTotalTime = previousTotalTime + duration;
-
-      if (!existingStats) {
-        await supabase
-          .from('listening_stats')
-          .insert({
-            user_id: session.user.id,
-            total_listening_time: duration,
-            tracks_played: 1,
-            peak_hours: peakHours,
-            favorite_periods: favoritePeriods
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+          
+          if (savedProgress) {
+            audioRef.current.currentTime = parseFloat(savedProgress);
+          }
+          
+          setCurrentSong(song);
+          setQueue(prevQueue => {
+            if (!prevQueue.some(s => s.id === song.id)) {
+              return [song, ...prevQueue];
+            }
+            return prevQueue;
           });
-      } else {
-        await supabase
-          .from('listening_stats')
-          .update({
-            total_listening_time: newTotalTime,
-            tracks_played: existingStats.tracks_played + 1,
-            peak_hours: peakHours,
-            favorite_periods: favoritePeriods
-          })
-          .eq('user_id', session.user.id);
+        } catch (error) {
+          console.error("Erreur lors de la restauration de la lecture:", error);
+          localStorage.removeItem('currentSong');
+          localStorage.removeItem('audioProgress');
+        }
       }
+    };
 
-      console.log(`Temps d'écoute mis à jour: ${duration} secondes, Total: ${newTotalTime} secondes`);
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des statistiques:", error);
+    restorePlayback();
+  }, []);
+
+  useEffect(() => {
+    if (currentSong) {
+      localStorage.setItem('currentSong', JSON.stringify(currentSong));
     }
-  };
-
-  const getRandomSong = async () => {
-    try {
-      const { data: songs } = await supabase
-        .from('songs')
-        .select('*')
-        .order('created_at');
-
-      if (songs && songs.length > 0) {
-        const randomIndex = Math.floor(Math.random() * songs.length);
-        const randomSong = songs[randomIndex];
-        return {
-          id: randomSong.id,
-          title: randomSong.title,
-          artist: randomSong.artist || '',
-          duration: randomSong.duration || '0:00',
-          url: randomSong.file_path,
-          imageUrl: randomSong.image_url,
-          bitrate: '320 kbps'
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error("Erreur lors de la récupération d'une chanson aléatoire:", error);
-      return null;
-    }
-  };
-
-  const handleEnded = async () => {
-    if (!currentSong) return;
-
-    if (startTimeRef.current !== null) {
-      accumulatedTimeRef.current += (Date.now() - startTimeRef.current) / 1000;
-    }
-    
-    if (accumulatedTimeRef.current > 0) {
-      await updateListeningStats(currentSong, Math.round(accumulatedTimeRef.current));
-    }
-    
-    accumulatedTimeRef.current = 0;
-    startTimeRef.current = null;
-
-    // Si la file d'attente est vide ou ne contient qu'une seule chanson
-    if (queue.length <= 1) {
-      const randomSong = await getRandomSong();
-      if (randomSong) {
-        setQueue(prev => [...prev, randomSong]);
-        toast.success(`Ajout aléatoire : ${randomSong.title}`);
-      }
-    }
-
-    if (!fadingRef.current) {
-      setProgress(0);
-      const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-      const nextSong = queue[currentIndex + 1];
-      
-      if (nextSong) {
-        play(nextSong);
-      } else if (repeatMode === 'all') {
-        play(queue[0]);
-      }
-    }
-  };
+  }, [currentSong]);
 
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
@@ -276,7 +186,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
       if (songError) {
-        console.error("Erreur lors de l'enregistrement de la chanson:", songError);
+        console.error("Erreur lors de l'insertion de la chanson:", songError);
         return;
       }
 
@@ -315,6 +225,67 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.error("Erreur lors du calcul de la durée:", error);
       return 0;
+    }
+  };
+
+  const updateListeningStats = async (song: Song, actualListeningTime: number) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: existingStats, error: statsError } = await supabase
+        .from('listening_stats')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (statsError) {
+        console.error("Erreur lors de la récupération des statistiques:", statsError);
+        return;
+      }
+
+      const currentHour = new Date().getHours();
+      const currentPeriod = `${currentHour}:00-${currentHour + 1}:00`;
+      
+      let peakHours = existingStats?.peak_hours || {};
+      peakHours[currentPeriod] = (peakHours[currentPeriod] || 0) + 1;
+
+      const favoritePeriods = Object.entries(peakHours)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 5)
+        .map(([period, count]) => ({
+          period,
+          count
+        }));
+
+      const previousTotalTime = existingStats?.total_listening_time || 0;
+      const newTotalTime = previousTotalTime + actualListeningTime;
+
+      if (!existingStats) {
+        await supabase
+          .from('listening_stats')
+          .insert({
+            user_id: session.user.id,
+            total_listening_time: actualListeningTime,
+            tracks_played: 1,
+            peak_hours: peakHours,
+            favorite_periods: favoritePeriods
+          });
+      } else {
+        await supabase
+          .from('listening_stats')
+          .update({
+            total_listening_time: newTotalTime,
+            tracks_played: existingStats.tracks_played + 1,
+            peak_hours: peakHours,
+            favorite_periods: favoritePeriods
+          })
+          .eq('user_id', session.user.id);
+      }
+
+      console.log(`Temps d'écoute mis à jour: ${actualListeningTime} secondes, Total: ${newTotalTime} secondes`);
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des statistiques:", error);
     }
   };
 
@@ -881,6 +852,59 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
 
   useEffect(() => {
+    if (currentSong) {
+      preloadNextSong();
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      if (repeatMode === 'one') {
+        audioRef.current.currentTime = 0;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+          });
+        }
+      } else {
+        nextSong();
+      }
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    const handleTimeUpdate = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
+    audioRef.current.addEventListener('error', handleError);
+    audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audioRef.current.removeEventListener('error', handleError);
+      audioRef.current.removeEventListener('ended', handleEnded);
+      audioRef.current.removeEventListener('play', handlePlay);
+      audioRef.current.removeEventListener('pause', handlePause);
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [repeatMode, nextSong]);
+
+  useEffect(() => {
     if (!audioRef.current) return;
 
     let startTime: number | null = null;
@@ -901,27 +925,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
+    const handleEnded = async () => {
+      if (startTime !== null) {
+        accumulatedTime += (Date.now() - startTime) / 1000;
+      }
+      if (currentSong && accumulatedTime > 0) {
+        await updateListeningStats(currentSong, Math.round(accumulatedTime));
+      }
+      accumulatedTime = 0;
+      startTime = null;
+    };
+
     const handleSeeked = () => {
       if (!audioRef.current.paused) {
         startTime = Date.now();
       }
     };
-
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('pause', handlePause);
-    audioRef.current.addEventListener('seeked', handleSeeked);
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('pause', handlePause);
-        audioRef.current.removeEventListener('seeked', handleSeeked);
-      }
-    };
-  }, [currentSong]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('pause', handlePause);
@@ -936,7 +955,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('seeked', handleSeeked);
       }
     };
-  }, [currentSong, queue, repeatMode, play]);
+  }, [currentSong]);
 
   return (
     <PlayerContext.Provider value={{
@@ -952,12 +971,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       favoriteStats,
       playbackRate,
       history,
-      setQueue,
       setHistory,
       play,
       pause,
-      setVolume,
-      setProgress,
+      setVolume: updateVolume,
+      setProgress: updateProgress,
       nextSong,
       previousSong,
       addToQueue,
@@ -966,7 +984,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       toggleFavorite,
       removeFavorite,
       setSearchQuery,
-      setPlaybackRate
+      setPlaybackRate: updatePlaybackRate,
+      setQueue,
     }}>
       {children}
     </PlayerContext.Provider>
@@ -980,3 +999,5 @@ export const usePlayer = () => {
   }
   return context;
 };
+
+export default PlayerProvider;
