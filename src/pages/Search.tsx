@@ -17,7 +17,7 @@ interface Song {
   duration: string;
   url: string;
   file_path: string;
-  image_url?: string;
+  imageUrl?: string;
 }
 
 const Search = () => {
@@ -53,12 +53,12 @@ const Search = () => {
   };
 
   useEffect(() => {
-    if (currentSong?.image_url && !currentSong.image_url.includes('picsum.photos')) {
-      extractDominantColor(currentSong.image_url);
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl);
     } else {
       setDominantColor(null);
     }
-  }, [currentSong?.image_url]);
+  }, [currentSong?.imageUrl]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -86,7 +86,7 @@ const Search = () => {
         duration: song.duration || '0:00',
         url: song.file_path,
         file_path: song.file_path,
-        image_url: song.image_url
+        imageUrl: song.image_url
       }));
 
       setResults(mappedSongs);
@@ -170,7 +170,7 @@ const Search = () => {
                       <div className="flex items-center flex-1">
                         <div className="relative overflow-hidden rounded-md group-hover:shadow-xl transition-all duration-300">
                           <img
-                            src={song.image_url || "https://picsum.photos/56/56"}
+                            src={song.imageUrl || "https://picsum.photos/56/56"}
                             alt={song.title}
                             className={cn(
                               "w-14 h-14 object-cover rounded-md transform transition-transform duration-300 group-hover:scale-105",
