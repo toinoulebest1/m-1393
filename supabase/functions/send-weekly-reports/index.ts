@@ -31,6 +31,23 @@ const handler = async (req: Request): Promise<Response> => {
     // Fin de la journée d'hier (23:59:59)
     const endOfYesterday = new Date(yesterday.setHours(23, 59, 59, 999));
 
+    // Purger les anciens signalements résolus ou rejetés (plus vieux que 30 jours)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { data: deleteData, error: deleteError } = await supabaseClient
+      .from('song_reports')
+      .delete()
+      .lt('created_at', thirtyDaysAgo.toISOString())
+      .in('status', ['resolved', 'rejected']);
+
+    if (deleteError) {
+      console.error("Erreur lors de la purge des anciens signalements:", deleteError);
+    } else {
+      console.log("Purge des anciens signalements effectuée avec succès");
+    }
+
+    // Récupérer les statistiques d'hier
     const { data: stats, error: statsError } = await supabaseClient
       .from('song_reports')
       .select('status')
@@ -95,7 +112,8 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           <p style="color: #666; font-size: 14px; text-align: center;">
-            Ce rapport contient les statistiques des signalements de la journée du ${date}.
+            Ce rapport contient les statistiques des signalements de la journée du ${date}.<br>
+            Une purge automatique des signalements résolus et rejetés de plus de 30 jours a été effectuée.
           </p>
         </div>
       `,
