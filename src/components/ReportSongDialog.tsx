@@ -7,7 +7,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -35,7 +34,6 @@ interface ReportSongDialogProps {
 }
 
 export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState<ReportReason>("offensive_content");
   const [otherReason, setOtherReason] = useState("");
@@ -73,7 +71,6 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
       }
 
       toast.success("Chanson signalée avec succès");
-      setIsOpen(false);
       onClose();
     } catch (error) {
       console.error("Erreur:", error);
@@ -84,15 +81,7 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open);
-      if (!open) onClose();
-    }}>
-      <AlertDialogTrigger asChild>
-        <div className="flex items-center space-x-1 text-spotify-neutral cursor-pointer hover:text-white">
-          <Flag className="w-4 h-4" />
-        </div>
-      </AlertDialogTrigger>
+    <AlertDialog open={!!song} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Signaler une chanson</AlertDialogTitle>
@@ -140,10 +129,7 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
         <AlertDialogFooter>
           <Button
             variant="outline"
-            onClick={() => {
-              setIsOpen(false);
-              onClose();
-            }}
+            onClick={onClose}
             disabled={isSubmitting}
           >
             Annuler
