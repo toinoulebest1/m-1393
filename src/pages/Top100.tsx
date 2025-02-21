@@ -446,41 +446,58 @@ const Top100 = () => {
                   >
                     <TableCell className="font-medium text-white">
                       {isCurrentSong && isPlaying ? (
-                        <div className="w-4 h-4 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spotify-accent opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-4 w-4 bg-spotify-accent"></span>
+                        <div className="relative flex items-center justify-center w-4 h-4">
+                          <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-spotify-accent opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-spotify-accent"></span>
                         </div>
                       ) : (
-                        index + 1
+                        <span className="opacity-50">{index + 1}</span>
                       )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        <img
-                          src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                          alt={stat.song.title}
-                          className={`w-12 h-12 rounded-md object-cover hover-scale transition-transform duration-300 ${
-                            isCurrentSong ? 'scale-105' : 'group-hover:scale-105'
-                          }`}
-                          style={glowStyle}
-                        />
-                        <span className="font-medium story-link">
-                          {stat.song.title}
-                        </span>
+                        <div className="relative">
+                          <img
+                            src={stat.song.image_url || PLACEHOLDER_IMAGE}
+                            alt={stat.song.title}
+                            className={`w-12 h-12 rounded-md object-cover transition-all duration-300 ${
+                              isCurrentSong ? 'scale-105' : 'group-hover:scale-105'
+                            }`}
+                            style={glowStyle}
+                          />
+                          {isCurrentSong && (
+                            <div className="absolute inset-0 bg-black bg-opacity-40 rounded-md flex items-center justify-center">
+                              <div className="relative flex items-center justify-center w-6 h-6">
+                                <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-spotify-accent opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-spotify-accent"></span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className={`font-medium transition-colors duration-300 ${
+                            isCurrentSong ? 'text-spotify-accent' : 'text-white group-hover:text-spotify-accent'
+                          }`}>
+                            {stat.song.title}
+                          </span>
+                          <span className="text-sm text-spotify-neutral group-hover:text-white transition-colors duration-300">
+                            {stat.song.artist}
+                          </span>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-spotify-neutral">
+                    <TableCell className="text-spotify-neutral group-hover:text-white transition-colors duration-300">
                       {stat.song.artist}
                     </TableCell>
-                    <TableCell className="text-spotify-neutral">
+                    <TableCell className="text-spotify-neutral group-hover:text-white transition-colors duration-300">
                       {formatDuration(stat.song.duration)}
                     </TableCell>
                     <TableCell className="text-spotify-neutral">
                       <div className="flex items-center space-x-2">
-                        <Heart className={`w-4 h-4 transition-all duration-300 pulse ${
+                        <Heart className={`w-4 h-4 transition-all duration-300 ${
                           isCurrentSong ? 'scale-110' : ''
                         } text-spotify-accent fill-spotify-accent`} />
-                        <span>{stat.count || 0}</span>
+                        <span className="group-hover:text-white transition-colors duration-300">{stat.count || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -488,7 +505,7 @@ const Top100 = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="hover-scale transition-all duration-300 hover:bg-white/10"
+                          className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePlay(stat.song);
@@ -499,7 +516,7 @@ const Top100 = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="hover-scale transition-all duration-300 hover:bg-white/10"
+                          className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedSong({
@@ -515,7 +532,7 @@ const Top100 = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="hover-scale transition-all duration-300 hover:bg-red-500/10 text-red-500"
+                            className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-red-500/10 text-red-500"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(stat.songId);
