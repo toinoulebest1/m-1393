@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -7,6 +8,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ColorThief from 'colorthief';
 import React from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 
 const Favorites = () => {
@@ -16,10 +25,10 @@ const Favorites = () => {
     play, 
     currentSong, 
     isPlaying, 
-    queue,
-    pause,
+    addToQueue,
     removeFavorite,
-    setQueue 
+    queue,
+    pause 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
 
@@ -58,19 +67,23 @@ const Favorites = () => {
 
   const handlePlay = async (song: any) => {
     try {
+      // Si la chanson est déjà en cours de lecture, on met en pause
       if (currentSong?.id === song.id) {
         if (isPlaying) {
           pause();
         } else {
-          play(currentSong);
+          play(currentSong); // On passe la chanson courante pour reprendre la lecture
         }
         return;
       }
       
-      const songIndex = favorites.findIndex(fav => fav.id === song.id);
-      const newQueue = [...favorites.slice(songIndex)];
-      setQueue(newQueue);
+      // Si c'est une nouvelle chanson, on la joue et on met à jour la queue
       await play(song);
+      const songIndex = favorites.findIndex(fav => fav.id === song.id);
+      const remainingSongs = favorites.slice(songIndex + 1);
+      remainingSongs.forEach(nextSong => {
+        addToQueue(nextSong);
+      });
       toast.success(`Lecture de ${song.title}`);
     } catch (error) {
       console.error("Error playing song:", error);
@@ -80,15 +93,13 @@ const Favorites = () => {
 
   const handlePlayAll = () => {
     if (favorites.length === 0) return;
-    setQueue([...favorites]);
     handlePlay(favorites[0]);
   };
 
   const handleShufflePlay = () => {
     if (favorites.length === 0) return;
-    const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
-    setQueue(shuffledFavorites);
-    handlePlay(shuffledFavorites[0]);
+    const randomIndex = Math.floor(Math.random() * favorites.length);
+    handlePlay(favorites[randomIndex]);
   };
 
   const handleRemoveFavorite = async (song: any) => {

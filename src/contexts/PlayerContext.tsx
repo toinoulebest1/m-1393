@@ -1,29 +1,23 @@
-
-import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
+import { supabase } from '@/integrations/supabase/client';
 
-export interface Song {
+interface Song {
   id: string;
   title: string;
   artist: string;
+  duration: string;
   url: string;
   imageUrl?: string;
-  duration?: string;
   bitrate?: string;
 }
 
-export interface FavoriteStat {
+interface FavoriteStat {
   songId: string;
   count: number;
-  lastUpdated: string;
-  song: {
-    id: string;
-    title: string;
-    artist: string;
-    url: string;
-    duration: string;
-  };
+  lastUpdated: number;
+  song: Song;
 }
 
 interface PlayerContextType {
@@ -53,30 +47,102 @@ interface PlayerContextType {
   removeFavorite: (songId: string) => void;
   setSearchQuery: (query: string) => void;
   setPlaybackRate: (rate: number) => void;
-  setQueue: (songs: Song[]) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 const globalAudio = new Audio();
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const audioRef = useRef<HTMLAudioElement>(globalAudio);
+  const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
+  const overlapTimeRef = useRef(3);
+  const fadingRef = useRef(false);
+  const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+  
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(50);
+  const [volume, setVolume] = useState(70);
   const [queue, setQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
   const [favorites, setFavorites] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
+  const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>(() => {
+    const savedStats = localStorage.getItem('favoriteStats');
+    return savedStats ? JSON.parse(savedStats) : [];
+  });
   const [playbackRate, setPlaybackRate] = useState(1);
   const [history, setHistory] = useState<Song[]>([]);
-  const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+  const [preferences, setPreferences] = useState({
+    crossfadeEnabled: false,
+    crossfadeDuration: 3,
+  });
 
-  const audioRef = useRef<HTMLAudioElement>(globalAudio);
-  const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
-  const fadingRef = useRef(false);
+  const preloadNextSong = async () => {
+    if (!currentSong || queue.length === 0) return;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    const nextSong = queue[currentIndex + 1];
+    
+    if (!nextSong) return;
+
+    try {
+      const audioUrl = await getAudioFile(nextSong.url);
+      if (!audioUrl) return;
+
+      nextAudioRef.current.src = audioUrl;
+      await nextAudioRef.current.load();
+      nextAudioRef.current.volume = 0;
+      setNextSongPreloaded(true);
+    } catch (error) {
+      console.error("Erreur lors du préchargement:", error);
+    }
+  };
+
+  const addToHistory = async (song: Song) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error: songError } = await supabase
+        .from('songs')
+        .upsert({
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          file_path: song.url,
+          duration: song.duration,
+          image_url: song.imageUrl
+        });
+
+      if (songError) {
+        console.error("Erreur lors de l'insertion de la chanson:", songError);
+        return;
+      }
+
+      const { error: historyError } = await supabase
+        .from('play_history')
+        .insert({
+          user_id: session.user.id,
+          song_id: song.id,
+          played_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error("Erreur lors de l'ajout à l'historique:", historyError);
+        return;
+      }
+
+      setHistory(prev => [{
+        ...song,
+        playedAt: new Date().toISOString()
+      }, ...prev.filter(s => s.id !== song.id)]);
+
+    } catch (error) {
+      console.error("Erreur lors de l'ajout à l'historique:", error);
+    }
+  };
 
   const play = async (song?: Song) => {
     fadingRef.current = false;
@@ -113,7 +179,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
-        audioRef.current.volume = volume / 100;
+        audioRef.current.volume = 1;
         nextAudioRef.current.volume = 0;
         
         audioRef.current.src = audioUrl;
@@ -129,6 +195,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsPlaying(false);
           });
         }
+
+        preloadNextSong();
       } catch (error) {
         console.error("Error playing audio:", error);
         setCurrentSong(null);
@@ -136,7 +204,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } else if (audioRef.current) {
       try {
-        audioRef.current.volume = volume / 100;
+        audioRef.current.volume = 1;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
@@ -160,25 +228,62 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsPlaying(false);
   };
 
+  const updateVolume = (newVolume: number) => {
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100;
+    }
+    setVolume(newVolume);
+  };
+
+  const updateProgress = (newProgress: number) => {
+    if (audioRef.current) {
+      const time = (newProgress / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = time;
+    }
+    setProgress(newProgress);
+  };
+
+  const getNextSong = () => {
+    const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+    if (shuffleMode) {
+      const remainingSongs = queue.slice(currentIndex + 1);
+      const randomIndex = Math.floor(Math.random() * remainingSongs.length);
+      return remainingSongs[randomIndex];
+    }
+    return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
+  };
+
   const nextSong = () => {
-    if (queue.length > 0) {
-      const nextSong = queue[0];
-      const newQueue = queue.slice(1);
-      setQueue(newQueue);
-      play(nextSong);
+    fadingRef.current = false;
+    nextAudioRef.current.volume = 0;
+    audioRef.current.volume = 1;
+    
+    const next = getNextSong();
+    if (next) {
+      play(next);
+    } else if (repeatMode === 'all') {
+      play(queue[0]);
     }
   };
 
   const previousSong = () => {
-    if (history.length > 1) {
-      const previousSong = history[1]; // Get the second song in history (current song is first)
-      setHistory(prev => prev.slice(1)); // Remove the current song from history
-      play(previousSong);
+    fadingRef.current = false;
+    nextAudioRef.current.volume = 0;
+    audioRef.current.volume = 1;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+    if (currentIndex > 0) {
+      play(queue[currentIndex - 1]);
     }
   };
 
   const addToQueue = (song: Song) => {
-    setQueue(prev => [...prev, song]);
+    setQueue(prevQueue => {
+      if (prevQueue.length === 0 && !currentSong) {
+        play(song);
+      }
+      return [...prevQueue, song];
+    });
   };
 
   const toggleShuffle = () => {
@@ -187,38 +292,102 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleRepeat = () => {
     setRepeatMode(current => {
-      if (current === 'none') return 'one';
-      if (current === 'one') return 'all';
-      return 'none';
-    });
-  };
-
-  const toggleFavorite = (song: Song) => {
-    setFavorites(prev => {
-      if (prev.some(f => f.id === song.id)) {
-        return prev.filter(f => f.id !== song.id);
-      } else {
-        return [...prev, song];
+      switch (current) {
+        case 'none': return 'one';
+        case 'one': return 'all';
+        case 'all': return 'none';
       }
     });
   };
 
-  const removeFavorite = (songId: string) => {
-    setFavorites(prev => prev.filter(f => f.id !== songId));
-  };
+  const toggleFavorite = async (song: Song) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return;
+      }
 
-  const updateVolume = (newVolume: number) => {
-    setVolume(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
+      const isFavorite = favorites.some(f => f.id === song.id);
+      
+      if (isFavorite) {
+        const { error } = await supabase
+          .from('favorite_stats')
+          .delete()
+          .eq('song_id', song.id)
+          .eq('user_id', session.user.id);
+
+        if (error) {
+          console.error("Erreur lors de la suppression du favori:", error);
+          return;
+        }
+
+        setFavorites(prev => prev.filter(f => f.id !== song.id));
+      } else {
+        const { data: existingSong, error: songCheckError } = await supabase
+          .from('songs')
+          .select()
+          .eq('id', song.id)
+          .single();
+
+        if (!existingSong) {
+          const { error: songInsertError } = await supabase
+            .from('songs')
+            .insert({
+              id: song.id,
+              title: song.title,
+              artist: song.artist,
+              file_path: song.url,
+              duration: song.duration,
+              image_url: song.imageUrl
+            });
+
+          if (songInsertError) {
+            console.error("Erreur lors de l'ajout de la chanson:", songInsertError);
+            return;
+          }
+        }
+
+        const { error: favoriteError } = await supabase
+          .from('favorite_stats')
+          .insert({
+            song_id: song.id,
+            user_id: session.user.id,
+            count: 1
+          });
+
+        if (favoriteError) {
+          console.error("Erreur lors de l'ajout aux favoris:", favoriteError);
+          return;
+        }
+
+        setFavorites(prev => [...prev, song]);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la gestion des favoris:", error);
     }
   };
 
-  const updateProgress = (newProgress: number) => {
-    setProgress(newProgress);
-    if (audioRef.current) {
-      const duration = audioRef.current.duration;
-      audioRef.current.currentTime = (newProgress / 100) * duration;
+  const removeFavorite = async (songId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from('favorite_stats')
+        .delete()
+        .eq('song_id', songId)
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        console.error("Erreur lors de la suppression du favori:", error);
+        return;
+      }
+
+      setFavorites(prev => prev.filter(s => s.id !== songId));
+    } catch (error) {
+      console.error("Erreur lors de la suppression du favori:", error);
     }
   };
 
@@ -229,29 +398,338 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const addToHistory = async (song: Song) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-      const { error } = await supabase
-        .from('play_history')
-        .insert({
-          user_id: session.user.id,
-          song_id: song.id,
-          played_at: new Date().toISOString()
-        });
+        const { data } = await supabase
+          .from('music_preferences')
+          .select('crossfade_enabled, crossfade_duration')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error adding to history:", error);
-        return;
+        if (data) {
+          setPreferences({
+            crossfadeEnabled: data.crossfade_enabled,
+            crossfadeDuration: data.crossfade_duration,
+          });
+          overlapTimeRef.current = data.crossfade_duration;
+          console.log('Durée du fondu mise à jour:', data.crossfade_duration);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
       }
+    };
 
-      setHistory(prev => [song, ...prev]);
-    } catch (error) {
-      console.error("Error adding to history:", error);
+    loadPreferences();
+    
+    const preferenceChannel = supabase
+      .channel('music_preferences_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'music_preferences'
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData.crossfade_duration !== undefined) {
+            overlapTimeRef.current = newData.crossfade_duration;
+            setPreferences(prev => ({
+              ...prev,
+              crossfadeDuration: newData.crossfade_duration,
+              crossfadeEnabled: newData.crossfade_enabled
+            }));
+            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      preferenceChannel.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        console.log("Chargement initial des favoris");
+
+        const { data: favStats, error: favError } = await supabase
+          .from('favorite_stats')
+          .select('song_id')
+          .eq('user_id', session.user.id);
+
+        if (favError) throw favError;
+
+        if (favStats && favStats.length > 0) {
+          const { data: favoriteSongs, error: songsError } = await supabase
+            .from('songs')
+            .select('*')
+            .in('id', favStats.map(row => row.song_id));
+
+          if (songsError) throw songsError;
+
+          if (favoriteSongs) {
+            console.log("Favoris chargés:", favoriteSongs);
+            const mappedSongs: Song[] = favoriteSongs.map(song => ({
+              id: song.id,
+              title: song.title,
+              artist: song.artist || '',
+              duration: song.duration || '0:00',
+              url: song.file_path,
+              imageUrl: song.image_url,
+              bitrate: '320 kbps'
+            }));
+            setFavorites(mappedSongs);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des favoris:", error);
+      }
+    };
+
+    loadFavorites();
+  }, []);
+
+  useEffect(() => {
+    const setupRealtimeFavorites = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        console.log("Mise en place de l'écoute des favoris en temps réel");
+
+        const channel = supabase
+          .channel('favorite_changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'favorite_stats',
+              filter: `user_id=eq.${session.user.id}`
+            },
+            async (payload) => {
+              console.log("Changement détecté dans les favoris:", payload);
+
+              const { data: favStats } = await supabase
+                .from('favorite_stats')
+                .select('song_id')
+                .eq('user_id', session.user.id);
+
+              if (favStats && favStats.length > 0) {
+                const { data: favoriteSongs } = await supabase
+                  .from('songs')
+                  .select('*')
+                  .in('id', favStats.map(row => row.song_id));
+
+                if (favoriteSongs) {
+                  console.log("Mise à jour des favoris:", favoriteSongs);
+                  const mappedSongs: Song[] = favoriteSongs.map(song => ({
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist || '',
+                    duration: song.duration || '0:00',
+                    url: song.file_path,
+                    imageUrl: song.image_url,
+                    bitrate: '320 kbps'
+                  }));
+                  setFavorites(mappedSongs);
+                }
+              } else {
+                setFavorites([]);
+              }
+            }
+          )
+          .subscribe();
+
+        return () => {
+          console.log("Nettoyage de l'écoute des favoris");
+          supabase.removeChannel(channel);
+        };
+      } catch (error) {
+        console.error("Erreur lors de la configuration de l'écoute en temps réel:", error);
+      }
+    };
+
+    setupRealtimeFavorites();
+  }, []);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (!currentSong || !nextSongPreloaded || fadingRef.current) return;
+
+      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
+      
+      if (timeLeft <= overlapTimeRef.current && nextAudioRef.current.paused) {
+        fadingRef.current = true;
+
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          const alertElement = document.getElementById('next-song-alert');
+          const titleElement = document.getElementById('next-song-title');
+          const artistElement = document.getElementById('next-song-artist');
+
+          if (alertElement && titleElement && artistElement) {
+            titleElement.textContent = nextSong.title;
+            artistElement.textContent = nextSong.artist;
+            alertElement.classList.remove('opacity-0', 'translate-y-2');
+            alertElement.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+              alertElement.classList.add('opacity-0', 'translate-y-2');
+              alertElement.classList.remove('opacity-100', 'translate-y-0');
+            }, 3000);
+          }
+        }
+
+        nextAudioRef.current.currentTime = 0;
+        const playPromise = nextAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Erreur lors du démarrage du fondu:", error);
+            fadingRef.current = false;
+          });
+        }
+
+        const steps = 100;
+        const intervalTime = (overlapTimeRef.current * 1000) / steps;
+        const volumeStep = 1 / steps;
+
+        let currentOutVolume = 1;
+        let currentInVolume = 0;
+
+        const fadeInterval = setInterval(() => {
+          if (currentOutVolume > 0 || currentInVolume < 1) {
+            currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+            currentInVolume = Math.min(1, currentInVolume + volumeStep);
+            
+            if (audioRef.current) audioRef.current.volume = currentOutVolume;
+            if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+          } else {
+            clearInterval(fadeInterval);
+            
+            if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+            }
+
+            const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+            const nextSong = queue[currentIndex + 1];
+            if (nextSong) {
+              setCurrentSong(nextSong);
+              
+              const tempAudio = audioRef.current;
+              audioRef.current = nextAudioRef.current;
+              nextAudioRef.current = tempAudio;
+              
+              setProgress(0);
+              setNextSongPreloaded(false);
+              fadingRef.current = false;
+              
+              preloadNextSong();
+            }
+          }
+        }, intervalTime);
+      }
+    };
+
+    const handleEnded = () => {
+      if (!fadingRef.current) {
+        setProgress(0);
+        const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+        const nextSong = queue[currentIndex + 1];
+        
+        if (nextSong) {
+          play(nextSong);
+        } else if (repeatMode === 'all') {
+          play(queue[0]);
+        }
+      }
+    };
+
+    const handleTimeUpdateProgress = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+    };
+  }, [currentSong, nextSongPreloaded, queue, play, repeatMode]);
+
+  useEffect(() => {
+    if (currentSong) {
+      preloadNextSong();
     }
-  };
+  }, [currentSong]);
+
+  useEffect(() => {
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      if (repeatMode === 'one') {
+        audioRef.current.currentTime = 0;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+          });
+        }
+      } else {
+        nextSong();
+      }
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    const handleTimeUpdate = () => {
+      const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(percentage);
+    };
+
+    audioRef.current.addEventListener('error', handleError);
+    audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audioRef.current.removeEventListener('error', handleError);
+      audioRef.current.removeEventListener('ended', handleEnded);
+      audioRef.current.removeEventListener('play', handlePlay);
+      audioRef.current.removeEventListener('pause', handlePause);
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [repeatMode, nextSong]);
 
   return (
     <PlayerContext.Provider
@@ -282,7 +760,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeFavorite,
         setSearchQuery,
         setPlaybackRate: updatePlaybackRate,
-        setQueue,
       }}
     >
       {children}
@@ -297,5 +774,3 @@ export const usePlayer = () => {
   }
   return context;
 };
-
-export default PlayerProvider;
