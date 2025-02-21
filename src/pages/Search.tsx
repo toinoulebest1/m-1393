@@ -41,7 +41,7 @@ const Search = () => {
     return localStorage.getItem('lastSelectedGenre') || "";
   });
   const [songToReport, setSongToReport] = useState<any>(null);
-  const { play, setQueue, queue, currentSong, favorites, toggleFavorite } = usePlayer();
+  const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
 
   useEffect(() => {
@@ -138,6 +138,19 @@ const Search = () => {
   };
 
   const handlePlay = (song: any) => {
+    // Si on clique sur la musique en cours de lecture
+    if (currentSong?.id === song.id) {
+      // Si la musique est en cours de lecture, on la met en pause
+      if (isPlaying) {
+        pause();
+      } else {
+        // Sinon, on reprend la lecture
+        play();
+      }
+      return;
+    }
+
+    // Si c'est une nouvelle musique
     if (song.imageUrl && !song.imageUrl.includes('picsum.photos')) {
       extractDominantColor(song.imageUrl);
     }
