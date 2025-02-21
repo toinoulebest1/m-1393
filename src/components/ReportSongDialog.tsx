@@ -1,4 +1,5 @@
 
+```typescript
 import { useState } from "react";
 import {
   AlertDialog,
@@ -13,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -89,14 +89,7 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
       if (!open) onClose();
     }}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-        >
-          <Flag className="h-4 w-4 mr-2" />
-          Signaler
-        </Button>
+        {/* Retrait du bouton de signalement */}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -166,3 +159,4 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
     </AlertDialog>
   );
 };
+```
