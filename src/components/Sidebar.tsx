@@ -1,6 +1,6 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -42,6 +42,7 @@ export const Sidebar = () => {
 
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
+    { to: "/search", icon: Search, label: "Rechercher" },
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') }
@@ -67,7 +68,7 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50"> {/* Ajusté la hauteur pour tenir compte du Player */}
+    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
           <Music2 className="w-8 h-8 text-spotify-accent" />
@@ -93,7 +94,7 @@ export const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="flex-1 flex flex-col min-h-0"> {/* Ajout de min-h-0 pour gérer le scroll */}
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
           <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
             <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
