@@ -143,7 +143,7 @@ const Search = () => {
                 box-shadow: none;
               }
               50% {
-                transform: scale(1.05);
+                transform: scale(1.02);
                 box-shadow: var(--glow-shadow);
               }
             }
@@ -160,7 +160,7 @@ const Search = () => {
             }
 
             .animate-pulse-glow {
-              animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+              animation: pulse-glow 3s ease-in-out infinite;
             }
           `}
         </style>
