@@ -44,7 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: emailResponse, error: emailError } = await resend.emails.send({
       from: "Rapports de Signalements <onboarding@resend.dev>",
-      to: "contact@votredomaine.com", // TODO: Remplacer par votre email
+      to: "saumonlol5@gmail.com",
       subject: "Rapport Quotidien des Signalements",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
