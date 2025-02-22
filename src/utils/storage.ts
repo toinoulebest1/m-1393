@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
@@ -23,17 +22,6 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   }
 
   try {
-    // Création du bucket s'il n'existe pas
-    const { error: bucketError } = await supabase.storage.createBucket('audio', {
-      public: true,
-      fileSizeLimit: 524288000, // 500MB
-    });
-
-    if (bucketError && bucketError.message !== 'Bucket already exists') {
-      console.error("Erreur lors de la création du bucket:", bucketError);
-      throw bucketError;
-    }
-
     console.log("Uploading file to Supabase storage:", id);
     const { data, error } = await supabase.storage
       .from('audio')

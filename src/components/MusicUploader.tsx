@@ -22,7 +22,7 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
+  const [uploadToastId, setUploadToastId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
 
@@ -31,7 +31,7 @@ export const MusicUploader = () => {
       if (!uploadToastId) {
         const id = toast.loading("Upload en cours...", {
           description: `${uploadProgress}%`
-        });
+        }).toString();
         setUploadToastId(id);
       } else {
         toast.loading("Upload en cours...", {
@@ -192,11 +192,7 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      const audioPath = await storeAudioFile(fileId, file);
-
-      if (!audioPath) {
-        throw new Error("Échec du stockage du fichier");
-      }
+      await storeAudioFile(fileId, file);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -212,13 +208,7 @@ export const MusicUploader = () => {
         audio.src = audioUrl;
       });
 
-      const bitrate = formatBitrate(file.size, duration);
-      console.log("Informations du fichier:", {
-        taille: file.size,
-        duree: duration,
-        bitrate: bitrate
-      });
-
+      const formattedDuration = formatDuration(duration);
       URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
@@ -241,21 +231,23 @@ export const MusicUploader = () => {
         }
       }
 
-      // Ajouter la chanson à la base de données
-      const { error: insertError } = await supabase
+      const { data: songData, error: songError } = await supabase
         .from('songs')
         .insert({
           id: fileId,
           title: title,
           artist: artist,
-          duration: formatDuration(duration),
-          file_path: audioPath,
+          file_path: fileId,
+          duration: formattedDuration,
           image_url: imageUrl,
-        });
+        })
+        .select()
+        .single();
 
-      if (insertError) {
-        console.error("Erreur lors de l'insertion dans la base de données:", insertError);
-        throw insertError;
+      if (songError) {
+        console.error("Erreur lors de l'enregistrement dans la base de données:", songError);
+        toast.error("Erreur lors de l'enregistrement de la chanson");
+        return null;
       }
 
       setIsUploading(false);
@@ -265,10 +257,10 @@ export const MusicUploader = () => {
         id: fileId,
         title,
         artist,
-        duration: formatDuration(duration),
-        url: audioPath,
+        duration: formattedDuration,
+        url: fileId,
         imageUrl,
-        bitrate
+        bitrate: formatBitrate(file.size, duration)
       };
 
     } catch (error) {
