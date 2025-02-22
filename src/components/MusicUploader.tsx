@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -31,7 +32,7 @@ export const MusicUploader = () => {
       if (!uploadToastId) {
         const id = toast.loading("Upload en cours...", {
           description: `${uploadProgress}%`
-        }).toString();
+        });
         setUploadToastId(id);
       } else {
         toast.loading("Upload en cours...", {
@@ -192,19 +193,11 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const newProgress = prev + 5;
-          if (newProgress >= 90) {
-            clearInterval(progressInterval);
-          }
-          return Math.min(newProgress, 90);
-        });
-      }, 100);
+      const audioPath = await storeAudioFile(fileId, file);
 
-      await storeAudioFile(fileId, file);
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      if (!audioPath) {
+        throw new Error("Échec du stockage du fichier");
+      }
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -246,9 +239,24 @@ export const MusicUploader = () => {
         if (deezerCover) {
           console.log("Pochette Deezer trouvée:", deezerCover);
           imageUrl = deezerCover;
-        } else {
-          console.log("Aucune pochette trouvée sur Deezer");
         }
+      }
+
+      // Ajouter la chanson à la base de données
+      const { error: insertError } = await supabase
+        .from('songs')
+        .insert({
+          id: fileId,
+          title: title,
+          artist: artist,
+          duration: formatDuration(duration),
+          file_path: audioPath,
+          image_url: imageUrl,
+        });
+
+      if (insertError) {
+        console.error("Erreur lors de l'insertion dans la base de données:", insertError);
+        throw insertError;
       }
 
       setIsUploading(false);
@@ -259,7 +267,7 @@ export const MusicUploader = () => {
         title,
         artist,
         duration: formatDuration(duration),
-        url: fileId,
+        url: audioPath,
         imageUrl,
         bitrate
       };
