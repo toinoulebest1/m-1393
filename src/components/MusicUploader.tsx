@@ -192,7 +192,19 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          if (newProgress >= 90) {
+            clearInterval(progressInterval);
+          }
+          return Math.min(newProgress, 90);
+        });
+      }, 100);
+
       await storeAudioFile(fileId, file);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -208,7 +220,13 @@ export const MusicUploader = () => {
         audio.src = audioUrl;
       });
 
-      const formattedDuration = formatDuration(duration);
+      const bitrate = formatBitrate(file.size, duration);
+      console.log("Informations du fichier:", {
+        taille: file.size,
+        duree: duration,
+        bitrate: bitrate
+      });
+
       URL.revokeObjectURL(audioUrl);
 
       let imageUrl = "https://picsum.photos/240/240";
@@ -228,26 +246,9 @@ export const MusicUploader = () => {
         if (deezerCover) {
           console.log("Pochette Deezer trouvée:", deezerCover);
           imageUrl = deezerCover;
+        } else {
+          console.log("Aucune pochette trouvée sur Deezer");
         }
-      }
-
-      const { data: songData, error: songError } = await supabase
-        .from('songs')
-        .insert({
-          id: fileId,
-          title: title,
-          artist: artist,
-          file_path: fileId,
-          duration: formattedDuration,
-          image_url: imageUrl,
-        })
-        .select()
-        .single();
-
-      if (songError) {
-        console.error("Erreur lors de l'enregistrement dans la base de données:", songError);
-        toast.error("Erreur lors de l'enregistrement de la chanson");
-        return null;
       }
 
       setIsUploading(false);
@@ -257,10 +258,10 @@ export const MusicUploader = () => {
         id: fileId,
         title,
         artist,
-        duration: formattedDuration,
+        duration: formatDuration(duration),
         url: fileId,
         imageUrl,
-        bitrate: formatBitrate(file.size, duration)
+        bitrate
       };
 
     } catch (error) {
