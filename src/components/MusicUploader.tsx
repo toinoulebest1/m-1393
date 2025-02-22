@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -23,7 +22,7 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadToastId, setUploadToastId] = useState<string | null>(null);
+  const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
 
