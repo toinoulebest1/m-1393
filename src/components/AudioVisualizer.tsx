@@ -1,12 +1,14 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { X } from 'lucide-react';
 
 interface AudioVisualizerProps {
   isVisible: boolean;
+  onClose?: () => void;
 }
 
-export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible }) => {
+export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible, onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { isPlaying } = usePlayer();
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -182,7 +184,16 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible }) =
   
   return (
     <div className="fixed inset-x-0 bottom-24 flex justify-center z-40 px-4">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-4xl relative">
+        {/* Bouton de fermeture (croix) */}
+        <button 
+          onClick={onClose} 
+          className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-black/60 text-white rounded-full transition-all z-10"
+          aria-label="Fermer le visualiseur"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        
         <canvas 
           ref={canvasRef} 
           width={800}

@@ -57,6 +57,10 @@ const Index = () => {
     };
   }, [userId]); // Ajout de userId comme dépendance
 
+  const handleCloseVisualizer = () => {
+    setVisualizerActive(false);
+  };
+
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
@@ -70,8 +74,14 @@ const Index = () => {
           <AccountSettingsDialog />
         </div>
         <NowPlaying />
-        <AudioVisualizer isVisible={visualizerActive} />
-        <Player onVisualizerToggle={() => setVisualizerActive(prev => !prev)} visualizerActive={visualizerActive} />
+        <AudioVisualizer 
+          isVisible={visualizerActive} 
+          onClose={handleCloseVisualizer} 
+        />
+        <Player 
+          onVisualizerToggle={() => setVisualizerActive(prev => !prev)} 
+          visualizerActive={visualizerActive} 
+        />
       </div>
       <Toaster />
     </div>
