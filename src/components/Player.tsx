@@ -5,8 +5,14 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CastButton } from "./CastButton";
+import { VisualizerButton } from "./VisualizerButton";
 
-export const Player = () => {
+interface PlayerProps {
+  onVisualizerToggle?: () => void;
+  visualizerActive?: boolean;
+}
+
+export const Player = ({ onVisualizerToggle, visualizerActive = false }: PlayerProps) => {
   const { 
     currentSong, 
     isPlaying, 
@@ -184,6 +190,12 @@ export const Player = () => {
           </div>
 
           <div className="flex items-center space-x-4">
+            {onVisualizerToggle && (
+              <VisualizerButton 
+                isActive={visualizerActive || false} 
+                onClick={onVisualizerToggle} 
+              />
+            )}
             <CastButton />
             <div className="flex items-center space-x-2">
               <Volume2 className="text-spotify-neutral w-5 h-5" />

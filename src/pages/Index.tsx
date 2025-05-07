@@ -5,10 +5,12 @@ import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { AudioVisualizer } from "@/components/AudioVisualizer";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [visualizerActive, setVisualizerActive] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -68,7 +70,8 @@ const Index = () => {
           <AccountSettingsDialog />
         </div>
         <NowPlaying />
-        <Player />
+        <AudioVisualizer isVisible={visualizerActive} />
+        <Player onVisualizerToggle={() => setVisualizerActive(prev => !prev)} visualizerActive={visualizerActive} />
       </div>
       <Toaster />
     </div>
