@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -92,7 +93,9 @@ const Search = () => {
     setSearchQuery(query);
     localStorage.setItem('lastSearch', query);
     
-    if (query.length < 2 && searchFilter !== "genre") {
+    const isWildcardSearch = query === "*";
+    
+    if (!isWildcardSearch && query.length < 2 && searchFilter !== "genre") {
       setResults([]);
       return;
     }
@@ -103,17 +106,22 @@ const Search = () => {
         .from('songs')
         .select('*');
 
-      if (searchFilter === "title") {
-        queryBuilder = queryBuilder.ilike('title', `%${query}%`);
-      } else if (searchFilter === "artist") {
-        queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
-      } else if (searchFilter === "genre") {
-        if (selectedGenre) {
-          queryBuilder = queryBuilder.eq('genre', selectedGenre);
+      if (!isWildcardSearch) {
+        if (searchFilter === "title") {
+          queryBuilder = queryBuilder.ilike('title', `%${query}%`);
+        } else if (searchFilter === "artist") {
+          queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
+        } else if (searchFilter === "genre") {
+          if (selectedGenre) {
+            queryBuilder = queryBuilder.eq('genre', selectedGenre);
+          }
+        } else {
+          queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
         }
-      } else {
-        queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
       }
+      
+      // For wildcard search or genre filter, we don't need additional filters
+      // as we want to get all songs
 
       const { data, error } = await queryBuilder;
 
@@ -132,6 +140,10 @@ const Search = () => {
       }));
 
       setResults(formattedResults);
+      
+      if (isWildcardSearch) {
+        toast.success(`Tous les morceaux listés (${formattedResults.length})`);
+      }
     } catch (error) {
       console.error('Erreur de recherche:', error);
       toast.error("Erreur lors de la recherche");
@@ -263,7 +275,7 @@ const Search = () => {
                 )} />
                 <Input
                   type="text"
-                  placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste..."}
+                  placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste (ou * pour tout afficher)"}
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   className={cn(
@@ -537,7 +549,7 @@ const Search = () => {
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                Commencez à taper pour rechercher des chansons...
+                Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
               </div>
             )}
           </div>
