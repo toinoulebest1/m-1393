@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
@@ -5,12 +6,10 @@ import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
-import { AudioVisualizer } from "@/components/AudioVisualizer";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [visualizerActive, setVisualizerActive] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -57,10 +56,6 @@ const Index = () => {
     };
   }, [userId]); // Ajout de userId comme dépendance
 
-  const handleCloseVisualizer = () => {
-    setVisualizerActive(false);
-  };
-
   return (
     <div className="flex min-h-screen relative">
       <Sidebar />
@@ -74,14 +69,7 @@ const Index = () => {
           <AccountSettingsDialog />
         </div>
         <NowPlaying />
-        <AudioVisualizer 
-          isVisible={visualizerActive} 
-          onClose={handleCloseVisualizer} 
-        />
-        <Player 
-          onVisualizerToggle={() => setVisualizerActive(prev => !prev)} 
-          visualizerActive={visualizerActive} 
-        />
+        <Player />
       </div>
       <Toaster />
     </div>
