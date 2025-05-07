@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
 
   try {
     const { songs } = await req.json()
-    const updates = []
+    const updatedItems = []
     let updated = 0
     let errors = 0
     
@@ -39,43 +39,43 @@ Deno.serve(async (req) => {
         
         if (data.data && data.data.length > 0) {
           const track = data.data[0]
-          const updates = {}
+          const songUpdates = {}
           
           // Only update if we have better data
-          if ((!song.imageUrl || song.imageUrl.includes('picsum')) && track.album?.cover_xl) {
-            updates.image_url = track.album.cover_xl
+          if ((!song.image_url || song.image_url.includes('picsum')) && track.album?.cover_xl) {
+            songUpdates.image_url = track.album.cover_xl
           }
           
           if (!song.artist && track.artist?.name) {
-            updates.artist = track.artist.name
+            songUpdates.artist = track.artist.name
           }
           
           if (!song.genre && track.album?.genre_id) {
-            updates.genre = String(track.album.genre_id)
+            songUpdates.genre = String(track.album.genre_id)
           }
           
           if (!song.duration && track.duration) {
             const minutes = Math.floor(track.duration / 60)
             const seconds = track.duration % 60
-            updates.duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
+            songUpdates.duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
           }
           
-          if (Object.keys(updates).length > 0) {
+          if (Object.keys(songUpdates).length > 0) {
             const { error: updateError } = await supabase
               .from('songs')
-              .update(updates)
+              .update(songUpdates)
               .eq('id', song.id)
               
             if (updateError) {
               console.error(`Error updating song ${song.id}:`, updateError)
               errors++
             } else {
-              console.log(`Updated song: ${song.id} with:`, updates)
+              console.log(`Updated song: ${song.id} with:`, songUpdates)
               updated++
-              updates.push({
+              updatedItems.push({
                 id: song.id,
                 title: song.title,
-                updates: Object.keys(updates)
+                updates: Object.keys(songUpdates)
               })
             }
           } else {
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         updated, 
         errors, 
-        updates 
+        updates: updatedItems 
       }),
       {
         headers: {

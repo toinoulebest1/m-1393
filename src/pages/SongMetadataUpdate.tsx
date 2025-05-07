@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ReloadIcon, MusicIcon } from "lucide-react";
+import { LoaderIcon, MusicIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
@@ -216,7 +215,7 @@ const SongMetadataUpdate = () => {
                   disabled={updating || selectedSongs.length === 0}
                   className="flex items-center gap-2"
                 >
-                  {updating && <ReloadIcon className="h-4 w-4 animate-spin" />}
+                  {updating && <LoaderIcon className="h-4 w-4 animate-spin" />}
                   {updating ? "Mise à jour..." : "Mettre à jour les métadonnées"}
                 </Button>
               </div>
