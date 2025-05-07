@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,62 +38,61 @@ export const MusicPreferences = () => {
   ]);
 
   useEffect(() => {
-    fetchPreferences();
-    fetchStats();
-  }, []);
+    const loadPreferences = async () => {
+      try {
+        setIsLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-  const fetchPreferences = async () => {
-    try {
-      setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error } = await supabase
-        .from('music_preferences')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        console.log('Loaded preferences:', data);
-        setPreferences({
-          crossfadeEnabled: data.crossfade_enabled || false,
-          crossfadeDuration: data.crossfade_duration || 3,
-          audioQuality: data.audio_quality || 'high',
-          preferredLanguages: data.preferred_languages || [],
-        });
-      } else {
-        // Création des préférences par défaut
-        const defaultPreferences = {
-          user_id: session.user.id,
-          crossfade_enabled: false,
-          crossfade_duration: 3,
-          audio_quality: 'high',
-          preferred_languages: []
-        };
-
-        const { error: insertError } = await supabase
+        const { data, error } = await supabase
           .from('music_preferences')
-          .insert([defaultPreferences]);
-        
-        if (insertError) throw insertError;
-        
-        setPreferences({
-          crossfadeEnabled: false,
-          crossfadeDuration: 3,
-          audioQuality: 'high',
-          preferredLanguages: [],
-        });
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          console.log('Loaded preferences:', data);
+          setPreferences({
+            crossfadeEnabled: data.crossfade_enabled || false,
+            crossfadeDuration: data.crossfade_duration || 3,
+            audioQuality: data.audio_quality || 'high',
+            preferredLanguages: data.preferred_languages || [],
+          });
+        } else {
+          // Création des préférences par défaut
+          const defaultPreferences = {
+            user_id: session.user.id,
+            crossfade_enabled: false,
+            crossfade_duration: 3,
+            audio_quality: 'high',
+            preferred_languages: []
+          };
+
+          const { error: insertError } = await supabase
+            .from('music_preferences')
+            .insert([defaultPreferences]);
+          
+          if (insertError) throw insertError;
+          
+          setPreferences({
+            crossfadeEnabled: false,
+            crossfadeDuration: 3,
+            audioQuality: 'high',
+            preferredLanguages: [],
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching preferences:', error);
+        toast.error("Erreur lors du chargement des préférences");
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching preferences:', error);
-      toast.error("Erreur lors du chargement des préférences");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    loadPreferences();
+  }, []);
 
   const fetchStats = async () => {
     try {
@@ -148,7 +146,6 @@ export const MusicPreferences = () => {
       if (error) throw error;
 
       toast.success("Préférences sauvegardées avec succès");
-      await fetchPreferences();
     } catch (error) {
       console.error('Error saving preferences:', error);
       toast.error("Erreur lors de la sauvegarde des préférences");
