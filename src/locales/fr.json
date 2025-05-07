@@ -1,63 +1,39 @@
 
 {
-  "auth": {
-    "login": "Se connecter",
-    "signup": "S'inscrire",
-    "email": "Email",
-    "password": "Mot de passe",
-    "confirmPassword": "Confirmer le mot de passe",
-    "forgotPassword": "Mot de passe oublié?",
-    "noAccount": "Pas encore de compte?",
-    "haveAccount": "Déjà un compte?",
-    "signInWith": "Ou se connecter avec",
-    "rememberMe": "Se souvenir de moi",
-    "resetPassword": "Réinitialiser le mot de passe",
-    "signInTitle": "Connectez-vous à votre compte",
-    "signInSubtitle": "Entrez vos identifiants ci-dessous",
-    "signUpTitle": "Créer un compte",
-    "signUpSubtitle": "Entrez vos informations ci-dessous"
-  },
-  "player": {
-    "nowPlaying": "En cours de lecture",
-    "queue": "File d'attente",
-    "next": "Suivant",
-    "lyrics": "Paroles"
-  },
-  "sidebar": {
+  "common": {
+    "appName": "Spotify Clone",
     "home": "Accueil",
-    "search": "Recherche",
-    "library": "Bibliothèque",
-    "yourMusic": "Votre musique",
-    "playlists": "Playlists",
     "favorites": "Favoris",
-    "history": "Historique",
+    "queue": "File d'attente",
+    "search": "Rechercher",
+    "nowPlaying": "En cours de lecture",
+    "track": "titre",
+    "tracks": "titres",
+    "noFavorites": "Pas encore de favoris",
+    "clickHeartToAdd": "Cliquez sur le cœur à côté d'un titre pour l'ajouter à vos favoris",
+    "upload": "Importer des fichiers",
+    "fileSelected": "{{count}} fichier importé",
+    "fileSelected_plural": "{{count}} fichiers importés",
     "top100": "Top 100",
-    "admin": "Administration",
-    "reports": "Signalements",
-    "upload": "Importer de la musique"
-  },
-  "upload": {
-    "title": "Importer de la musique",
-    "subtitle": "Glissez-déposez des fichiers audio ou cliquez pour sélectionner",
-    "uploading": "Importation en cours...",
-    "success": "Importation réussie",
-    "error": "Erreur lors de l'importation",
-    "audioOnly": "Formats audio uniquement"
-  },
-  "report": {
-    "title": "Signaler un problème",
-    "description": "Décrivez le problème avec cette chanson",
-    "reason": "Raison du signalement",
-    "submit": "Envoyer le signalement",
+    "selectSong": "Sélectionnez un titre",
+    "noArtist": "Artiste inconnu",
+    "logout": "Se déconnecter",
+    "downloads": "Téléchargements",
+    "noDownloads": "Aucun téléchargement",
+    "title": "Titre",
+    "artist": "Artiste",
+    "duration": "Durée",
+    "downloadedAt": "Téléchargé le",
+    "lastPlayed": "Dernière lecture",
+    "history": "Historique",
+    "accountSettings": "Paramètres du compte",
+    "emptyHistory": "Votre historique d'écoute est vide",
+    "startListening": "Écoutez de la musique pour commencer à construire votre historique",
+    "deleteHistory": "Supprimer l'historique",
+    "confirmDeleteHistory": "Supprimer l'historique ?",
+    "confirmDeleteHistoryMessage": "Êtes-vous sûr de vouloir supprimer tout votre historique d'écoute ? Cette action est irréversible.",
     "cancel": "Annuler",
-    "success": "Signalement envoyé avec succès",
-    "error": "Erreur lors de l'envoi du signalement",
-    "reasons": {
-      "inappropriate": "Contenu inapproprié",
-      "copyright": "Violation de droits d'auteur",
-      "quality": "Qualité audio médiocre",
-      "metadata": "Métadonnées incorrectes",
-      "other": "Autre problème"
-    }
+    "delete": "Supprimer",
+    "loading": "Chargement..."
   }
 }

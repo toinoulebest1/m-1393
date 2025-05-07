@@ -1,147 +1,177 @@
-import { Routes, Route, BrowserRouter, Navigate } from "react-router-dom";
+
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState, Suspense } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
-import Search from "./pages/Search";
-import Auth from "./pages/Auth";
 import Favorites from "./pages/Favorites";
 import History from "./pages/History";
 import Top100 from "./pages/Top100";
 import Reports from "./pages/Reports";
-import Admin from "./pages/Admin";
-import { PlayerProvider } from "./contexts/PlayerContext";
-import { CastProvider } from "./contexts/CastContext";
-import { useEffect } from "react";
-import { supabase } from "./integrations/supabase/client";
+import Search from "./pages/Search";
+import Auth from "./pages/Auth";
+import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
-import { useState } from "react";
+import { PlayerProvider } from "./contexts/PlayerContext";
+import CastProvider from "./contexts/CastContext";
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
-    };
-    
-    checkAuth();
-  }, []);
-  
-  if (isAuthenticated === null) {
-    return <div>Chargement...</div>;
-  }
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  return <>{children}</>;
-};
+  const [isLoading, setIsLoading] = useState(true);
 
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  
   useEffect(() => {
-    const checkAdminRole = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setIsAdmin(false);
-        return;
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Session error:", error);
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(!!session);
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
       }
-      
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
-      
-      setIsAdmin(data?.role === 'admin');
     };
-    
-    checkAdminRole();
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
+      setIsAuthenticated(!!session);
+      if (event === 'SIGNED_OUT') {
+        queryClient.clear();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
-  
-  if (isAdmin === null) {
-    return <div>Chargement...</div>;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      </div>
+    );
   }
-  
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return <>{children}</>;
+
+  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
 };
 
-function App() {
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initI18n = async () => {
+      if (i18n.isInitialized) {
+        setIsLoading(false);
+      } else {
+        i18n.on('initialized', () => {
+          setIsLoading(false);
+        });
+      }
+    };
+    initI18n();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      </div>
+    );
+  }
+
   return (
-    <I18nextProvider i18n={i18n}>
-      <BrowserRouter>
-        <PlayerProvider>
-          <CastProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Index />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/search"
-                element={
-                  <ProtectedRoute>
-                    <Search />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/favorites"
-                element={
-                  <ProtectedRoute>
-                    <Favorites />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <ProtectedRoute>
-                    <History />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/top100"
-                element={
-                  <ProtectedRoute>
-                    <Top100 />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reports"
-                element={
-                  <AdminRoute>
-                    <Reports />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <AdminRoute>
-                    <Admin />
-                  </AdminRoute>
-                }
-              />
-            </Routes>
-          </CastProvider>
-        </PlayerProvider>
-      </BrowserRouter>
-    </I18nextProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <TooltipProvider>
+          <PlayerProvider>
+            <CastProvider>
+              <Toaster />
+              <Sonner />
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                </div>
+              }>
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route
+                      path="/"
+                      element={
+                        <PrivateRoute>
+                          <Index />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/search"
+                      element={
+                        <PrivateRoute>
+                          <Search />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/favorites"
+                      element={
+                        <PrivateRoute>
+                          <Favorites />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/history"
+                      element={
+                        <PrivateRoute>
+                          <History />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/top100"
+                      element={
+                        <PrivateRoute>
+                          <Top100 />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/reports"
+                      element={
+                        <PrivateRoute>
+                          <Reports />
+                        </PrivateRoute>
+                      }
+                    />
+                  </Routes>
+                </BrowserRouter>
+              </Suspense>
+            </CastProvider>
+          </PlayerProvider>
+        </TooltipProvider>
+      </I18nextProvider>
+    </QueryClientProvider>
   );
-}
+};
 
 export default App;

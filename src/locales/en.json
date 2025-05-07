@@ -1,63 +1,38 @@
 
 {
-  "auth": {
-    "login": "Login",
-    "signup": "Sign Up",
-    "email": "Email",
-    "password": "Password",
-    "confirmPassword": "Confirm Password",
-    "forgotPassword": "Forgot Password?",
-    "noAccount": "Don't have an account?",
-    "haveAccount": "Already have an account?",
-    "signInWith": "Or sign in with",
-    "rememberMe": "Remember me",
-    "resetPassword": "Reset Password",
-    "signInTitle": "Sign in to your account",
-    "signInSubtitle": "Enter your credentials below",
-    "signUpTitle": "Create an account",
-    "signUpSubtitle": "Enter your information below"
-  },
-  "player": {
-    "nowPlaying": "Now Playing",
-    "queue": "Queue",
-    "next": "Next",
-    "lyrics": "Lyrics"
-  },
-  "sidebar": {
+  "common": {
+    "appName": "Spotify Clone",
     "home": "Home",
-    "search": "Search",
-    "library": "Library",
-    "yourMusic": "Your Music",
-    "playlists": "Playlists",
     "favorites": "Favorites",
-    "history": "History",
+    "queue": "Queue",
+    "search": "Search",
+    "nowPlaying": "Now Playing",
+    "track": "track",
+    "tracks": "tracks",
+    "noFavorites": "No favorites yet",
+    "clickHeartToAdd": "Click the heart next to a song to add it to your favorites",
+    "upload": "Upload files",
+    "fileSelected": "{{count}} file imported",
+    "fileSelected_plural": "{{count}} files imported",
     "top100": "Top 100",
-    "admin": "Admin",
-    "reports": "Reports",
-    "upload": "Upload Music"
-  },
-  "upload": {
-    "title": "Upload Music",
-    "subtitle": "Drag and drop audio files or click to select",
-    "uploading": "Uploading...",
-    "success": "Upload successful",
-    "error": "Upload error",
-    "audioOnly": "Audio formats only"
-  },
-  "report": {
-    "title": "Report an Issue",
-    "description": "Describe the issue with this song",
-    "reason": "Reason for reporting",
-    "submit": "Submit Report",
+    "selectSong": "Select a song",
+    "noArtist": "Unknown Artist",
+    "logout": "Logout",
+    "downloads": "Downloads",
+    "noDownloads": "No downloads yet",
+    "title": "Title",
+    "artist": "Artist",
+    "duration": "Duration",
+    "downloadedAt": "Downloaded on",
+    "lastPlayed": "Last played",
+    "history": "History",
+    "accountSettings": "Account Settings",
+    "emptyHistory": "Your listening history is empty",
+    "startListening": "Listen to music to start building your history",
+    "deleteHistory": "Delete history",
+    "confirmDeleteHistory": "Delete history?",
+    "confirmDeleteHistoryMessage": "Are you sure you want to delete your entire listening history? This action cannot be undone.",
     "cancel": "Cancel",
-    "success": "Report submitted successfully",
-    "error": "Error submitting report",
-    "reasons": {
-      "inappropriate": "Inappropriate content",
-      "copyright": "Copyright violation",
-      "quality": "Poor audio quality",
-      "metadata": "Incorrect metadata",
-      "other": "Other issue"
-    }
+    "delete": "Delete"
   }
 }
