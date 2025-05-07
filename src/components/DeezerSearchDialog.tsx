@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +19,22 @@ interface DeezerSearchDialogProps {
 const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSearchDialogProps) => {
   const { t } = useTranslation();
   const { refreshCurrentSong } = usePlayerContext();
-  const [query, setQuery] = useState<string>(
-    song.artist && song.artist !== "Unknown Artist" 
-      ? `${song.artist} ${song.title}` 
-      : song.title
-  );
+  const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<any[]>([]);
+
+  // Reset query and results when song changes or dialog opens
+  useEffect(() => {
+    if (open && song) {
+      // Create initial search query from song metadata
+      const initialQuery = song.artist && song.artist !== "Unknown Artist" 
+        ? `${song.artist} ${song.title}` 
+        : song.title;
+      
+      setQuery(initialQuery);
+      setResults([]);
+    }
+  }, [open, song]);
 
   const handleSearch = async () => {
     if (!query.trim()) {
