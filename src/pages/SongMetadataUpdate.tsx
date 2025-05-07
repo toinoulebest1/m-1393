@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -74,9 +75,15 @@ const SongMetadataUpdate = () => {
 
         setSongs(data || []);
         
-        // Filter songs without images by default
-        const songsWithoutImages = data?.filter(song => !song.image_url || song.image_url.includes('picsum')) || [];
-        setSelectedSongs(songsWithoutImages.map(song => song.id));
+        // Filter songs with missing data - prioritize songs without images or with "Unknown Artist"
+        const songsWithMissingData = data?.filter(song => 
+          !song.image_url || 
+          song.image_url.includes('picsum') || 
+          !song.artist || 
+          song.artist === "Unknown Artist"
+        ) || [];
+        
+        setSelectedSongs(songsWithMissingData.map(song => song.id));
       } catch (error) {
         console.error("Erreur:", error);
         toast.error("Erreur lors du chargement des chansons");
@@ -307,7 +314,9 @@ const SongMetadataUpdate = () => {
                           )}
                         </TableCell>
                         <TableCell className="font-medium text-foreground">{song.title}</TableCell>
-                        <TableCell className="text-foreground">{song.artist || "Artiste inconnu"}</TableCell>
+                        <TableCell className={`text-foreground ${song.artist === "Unknown Artist" ? "text-yellow-400" : ""}`}>
+                          {song.artist || "Artiste inconnu"}
+                        </TableCell>
                         <TableCell className="text-foreground">{song.genre || "—"}</TableCell>
                         <TableCell className="text-foreground">{song.duration || "—"}</TableCell>
                       </TableRow>

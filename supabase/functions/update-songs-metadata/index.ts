@@ -26,8 +26,24 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing song: ${song.id} - ${song.title} by ${song.artist}`)
         
+        // Determine what to search for in the Deezer API
+        let searchQuery = ""
+        
+        // If artist is known, use it with title
+        if (song.artist && song.artist !== "Unknown Artist") {
+          searchQuery = `${song.artist} ${song.title}` 
+        } 
+        // If title contains artist information (like "Artist - Title")
+        else if (song.title && song.title.includes(' - ')) {
+          searchQuery = song.title
+        } 
+        // Just use the title as a last resort
+        else {
+          searchQuery = song.title
+        }
+        
         const response = await fetch(
-          `https://api.deezer.com/search?q=${encodeURIComponent(`${song.artist || ''} ${song.title}`)}`
+          `https://api.deezer.com/search?q=${encodeURIComponent(searchQuery)}`
         )
         
         if (!response.ok) {
@@ -46,7 +62,8 @@ Deno.serve(async (req) => {
             songUpdates.image_url = track.album.cover_xl
           }
           
-          if (!song.artist && track.artist?.name) {
+          // Update artist if unknown or empty
+          if ((!song.artist || song.artist === "Unknown Artist") && track.artist?.name) {
             songUpdates.artist = track.artist.name
           }
           
@@ -58,6 +75,15 @@ Deno.serve(async (req) => {
             const minutes = Math.floor(track.duration / 60)
             const seconds = track.duration % 60
             songUpdates.duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
+          }
+          
+          // If the title is potentially generic or contains metadata (like "Artist - Title")
+          // and we found a better title from Deezer, update it
+          if (song.title.includes(' - ') && track.title) {
+            // Only update if the Deezer title isn't too generic
+            if (track.title.length > 3) {
+              songUpdates.title = track.title
+            }
           }
           
           if (Object.keys(songUpdates).length > 0) {
@@ -82,7 +108,7 @@ Deno.serve(async (req) => {
             console.log(`No updates needed for song: ${song.id}`)
           }
         } else {
-          console.log(`No results found for: ${song.artist} - ${song.title}`)
+          console.log(`No results found for: ${searchQuery}`)
         }
         
         // Add a small delay to avoid rate limiting
