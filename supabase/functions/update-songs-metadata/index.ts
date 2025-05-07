@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.1'
 
 const corsHeaders = {
@@ -136,7 +135,7 @@ Deno.serve(async (req) => {
               console.error(`Error updating song ${song.id}:`, updateError)
               errors++
             } else {
-              console.log(`Updated song: ${song.id} with:`, songUpdates)
+              console.log(`Updated song: ${song.id} with metadata:`, songUpdates)
               updated++
               updatedItems.push({
                 id: song.id,

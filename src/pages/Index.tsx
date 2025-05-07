@@ -6,10 +6,12 @@ import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { usePlayerContext } from "@/contexts/PlayerContext";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const { refreshCurrentSong } = usePlayerContext();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,8 +33,8 @@ const Index = () => {
 
     fetchProfile();
 
-    // Abonnement aux changements en temps réel
-    const channel = supabase
+    // Abonnement aux changements en temps réel pour le profil
+    const profileChannel = supabase
       .channel('profiles-changes')
       .on(
         'postgres_changes',
@@ -50,11 +52,29 @@ const Index = () => {
       )
       .subscribe();
 
-    // Nettoyage de l'abonnement
+    // Abonnement aux changements en temps réel pour les chansons
+    const songsChannel = supabase
+      .channel('songs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'songs',
+        },
+        (payload: any) => {
+          // Actualiser la chanson courante si ses métadonnées ont été mises à jour
+          refreshCurrentSong && refreshCurrentSong();
+        }
+      )
+      .subscribe();
+
+    // Nettoyage des abonnements
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(songsChannel);
     };
-  }, [userId]); // Ajout de userId comme dépendance
+  }, [userId, username, refreshCurrentSong]);
 
   return (
     <div className="flex min-h-screen relative">

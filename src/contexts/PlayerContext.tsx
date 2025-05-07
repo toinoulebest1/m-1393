@@ -48,6 +48,7 @@ interface PlayerContextType {
   removeFavorite: (songId: string) => void;
   setSearchQuery: (query: string) => void;
   setPlaybackRate: (rate: number) => void;
+  refreshCurrentSong: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -894,16 +895,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               // Passer à la chanson suivante
               const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-              const nextSong = queue[currentIndex + 1];
-              if (nextSong) {
+              const nextTrack = queue[currentIndex + 1];
+              if (nextTrack) {
                 // Échange des références audio
                 const tempAudio = audioRef.current;
                 audioRef.current = nextAudioRef.current;
                 nextAudioRef.current = tempAudio;
                 nextAudioRef.current.src = '';  // Réinitialiser l'audio de préchargement
                 
-                setCurrentSong(nextSong);
-                localStorage.setItem('currentSong', JSON.stringify(nextSong));
+                setCurrentSong(nextTrack);
+                localStorage.setItem('currentSong', JSON.stringify(nextTrack));
                 
                 setProgress(0);
                 setNextSongPreloaded(false);
@@ -1045,6 +1046,33 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong]);
 
+  // Fonction pour rafraîchir les métadonnées de la chanson actuelle
+  const refreshCurrentSong = () => {
+    if (currentSong) {
+      const fetchUpdatedSong = async () => {
+        console.log("Rafraîchissement des métadonnées de la chanson:", currentSong.id);
+        const { data, error } = await supabase
+          .from('songs')
+          .select('*')
+          .eq('id', currentSong.id)
+          .single();
+
+        if (data && !error) {
+          setCurrentSong({
+            ...currentSong,
+            title: data.title,
+            artist: data.artist,
+            imageUrl: data.image_url,
+            genre: data.genre,
+            duration: data.duration
+          });
+        }
+      };
+
+      fetchUpdatedSong();
+    }
+  };
+
   return (
     <PlayerContext.Provider value={{
       currentSong,
@@ -1074,6 +1102,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSearchQuery,
       setPlaybackRate: updatePlaybackRate,
       setQueue,
+      refreshCurrentSong,
     }}>
       {children}
       <div 
@@ -1092,6 +1121,14 @@ export const usePlayer = () => {
   const context = useContext(PlayerContext);
   if (!context) {
     throw new Error('usePlayer must be used within a PlayerProvider');
+  }
+  return context;
+};
+
+export const usePlayerContext = () => {
+  const context = useContext(PlayerContext);
+  if (!context) {
+    throw new Error("usePlayerContext must be used within a PlayerProvider");
   }
   return context;
 };

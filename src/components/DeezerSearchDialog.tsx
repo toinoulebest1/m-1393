@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LoaderIcon, Search, Music } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { usePlayerContext } from "@/contexts/PlayerContext";
 
 interface DeezerSearchDialogProps {
   open: boolean;
@@ -17,6 +17,7 @@ interface DeezerSearchDialogProps {
 
 const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSearchDialogProps) => {
   const { t } = useTranslation();
+  const { refreshCurrentSong } = usePlayerContext();
   const [query, setQuery] = useState<string>(
     song.artist && song.artist !== "Unknown Artist" 
       ? `${song.artist} ${song.title}` 
@@ -101,6 +102,11 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
         }
         
         toast.success(t("common.metadataUpdated"));
+        
+        // Refresh current song if it's the one being updated
+        refreshCurrentSong();
+        
+        // Call the callback to refresh the list
         onUpdateSuccess();
       } else {
         toast.info(t("common.noChangesNeeded"));
