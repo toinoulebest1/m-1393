@@ -7,11 +7,22 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
+import { toast } from "sonner";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const { refreshCurrentSong } = usePlayerContext();
+  const { refreshCurrentSong, currentSong } = usePlayerContext();
+
+  // Force re-render when currentSong changes
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  useEffect(() => {
+    if (currentSong) {
+      // This will trigger a re-render when the current song changes
+      setForceUpdate(prev => prev + 1);
+    }
+  }, [currentSong]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -68,6 +79,14 @@ const Index = () => {
           if (refreshCurrentSong) {
             console.log("Refreshing current song from Index.tsx");
             refreshCurrentSong();
+            // Force re-render after metadata update
+            setTimeout(() => {
+              setForceUpdate(prev => prev + 1);
+              toast.info("Métadonnées mises à jour", {
+                duration: 2000,
+                position: "top-center"
+              });
+            }, 500);
           }
         }
       )
@@ -92,7 +111,8 @@ const Index = () => {
           )}
           <AccountSettingsDialog />
         </div>
-        <NowPlaying />
+        {/* Pass forceUpdate to force re-render when metadata changes */}
+        <NowPlaying key={`now-playing-${forceUpdate}`} />
         <Player />
       </div>
       <Toaster />
