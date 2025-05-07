@@ -38,32 +38,50 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible }) =
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
     
-    const barWidth = (WIDTH / bufferLength) * 2.5;
-    let barHeight;
-    let x = 0;
-    
     function renderFrame() {
       if (!isVisible) return;
       
       requestAnimationFrame(renderFrame);
       
-      x = 0;
-      
       analyser.getByteFrequencyData(dataArray);
       
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      
+      // Fond avec dégradé
+      const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+      gradient.addColorStop(0, 'rgba(26, 31, 44, 0.3)');
+      gradient.addColorStop(1, 'rgba(20, 24, 36, 0.3)');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       
+      const barWidth = (WIDTH / bufferLength) * 2;
+      let x = 0;
+      
       for (let i = 0; i < bufferLength; i++) {
-        barHeight = dataArray[i] / 2;
+        const barHeight = (dataArray[i] / 255) * HEIGHT * 0.8;
         
-        // Couleur dynamique basée sur la fréquence
-        const h = i / bufferLength * 360;
-        ctx.fillStyle = `hsla(${h}, 100%, 50%, 0.8)`;
+        // Couleur dynamique basée sur la fréquence et l'amplitude
+        const h = (i / bufferLength) * 300 + 240; // Teinte de couleur (bleu-violet)
+        const s = 90; // Saturation
+        const l = 50 + (dataArray[i] / 255) * 30; // Luminosité
         
-        ctx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
+        ctx.fillStyle = `hsla(${h}, ${s}%, ${l}%, 0.8)`;
         
-        x += barWidth + 1;
+        // Dessine une barre arrondie
+        const roundedBarHeight = Math.max(4, barHeight);
+        
+        // Effet miroir pour les barres
+        // Barre du haut
+        ctx.beginPath();
+        ctx.roundRect(x, HEIGHT/2 - roundedBarHeight, barWidth - 1, roundedBarHeight, 3);
+        ctx.fill();
+        
+        // Barre du bas (effet miroir)
+        ctx.beginPath();
+        ctx.roundRect(x, HEIGHT/2, barWidth - 1, roundedBarHeight * 0.7, 3);
+        ctx.fill();
+        
+        x += barWidth;
       }
     }
     
@@ -85,13 +103,15 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible }) =
   if (!isVisible) return null;
   
   return (
-    <div className="absolute bottom-24 left-0 right-0 flex justify-center z-40">
-      <canvas 
-        ref={canvasRef} 
-        width={window.innerWidth * 0.8} 
-        height={120}
-        className="rounded-lg bg-black bg-opacity-30 backdrop-blur-sm"
-      />
+    <div className="fixed inset-x-0 bottom-24 flex justify-center z-40 px-4">
+      <div className="w-full max-w-4xl">
+        <canvas 
+          ref={canvasRef} 
+          width={800}
+          height={180}
+          className="w-full rounded-xl bg-black bg-opacity-25 backdrop-blur-md border border-white/10 shadow-lg"
+        />
+      </div>
     </div>
   );
 };
