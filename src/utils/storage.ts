@@ -85,3 +85,34 @@ export const getAudioFile = async (path: string) => {
     throw error;
   }
 };
+
+export const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
+  try {
+    const query = `${artist} ${title}`;
+    console.log("Recherche Deezer pour:", { artist, title });
+    
+    const { data: supabaseData, error } = await supabase.functions.invoke('deezer-search', {
+      body: { query }
+    });
+    
+    if (error) {
+      console.error("Erreur lors de l'appel à l'edge function Deezer:", error);
+      return null;
+    }
+
+    console.log("Résultat de la recherche Deezer:", supabaseData);
+    
+    if (supabaseData?.data && supabaseData.data.length > 0) {
+      const track = supabaseData.data[0];
+      if (track.album?.cover_xl) {
+        console.log("Pochette trouvée:", track.album.cover_xl);
+        return track.album.cover_xl;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Erreur lors de la recherche Deezer:", error);
+    return "https://picsum.photos/240/240";
+  }
+};

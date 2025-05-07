@@ -3,7 +3,7 @@ import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
-import { storeAudioFile } from "@/utils/storage";
+import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,7 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadToastId, setUploadToastId] = useState<string | null>(null);
+  const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
 
@@ -78,36 +78,6 @@ export const MusicUploader = () => {
 
   const generateUUID = () => {
     return crypto.randomUUID();
-  };
-
-  const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
-    try {
-      const query = encodeURIComponent(`${artist} ${title}`);
-      console.log("Recherche Deezer pour:", { artist, title });
-      
-      const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.deezer.com/search?q=${query}`);
-      
-      if (!response.ok) {
-        console.error("Erreur API Deezer:", response.status);
-        return null;
-      }
-
-      const data = await response.json();
-      console.log("Résultat de la recherche Deezer:", data);
-      
-      if (data.data && data.data.length > 0) {
-        const track = data.data[0];
-        if (track.album?.cover_xl) {
-          console.log("Pochette trouvée:", track.album.cover_xl);
-          return track.album.cover_xl;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error("Erreur lors de la recherche Deezer:", error);
-      return "https://picsum.photos/240/240";
-    }
   };
 
   const extractMetadata = async (file: File) => {
