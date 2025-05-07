@@ -58,13 +58,17 @@ const Index = () => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'songs',
         },
         (payload: any) => {
+          console.log("Song change detected:", payload);
           // Actualiser la chanson courante si ses métadonnées ont été mises à jour
-          refreshCurrentSong && refreshCurrentSong();
+          if (refreshCurrentSong) {
+            console.log("Refreshing current song from Index.tsx");
+            refreshCurrentSong();
+          }
         }
       )
       .subscribe();

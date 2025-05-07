@@ -104,6 +104,7 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
         toast.success(t("common.metadataUpdated"));
         
         // Refresh current song if it's the one being updated
+        console.log("Explicitly calling refreshCurrentSong from DeezerSearchDialog");
         refreshCurrentSong();
         
         // Call the callback to refresh the list
@@ -196,7 +197,10 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => handleApplyMetadata(track)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApplyMetadata(track);
+                      }}
                       className="shrink-0"
                     >
                       {t("common.apply")}
