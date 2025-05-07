@@ -17,6 +17,7 @@ import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
 import { PlayerProvider } from "./contexts/PlayerContext";
+import CastProvider from "./contexts/CastContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,67 +104,69 @@ const App = () => {
       <I18nextProvider i18n={i18n}>
         <TooltipProvider>
           <PlayerProvider>
-            <Toaster />
-            <Sonner />
-            <Suspense fallback={
-              <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-              </div>
-            }>
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route
-                    path="/"
-                    element={
-                      <PrivateRoute>
-                        <Index />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/search"
-                    element={
-                      <PrivateRoute>
-                        <Search />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/favorites"
-                    element={
-                      <PrivateRoute>
-                        <Favorites />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/history"
-                    element={
-                      <PrivateRoute>
-                        <History />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/top100"
-                    element={
-                      <PrivateRoute>
-                        <Top100 />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/reports"
-                    element={
-                      <PrivateRoute>
-                        <Reports />
-                      </PrivateRoute>
-                    }
-                  />
-                </Routes>
-              </BrowserRouter>
-            </Suspense>
+            <CastProvider>
+              <Toaster />
+              <Sonner />
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                </div>
+              }>
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route
+                      path="/"
+                      element={
+                        <PrivateRoute>
+                          <Index />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/search"
+                      element={
+                        <PrivateRoute>
+                          <Search />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/favorites"
+                      element={
+                        <PrivateRoute>
+                          <Favorites />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/history"
+                      element={
+                        <PrivateRoute>
+                          <History />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/top100"
+                      element={
+                        <PrivateRoute>
+                          <Top100 />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/reports"
+                      element={
+                        <PrivateRoute>
+                          <Reports />
+                        </PrivateRoute>
+                      }
+                    />
+                  </Routes>
+                </BrowserRouter>
+              </Suspense>
+            </CastProvider>
           </PlayerProvider>
         </TooltipProvider>
       </I18nextProvider>
