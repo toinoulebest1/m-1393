@@ -39,6 +39,11 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible, onC
     };
   }, []);
   
+  const handleEffectChange = (newEffect: VisualizerEffect) => {
+    console.log("Changement d'effet dans AudioVisualizer:", newEffect);
+    setEffect(newEffect);
+  };
+  
   useEffect(() => {
     // Ne pas continuer si le visualiseur n'est pas visible
     if (!isVisible) return;
@@ -338,6 +343,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible, onC
       const HEIGHT = canvas.height;
       
       // Sélectionner la fonction de rendu en fonction de l'effet choisi
+      console.log("Effet actuel:", effect);
       switch (effect) {
         case 'wave':
           renderWave(dataArray, bufferLength, WIDTH, HEIGHT);
@@ -374,7 +380,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isVisible, onC
       <div className="w-full max-w-4xl relative">
         <VisualizerEffectSelector
           currentEffect={effect}
-          onEffectChange={setEffect}
+          onEffectChange={handleEffectChange}
         />
         
         <button 

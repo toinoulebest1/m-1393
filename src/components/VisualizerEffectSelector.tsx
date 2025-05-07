@@ -44,7 +44,10 @@ export const VisualizerEffectSelector: React.FC<VisualizerEffectSelectorProps> =
           <DropdownMenuItem 
             key={effect}
             className={`${currentEffect === effect ? 'bg-white/10 text-spotify-accent' : 'text-white'} hover:bg-white/20`}
-            onClick={() => onEffectChange(effect)}
+            onClick={() => {
+              console.log("Effet sélectionné:", effect);
+              onEffectChange(effect);
+            }}
           >
             {effectLabels[effect]}
           </DropdownMenuItem>
