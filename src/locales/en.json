@@ -43,6 +43,21 @@
     "updateResults": "Update Results",
     "updated": "updated",
     "errors": "errors",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "useApiToUpdate": "Use Deezer API to update missing song information",
+    "noSongs": "No songs available",
+    "searchDeezer": "Search Deezer",
+    "searchDeezerDescription": "Search manually for song metadata on Deezer",
+    "searchPlaceholder": "Search by artist, title or album...",
+    "search": "Search",
+    "searchResults": "Search Results",
+    "apply": "Apply",
+    "searchQueryRequired": "Please enter a search query",
+    "searchError": "Error searching Deezer",
+    "noResultsFound": "No results found",
+    "metadataUpdated": "Song metadata updated successfully",
+    "updateError": "Error updating song metadata",
+    "noChangesNeeded": "No changes needed",
+    "searchManually": "Search manually"
   }
 }

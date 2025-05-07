@@ -14,11 +14,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { LoaderIcon, MusicIcon } from "lucide-react";
+import { LoaderIcon, MusicIcon, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useTranslation } from "react-i18next";
+import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 
 const SongMetadataUpdate = () => {
+  const { t } = useTranslation();
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -27,6 +30,8 @@ const SongMetadataUpdate = () => {
   const [updateResults, setUpdateResults] = useState<any>(null);
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);
   const [updateProgress, setUpdateProgress] = useState(0);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<any>(null);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -130,15 +135,7 @@ const SongMetadataUpdate = () => {
         toast.error(`${data.errors} erreur(s) lors de la mise à jour`);
       }
       
-      // Refresh songs list
-      const { data: refreshedSongs, error: refreshError } = await supabase
-        .from('songs')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (!refreshError) {
-        setSongs(refreshedSongs || []);
-      }
+      refreshSongsList();
       
     } catch (error) {
       console.error("Erreur:", error);
@@ -171,6 +168,29 @@ const SongMetadataUpdate = () => {
     const songsWithoutImages = songs.filter(song => !song.image_url || song.image_url.includes('picsum')).map(song => song.id);
     setSelectedSongs(songsWithoutImages);
   };
+  
+  const handleOpenSearchDialog = (song: any) => {
+    setSelectedSong(song);
+    setSearchDialogOpen(true);
+  };
+  
+  const refreshSongsList = async () => {
+    try {
+      setLoading(true);
+      const { data: refreshedSongs, error: refreshError } = await supabase
+        .from('songs')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (!refreshError) {
+        setSongs(refreshedSongs || []);
+      }
+    } catch (error) {
+      console.error("Erreur lors du rafraîchissement de la liste:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (isCheckingRole) {
     return (
@@ -194,10 +214,10 @@ const SongMetadataUpdate = () => {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-2xl font-semibold leading-none tracking-tight text-foreground">
-                  Mise à jour des Métadonnées
+                  {t("common.updateMetadata")}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Utilisez l'API Deezer pour mettre à jour les informations manquantes des chansons
+                  {t("common.useApiToUpdate")}
                 </p>
               </div>
               <div className="flex space-x-2">
@@ -206,14 +226,14 @@ const SongMetadataUpdate = () => {
                   size="sm"
                   onClick={handleSelectWithoutImages}
                 >
-                  Sélectionner les chansons sans image
+                  {t("common.selectNoImage")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleSelectAll}
                 >
-                  {selectedSongs.length === songs.length ? "Désélectionner tout" : "Sélectionner tout"}
+                  {selectedSongs.length === songs.length ? t("common.deselectAll") : t("common.selectAll")}
                 </Button>
                 <Button
                   variant="default"
@@ -223,7 +243,7 @@ const SongMetadataUpdate = () => {
                   className="flex items-center gap-2"
                 >
                   {updating && <LoaderIcon className="h-4 w-4 animate-spin" />}
-                  {updating ? "Mise à jour..." : "Mettre à jour les métadonnées"}
+                  {updating ? t("common.updating") : t("common.updateMetadata")}
                 </Button>
               </div>
             </div>
@@ -239,14 +259,14 @@ const SongMetadataUpdate = () => {
             {updateResults && (
               <div className="mb-6 p-4 rounded-lg border border-border">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-medium">Résultats de la mise à jour</h4>
+                  <h4 className="text-lg font-medium">{t("common.updateResults")}</h4>
                   <div className="flex space-x-2">
                     <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                      {updateResults.updated} mis à jour
+                      {updateResults.updated} {t("common.updated")}
                     </Badge>
                     {updateResults.errors > 0 && (
                       <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
-                        {updateResults.errors} erreurs
+                        {updateResults.errors} {t("common.errors")}
                       </Badge>
                     )}
                   </div>
@@ -260,7 +280,7 @@ const SongMetadataUpdate = () => {
               </div>
             ) : songs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Aucune chanson disponible
+                {t("common.noSongs")}
               </div>
             ) : (
               <div className="rounded-lg border border-border bg-spotify-dark overflow-hidden">
@@ -278,10 +298,11 @@ const SongMetadataUpdate = () => {
                         </div>
                       </TableHead>
                       <TableHead className="w-16"></TableHead>
-                      <TableHead className="text-foreground">Titre</TableHead>
-                      <TableHead className="text-foreground">Artiste</TableHead>
-                      <TableHead className="text-foreground">Genre</TableHead>
-                      <TableHead className="text-foreground">Durée</TableHead>
+                      <TableHead className="text-foreground">{t("common.title")}</TableHead>
+                      <TableHead className="text-foreground">{t("common.artist")}</TableHead>
+                      <TableHead className="text-foreground">{t("common.genre")}</TableHead>
+                      <TableHead className="text-foreground">{t("common.duration")}</TableHead>
+                      <TableHead className="w-24"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -315,10 +336,20 @@ const SongMetadataUpdate = () => {
                         </TableCell>
                         <TableCell className="font-medium text-foreground">{song.title}</TableCell>
                         <TableCell className={`text-foreground ${song.artist === "Unknown Artist" ? "text-yellow-400" : ""}`}>
-                          {song.artist || "Artiste inconnu"}
+                          {song.artist || t("common.noArtist")}
                         </TableCell>
                         <TableCell className="text-foreground">{song.genre || "—"}</TableCell>
                         <TableCell className="text-foreground">{song.duration || "—"}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenSearchDialog(song)}
+                            title={t("common.searchManually")}
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -329,6 +360,15 @@ const SongMetadataUpdate = () => {
         </div>
       </div>
       <Player />
+      
+      {selectedSong && (
+        <DeezerSearchDialog
+          open={searchDialogOpen}
+          onClose={() => setSearchDialogOpen(false)}
+          song={selectedSong}
+          onUpdateSuccess={refreshSongsList}
+        />
+      )}
     </div>
   );
 };

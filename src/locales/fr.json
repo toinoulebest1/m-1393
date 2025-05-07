@@ -43,6 +43,21 @@
     "updating": "Mise à jour...",
     "updateResults": "Résultats de la mise à jour",
     "updated": "mis à jour",
-    "errors": "erreurs"
+    "errors": "erreurs",
+    "useApiToUpdate": "Utiliser l'API Deezer pour mettre à jour les informations manquantes",
+    "noSongs": "Aucune chanson disponible",
+    "searchDeezer": "Rechercher sur Deezer",
+    "searchDeezerDescription": "Rechercher manuellement les métadonnées d'une chanson sur Deezer",
+    "searchPlaceholder": "Rechercher par artiste, titre ou album...",
+    "search": "Rechercher",
+    "searchResults": "Résultats de recherche",
+    "apply": "Appliquer",
+    "searchQueryRequired": "Veuillez entrer une requête de recherche",
+    "searchError": "Erreur lors de la recherche Deezer",
+    "noResultsFound": "Aucun résultat trouvé",
+    "metadataUpdated": "Métadonnées de la chanson mises à jour avec succès",
+    "updateError": "Erreur lors de la mise à jour des métadonnées",
+    "noChangesNeeded": "Aucune modification nécessaire",
+    "searchManually": "Rechercher manuellement"
   }
 }
