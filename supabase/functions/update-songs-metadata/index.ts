@@ -26,23 +26,24 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing song: ${song.id} - ${song.title} by ${song.artist}`)
         
-        // Determine what to search for in the Deezer API
+        // ---- PREMIÈRE STRATÉGIE: Recherche avec les informations disponibles ----
         let searchQuery = ""
         
-        // If artist is known, use it with title
+        // Si l'artiste est connu, on l'utilise avec le titre
         if (song.artist && song.artist !== "Unknown Artist") {
           searchQuery = `${song.artist} ${song.title}` 
         } 
-        // If title contains artist information (like "Artist - Title")
+        // Si le titre contient des informations sur l'artiste (comme "Artiste - Titre")
         else if (song.title && song.title.includes(' - ')) {
           searchQuery = song.title
         } 
-        // Just use the title as a last resort
+        // Utiliser simplement le titre en dernier recours
         else {
           searchQuery = song.title
         }
         
-        const response = await fetch(
+        console.log(`Trying initial search with query: ${searchQuery}`)
+        let response = await fetch(
           `https://api.deezer.com/search?q=${encodeURIComponent(searchQuery)}`
         )
         
@@ -51,18 +52,57 @@ Deno.serve(async (req) => {
           throw new Error(`Deezer API error: ${response.status}`)
         }
         
-        const data = await response.json()
+        let data = await response.json()
+        let results = data.data || []
+
+        // Si aucun résultat n'a été trouvé, essayez avec juste le titre
+        if (results.length === 0 && song.title) {
+          const titleOnlyQuery = song.title.split(' - ').pop()?.trim() || song.title
+          console.log(`No results found. Trying with title only: ${titleOnlyQuery}`)
+          
+          response = await fetch(
+            `https://api.deezer.com/search?q=${encodeURIComponent(titleOnlyQuery)}`
+          )
+          
+          if (response.ok) {
+            data = await response.json()
+            results = data.data || []
+          }
+        }
         
-        if (data.data && data.data.length > 0) {
-          const track = data.data[0]
+        // ---- TRAITEMENT DES RÉSULTATS ----
+        if (results.length > 0) {
+          // Essayer de trouver la meilleure correspondance basée sur la durée (si disponible)
+          let bestMatch = results[0]
+          
+          if (song.duration) {
+            // Extraire le temps en secondes du format "mm:ss"
+            const durationParts = song.duration.split(':')
+            const songDurationSecs = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1] || '0')
+            
+            // Chercher la correspondance la plus proche en termes de durée
+            let closestDurationDiff = Math.abs(results[0].duration - songDurationSecs)
+            
+            for (const result of results) {
+              const durationDiff = Math.abs(result.duration - songDurationSecs)
+              if (durationDiff < closestDurationDiff) {
+                closestDurationDiff = durationDiff
+                bestMatch = result
+              }
+            }
+            
+            console.log(`Found best match by duration: ${bestMatch.artist?.name} - ${bestMatch.title}`)
+          }
+          
+          const track = bestMatch
           const songUpdates = {}
           
-          // Only update if we have better data
+          // Mettre à jour uniquement si nous avons de meilleures données
           if ((!song.image_url || song.image_url.includes('picsum')) && track.album?.cover_xl) {
             songUpdates.image_url = track.album.cover_xl
           }
           
-          // Update artist if unknown or empty
+          // Mettre à jour l'artiste si inconnu ou vide
           if ((!song.artist || song.artist === "Unknown Artist") && track.artist?.name) {
             songUpdates.artist = track.artist.name
           }
@@ -77,10 +117,10 @@ Deno.serve(async (req) => {
             songUpdates.duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
           }
           
-          // If the title is potentially generic or contains metadata (like "Artist - Title")
-          // and we found a better title from Deezer, update it
+          // Si le titre contient potentiellement des métadonnées (comme "Artiste - Titre")
+          // et que nous avons trouvé un meilleur titre via Deezer, le mettre à jour
           if (song.title.includes(' - ') && track.title) {
-            // Only update if the Deezer title isn't too generic
+            // Ne mettre à jour que si le titre de Deezer n'est pas trop générique
             if (track.title.length > 3) {
               songUpdates.title = track.title
             }
@@ -108,10 +148,10 @@ Deno.serve(async (req) => {
             console.log(`No updates needed for song: ${song.id}`)
           }
         } else {
-          console.log(`No results found for: ${searchQuery}`)
+          console.log(`No results found for any search strategy: ${searchQuery}`)
         }
         
-        // Add a small delay to avoid rate limiting
+        // Ajouter un petit délai pour éviter les limitations de taux
         await new Promise(resolve => setTimeout(resolve, 300))
         
       } catch (error) {
