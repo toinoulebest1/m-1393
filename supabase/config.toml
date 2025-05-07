@@ -8,13 +8,13 @@ schemas = ["public", "storage", "graphql_public"]
 
 [db]
 port = 54322
-shadow_port = 54320
-major_version = 15
+
+[realtime]
+enabled = true
 
 [studio]
 enabled = true
 port = 54323
-api_url = "http://127.0.0.1"
 
 [inbucket]
 enabled = true
@@ -22,16 +22,28 @@ port = 54324
 
 [storage]
 enabled = true
-port = 54325
 
 [auth]
 enabled = true
-port = 54326
+site_url = "http://localhost:3000"
 
-[realtime]
-enabled = true
-port = 54327
+[analytics]
+enabled = false
 
-[functions]
 [functions.deezer-search]
-verify_jwt = false
+verify_jwt = true
+
+[functions.deezer-proxy]
+verify_jwt = true
+
+[functions.generate-lyrics]
+verify_jwt = true
+
+[functions.send-weekly-reports]
+verify_jwt = true
+
+[functions.voice-to-text]
+verify_jwt = true
+
+[functions.update-songs-metadata]
+verify_jwt = true

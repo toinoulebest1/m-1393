@@ -13,6 +13,7 @@ import Top100 from "./pages/Top100";
 import Reports from "./pages/Reports";
 import Search from "./pages/Search";
 import Auth from "./pages/Auth";
+import SongMetadataUpdate from "./pages/SongMetadataUpdate";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
@@ -160,6 +161,14 @@ const App = () => {
                       element={
                         <PrivateRoute>
                           <Reports />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/metadata-update"
+                      element={
+                        <PrivateRoute>
+                          <SongMetadataUpdate />
                         </PrivateRoute>
                       }
                     />

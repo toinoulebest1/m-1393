@@ -34,6 +34,15 @@
     "confirmDeleteHistoryMessage": "Êtes-vous sûr de vouloir supprimer tout votre historique d'écoute ? Cette action est irréversible.",
     "cancel": "Annuler",
     "delete": "Supprimer",
-    "loading": "Chargement..."
+    "loading": "Chargement...",
+    "metadata": "Métadonnées",
+    "updateMetadata": "Mettre à jour les métadonnées",
+    "selectAll": "Sélectionner tout",
+    "deselectAll": "Désélectionner tout",
+    "selectNoImage": "Sélectionner les chansons sans image",
+    "updating": "Mise à jour...",
+    "updateResults": "Résultats de la mise à jour",
+    "updated": "mis à jour",
+    "errors": "erreurs"
   }
 }

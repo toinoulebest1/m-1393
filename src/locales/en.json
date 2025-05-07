@@ -33,6 +33,16 @@
     "confirmDeleteHistory": "Delete history?",
     "confirmDeleteHistoryMessage": "Are you sure you want to delete your entire listening history? This action cannot be undone.",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "metadata": "Metadata",
+    "updateMetadata": "Update Metadata",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "selectNoImage": "Select Songs Without Images",
+    "updating": "Updating...",
+    "updateResults": "Update Results",
+    "updated": "updated",
+    "errors": "errors",
+    "loading": "Loading..."
   }
 }
