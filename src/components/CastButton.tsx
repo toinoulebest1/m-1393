@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Cast } from 'lucide-react';
+import { Cast, Airplay } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCast } from '@/contexts/CastContext';
 import { cn } from '@/lib/utils';
@@ -35,15 +35,24 @@ export const CastButton = () => {
       <PopoverTrigger asChild>
         <Button 
           variant="ghost" 
-          size="icon"
+          size="sm"
           className={cn(
-            "rounded-full p-2 hover:bg-white/5 transition-colors",
-            isCasting && "text-spotify-accent"
+            "flex items-center gap-2 rounded-full px-3 py-2 bg-gradient-to-r",
+            isCasting 
+              ? "from-purple-600 to-blue-500 text-white hover:from-purple-700 hover:to-blue-600" 
+              : "from-white/5 to-white/10 hover:from-white/10 hover:to-white/20 border border-white/10"
           )}
         >
-          <Cast className="w-5 h-5" />
+          {isCasting ? (
+            <Airplay className="w-4 h-4" />
+          ) : (
+            <Cast className="w-4 h-4" />
+          )}
+          <span className="text-xs font-medium">
+            {isCasting ? activeDevice?.name || 'Diffusion' : 'Diffuser'}
+          </span>
           {isCasting && (
-            <span className="absolute bottom-0 right-0 w-2 h-2 bg-spotify-accent rounded-full"></span>
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-spotify-accent rounded-full"></span>
           )}
         </Button>
       </PopoverTrigger>

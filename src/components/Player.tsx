@@ -183,16 +183,18 @@ export const Player = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-4">
             <CastButton />
-            <Volume2 className="text-spotify-neutral w-5 h-5" />
-            <Slider
-              value={[volume]}
-              max={100}
-              step={1}
-              className="w-24"
-              onValueChange={(value) => setVolume(value[0])}
-            />
+            <div className="flex items-center space-x-2">
+              <Volume2 className="text-spotify-neutral w-5 h-5" />
+              <Slider
+                value={[volume]}
+                max={100}
+                step={1}
+                className="w-24"
+                onValueChange={(value) => setVolume(value[0])}
+              />
+            </div>
           </div>
         </div>
       </div>
