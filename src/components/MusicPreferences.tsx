@@ -122,6 +122,11 @@ export const MusicPreferences = () => {
         return;
       }
 
+      console.log("Sauvegarde des préférences:", {
+        crossfade_enabled: preferences.overlapEnabled,
+        crossfade_duration: preferences.overlapDuration,
+      });
+
       const { error } = await supabase
         .from('music_preferences')
         .update({
