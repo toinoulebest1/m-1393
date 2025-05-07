@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Waveform } from 'lucide-react';
+import { AudioWaveform } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +25,7 @@ export const VisualizerButton: React.FC<VisualizerButtonProps> = ({
           : "from-white/5 to-white/10 hover:from-white/10 hover:to-white/20 border border-white/10"
       )}
     >
-      <Waveform className="w-4 h-4" />
+      <AudioWaveform className="w-4 h-4" />
       <span className="text-xs font-medium">
         {isActive ? 'Visualiseur' : 'Visualiseur'}
       </span>
