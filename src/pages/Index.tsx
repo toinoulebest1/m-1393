@@ -6,6 +6,7 @@ import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import CastProvider from "@/contexts/CastContext";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -68,8 +69,10 @@ const Index = () => {
           )}
           <AccountSettingsDialog />
         </div>
-        <NowPlaying />
-        <Player />
+        <CastProvider>
+          <NowPlaying />
+          <Player />
+        </CastProvider>
       </div>
       <Toaster />
     </div>

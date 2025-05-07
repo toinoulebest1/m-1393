@@ -4,6 +4,7 @@ import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { CastButton } from "./CastButton";
 
 export const Player = () => {
   const { 
@@ -183,6 +184,7 @@ export const Player = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            <CastButton />
             <Volume2 className="text-spotify-neutral w-5 h-5" />
             <Slider
               value={[volume]}
