@@ -15,11 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { MultiSelect } from "./MultiSelect";
 
 export const MusicPreferences = () => {
   const [preferences, setPreferences] = useState({
-    overlapEnabled: false,
-    overlapDuration: 3,
+    crossfadeEnabled: false,
+    crossfadeDuration: 3,
     audioQuality: 'high',
     preferredLanguages: [] as string[],
   });
@@ -29,6 +30,13 @@ export const MusicPreferences = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [availableLanguages] = useState([
+    { value: 'fr', label: 'Français' },
+    { value: 'en', label: 'English' },
+    { value: 'es', label: 'Español' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'it', label: 'Italiano' },
+  ]);
 
   useEffect(() => {
     fetchPreferences();
@@ -52,8 +60,8 @@ export const MusicPreferences = () => {
       if (data) {
         console.log('Loaded preferences:', data);
         setPreferences({
-          overlapEnabled: data.crossfade_enabled || false,
-          overlapDuration: data.crossfade_duration || 3,
+          crossfadeEnabled: data.crossfade_enabled || false,
+          crossfadeDuration: data.crossfade_duration || 3,
           audioQuality: data.audio_quality || 'high',
           preferredLanguages: data.preferred_languages || [],
         });
@@ -74,8 +82,8 @@ export const MusicPreferences = () => {
         if (insertError) throw insertError;
         
         setPreferences({
-          overlapEnabled: false,
-          overlapDuration: 3,
+          crossfadeEnabled: false,
+          crossfadeDuration: 3,
           audioQuality: 'high',
           preferredLanguages: [],
         });
@@ -123,15 +131,15 @@ export const MusicPreferences = () => {
       }
 
       console.log("Sauvegarde des préférences:", {
-        crossfade_enabled: preferences.overlapEnabled,
-        crossfade_duration: preferences.overlapDuration,
+        crossfade_enabled: preferences.crossfadeEnabled,
+        crossfade_duration: preferences.crossfadeDuration,
       });
 
       const { error } = await supabase
         .from('music_preferences')
         .update({
-          crossfade_enabled: preferences.overlapEnabled,
-          crossfade_duration: preferences.overlapDuration,
+          crossfade_enabled: preferences.crossfadeEnabled,
+          crossfade_duration: preferences.crossfadeDuration,
           audio_quality: preferences.audioQuality,
           preferred_languages: preferences.preferredLanguages,
         })
@@ -153,6 +161,13 @@ export const MusicPreferences = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
+  };
+
+  const handleLanguageChange = (selectedOptions: string[]) => {
+    setPreferences(prev => ({
+      ...prev,
+      preferredLanguages: selectedOptions
+    }));
   };
 
   if (isLoading) {
@@ -178,33 +193,33 @@ export const MusicPreferences = () => {
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="overlap" className="flex items-center gap-2">
+              <Label htmlFor="crossfade" className="flex items-center gap-2">
                 Fondu enchaîné entre les pistes
               </Label>
               <Switch
-                id="overlap"
-                checked={preferences.overlapEnabled}
+                id="crossfade"
+                checked={preferences.crossfadeEnabled}
                 onCheckedChange={(checked) => 
-                  setPreferences(prev => ({ ...prev, overlapEnabled: checked }))
+                  setPreferences(prev => ({ ...prev, crossfadeEnabled: checked }))
                 }
               />
             </div>
 
-            {preferences.overlapEnabled && (
+            {preferences.crossfadeEnabled && (
               <div className="space-y-2">
-                <Label htmlFor="overlapDuration">
+                <Label htmlFor="crossfadeDuration">
                   Durée du fondu (secondes)
                 </Label>
                 <Input
-                  id="overlapDuration"
+                  id="crossfadeDuration"
                   type="number"
                   min="1"
                   max="10"
-                  value={preferences.overlapDuration}
+                  value={preferences.crossfadeDuration}
                   onChange={(e) => 
                     setPreferences(prev => ({ 
                       ...prev, 
-                      overlapDuration: parseInt(e.target.value) || 3 
+                      crossfadeDuration: parseInt(e.target.value) || 3 
                     }))
                   }
                   className="bg-white/5 border-white/10"
@@ -232,6 +247,19 @@ export const MusicPreferences = () => {
                   <SelectItem value="high">Haute (320 kbps)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="languages" className="flex items-center gap-2">
+                <Languages className="w-4 h-4" />
+                Langues préférées
+              </Label>
+              <MultiSelect 
+                options={availableLanguages}
+                selected={preferences.preferredLanguages}
+                onChange={handleLanguageChange}
+                placeholder="Sélectionnez les langues"
+              />
             </div>
 
             <Button 
