@@ -1,134 +1,172 @@
 
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Home, Search, Library, LayoutList, Clock, Heart, Settings, Crown, Music, UserCircle, Tag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
+import { MusicUploader } from "@/components/MusicUploader";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { MusicUploader } from "./MusicUploader";
-import { ThemeToggle } from "./ThemeToggle";
-import { AdBanner } from "./AdBanner";
-import { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+interface SidebarLinkProps {
+  to: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  isActive?: boolean;
+}
+
+const SidebarLink: React.FC<SidebarLinkProps> = ({ to, icon, children, isActive = false }) => {
+  return (
+    <Link to={to}>
+      <Button
+        variant="ghost"
+        className={cn(
+          "flex items-center w-full justify-start gap-x-3 px-3",
+          "transition-all duration-300",
+          isActive 
+            ? "bg-white/10 text-white" 
+            : "hover:bg-white/5 text-spotify-neutral hover:text-white"
+        )}
+      >
+        {icon}
+        <span className="font-medium">{children}</span>
+      </Button>
+    </Link>
+  );
+};
 
 export const Sidebar = () => {
+  const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const fetchUserRole = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userRole } = await supabase
+      
+      if (!session) {
+        setUserRole(null);
+        return;
+      }
+      
+      const { data } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
         .single();
-
-      setIsAdmin(userRole?.role === 'admin');
+      
+      if (data) {
+        setUserRole(data.role);
+      }
     };
-
-    checkAdminStatus();
+    
+    fetchUserRole();
   }, []);
 
-  const links = [
-    { to: "/", icon: Home, label: t('common.home') },
-    { to: "/search", icon: Search, label: "Rechercher" },
-    { to: "/favorites", icon: Heart, label: t('common.favorites') },
-    { to: "/history", icon: History, label: t('common.history') },
-    { to: "/top100", icon: Trophy, label: t('common.top100') }
-  ];
-
-  if (isAdmin) {
-    links.push({ to: "/reports", icon: Flag, label: "Signalements" });
-  }
-
-  const handleLanguageChange = (value: string) => {
-    i18n.changeLanguage(value);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-      toast.success("Déconnexion réussie");
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-      toast.error("Erreur lors de la déconnexion");
-    }
-  };
-
   return (
-    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
-      <div className="mb-8">
-        <div className="flex items-center gap-2">
-          <Music2 className="w-8 h-8 text-spotify-accent" />
-          <h1 className="text-xl font-bold text-white">Spotify Clone</h1>
-        </div>
+    <aside className="fixed left-0 top-0 h-full w-64 bg-black bg-opacity-95 flex flex-col border-r border-white/5 z-40">
+      <div className="p-6">
+        <Link to="/" className="flex items-center gap-x-2">
+          <Music className="text-white h-8 w-8" />
+          <span className="text-white text-xl font-bold">Musicly</span>
+        </Link>
       </div>
 
-      <nav className="space-y-2">
-        {links.map(({ to, icon: Icon, label }) => (
-          <Link
-            key={to}
-            to={to}
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors",
-              location.pathname === to
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/10"
-            )}
+      <div className="flex-1 flex flex-col">
+        <div className="px-3 py-2">
+          <SidebarLink 
+            to="/"
+            icon={<Home className="h-5 w-5" />}
+            isActive={location.pathname === "/"}
           >
-            <Icon className="w-5 h-5" />
-            <span className="font-medium">{label}</span>
-          </Link>
-        ))}
-      </nav>
+            {t('sidebar.home')}
+          </SidebarLink>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
-          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-            <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-              <SelectValue placeholder="Langue" />
-            </SelectTrigger>
-            <SelectContent className="bg-spotify-dark border-white/10">
-              <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-                Français
-              </SelectItem>
-              <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-                English
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <SidebarLink 
+            to="/search"
+            icon={<Search className="h-5 w-5" />}
+            isActive={location.pathname === "/search"}
+          >
+            {t('sidebar.search')}
+          </SidebarLink>
 
-          <ThemeToggle />
-
-          <MusicUploader />
-          
-          <AdBanner />
+          <SidebarLink 
+            to="/library"
+            icon={<Library className="h-5 w-5" />}
+            isActive={location.pathname === "/library"}
+          >
+            {t('sidebar.library')}
+          </SidebarLink>
         </div>
 
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
-            onClick={handleLogout}
+        <div className="px-3 py-6 flex flex-col">
+          <h3 className="text-sm font-semibold text-spotify-neutral px-4 mb-2">
+            {t('sidebar.yourMusic')}
+          </h3>
+
+          <SidebarLink 
+            to="/playlists"
+            icon={<LayoutList className="h-5 w-5" />}
+            isActive={location.pathname === "/playlists"}
           >
-            <LogOut className="w-5 h-5 mr-2" />
-            <span>{t('common.logout')}</span>
-          </Button>
+            {t('sidebar.playlists')}
+          </SidebarLink>
+
+          <SidebarLink 
+            to="/favorites"
+            icon={<Heart className="h-5 w-5" />}
+            isActive={location.pathname === "/favorites"}
+          >
+            {t('sidebar.favorites')}
+          </SidebarLink>
+
+          <SidebarLink 
+            to="/history"
+            icon={<Clock className="h-5 w-5" />}
+            isActive={location.pathname === "/history"}
+          >
+            {t('sidebar.history')}
+          </SidebarLink>
+
+          <SidebarLink 
+            to="/top100"
+            icon={<Crown className="h-5 w-5" />}
+            isActive={location.pathname === "/top100"}
+          >
+            {t('sidebar.top100')}
+          </SidebarLink>
         </div>
+
+        {userRole === 'admin' && (
+          <div className="px-3 py-6 flex flex-col">
+            <h3 className="text-sm font-semibold text-spotify-neutral px-4 mb-2">
+              {t('sidebar.admin')}
+            </h3>
+
+            <SidebarLink 
+              to="/admin"
+              icon={<Settings className="h-5 w-5" />}
+              isActive={location.pathname === "/admin"}
+            >
+              {t('sidebar.admin')}
+            </SidebarLink>
+
+            <SidebarLink 
+              to="/reports"
+              icon={<Tag className="h-5 w-5" />}
+              isActive={location.pathname === "/reports"}
+            >
+              {t('sidebar.reports')}
+            </SidebarLink>
+          </div>
+        )}
+
+        <MusicUploader />
       </div>
-    </div>
+
+      <div className="p-4 border-t border-white/5">
+        <UserCircle className="h-6 w-6 text-spotify-neutral" />
+      </div>
+    </aside>
   );
 };
