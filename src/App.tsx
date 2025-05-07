@@ -1,4 +1,3 @@
-
 import { Routes, Route, BrowserRouter, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Search from "./pages/Search";
@@ -14,6 +13,7 @@ import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
+import { useState } from "react";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -72,14 +72,12 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-import { useState } from "react";
-
 function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <BrowserRouter>
-        <CastProvider>
-          <PlayerProvider>
+        <PlayerProvider>
+          <CastProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route
@@ -139,8 +137,8 @@ function App() {
                 }
               />
             </Routes>
-          </PlayerProvider>
-        </CastProvider>
+          </CastProvider>
+        </PlayerProvider>
       </BrowserRouter>
     </I18nextProvider>
   );
