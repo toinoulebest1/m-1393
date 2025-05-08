@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -425,33 +424,15 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             </div>
           )}
           
+          {/* Nouvelle barre de lecture juste après l'image et avant le titre */}
           <div className={cn(
-            "text-center md:text-left transition-all duration-500 w-full px-4 md:px-0",
+            "w-full mb-4 transition-all duration-500",
             animationStage === "content" && contentAnimationVisible
               ? "opacity-100 transform translate-y-0" 
               : "opacity-0 transform translate-y-4"
           )}
           style={{
             transitionDelay: animationStage === "content" ? "150ms" : "0ms"
-          }}
-          >
-            <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
-              {songTitle}
-            </h1>
-            <p className="text-lg md:text-xl text-spotify-neutral break-words">
-              {songArtist}
-            </p>
-          </div>
-          
-          {/* Nouvelle barre de lecture en dessous de l'image */}
-          <div className={cn(
-            "w-full mt-4 transition-all duration-500",
-            animationStage === "content" && contentAnimationVisible
-              ? "opacity-100 transform translate-y-0" 
-              : "opacity-0 transform translate-y-4"
-          )}
-          style={{
-            transitionDelay: animationStage === "content" ? "200ms" : "0ms"
           }}>
             {/* Affichage de la progression */}
             <div className="flex items-center justify-between text-xs mb-1">
@@ -503,24 +484,42 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </Button>
               </div>
             </div>
-            
-            {/* Generate lyrics button (only shown when no lyrics) */}
-            {!lyrics && !isLoading && !error && (
-              <Button
-                onClick={generateLyrics}
-                disabled={isGenerating || !song?.artist}
-                className="mt-4 md:mt-6 animate-fade-in w-full"
-                variant="outline"
-              >
-                {isGenerating ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Music className="h-4 w-4 mr-2" />
-                )}
-                Récupérer les paroles
-              </Button>
-            )}
           </div>
+          
+          <div className={cn(
+            "text-center md:text-left transition-all duration-500 w-full px-4 md:px-0",
+            animationStage === "content" && contentAnimationVisible
+              ? "opacity-100 transform translate-y-0" 
+              : "opacity-0 transform translate-y-4"
+          )}
+          style={{
+            transitionDelay: animationStage === "content" ? "200ms" : "0ms"
+          }}
+          >
+            <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
+              {songTitle}
+            </h1>
+            <p className="text-lg md:text-xl text-spotify-neutral break-words">
+              {songArtist}
+            </p>
+          </div>
+          
+          {/* Generate lyrics button (only shown when no lyrics) */}
+          {!lyrics && !isLoading && !error && (
+            <Button
+              onClick={generateLyrics}
+              disabled={isGenerating || !song?.artist}
+              className="mt-4 md:mt-6 animate-fade-in w-full"
+              variant="outline"
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Music className="h-4 w-4 mr-2" />
+              )}
+              Récupérer les paroles
+            </Button>
+          )}
         </div>
 
         {/* Right side - Lyrics content with proper overflow handling */}
