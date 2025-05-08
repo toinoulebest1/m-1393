@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { X, Music, Loader2, Maximize, Minimize } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -399,10 +400,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Ajouter du CSS spécifique pour Firefox en fallback */}
+      {/* Ajouter du CSS spécifique pour Firefox en fallback - Fixed: removed jsx prop */}
       {fullscreen && isFirefox && (
-        <style jsx>{`
-          :global(.firefox-fullscreen) {
+        <style>
+          {`
+          .firefox-fullscreen {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
@@ -411,11 +413,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             z-index: 9999 !important;
           }
           
-          :global(.firefox-content) {
+          .firefox-content {
             height: 100vh !important;
             width: 100vw !important;
           }
-        `}</style>
+          `}
+        </style>
       )}
     </div>
   );
