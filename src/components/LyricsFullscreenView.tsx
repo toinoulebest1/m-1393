@@ -3,11 +3,22 @@ import React, { useState, useEffect } from "react";
 import { X, Music, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Song } from "@/contexts/PlayerContext";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+
+// Define the Song interface since we can't import it from PlayerContext
+interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  duration: string;
+  url: string;
+  imageUrl?: string;
+  bitrate?: string;
+  genre?: string;
+}
 
 interface LyricsFullscreenViewProps {
   song: Song | null;
