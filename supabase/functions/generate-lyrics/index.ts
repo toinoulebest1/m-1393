@@ -2,8 +2,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -16,52 +14,104 @@ serve(async (req) => {
   }
 
   try {
-    if (!openAIApiKey) {
-      console.error('OpenAI API key is not set');
-      throw new Error('OpenAI API key is not configured');
-    }
-
     const { songTitle, artist } = await req.json();
-    console.log('Attempting to generate lyrics for:', songTitle, 'by', artist);
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    console.log('Attempting to find lyrics for:', songTitle, 'by', artist);
+    
+    // Step 1: Search for songs using the song title and artist
+    const searchQuery = encodeURIComponent(`${songTitle} ${artist || ''}`);
+    const searchResponse = await fetch(`https://api.genius.com/search?q=${searchQuery}`, {
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('GENIUS_API_KEY')}`,
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Tu es un assistant spécialisé dans la génération de paroles de chansons. Génère uniquement les paroles, sans texte supplémentaire.'
-          },
-          {
-            role: 'user',
-            content: `Génère les paroles pour la chanson "${songTitle}" ${artist ? `de ${artist}` : ''}. Si tu n'es pas sûr des paroles exactes, génère des paroles qui pourraient correspondre au titre de la chanson et au style de l'artiste.`
-          }
-        ],
-      }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API error response:', errorData);
-      
-      // Check specifically for quota exceeded error
-      if (errorData.error?.message?.includes('exceeded your current quota')) {
-        throw new Error('OpenAI API quota exceeded. Please check your billing status and ensure you have available credits.');
-      }
-      
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+    if (!searchResponse.ok) {
+      const errorData = await searchResponse.json();
+      console.error('Genius search API error:', errorData);
+      throw new Error(`Genius API error: ${errorData.meta?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
-    console.log('Successfully generated lyrics for:', songTitle);
+    const searchData = await searchResponse.json();
+    
+    // Check if we got any search results
+    if (!searchData.response.hits || searchData.response.hits.length === 0) {
+      console.log('No results found on Genius for:', searchQuery);
+      return new Response(
+        JSON.stringify({ 
+          lyrics: `Aucune parole trouvée pour "${songTitle}" ${artist ? `par ${artist}` : ''}.` 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get the first match from search results
+    const firstHit = searchData.response.hits[0];
+    const songId = firstHit.result.id;
+    const songUrl = firstHit.result.url;
+    
+    console.log('Found song on Genius:', firstHit.result.title, 'by', firstHit.result.primary_artist.name);
+    console.log('Song URL:', songUrl);
+
+    // Step 2: We need to scrape the lyrics from the Genius web page
+    // since the API doesn't directly provide lyrics
+    const songPageResponse = await fetch(songUrl);
+    if (!songPageResponse.ok) {
+      throw new Error('Failed to fetch the song page from Genius');
+    }
+
+    const html = await songPageResponse.text();
+    
+    // Extract lyrics from HTML using a simple approach
+    // This is not ideal but works for a basic implementation
+    let lyrics = '';
+    const lyricsMatch = html.match(/<div class="Lyrics__Container-sc-[^>]*>([\s\S]*?)<\/div>/g);
+    
+    if (lyricsMatch) {
+      // Remove HTML tags to get clean lyrics
+      lyrics = lyricsMatch.join('\n')
+        .replace(/<[^>]*>/g, '')  // Remove HTML tags
+        .replace(/\[.*?\]/g, '')  // Remove [Verse], [Chorus], etc.
+        .replace(/\n{3,}/g, '\n\n')  // Normalize multiple newlines
+        .trim();
+    }
+
+    if (!lyrics) {
+      // If traditional extraction method fails, try an alternative approach
+      const alternativeLyricsMatch = html.match(/window\.__PRELOADED_STATE__ = JSON\.parse\('(.+?)'\)/);
+      if (alternativeLyricsMatch && alternativeLyricsMatch[1]) {
+        try {
+          // The lyrics might be in the preloaded state
+          const jsonString = alternativeLyricsMatch[1].replace(/\\(.)/g, "$1");
+          const preloadedState = JSON.parse(jsonString);
+          
+          // Navigate through the JSON structure to find lyrics
+          // Note: the exact path may vary depending on Genius's implementation
+          const pages = preloadedState.songPage || {};
+          const lyricsData = pages.lyricsData || {};
+          
+          if (lyricsData.body && lyricsData.body.html) {
+            lyrics = lyricsData.body.html
+              .replace(/<[^>]*>/g, '')
+              .replace(/\[.*?\]/g, '')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
+          }
+        } catch (e) {
+          console.error('Error parsing preloaded state:', e);
+        }
+      }
+    }
+
+    // If we still don't have lyrics, return a message
+    if (!lyrics) {
+      lyrics = `Les paroles n'ont pas pu être extraites pour "${songTitle}" ${artist ? `par ${artist}` : ''}.\n` +
+               `Vous pouvez les consulter directement sur Genius: ${songUrl}`;
+    }
+
+    console.log('Successfully extracted lyrics for:', songTitle);
 
     return new Response(
-      JSON.stringify({ lyrics: data.choices[0].message.content }),
+      JSON.stringify({ lyrics }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
@@ -69,13 +119,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in generate-lyrics function:', error);
     
-    // Return a more user-friendly error message
-    const errorMessage = error.message.includes('quota exceeded')
-      ? 'Le service de génération de paroles est temporairement indisponible. Veuillez réessayer plus tard.'
-      : error.message;
-    
+    // Return a user-friendly error message
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: "Impossible de récupérer les paroles. Veuillez vérifier votre clé API Genius ou réessayer plus tard." 
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

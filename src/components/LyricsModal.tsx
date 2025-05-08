@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,14 +83,14 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       await refetch();
       toast({
         title: "Succès",
-        description: "Les paroles ont été générées avec succès",
+        description: "Les paroles ont été récupérées avec succès",
       });
     } catch (error) {
       console.error('Error generating lyrics:', error);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: error.message || "Impossible de générer les paroles",
+        description: error.message || "Impossible de récupérer les paroles",
       });
     } finally {
       setIsGenerating(false);
@@ -116,7 +116,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
                 ) : (
                   <Wand2 className="h-4 w-4 mr-2" />
                 )}
-                Générer les paroles
+                Récupérer les paroles
               </Button>
             )}
           </DialogTitle>
