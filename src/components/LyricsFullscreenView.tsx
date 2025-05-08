@@ -97,30 +97,69 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   };
 
-  // Toggle fullscreen function
+  // Toggle fullscreen function with improved browser compatibility
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-      setFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setFullscreen(false);
+    try {
+      if (!fullscreen) {
+        // Trying to enter fullscreen
+        const element = document.documentElement;
+        
+        const requestFullscreen = element.requestFullscreen || 
+                               (element as any).mozRequestFullScreen ||
+                               (element as any).webkitRequestFullscreen || 
+                               (element as any).msRequestFullscreen;
+        
+        if (requestFullscreen) {
+          requestFullscreen.call(element);
+          console.log("Requesting fullscreen mode");
+        } else {
+          console.error("Fullscreen API not available in this browser");
+          toast.error("Le mode plein écran n'est pas supporté par votre navigateur");
+        }
+      } else {
+        // Trying to exit fullscreen
+        const exitFullscreen = document.exitFullscreen || 
+                            (document as any).mozCancelFullScreen ||
+                            (document as any).webkitExitFullscreen || 
+                            (document as any).msExitFullscreen;
+        
+        if (exitFullscreen) {
+          exitFullscreen.call(document);
+          console.log("Exiting fullscreen mode");
+        }
       }
+    } catch (err) {
+      console.error("Error toggling fullscreen:", err);
+      toast.error("Problème avec le mode plein écran");
     }
   };
 
-  // Handle fullscreen change events
+  // Handle fullscreen change events with improved browser compatibility
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setFullscreen(!!document.fullscreenElement);
+      const isFullscreenNow = !!(
+        document.fullscreenElement || 
+        (document as any).mozFullScreenElement ||
+        (document as any).webkitFullscreenElement || 
+        (document as any).msFullscreenElement
+      );
+      
+      console.log("Fullscreen state changed:", isFullscreenNow);
+      setFullscreen(isFullscreenNow);
     };
 
+    // Add multiple event listeners for cross-browser compatibility
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
     return () => {
+      // Remove all listeners when component unmounts
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, []);
 
@@ -177,7 +216,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           className="text-white hover:bg-white/10 rounded-full"
           title={fullscreen ? "Quitter le plein écran" : "Afficher en plein écran"}
         >
-          {fullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
+          {fullscreen ? (
+            <Minimize className="w-6 h-6" />
+          ) : (
+            <Maximize className="w-6 h-6" />
+          )}
         </Button>
         <Button
           variant="ghost"
@@ -189,8 +232,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </Button>
       </div>
 
-      {/* Main content container - Fixed height with overflow handling */}
-      <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6">
+      {/* Main content container */}
+      <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden">
         {/* Left side - Song information with animation */}
         <div 
           className={cn(
@@ -260,7 +303,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         {/* Right side - Lyrics content with proper overflow handling */}
         <div 
           className={cn(
-            "flex-grow transition-all duration-500 ease-out h-[70%] md:h-full md:max-h-full",
+            "flex-grow transition-all duration-500 ease-out h-[70%] md:h-full md:max-h-full overflow-hidden",
             animationStage === "entry" 
               ? "opacity-0" 
               : animationStage === "content"
