@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,9 +41,9 @@ export const LyricsFullscreenView = () => {
   
   const isFavorite = favorites.some(f => f.id === song?.id);
 
-  const { data: lyricsData, isLoading } = useQuery(
-    ["lyrics", song?.artist, song?.title],
-    async () => {
+  const { data: lyricsData, isLoading } = useQuery({
+    queryKey: ["lyrics", song?.artist, song?.title],
+    queryFn: async () => {
       if (!song?.artist || !song?.title) {
         return null;
       }
@@ -62,19 +62,17 @@ export const LyricsFullscreenView = () => {
         return null;
       }
     },
-    {
-      enabled: !!song?.artist && !!song?.title,
-      retry: false,
-      onSuccess: (data) => {
-        setLyrics(data || null);
-        setError(null);
-      },
-      onError: () => {
-        setError("Erreur lors de la récupération des paroles.");
-        setLyrics(null);
-      },
-    }
-  );
+    enabled: !!song?.artist && !!song?.title,
+    retry: false,
+    onSuccess: (data) => {
+      setLyrics(data || null);
+      setError(null);
+    },
+    onError: () => {
+      setError("Erreur lors de la récupération des paroles.");
+      setLyrics(null);
+    },
+  });
 
   useEffect(() => {
     setSongTitle(song?.title || "");
@@ -203,7 +201,7 @@ export const LyricsFullscreenView = () => {
             />
           </div>
           
-          {/* Nouvelle barre de lecture juste après l'image et avant le titre */}
+          {/* Barre de lecture juste après l'image et avant le titre */}
           <div className={cn(
             "w-full mb-4 transition-all duration-500",
             animationStage === "content" && contentAnimationVisible
@@ -277,7 +275,7 @@ export const LyricsFullscreenView = () => {
                   <SkipForward className="h-5 w-5" />
                 </Button>
                 
-                {/* Nouveau bouton favoris */}
+                {/* Bouton favoris */}
                 <Button
                   variant="ghost"
                   size="icon"

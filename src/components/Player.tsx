@@ -378,12 +378,7 @@ export const Player = () => {
       </div>
       
       {/* Affichage des paroles en plein écran */}
-      {showLyrics && currentSong && (
-        <LyricsFullscreenView 
-          song={currentSong} 
-          onClose={() => setShowLyrics(false)} 
-        />
-      )}
+      {showLyrics && <LyricsFullscreenView />}
     </>
   );
 };
