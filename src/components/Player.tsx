@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Music } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -166,6 +167,23 @@ export const Player = () => {
     return !(gameState === 'over' || gameState === 'answered');
   };
   
+  // Helper function to prevent right-click on images during blind test
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isBlindTest) {
+      e.preventDefault();
+      return false;
+    }
+  };
+  
+  // Helper to get placeholder image for blind test
+  const getImageSrc = () => {
+    if (isBlindTest && shouldBlurImage()) {
+      // Use a generic music placeholder instead of the actual image
+      return "https://picsum.photos/56/56";
+    }
+    return currentSong?.imageUrl || "https://picsum.photos/56/56";
+  };
+  
   const songInfo = getDisplayedSongInfo();
   const blurImage = shouldBlurImage();
 
@@ -181,13 +199,23 @@ export const Player = () => {
                   <>
                     <div className="relative w-14 h-14 mr-4">
                       <img
-                        src={currentSong.imageUrl || "https://picsum.photos/56/56"}
+                        src={getImageSrc()}
                         alt="Album art"
                         className={cn(
                           "w-full h-full rounded-lg shadow-lg",
                           blurImage && "blur-md"
                         )}
+                        onContextMenu={handleContextMenu}
+                        draggable="false"
                       />
+                      {blurImage && (
+                        <div 
+                          className="absolute inset-0 flex items-center justify-center z-10"
+                          onContextMenu={handleContextMenu}
+                        >
+                          <Music className="w-6 h-6 text-white/50" />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-white truncate">
@@ -310,13 +338,23 @@ export const Player = () => {
                   <div className="flex items-center space-x-3">
                     <div className="relative w-12 h-12">
                       <img
-                        src={currentSong.imageUrl || "https://picsum.photos/56/56"}
+                        src={getImageSrc()}
                         alt="Album art"
                         className={cn(
                           "w-full h-full rounded-md shadow-md",
                           blurImage && "blur-md"
                         )}
+                        onContextMenu={handleContextMenu}
+                        draggable="false"
                       />
+                      {blurImage && (
+                        <div 
+                          className="absolute inset-0 flex items-center justify-center z-10"
+                          onContextMenu={handleContextMenu}
+                        >
+                          <Music className="w-5 h-5 text-white/50" />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 max-w-[50vw]">
                       <h3 className="font-medium text-white text-sm truncate">
@@ -431,6 +469,18 @@ export const Player = () => {
           )}
         </div>
       </div>
+      
+      {/* Ajoutons un style global pour bloquer la sélection des images pendant le blind test */}
+      {isBlindTest && (
+        <style jsx global>{`
+          img {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+          }
+        `}</style>
+      )}
       
       {/* Affichage des paroles en plein écran */}
       {showLyrics && currentSong && (
