@@ -17,18 +17,47 @@ serve(async (req) => {
     const { songTitle, artist } = await req.json();
     console.log('Attempting to find lyrics for:', songTitle, 'by', artist);
     
+    // Verify that we have a valid API key
+    const GENIUS_API_KEY = Deno.env.get('GENIUS_API_KEY');
+    if (!GENIUS_API_KEY) {
+      console.error('No Genius API key found in environment variables');
+      return new Response(
+        JSON.stringify({ 
+          error: "Configuration error: Genius API key is missing. Please contact the administrator." 
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
     // Step 1: Search for songs using the song title and artist
     const searchQuery = encodeURIComponent(`${songTitle} ${artist || ''}`);
     const searchResponse = await fetch(`https://api.genius.com/search?q=${searchQuery}`, {
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('GENIUS_API_KEY')}`,
+        'Authorization': `Bearer ${GENIUS_API_KEY}`,
       },
     });
 
     if (!searchResponse.ok) {
       const errorData = await searchResponse.json();
       console.error('Genius search API error:', errorData);
-      throw new Error(`Genius API error: ${errorData.meta?.message || 'Unknown error'}`);
+      
+      // Handle specific error types
+      if (errorData.error === 'invalid_token') {
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid or expired Genius API key. Please update the API key in the Supabase settings." 
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      throw new Error(`Genius API error: ${errorData.meta?.message || JSON.stringify(errorData) || 'Unknown error'}`);
     }
 
     const searchData = await searchResponse.json();
@@ -114,6 +143,7 @@ serve(async (req) => {
       JSON.stringify({ lyrics }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       }
     );
   } catch (error) {
