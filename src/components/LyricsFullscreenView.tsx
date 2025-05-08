@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Slider } from "@/components/ui/slider";
+import ColorThief from "colorthief";
 
 // Define the Song interface since we can't import it from PlayerContext
 interface Song {
@@ -40,6 +41,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [entryAnimationTimeout, setEntryAnimationTimeout] = useState<number | null>(null);
   const [contentAnimationVisible, setContentAnimationVisible] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [accentColor, setAccentColor] = useState<[number, number, number] | null>(null);
 
   // Intégration du contexte Player pour contrôler la lecture
   const { 
@@ -58,6 +61,53 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     const userAgent = navigator.userAgent.toLowerCase();
     setIsFirefox(userAgent.indexOf('firefox') > -1);
   }, []);
+
+  // Extraction de la couleur dominante de l'image de l'album
+  const extractDominantColor = useCallback(async (imageUrl: string) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = (e) => {
+          console.error("Error loading image for color extraction:", e);
+          reject(new Error("Failed to load image"));
+        };
+        img.src = imageUrl;
+      });
+
+      const colorThief = new ColorThief();
+      const dominantRgb = colorThief.getColor(img);
+      console.log("Extracted dominant color:", dominantRgb);
+      
+      // Créer une version plus saturée pour l'accent
+      const accentRgb: [number, number, number] = [
+        Math.min(255, dominantRgb[0] * 1.3),
+        Math.min(255, dominantRgb[1] * 1.3),
+        Math.min(255, dominantRgb[2] * 1.3)
+      ];
+      
+      setDominantColor(dominantRgb);
+      setAccentColor(accentRgb);
+    } catch (error) {
+      console.error("Erreur lors de l'extraction de la couleur:", error);
+      // Couleur de secours si l'extraction échoue
+      setDominantColor([48, 12, 61]);
+      setAccentColor([75, 20, 95]);
+    }
+  }, []);
+
+  // Extraire la couleur lorsque la chanson change
+  useEffect(() => {
+    if (song?.imageUrl && !song.imageUrl.includes('placeholder')) {
+      extractDominantColor(song.imageUrl);
+    } else {
+      // Couleurs par défaut si pas d'image
+      setDominantColor([48, 12, 61]);
+      setAccentColor([75, 20, 95]);
+    }
+  }, [song?.imageUrl, extractDominantColor]);
 
   // Query to fetch lyrics from the database
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -78,6 +128,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     enabled: !!song?.id,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
     retry: 1,
+    meta: {
+      onSuccess: (data) => {
+        console.log("Lyrics fetched successfully:", data?.substring(0, 50) + "...");
+      },
+      onError: (error) => {
+        console.error("Error fetching lyrics:", error);
+      }
+    }
   });
 
   // Force a render to ensure animations trigger properly
@@ -338,9 +396,23 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const songArtist = song?.artist || "Artiste inconnu";
   const songImage = song?.imageUrl || "/placeholder.svg";
 
+  // Préparation des couleurs pour les styles CSS
+  const bgGradientStyle = dominantColor ? {
+    background: `radial-gradient(circle at center, 
+      rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
+      rgba(${dominantColor[0] * 0.6}, ${dominantColor[1] * 0.6}, ${dominantColor[2] * 0.6}, 0.95) 40%, 
+      rgba(0, 0, 0, 0.98) 100%)`,
+  } : {};
+
+  // Style pour le flou dynamique
+  const blurOverlayStyle = {
+    backdropFilter: "blur(120px)",
+    WebkitBackdropFilter: "blur(120px)",
+  };
+
   return (
     <div className={cn(
-      "fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col",
+      "fixed inset-0 z-[100] flex flex-col",
       fullscreen && isFirefox ? "firefox-fullscreen" : "",
       animationStage === "entry" ? "animate-fade-in" : 
       animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
@@ -351,6 +423,46 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       transform: "translateZ(0)",
       backfaceVisibility: "hidden"
     }}>
+      {/* Background with album art color */}
+      <div 
+        className="absolute inset-0 z-0 transition-all duration-1000 ease-in-out"
+        style={bgGradientStyle}
+      >
+        {/* Overlay patterns for visual interest */}
+        <div 
+          className="absolute inset-0 z-0 opacity-30"
+          style={{
+            backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.343-4 3 1.343 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E\")",
+          }}
+        />
+        
+        {/* Blur overlay */}
+        <div 
+          className="absolute inset-0 z-1 bg-black bg-opacity-40"
+          style={blurOverlayStyle}
+        />
+
+        {/* Dynamic light spots based on album colors */}
+        {accentColor && (
+          <>
+            <div
+              className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full opacity-20 blur-[100px] animate-pulse"
+              style={{
+                background: `radial-gradient(circle at center, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.8) 0%, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0) 70%)`,
+                animation: "pulse 4s infinite alternate",
+              }}
+            />
+            <div
+              className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full opacity-10 blur-[80px] animate-pulse"
+              style={{
+                background: `radial-gradient(circle at center, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.7) 0%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0) 70%)`,
+                animation: "pulse 6s infinite alternate-reverse",
+              }}
+            />
+          </>
+        )}
+      </div>
+
       {/* Header with close and fullscreen buttons */}
       <div className="absolute top-4 right-4 flex items-center space-x-2 z-50">
         <Button
@@ -378,7 +490,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
 
       {/* Main content container */}
       <div className={cn(
-        "flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden", 
+        "flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden relative z-10", 
         fullscreen && isFirefox ? "firefox-content" : ""
       )}>
         {/* Left side - Song information with animation */}
@@ -409,7 +521,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                     : "w-32 h-32 opacity-90"
                 )}
                 style={{
-                  transitionDelay: animationStage === "content" ? "100ms" : "0ms"
+                  transitionDelay: animationStage === "content" ? "100ms" : "0ms",
+                  boxShadow: accentColor ? `0 0 30px 5px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.6)` : undefined,
                 }}
                 onLoad={() => console.log("Album image loaded")}
                 onError={(e) => {
@@ -546,7 +659,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               </div>
             ) : lyrics ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 animate-fade-in">
+                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 animate-fade-in backdrop-blur-sm bg-black/20">
                   <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
                     {lyrics}
                   </div>
@@ -623,6 +736,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         @keyframes fadeIn {
           0% { opacity: 0; transform: translateY(10px); }
           100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 0.6;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+          }
         }
         `}
       </style>
