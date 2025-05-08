@@ -35,6 +35,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [fullscreen, setFullscreen] = useState(false);
   const [isFirefox, setIsFirefox] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [entryAnimationTimeout, setEntryAnimationTimeout] = useState<number | null>(null);
+  const [contentAnimationVisible, setContentAnimationVisible] = useState(false);
+  const [renderCount, setRenderCount] = useState(0);
 
   // Détection de Firefox au montage du composant
   useEffect(() => {
@@ -59,7 +62,15 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       return data?.content || null;
     },
     enabled: !!song?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    retry: 1,
   });
+
+  // Force a render to ensure animations trigger properly
+  useEffect(() => {
+    setRenderCount(prev => prev + 1);
+    console.log(`Rendering lyrics component: render #${renderCount + 1}`);
+  }, []);
 
   // Function to generate lyrics
   const generateLyrics = async () => {
@@ -193,40 +204,45 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, []);
 
-  // Handle animation sequence - IMPROVED animation timing
+  // IMPROVED animation sequence with proper timing and guaranteed transition
   useEffect(() => {
-    // Reset animation state on component mount
-    setAnimationComplete(false);
+    // Clear any existing timeouts to prevent race conditions
+    if (entryAnimationTimeout !== null) {
+      clearTimeout(entryAnimationTimeout);
+    }
+    
+    console.log(`Animation starting: stage=${animationStage}, song=${song?.title}`);
+    
+    // Force entry animation state on component mount
     setAnimationStage("entry");
+    setAnimationComplete(false);
+    setContentAnimationVisible(false);
     
-    // Force initial render with entry animation
-    const forceRender = setTimeout(() => {
-      console.log("Forcing initial render with entry animation");
-    }, 10);
-    
-    // After entry animation completes, switch to content stage
-    const entryTimer = setTimeout(() => {
+    // Transition to content stage after entry animation completes
+    const timeout = window.setTimeout(() => {
       console.log("Animation stage: switching to content");
       setAnimationStage("content");
       
-      // Set animation complete after giving time for content animations to finish
-      const completeTimer = setTimeout(() => {
-        console.log("Animation complete");
-        setAnimationComplete(true);
-      }, 500);
-      
-      return () => clearTimeout(completeTimer);
-    }, 400);
+      // Set content visible with short delay to ensure CSS transition happens
+      setTimeout(() => {
+        setContentAnimationVisible(true);
+        console.log("Content animation now visible");
+        
+        // Mark animation complete after all transitions finish
+        setTimeout(() => {
+          setAnimationComplete(true);
+          console.log("Animation complete");
+        }, 300);
+      }, 50);
+    }, 300); // Slightly shorter delay to make sure animation feels responsive
     
+    // Store timeout ID for cleanup
+    setEntryAnimationTimeout(timeout);
+
     // Handle escape key to close
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Trigger exit animation before closing
-        console.log("Escape key pressed, starting exit animation");
-        setAnimationStage("exit");
-        setTimeout(() => {
-          onClose();
-        }, 300);
+        handleClose();
       }
     };
 
@@ -234,10 +250,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      clearTimeout(entryTimer);
-      clearTimeout(forceRender);
+      if (entryAnimationTimeout !== null) {
+        clearTimeout(entryAnimationTimeout);
+      }
     };
-  }, [onClose]);
+  }, [song?.id]); // Reset animation when song changes
   
   // Handle close button click with animation
   const handleClose = () => {
@@ -247,12 +264,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onClose();
     }, 300);
   };
-
-  // Log song data to help debug
-  useEffect(() => {
-    console.log("Current song data in LyricsFullscreenView:", song);
-    console.log("Current animation stage:", animationStage);
-  }, [song, animationStage]);
 
   // Ensure song data is populated
   const songTitle = song?.title || "Titre inconnu";
@@ -266,7 +277,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       animationStage === "entry" ? "animate-fade-in" : 
       animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
       "opacity-100"
-    )}>
+    )}
+    style={{
+      // Force hardware acceleration
+      transform: "translateZ(0)",
+      backfaceVisibility: "hidden"
+    }}>
       {/* Header with close and fullscreen buttons */}
       <div className="absolute top-4 right-4 flex items-center space-x-2 z-50">
         <Button
@@ -301,12 +317,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         <div 
           className={cn(
             "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out",
-            animationStage === "entry" 
-              ? "md:w-full h-[30%] md:h-full transform scale-95 opacity-90" 
-              : animationStage === "content" 
-                ? "md:w-1/3 h-[30%] md:h-full md:pr-8 opacity-100 transform scale-100" 
-                : "md:w-full h-[30%] md:h-full transform scale-95 opacity-50"
+            animationStage === "content" && contentAnimationVisible
+              ? "md:w-1/3 h-[30%] md:h-full md:pr-8 opacity-100 transform scale-100" 
+              : "md:w-full h-[30%] md:h-full transform scale-95 opacity-90"
           )}
+          style={{ 
+            transitionDelay: animationStage === "content" ? "50ms" : "0ms",
+            // Force hardware acceleration
+            transform: contentAnimationVisible ? 
+              "translateZ(0) scale(1)" : 
+              "translateZ(0) scale(0.95)"
+          }}
         >
           {songImage && (
             <div className="relative mb-4 md:mb-6 transition-all duration-500 ease-out">
@@ -315,12 +336,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 alt={`${songTitle} - Album art`}
                 className={cn(
                   "rounded-lg shadow-lg transition-all duration-500 ease-out object-cover",
-                  animationStage === "entry" 
-                    ? "w-32 h-32 opacity-90" 
-                    : animationStage === "content" 
-                      ? "md:w-64 md:h-64 w-44 h-44 opacity-100" 
-                      : "w-32 h-32 opacity-70"
+                  animationStage === "content" && contentAnimationVisible
+                    ? "md:w-64 md:h-64 w-44 h-44 opacity-100" 
+                    : "w-32 h-32 opacity-90"
                 )}
+                style={{
+                  transitionDelay: animationStage === "content" ? "100ms" : "0ms"
+                }}
                 onLoad={() => console.log("Album image loaded")}
                 onError={(e) => {
                   console.error("Failed to load album image");
@@ -329,19 +351,21 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               />
               <div className={cn(
                 "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-700",
-                animationStage === "content" ? "opacity-70" : "opacity-0"
+                contentAnimationVisible ? "opacity-70" : "opacity-0"
               )} />
             </div>
           )}
           
           <div className={cn(
             "text-center md:text-left transition-all duration-500 w-full px-4 md:px-0",
-            animationStage === "entry"
-              ? "opacity-0 transform translate-y-4" 
-              : animationStage === "content"
-                ? "opacity-100 transform translate-y-0 delay-100" 
-                : "opacity-0 transform -translate-y-4"
-          )}>
+            animationStage === "content" && contentAnimationVisible
+              ? "opacity-100 transform translate-y-0" 
+              : "opacity-0 transform translate-y-4"
+          )}
+          style={{
+            transitionDelay: animationStage === "content" ? "150ms" : "0ms"
+          }}
+          >
             <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
               {songTitle}
             </h1>
@@ -354,10 +378,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               <Button
                 onClick={generateLyrics}
                 disabled={isGenerating || !song?.artist}
-                className={cn(
-                  "mt-4 md:mt-8",
-                  animationStage === "content" ? "animate-fade-in delay-200" : ""
-                )}
+                className="mt-4 md:mt-8 animate-fade-in"
                 variant="outline"
               >
                 {isGenerating ? (
@@ -375,12 +396,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         <div 
           className={cn(
             "flex-grow transition-all duration-500 ease-out h-[70%] md:h-full md:max-h-full overflow-hidden",
-            animationStage === "entry" 
-              ? "opacity-0 transform translate-y-4" 
-              : animationStage === "content"
-                ? "opacity-100 transform translate-y-0 md:w-2/3 md:pl-8 md:border-l border-white/10 delay-200" 
-                : "opacity-0 transform translate-y-4"
+            animationStage === "content" && contentAnimationVisible
+              ? "opacity-100 transform translate-y-0 md:w-2/3 md:pl-8 md:border-l border-white/10" 
+              : "opacity-0 transform translate-y-4"
           )}
+          style={{
+            transitionDelay: animationStage === "content" ? "200ms" : "0ms",
+            // Force hardware acceleration
+            transform: contentAnimationVisible ? 
+              "translateZ(0) translateY(0)" : 
+              "translateZ(0) translateY(16px)"
+          }}
         >
           <div className="h-full w-full flex items-center justify-center">
             {isLoading ? (
@@ -390,14 +416,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               </div>
             ) : lyrics ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6">
+                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 animate-fade-in">
                   <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
                     {lyrics}
                   </div>
                 </div>
               </div>
             ) : error ? (
-              <div className="max-w-3xl mx-auto w-full p-6">
+              <div className="max-w-3xl mx-auto w-full p-6 animate-fade-in">
                 <Alert variant="destructive" className="mb-4">
                   <AlertTitle>Erreur</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -440,25 +466,28 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       </div>
 
       {/* Ajouter du CSS spécifique pour Firefox en fallback */}
-      {fullscreen && isFirefox && (
-        <style>
-          {`
-          .firefox-fullscreen {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            z-index: 9999 !important;
-          }
-          
-          .firefox-content {
-            height: 100vh !important;
-            width: 100vw !important;
-          }
-          `}
-        </style>
-      )}
+      <style jsx="true">
+        {`
+        .firefox-fullscreen {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 9999 !important;
+        }
+        
+        .firefox-content {
+          height: 100vh !important;
+          width: 100vw !important;
+        }
+
+        @keyframes fadeIn {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        `}
+      </style>
     </div>
   );
 };
