@@ -8,11 +8,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshCurrentSong, currentSong } = usePlayerContext();
+  const isMobile = useIsMobile();
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -103,14 +105,16 @@ const Index = () => {
     <div className="flex min-h-screen relative">
       <Sidebar />
       <div className="flex-1 ml-64">
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-          {username && (
-            <span className="text-spotify-neutral hover:text-white transition-colors">
-              {username}
-            </span>
-          )}
-          <AccountSettingsDialog />
-        </div>
+        {!isMobile && (
+          <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+            {username && (
+              <span className="text-spotify-neutral hover:text-white transition-colors">
+                {username}
+              </span>
+            )}
+            <AccountSettingsDialog />
+          </div>
+        )}
         {/* Pass forceUpdate to force re-render when metadata changes */}
         <NowPlaying key={`now-playing-${forceUpdate}`} />
         <Player />
