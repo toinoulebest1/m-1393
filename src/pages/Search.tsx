@@ -1,15 +1,15 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal, Music, Mic } from "lucide-react";
+import { Search as SearchIcon, Clock, Signal, Heart, Flag, SlidersHorizontal, Music, Mic, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ColorThief from 'colorthief';
 import { ReportSongDialog } from "@/components/ReportSongDialog";
+import { LyricsModal } from "@/components/LyricsModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,7 @@ const Search = () => {
     return localStorage.getItem('lastSelectedGenre') || "";
   });
   const [songToReport, setSongToReport] = useState<any>(null);
+  const [songToShowLyrics, setSongToShowLyrics] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -530,6 +531,16 @@ const Search = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setSongToShowLyrics(song);
+                              }}
+                              className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
+                            >
+                              <FileText className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSongToReport(song);
                               }}
                               className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
@@ -560,6 +571,15 @@ const Search = () => {
         song={songToReport}
         onClose={() => setSongToReport(null)}
       />
+      {songToShowLyrics && (
+        <LyricsModal
+          isOpen={!!songToShowLyrics}
+          onClose={() => setSongToShowLyrics(null)}
+          songId={songToShowLyrics.id}
+          songTitle={songToShowLyrics.title}
+          artist={songToShowLyrics.artist}
+        />
+      )}
     </div>
   );
 };
