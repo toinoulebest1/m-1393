@@ -117,14 +117,14 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center justify-between">
-            <span>Paroles - {songTitle}</span>
+            <span className="break-words">{songTitle}</span>
             {!lyrics && !isLoading && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={generateLyrics}
                 disabled={isGenerating || !artist}
-                className="ml-2"
+                className="ml-2 shrink-0"
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -135,7 +135,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
               </Button>
             )}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             {artist && `Par ${artist}`}
           </DialogDescription>
         </DialogHeader>

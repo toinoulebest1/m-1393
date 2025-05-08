@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { X, Music, Loader2 } from "lucide-react";
+import { X, Music, Loader2, Maximize } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -32,6 +32,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [animationStage, setAnimationStage] = useState<"entry" | "content" | "exit">("entry");
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Query to fetch lyrics from the database
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -97,6 +98,33 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   };
 
+  // Toggle fullscreen function
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+      setFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setFullscreen(false);
+      }
+    }
+  };
+
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   // Handle animation sequence
   useEffect(() => {
     // Start with entry animation
@@ -141,8 +169,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
       "opacity-100"
     )}>
-      {/* Close button (top right) */}
-      <div className="absolute top-4 right-4">
+      {/* Header with close and fullscreen buttons */}
+      <div className="absolute top-4 right-4 flex items-center space-x-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleFullscreen}
+          className="text-white hover:bg-white/10 rounded-full"
+          title={fullscreen ? "Quitter le plein écran" : "Afficher en plein écran"}
+        >
+          {fullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -153,30 +190,30 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </Button>
       </div>
 
-      {/* Main content - split layout with proper height */}
-      <div className="flex flex-col md:flex-row h-full w-full p-6 overflow-hidden">
+      {/* Main content container - Fixed height with overflow handling */}
+      <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6">
         {/* Left side - Song information with animation */}
         <div 
           className={cn(
-            "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out h-full",
+            "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out",
             animationStage === "entry" 
-              ? "md:w-full transform scale-95 opacity-90" 
+              ? "md:w-full h-[30%] md:h-full transform scale-95 opacity-90" 
               : animationStage === "content" 
-                ? "md:w-1/3 md:pr-8 opacity-100 transform scale-100" 
-                : "md:w-full transform scale-95 opacity-50"
+                ? "md:w-1/3 h-[30%] md:h-full md:pr-8 opacity-100 transform scale-100" 
+                : "md:w-full h-[30%] md:h-full transform scale-95 opacity-50"
           )}
         >
           {song?.imageUrl && (
-            <div className="relative mb-6 transition-all duration-500 ease-out">
+            <div className="relative mb-4 md:mb-6 transition-all duration-500 ease-out">
               <img
-                src={song.imageUrl || "https://picsum.photos/56/56"}
-                alt="Album art"
+                src={song.imageUrl || "/placeholder.svg"}
+                alt={`${song.title} - Album art`}
                 className={cn(
-                  "rounded-lg shadow-lg transition-all duration-500 ease-out",
+                  "rounded-lg shadow-lg transition-all duration-500 ease-out object-cover",
                   animationStage === "entry" 
                     ? "w-32 h-32 opacity-90" 
                     : animationStage === "content" 
-                      ? "md:w-64 md:h-64 w-48 h-48 opacity-100" 
+                      ? "md:w-64 md:h-64 w-44 h-44 opacity-100" 
                       : "w-32 h-32 opacity-70"
                 )}
               />
@@ -188,17 +225,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           )}
           
           <div className={cn(
-            "text-center md:text-left transition-all duration-500 w-full",
+            "text-center md:text-left transition-all duration-500 w-full px-4 md:px-0",
             animationStage === "entry"
               ? "opacity-0 transform translate-y-4" 
               : animationStage === "content"
                 ? "opacity-100 transform translate-y-0" 
                 : "opacity-0 transform -translate-y-4"
           )}>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 break-words">
+            <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
               {song?.title || "Titre inconnu"}
             </h1>
-            <p className="text-xl text-spotify-neutral break-words">
+            <p className="text-lg md:text-xl text-spotify-neutral break-words">
               {song?.artist || "Artiste inconnu"}
             </p>
             
@@ -207,7 +244,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               <Button
                 onClick={generateLyrics}
                 disabled={isGenerating || !song?.artist}
-                className="mt-8"
+                className="mt-4 md:mt-8"
                 variant="outline"
               >
                 {isGenerating ? (
@@ -224,7 +261,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         {/* Right side - Lyrics content with proper overflow handling */}
         <div 
           className={cn(
-            "flex-grow overflow-y-auto transition-all duration-500 ease-out h-full",
+            "flex-grow transition-all duration-500 ease-out h-[70%] md:h-full md:max-h-full",
             animationStage === "entry" 
               ? "opacity-0" 
               : animationStage === "content"
@@ -232,15 +269,19 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 : "opacity-0"
           )}
         >
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full w-full flex items-center justify-center">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
               </div>
             ) : lyrics ? (
-              <div className="max-w-3xl w-full mx-auto whitespace-pre-line text-spotify-neutral text-xl leading-relaxed p-6 overflow-y-auto max-h-full">
-                {lyrics}
+              <div className="w-full h-full flex items-start justify-center overflow-hidden">
+                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6">
+                  <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
+                    {lyrics}
+                  </div>
+                </div>
               </div>
             ) : error ? (
               <div className="max-w-3xl mx-auto w-full p-6">
@@ -263,13 +304,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="text-center p-6">
-                <p className="text-spotify-neutral text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
+              <div className="text-center p-4 md:p-6 w-full">
+                <p className="text-spotify-neutral text-lg md:text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
                 
                 <Button
                   onClick={generateLyrics}
                   disabled={isGenerating || !song?.artist}
                   variant="outline"
+                  className="mx-auto"
                 >
                   {isGenerating ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
