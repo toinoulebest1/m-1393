@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useRef, useEffect } from 'r
 import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
+import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 
 interface Song {
   id: string;
@@ -325,6 +326,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
 
+      // Update MediaSession metadata here when song changes
+      if ('mediaSession' in navigator) {
+        updateMediaSessionMetadata(song);
+      }
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -456,9 +462,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     const nextIndex = currentIndex + 1;
     if (nextIndex < queue.length) {
-      play(queue[nextIndex]);
+      const nextTrack = queue[nextIndex];
+      play(nextTrack);
+      // Ensure MediaSession is updated
+      if ('mediaSession' in navigator && nextTrack) {
+        updateMediaSessionMetadata(nextTrack);
+      }
     } else if (repeatMode === 'all') {
-      play(queue[0]);
+      const firstTrack = queue[0];
+      play(firstTrack);
+      // Ensure MediaSession is updated
+      if ('mediaSession' in navigator && firstTrack) {
+        updateMediaSessionMetadata(firstTrack);
+      }
     } else {
       // Fin de la queue et pas de répétition
       audioRef.current.pause();
@@ -497,7 +513,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     if (currentIndex > 0) {
-      play(queue[currentIndex - 1]);
+      const prevTrack = queue[currentIndex - 1];
+      play(prevTrack);
+      // Ensure MediaSession is updated
+      if ('mediaSession' in navigator && prevTrack) {
+        updateMediaSessionMetadata(prevTrack);
+      }
     }
   };
 

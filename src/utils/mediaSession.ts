@@ -3,6 +3,31 @@
  * Utility functions for MediaSession API
  */
 
+// Update media session metadata
+export const updateMediaSessionMetadata = (song: {
+  title: string;
+  artist: string;
+  imageUrl?: string;
+  genre?: string;
+}) => {
+  if ('mediaSession' in navigator) {
+    console.log('Updating MediaSession metadata for:', song.title);
+    
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: song.title,
+      artist: song.artist,
+      album: song.genre || 'Unknown Album',
+      artwork: [
+        {
+          src: song.imageUrl || "https://picsum.photos/256/256",
+          sizes: '256x256',
+          type: 'image/jpeg'
+        }
+      ]
+    });
+  }
+};
+
 // Update media session position state
 export const updatePositionState = (
   duration: number,
@@ -40,3 +65,4 @@ export const durationToSeconds = (duration: string | undefined): number => {
     return 0;
   }
 };
+

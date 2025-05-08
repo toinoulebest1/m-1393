@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
@@ -9,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { updateMediaSessionMetadata } from "@/utils/mediaSession";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -22,32 +22,16 @@ const Index = () => {
 
   // Set up MediaSession API for mobile device notifications
   useEffect(() => {
-    if ('mediaSession' in navigator && currentSong) {
-      console.log('Setting up MediaSession for:', currentSong.title);
+    if (currentSong) {
+      updateMediaSessionMetadata(currentSong);
       
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentSong.title,
-        artist: currentSong.artist,
-        album: currentSong.genre || 'Unknown Album', // Use genre field if it exists or fallback to 'Unknown Album'
-        artwork: [
-          {
-            src: currentSong.imageUrl || "https://picsum.photos/256/256",
-            sizes: '256x256',
-            type: 'image/jpeg'
-          }
-        ]
-      });
-
       // Set up media session action handlers
       navigator.mediaSession.setActionHandler('play', () => play());
       navigator.mediaSession.setActionHandler('pause', () => pause());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
       navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
-      
-      // Update playback state
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-  }, [currentSong, isPlaying, play, pause, nextSong, previousSong]);
+  }, [currentSong, play, pause, nextSong, previousSong]);
 
   // Update MediaSession playback state when isPlaying changes
   useEffect(() => {
