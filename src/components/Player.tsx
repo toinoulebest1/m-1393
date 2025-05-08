@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Music } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -470,16 +469,20 @@ export const Player = () => {
         </div>
       </div>
       
-      {/* Ajoutons un style global pour bloquer la sélection des images pendant le blind test */}
+      {/* Add protection styles with dangerouslySetInnerHTML instead of jsx global */}
       {isBlindTest && (
-        <style jsx global>{`
-          img {
-            user-select: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-          }
-        `}</style>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              img {
+                user-select: none;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+              }
+            `
+          }}
+        />
       )}
       
       {/* Affichage des paroles en plein écran */}
