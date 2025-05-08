@@ -155,7 +155,19 @@ export const Player = () => {
     }
   };
   
+  // Function to determine if image should be blurred in blind test
+  const shouldBlurImage = () => {
+    if (!isBlindTest) return false;
+    
+    const urlParams = new URLSearchParams(location.search);
+    const gameState = urlParams.get('state');
+    
+    // Only show clear image if game is over or answer was shown
+    return !(gameState === 'over' || gameState === 'answered');
+  };
+  
   const songInfo = getDisplayedSongInfo();
+  const blurImage = shouldBlurImage();
 
   return (
     <>
@@ -167,11 +179,16 @@ export const Player = () => {
               <div className="flex items-center flex-1 min-w-0">
                 {currentSong && (
                   <>
-                    <img
-                      src={currentSong.imageUrl || "https://picsum.photos/56/56"}
-                      alt="Album art"
-                      className="w-14 h-14 rounded-lg shadow-lg mr-4"
-                    />
+                    <div className="relative w-14 h-14 mr-4">
+                      <img
+                        src={currentSong.imageUrl || "https://picsum.photos/56/56"}
+                        alt="Album art"
+                        className={cn(
+                          "w-full h-full rounded-lg shadow-lg",
+                          blurImage && "blur-md"
+                        )}
+                      />
+                    </div>
                     <div className="min-w-0">
                       <h3 className="font-medium text-white truncate">
                         {songInfo.title || '••••••'}
@@ -291,11 +308,16 @@ export const Player = () => {
               {currentSong && (
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">
-                    <img
-                      src={currentSong.imageUrl || "https://picsum.photos/56/56"}
-                      alt="Album art"
-                      className="w-12 h-12 rounded-md shadow-md"
-                    />
+                    <div className="relative w-12 h-12">
+                      <img
+                        src={currentSong.imageUrl || "https://picsum.photos/56/56"}
+                        alt="Album art"
+                        className={cn(
+                          "w-full h-full rounded-md shadow-md",
+                          blurImage && "blur-md"
+                        )}
+                      />
+                    </div>
                     <div className="min-w-0 max-w-[50vw]">
                       <h3 className="font-medium text-white text-sm truncate">
                         {songInfo.title || '••••••'}
