@@ -34,6 +34,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [animationStage, setAnimationStage] = useState<"entry" | "content" | "exit">("entry");
   const [fullscreen, setFullscreen] = useState(false);
   const [isFirefox, setIsFirefox] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   // Détection de Firefox au montage du composant
   useEffect(() => {
@@ -192,20 +193,36 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, []);
 
-  // Handle animation sequence
+  // Handle animation sequence - IMPROVED animation timing
   useEffect(() => {
-    // Start with entry animation
+    // Reset animation state on component mount
+    setAnimationComplete(false);
     setAnimationStage("entry");
+    
+    // Force initial render with entry animation
+    const forceRender = setTimeout(() => {
+      console.log("Forcing initial render with entry animation");
+    }, 10);
     
     // After entry animation completes, switch to content stage
     const entryTimer = setTimeout(() => {
+      console.log("Animation stage: switching to content");
       setAnimationStage("content");
+      
+      // Set animation complete after giving time for content animations to finish
+      const completeTimer = setTimeout(() => {
+        console.log("Animation complete");
+        setAnimationComplete(true);
+      }, 500);
+      
+      return () => clearTimeout(completeTimer);
     }, 400);
     
     // Handle escape key to close
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         // Trigger exit animation before closing
+        console.log("Escape key pressed, starting exit animation");
         setAnimationStage("exit");
         setTimeout(() => {
           onClose();
@@ -218,11 +235,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       clearTimeout(entryTimer);
+      clearTimeout(forceRender);
     };
   }, [onClose]);
   
   // Handle close button click with animation
   const handleClose = () => {
+    console.log("Close button clicked, starting exit animation");
     setAnimationStage("exit");
     setTimeout(() => {
       onClose();
@@ -232,7 +251,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   // Log song data to help debug
   useEffect(() => {
     console.log("Current song data in LyricsFullscreenView:", song);
-  }, [song]);
+    console.log("Current animation stage:", animationStage);
+  }, [song, animationStage]);
+
+  // Ensure song data is populated
+  const songTitle = song?.title || "Titre inconnu";
+  const songArtist = song?.artist || "Artiste inconnu";
+  const songImage = song?.imageUrl || "/placeholder.svg";
 
   return (
     <div className={cn(
@@ -243,7 +268,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       "opacity-100"
     )}>
       {/* Header with close and fullscreen buttons */}
-      <div className="absolute top-4 right-4 flex items-center space-x-2">
+      <div className="absolute top-4 right-4 flex items-center space-x-2 z-50">
         <Button
           variant="ghost"
           size="icon"
@@ -283,11 +308,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 : "md:w-full h-[30%] md:h-full transform scale-95 opacity-50"
           )}
         >
-          {song?.imageUrl && (
+          {songImage && (
             <div className="relative mb-4 md:mb-6 transition-all duration-500 ease-out">
               <img
-                src={song.imageUrl || "/placeholder.svg"}
-                alt={`${song.title || "Titre inconnu"} - Album art`}
+                src={songImage}
+                alt={`${songTitle} - Album art`}
                 className={cn(
                   "rounded-lg shadow-lg transition-all duration-500 ease-out object-cover",
                   animationStage === "entry" 
@@ -296,6 +321,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                       ? "md:w-64 md:h-64 w-44 h-44 opacity-100" 
                       : "w-32 h-32 opacity-70"
                 )}
+                onLoad={() => console.log("Album image loaded")}
+                onError={(e) => {
+                  console.error("Failed to load album image");
+                  (e.target as HTMLImageElement).src = "/placeholder.svg";
+                }}
               />
               <div className={cn(
                 "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-700",
@@ -313,10 +343,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 : "opacity-0 transform -translate-y-4"
           )}>
             <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
-              {song?.title || "Titre inconnu"}
+              {songTitle}
             </h1>
             <p className="text-lg md:text-xl text-spotify-neutral break-words">
-              {song?.artist || "Artiste inconnu"}
+              {songArtist}
             </p>
             
             {/* Generate lyrics button (only shown on left side when no lyrics) */}
@@ -387,7 +417,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="text-center p-4 md:p-6 w-full">
+              <div className="text-center p-4 md:p-6 w-full animate-fade-in">
                 <p className="text-spotify-neutral text-lg md:text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
                 
                 <Button
