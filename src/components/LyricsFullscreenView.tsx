@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,7 @@ function formatTime(time: number): string {
 }
 
 export const LyricsFullscreenView = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // Set the modal to open by default
   const [animationStage, setAnimationStage] = useState<"idle" | "content">("idle");
   const [contentAnimationVisible, setContentAnimationVisible] = useState(false);
   const [songTitle, setSongTitle] = useState("");
@@ -111,10 +110,6 @@ export const LyricsFullscreenView = () => {
     }
   }, [isOpen]);
 
-  const openView = () => {
-    setIsOpen(true);
-  };
-
   const closeView = () => {
     setContentAnimationVisible(false);
     setTimeout(() => {
@@ -172,6 +167,11 @@ export const LyricsFullscreenView = () => {
       </div>
     );
   };
+
+  // If the modal is not open, don't render anything
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div
