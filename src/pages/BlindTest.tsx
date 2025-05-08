@@ -22,7 +22,7 @@ type Song = {
 type GameMode = "artist" | "title" | "both";
 
 const BlindTest = () => {
-  const { play, pause, isPlaying, loadSong, currentSong } = usePlayer();
+  const { play, pause, isPlaying, currentSong, setQueue } = usePlayer();
   
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +54,16 @@ const BlindTest = () => {
         }
 
         if (data && data.length > 0) {
-          setSongs(data);
+          // Map the data to match our Song type with url property
+          const formattedSongs: Song[] = data.map(song => ({
+            id: song.id,
+            title: song.title,
+            artist: song.artist || '',
+            url: song.file_path,
+            imageUrl: song.image_url,
+            duration: song.duration
+          }));
+          setSongs(formattedSongs);
         }
       } catch (error) {
         console.error("Exception while fetching songs:", error);
@@ -134,7 +143,9 @@ const BlindTest = () => {
     }
 
     const nextSong = songsList[index];
-    loadSong(nextSong);
+    
+    // Update queue and play the current song
+    setQueue([nextSong]);
     
     // Prepare answer options
     const newOptions = prepareOptions(nextSong, songs);
@@ -148,7 +159,7 @@ const BlindTest = () => {
     
     // Auto-play song
     setTimeout(() => {
-      play();
+      play(nextSong);
     }, 500);
   };
 
