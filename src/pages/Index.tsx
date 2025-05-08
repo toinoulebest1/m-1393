@@ -28,7 +28,7 @@ const Index = () => {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist,
-        album: currentSong.album || 'Unknown Album',
+        album: currentSong.genre || 'Unknown Album', // Use genre field if it exists or fallback to 'Unknown Album'
         artwork: [
           {
             src: currentSong.imageUrl || "https://picsum.photos/256/256",
