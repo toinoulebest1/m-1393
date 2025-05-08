@@ -31,6 +31,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
 
   // Query to fetch lyrics from the database
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -105,62 +106,80 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    
+    // Start animation sequence
+    const timer = setTimeout(() => {
+      setIsAnimationComplete(true);
+    }, 300); // Delay to allow entry animation to complete
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      clearTimeout(timer);
+    };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-white/10">
-        <div className="flex items-center space-x-4">
-          {song?.imageUrl && (
-            <img
-              src={song.imageUrl || "https://picsum.photos/56/56"}
-              alt="Album art"
-              className="w-12 h-12 rounded-md"
-            />
-          )}
-          <div>
-            <h1 className="text-xl font-bold text-white">{song?.title || "Titre inconnu"}</h1>
-            <p className="text-spotify-neutral">{song?.artist || "Artiste inconnu"}</p>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col animate-fade-in">
+      {/* Close button (top right) */}
+      <div className="absolute top-4 right-4">
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="text-white hover:bg-white/10"
+          className="text-white hover:bg-white/10 rounded-full"
         >
           <X className="w-6 h-6" />
         </Button>
       </div>
 
-      {/* Lyrics content */}
-      <div className="flex-grow p-6 overflow-y-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-spotify-accent mr-2" />
-            <span>Chargement des paroles...</span>
-          </div>
-        ) : lyrics ? (
-          <div className="max-w-3xl mx-auto whitespace-pre-line text-spotify-neutral text-lg leading-relaxed">
-            {lyrics}
-          </div>
-        ) : error ? (
-          <div className="max-w-3xl mx-auto">
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Erreur</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto text-center">
-            <p className="text-spotify-neutral mb-6">Aucune parole disponible pour cette chanson.</p>
-            {song && (
+      {/* Main content - split layout */}
+      <div className="flex flex-col md:flex-row h-full w-full p-6">
+        {/* Left side - Song information with animation */}
+        <div 
+          className={cn(
+            "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out",
+            isAnimationComplete 
+              ? "md:w-1/3 md:pr-8" 
+              : "w-full md:w-full transform scale-95 opacity-90"
+          )}
+        >
+          {song?.imageUrl && (
+            <div className="relative mb-6 transition-all duration-500 ease-out">
+              <img
+                src={song.imageUrl || "https://picsum.photos/56/56"}
+                alt="Album art"
+                className={cn(
+                  "rounded-lg shadow-lg transition-all duration-700 ease-out",
+                  isAnimationComplete 
+                    ? "md:w-64 md:h-64 w-48 h-48" 
+                    : "w-32 h-32 opacity-90"
+                )}
+              />
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-700",
+                isAnimationComplete ? "opacity-70" : "opacity-0"
+              )} />
+            </div>
+          )}
+          
+          <div className={cn(
+            "text-center md:text-left transition-all duration-500",
+            isAnimationComplete ? "opacity-100 transform translate-y-0" : "opacity-0 transform translate-y-4"
+          )}>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              {song?.title || "Titre inconnu"}
+            </h1>
+            <p className="text-xl text-spotify-neutral">
+              {song?.artist || "Artiste inconnu"}
+            </p>
+            
+            {/* Generate lyrics button (only shown on left side when no lyrics) */}
+            {!lyrics && !isLoading && !error && (
               <Button
                 onClick={generateLyrics}
-                disabled={isGenerating || !song.artist}
-                className="mx-auto"
+                disabled={isGenerating || !song?.artist}
+                className="mt-8"
+                variant="outline"
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -171,10 +190,55 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               </Button>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Optional: Add a footer here if needed */}
+        {/* Right side - Lyrics content */}
+        <div 
+          className={cn(
+            "flex-grow overflow-y-auto transition-all duration-500 ease-out",
+            isAnimationComplete 
+              ? "opacity-100 md:w-2/3 md:pl-8 md:border-l border-white/10" 
+              : "opacity-0"
+          )}
+        >
+          <div className="h-full flex items-center justify-center">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
+                <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
+              </div>
+            ) : lyrics ? (
+              <div className="max-w-3xl w-full mx-auto whitespace-pre-line text-spotify-neutral text-xl leading-relaxed p-6">
+                {lyrics}
+              </div>
+            ) : error ? (
+              <div className="max-w-3xl mx-auto w-full p-6">
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTitle>Erreur</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+                
+                <Button
+                  onClick={generateLyrics}
+                  disabled={isGenerating || !song?.artist}
+                  className="mt-4"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Music className="h-4 w-4 mr-2" />
+                  )}
+                  Réessayer
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center p-6">
+                <p className="text-spotify-neutral text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
