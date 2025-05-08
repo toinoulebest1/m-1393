@@ -69,9 +69,6 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       const audio = new Audio();
       audioRef.current = audio;
       
-      // Important: Set the MIME type explicitly
-      audio.type = 'audio/mpeg';
-      
       // Set up event handlers before setting source
       audio.oncanplaythrough = () => {
         try {
@@ -158,4 +155,3 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
 
   return null; // This component doesn't render anything
 };
-
