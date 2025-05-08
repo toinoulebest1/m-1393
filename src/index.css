@@ -138,7 +138,7 @@
 }
 
 .animate-theme-transition {
-  animation: themeTransition 2s ease-in-out;
+  animation: themeTransition 3s ease-in-out infinite;
   background-size: 200% 200%;
 }
 
