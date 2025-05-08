@@ -465,8 +465,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Ajouter du CSS spécifique pour Firefox en fallback */}
-      <style jsx="true">
+      {/* Fix for the style tag - removed jsx property */}
+      <style>
         {`
         .firefox-fullscreen {
           position: fixed !important;
