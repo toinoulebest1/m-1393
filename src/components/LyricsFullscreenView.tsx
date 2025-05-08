@@ -64,15 +64,25 @@ export const LyricsFullscreenView = () => {
     },
     enabled: !!song?.artist && !!song?.title,
     retry: false,
-    onSuccess: (data) => {
-      setLyrics(data || null);
-      setError(null);
-    },
-    onError: () => {
-      setError("Erreur lors de la récupération des paroles.");
-      setLyrics(null);
-    },
+    meta: {
+      onSuccess: (data: string | null) => {
+        setLyrics(data);
+        setError(null);
+      },
+      onError: () => {
+        setError("Erreur lors de la récupération des paroles.");
+        setLyrics(null);
+      }
+    }
   });
+
+  // Handle the success and error cases manually since we're using meta
+  useEffect(() => {
+    if (lyricsData !== undefined) {
+      setLyrics(lyricsData);
+      setError(lyricsData ? null : "Paroles non trouvées.");
+    }
+  }, [lyricsData]);
 
   useEffect(() => {
     setSongTitle(song?.title || "");
