@@ -13,12 +13,48 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const { refreshCurrentSong, currentSong } = usePlayerContext();
+  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
   const isMobile = useIsMobile();
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+
+  // Set up MediaSession API for mobile device notifications
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      console.log('Setting up MediaSession for:', currentSong.title);
+      
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist,
+        album: currentSong.album || 'Unknown Album',
+        artwork: [
+          {
+            src: currentSong.imageUrl || "https://picsum.photos/256/256",
+            sizes: '256x256',
+            type: 'image/jpeg'
+          }
+        ]
+      });
+
+      // Set up media session action handlers
+      navigator.mediaSession.setActionHandler('play', () => play());
+      navigator.mediaSession.setActionHandler('pause', () => pause());
+      navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+      navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
+      
+      // Update playback state
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [currentSong, isPlaying, play, pause, nextSong, previousSong]);
+
+  // Update MediaSession playback state when isPlaying changes
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     if (currentSong) {

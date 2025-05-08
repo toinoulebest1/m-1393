@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { CastButton } from "./CastButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
+import { useEffect, useRef } from "react";
+import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 
 export const Player = () => {
   const isMobile = useIsMobile();
@@ -18,6 +20,7 @@ export const Player = () => {
     shuffleMode,
     repeatMode,
     favorites,
+    playbackRate,
     play,
     pause,
     setVolume,
@@ -28,6 +31,32 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite
   } = usePlayer();
+  
+  const positionUpdateIntervalRef = useRef<number | null>(null);
+
+  // Set up interval to update position state for MediaSession API
+  useEffect(() => {
+    // Clear any existing interval
+    if (positionUpdateIntervalRef.current) {
+      window.clearInterval(positionUpdateIntervalRef.current);
+      positionUpdateIntervalRef.current = null;
+    }
+    
+    if ('mediaSession' in navigator && currentSong && isPlaying) {
+      positionUpdateIntervalRef.current = window.setInterval(() => {
+        const duration = durationToSeconds(currentSong.duration);
+        const position = (progress / 100) * duration;
+        
+        updatePositionState(duration, position, playbackRate);
+      }, 1000);
+    }
+    
+    return () => {
+      if (positionUpdateIntervalRef.current) {
+        window.clearInterval(positionUpdateIntervalRef.current);
+      }
+    };
+  }, [currentSong, isPlaying, progress, playbackRate]);
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
