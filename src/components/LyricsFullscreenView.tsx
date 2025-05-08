@@ -441,13 +441,75 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             <p className="text-lg md:text-xl text-spotify-neutral break-words">
               {songArtist}
             </p>
+          </div>
+          
+          {/* Nouvelle barre de lecture en dessous de l'image */}
+          <div className={cn(
+            "w-full mt-4 transition-all duration-500",
+            animationStage === "content" && contentAnimationVisible
+              ? "opacity-100 transform translate-y-0" 
+              : "opacity-0 transform translate-y-4"
+          )}
+          style={{
+            transitionDelay: animationStage === "content" ? "200ms" : "0ms"
+          }}>
+            {/* Affichage de la progression */}
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-spotify-neutral">{formatTime(progress)}</span>
+              <span className="text-spotify-neutral">{formatDuration(song?.duration)}</span>
+            </div>
             
-            {/* Generate lyrics button (only shown on left side when no lyrics) */}
+            {/* Barre de progression */}
+            <div className="flex items-center">
+              <Slider
+                value={[progress]}
+                max={100}
+                step={1}
+                className="flex-grow"
+                onValueChange={(value) => setProgress(value[0])}
+              />
+              
+              {/* Contrôles de lecture à droite de la barre */}
+              <div className="flex items-center ml-4 space-x-3">
+                <Button 
+                  variant="ghost"
+                  size="icon"
+                  onClick={previousSong}
+                  className="text-white hover:bg-white/10 rounded-full h-8 w-8 p-1"
+                >
+                  <SkipBack className="h-4 w-4" />
+                </Button>
+                
+                <Button
+                  variant="default"
+                  size="icon"
+                  onClick={() => isPlaying ? pause() : play()}
+                  className="bg-white text-black hover:bg-white/90 rounded-full h-8 w-8 flex items-center justify-center p-1"
+                >
+                  {isPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={nextSong}
+                  className="text-white hover:bg-white/10 rounded-full h-8 w-8 p-1"
+                >
+                  <SkipForward className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Generate lyrics button (only shown when no lyrics) */}
             {!lyrics && !isLoading && !error && (
               <Button
                 onClick={generateLyrics}
                 disabled={isGenerating || !song?.artist}
-                className="mt-4 md:mt-8 animate-fade-in"
+                className="mt-4 md:mt-6 animate-fade-in w-full"
                 variant="outline"
               >
                 {isGenerating ? (
@@ -534,58 +596,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Nouvelle barre de contrôle de lecture en bas de l'écran */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/70 backdrop-blur-md p-4 border-t border-white/10 z-50 animate-fade-in">
-        <div className="max-w-3xl mx-auto">
-          {/* Affichage de la progression */}
-          <div className="flex items-center justify-between text-xs px-1 mb-1">
-            <span className="text-spotify-neutral">{formatTime(progress)}</span>
-            <span className="text-spotify-neutral">{formatDuration(song?.duration)}</span>
-          </div>
-          
-          {/* Barre de progression */}
-          <Slider
-            value={[progress]}
-            max={100}
-            step={1}
-            className="mb-3"
-            onValueChange={(value) => setProgress(value[0])}
-          />
-          
-          {/* Contrôles de lecture */}
-          <div className="flex items-center justify-center space-x-6">
-            <Button 
-              variant="ghost"
-              size="icon"
-              onClick={previousSong}
-              className="text-white hover:bg-white/10 rounded-full"
-            >
-              <SkipBack className="h-5 w-5" />
-            </Button>
-            
-            <Button
-              variant="default"
-              size="icon"
-              onClick={() => isPlaying ? pause() : play()}
-              className="bg-white text-black hover:bg-white/90 rounded-full w-12 h-12 flex items-center justify-center"
-            >
-              {isPlaying ? (
-                <Pause className="h-5 w-5" />
-              ) : (
-                <Play className="h-5 w-5" />
-              )}
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={nextSong}
-              className="text-white hover:bg-white/10 rounded-full"
-            >
-              <SkipForward className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
+      <div id="next-song-alert"
+        className="fixed bottom-28 right-4 bg-spotify-dark/90 text-white p-3 rounded-lg shadow-lg transition-all duration-300 transform opacity-0 translate-y-2 z-50"
+      >
+        <p className="text-xs text-spotify-neutral">À suivre :</p>
+        <p id="next-song-title" className="font-medium"></p>
+        <p id="next-song-artist" className="text-sm text-spotify-neutral"></p>
       </div>
 
       {/* Fix for the style tag */}
