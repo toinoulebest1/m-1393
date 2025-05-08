@@ -2,19 +2,20 @@ import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { updateMediaSessionMetadata } from "@/utils/mediaSession";
+import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
   const isMobile = useIsMobile();
+  const positionUpdateIntervalRef = useRef<number | null>(null);
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -30,15 +31,59 @@ const Index = () => {
       navigator.mediaSession.setActionHandler('pause', () => pause());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
       navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
+      
+      // Set up position state updates
+      if (isPlaying) {
+        startPositionUpdates();
+      } else {
+        stopPositionUpdates();
+      }
     }
+    
+    return () => {
+      stopPositionUpdates();
+    };
   }, [currentSong, play, pause, nextSong, previousSong]);
 
   // Update MediaSession playback state when isPlaying changes
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      
+      if (isPlaying) {
+        startPositionUpdates();
+      } else {
+        stopPositionUpdates();
+      }
     }
   }, [isPlaying]);
+  
+  // Helper functions to manage position updates
+  const startPositionUpdates = () => {
+    if (!currentSong) return;
+    
+    // Clear any existing interval
+    stopPositionUpdates();
+    
+    // Get the audio element
+    const audioElement = document.querySelector('audio');
+    if (!audioElement) return;
+    
+    // Set up new interval to update position every second
+    const duration = durationToSeconds(currentSong.duration);
+    positionUpdateIntervalRef.current = window.setInterval(() => {
+      if (audioElement && !audioElement.paused && !isNaN(audioElement.currentTime)) {
+        updatePositionState(duration, audioElement.currentTime, audioElement.playbackRate);
+      }
+    }, 1000);
+  };
+  
+  const stopPositionUpdates = () => {
+    if (positionUpdateIntervalRef.current) {
+      clearInterval(positionUpdateIntervalRef.current);
+      positionUpdateIntervalRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (currentSong) {

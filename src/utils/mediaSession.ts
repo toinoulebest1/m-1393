@@ -9,6 +9,7 @@ export const updateMediaSessionMetadata = (song: {
   artist: string;
   imageUrl?: string;
   genre?: string;
+  duration?: string;
 }) => {
   if ('mediaSession' in navigator) {
     console.log('Updating MediaSession metadata for:', song.title);
@@ -25,6 +26,12 @@ export const updateMediaSessionMetadata = (song: {
         }
       ]
     });
+    
+    // Update position state immediately after setting metadata
+    if (song.duration) {
+      const durationInSeconds = durationToSeconds(song.duration);
+      updatePositionState(durationInSeconds, 0, 1);
+    }
   }
 };
 
