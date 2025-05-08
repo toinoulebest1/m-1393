@@ -29,13 +29,13 @@ interface LyricsFullscreenViewProps {
   onClose: () => void;
 }
 
-// Couleurs pré-définies pour les chansons sans image ou pendant le chargement
+// Default colors for songs without image or during loading
 const DEFAULT_COLORS = {
   dark: [48, 12, 61] as [number, number, number],
   accent: [75, 20, 95] as [number, number, number]
 };
 
-// Map de cache pour stocker les couleurs extraites (jusqu'à 20 entrées max)
+// Cache map for extracted colors (max 20 entries)
 const colorCache = new Map<string, {dominant: [number, number, number], accent: [number, number, number]}>();
 
 export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
@@ -51,7 +51,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [accentColor, setAccentColor] = useState<[number, number, number] | null>(null);
   const [contentVisible, setContentVisible] = useState(false);
 
-  // Intégration du contexte Player pour contrôler la lecture
+  // Integrate Player context to control playback
   const { 
     isPlaying, 
     progress, 
@@ -63,15 +63,15 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     previousSong
   } = usePlayer();
 
-  // Détection de Firefox au montage du composant
+  // Detect Firefox on component mount (only once)
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
     setIsFirefox(userAgent.indexOf('firefox') > -1);
   }, []);
 
-  // Extraction optimisée de la couleur dominante de l'image de l'album
+  // Optimized dominant color extraction with memoization
   const extractDominantColor = useCallback(async (imageUrl: string) => {
-    // Vérifier si la couleur est déjà en cache
+    // Check if color is already cached
     if (colorCache.has(imageUrl)) {
       const cachedColors = colorCache.get(imageUrl)!;
       setDominantColor(cachedColors.dominant);
@@ -80,7 +80,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
 
     try {
-      // Utiliser une image de taille réduite pour l'extraction de couleur
+      // Use smaller image for color extraction (performance optimization)
       const smallerImageUrl = imageUrl.includes('?') 
         ? `${imageUrl}&size=100` 
         : `${imageUrl}?size=100`;
@@ -90,35 +90,34 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
-        img.onerror = () => {
-          reject(new Error("Failed to load image"));
-        };
+        img.onerror = () => reject(new Error("Failed to load image"));
         img.src = smallerImageUrl;
       });
 
       const colorThief = new ColorThief();
       const dominantRgb = colorThief.getColor(img);
       
-      // Ensuring the color is properly typed as a tuple
+      // Ensure color is properly typed as a tuple
       const typedDominantRgb: [number, number, number] = [
         dominantRgb[0], 
         dominantRgb[1], 
         dominantRgb[2]
       ];
       
-      // Créer une version plus saturée pour l'accent
+      // Create a more saturated version for accent
       const accentRgb: [number, number, number] = [
         Math.min(255, typedDominantRgb[0] * 1.3),
         Math.min(255, typedDominantRgb[1] * 1.3),
         Math.min(255, typedDominantRgb[2] * 1.3)
       ];
       
-      // Mettre en cache les couleurs extraites
+      // Cache the extracted colors
       if (colorCache.size >= 20) {
-        // Limiter la taille du cache - supprimer la plus ancienne entrée
+        // Limit cache size - remove oldest entry
         const firstKey = colorCache.keys().next().value;
         colorCache.delete(firstKey);
       }
+      
       colorCache.set(imageUrl, {
         dominant: typedDominantRgb,
         accent: accentRgb
@@ -127,24 +126,33 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       setDominantColor(typedDominantRgb);
       setAccentColor(accentRgb);
     } catch (error) {
-      // Couleurs de secours si l'extraction échoue
+      // Fallback colors if extraction fails
       setDominantColor(DEFAULT_COLORS.dark);
       setAccentColor(DEFAULT_COLORS.accent);
     }
   }, []);
 
-  // Extraire la couleur lorsque la chanson change
+  // Extract color when song changes - with debounce
   useEffect(() => {
+    let timeout: number;
+    
     if (song?.imageUrl && !song.imageUrl.includes('placeholder')) {
-      extractDominantColor(song.imageUrl);
+      // Small delay to prioritize component mounting first
+      timeout = window.setTimeout(() => {
+        extractDominantColor(song.imageUrl as string);
+      }, 100);
     } else {
-      // Couleurs par défaut si pas d'image
+      // Default colors if no image
       setDominantColor(DEFAULT_COLORS.dark);
       setAccentColor(DEFAULT_COLORS.accent);
     }
+    
+    return () => {
+      if (timeout) window.clearTimeout(timeout);
+    };
   }, [song?.imageUrl, extractDominantColor]);
 
-  // Query to fetch lyrics from the database - optimisée avec mise en cache
+  // Query to fetch lyrics - optimized with caching
   const { data: lyrics, isLoading, refetch } = useQuery({
     queryKey: ["lyrics", song?.id],
     queryFn: async () => {
@@ -163,7 +171,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     staleTime: 1000 * 60 * 5, // 5 minutes cache
     retry: 1,
     meta: {
-      onSuccess: (data) => {
+      onSuccess: () => {
         // Success callback
       },
       onError: (error) => {
@@ -172,20 +180,20 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   });
 
-  // OPTIMISÉ: Animation plus légère et plus efficace
+  // OPTIMIZED: Lighter and more efficient animation
   useEffect(() => {
     setAnimationStage("entry");
     setContentVisible(false);
     
-    // Timeout plus court et plus efficace
+    // Shorter and more efficient timeout
     const timeout = setTimeout(() => {
       setAnimationStage("content");
       
-      // Délai réduit pour l'affichage du contenu
+      // Reduced delay for content display
       setTimeout(() => {
         setContentVisible(true);
-      }, 30);
-    }, 200);
+      }, 10); // Reduced from 30ms
+    }, 100); // Reduced from 200ms
     
     // Handle escape key to close
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -205,9 +213,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   // Handle close button click with animation
   const handleClose = () => {
     setAnimationStage("exit");
+    // Faster animation
     setTimeout(() => {
       onClose();
-    }, 200); // Animation plus rapide
+    }, 150); // Reduced from 200ms
   };
 
   // Function to generate lyrics
@@ -256,8 +265,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   };
 
-  // OPTIMISÉ: Toggle fullscreen function avec gestion de Firefox simplifiée
-  const toggleFullscreen = () => {
+  // OPTIMIZED: Toggle fullscreen function with simplified Firefox handling
+  const toggleFullscreen = useCallback(() => {
     try {
       if (!fullscreen) {
         const element = document.documentElement;
@@ -287,12 +296,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         }
       }
     } catch (err) {
-      // Fallback simple
+      // Simple fallback
       setFullscreen(!fullscreen);
     }
-  };
+  }, [fullscreen, isFirefox]);
 
-  // OPTIMISÉ: Meilleur gestion des événements de plein écran
+  // OPTIMIZED: Better fullscreen event handling
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFullscreenNow = !!(
@@ -305,22 +314,20 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       setFullscreen(isFullscreenNow);
     };
 
-    // Add multiple event listeners for cross-browser compatibility
+    // Add event listeners for cross-browser compatibility
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     
     return () => {
-      // Remove all listeners when component unmounts
+      // Remove all listeners on unmount
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, []);
 
-  // Formatage du temps plus performant
+  // More performant time formatter
   const formatTime = useCallback((progress: number) => {
     if (!song?.duration) return "0:00";
     
@@ -348,15 +355,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   }, [song?.duration]);
 
-  // Formatage de la durée plus performant
+  // More performant duration formatter
   const formatDuration = useCallback((duration: string | undefined) => {
     if (!duration) return "0:00";
     
     try {
       if (duration.includes(':')) {
-        const [minutes, seconds] = duration.split(':').map(Number);
-        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        return duration;
       }
       
       const durationInSeconds = parseFloat(duration);
@@ -376,22 +381,24 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const songArtist = song?.artist || "Artiste inconnu";
   const songImage = song?.imageUrl || "/placeholder.svg";
 
-  // OPTIMISÉ: Utilisation de useMemo pour calculer les styles une seule fois
+  // OPTIMIZED: Use useMemo for styles to calculate only once
   const bgStyle = useMemo(() => {
     if (!dominantColor) return {};
     
+    // Simplified gradient with fewer color stops
     return {
       background: `radial-gradient(circle at center, 
         rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
-        rgba(${dominantColor[0] * 0.6}, ${dominantColor[1] * 0.6}, ${dominantColor[2] * 0.6}, 0.95) 40%, 
-        rgba(0, 0, 0, 0.98) 100%)`,
+        rgba(0, 0, 0, 0.95) 100%)`,
+      willChange: 'transform',
+      transform: 'translateZ(0)',
     };
   }, [dominantColor]);
 
-  // Style pour le flou optimisé (moins intense)
+  // Simplified blur style with reduced intensity
   const blurOverlayStyle = useMemo(() => ({
-    backdropFilter: "blur(40px)",
-    WebkitBackdropFilter: "blur(40px)",
+    backdropFilter: "blur(30px)",
+    WebkitBackdropFilter: "blur(30px)",
   }), []);
 
   return (
@@ -399,38 +406,32 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       "fixed inset-0 z-[100] flex flex-col",
       fullscreen && isFirefox ? "firefox-fullscreen" : "",
       animationStage === "entry" ? "animate-fade-in" : 
-      animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
+      animationStage === "exit" ? "opacity-0 transition-opacity duration-200" : 
       "opacity-100"
     )}
     style={{
-      transform: "translateZ(0)",
-      willChange: "transform, opacity", // Optimisation pour le rendu
+      contain: 'content', // Performance optimization
+      transform: "translateZ(0)", // Hardware acceleration
+      willChange: "transform, opacity", // Hint to browser
     }}>
-      {/* Background with album art color - SIMPLIFIÉ */}
+      {/* Background with album art color - SIMPLIFIED */}
       <div 
         className="absolute inset-0 z-0"
         style={bgStyle}
       >
-        {/* Overlay patterns - SIMPLIFIÉ */}
-        <div 
-          className="absolute inset-0 z-0 opacity-30"
-          style={{
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E\")",
-          }}
-        />
-        
-        {/* Blur overlay - OPTIMISÉ */}
+        {/* Reduced overlay elements for better performance */}
         <div 
           className="absolute inset-0 z-1 bg-black bg-opacity-40"
           style={blurOverlayStyle}
         />
 
-        {/* Dynamic light spots - RÉDUIT */}
+        {/* Single light spot instead of multiple */}
         {accentColor && (
           <div
             className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full opacity-10 blur-[100px]"
             style={{
               background: `radial-gradient(circle at center, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.6) 0%, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0) 70%)`,
+              willChange: 'transform',
             }}
           />
         )}
@@ -461,7 +462,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </Button>
       </div>
 
-      {/* Main content container - OPTIMISÉ */}
+      {/* Main content container - OPTIMIZED */}
       <div className={cn(
         "flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden relative z-10", 
         fullscreen && isFirefox ? "firefox-content" : ""
@@ -469,49 +470,49 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         {/* Left side - Song information with simpler animation */}
         <div 
           className={cn(
-            "flex flex-col items-center md:items-start justify-center transition-all duration-300",
+            "flex flex-col items-center md:items-start justify-center transition-all duration-200",
             animationStage === "content" && contentVisible
               ? "md:w-1/3 h-[30%] md:h-full md:pr-8 opacity-100" 
               : "md:w-full h-[30%] md:h-full opacity-90"
           )}
         >
           {songImage && (
-            <div className="relative mb-4 md:mb-6 transition-all duration-300">
+            <div className="relative mb-4 md:mb-6 transition-all duration-200">
               <img
                 src={songImage}
                 alt={`${songTitle} - Album art`}
                 className={cn(
-                  "rounded-lg shadow-lg transition-all duration-300 object-cover",
+                  "rounded-lg shadow-lg transition-all duration-200 object-cover",
                   animationStage === "content" && contentVisible
                     ? "md:w-64 md:h-64 w-44 h-44 opacity-100" 
                     : "w-32 h-32 opacity-90"
                 )}
-                loading="eager" // Forcer le chargement prioritaire
+                loading="eager" // Force priority loading
                 style={{
                   boxShadow: accentColor ? `0 0 20px 2px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.4)` : undefined,
                 }}
               />
               <div className={cn(
-                "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-300",
+                "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-200",
                 contentVisible ? "opacity-70" : "opacity-0"
               )} />
             </div>
           )}
           
-          {/* Barre de lecture après l'image */}
+          {/* Playback controls after image */}
           <div className={cn(
-            "w-full mb-4 transition-all duration-300",
+            "w-full mb-4 transition-all duration-200",
             animationStage === "content" && contentVisible
               ? "opacity-100" 
               : "opacity-0"
           )}>
-            {/* Affichage de la progression */}
+            {/* Progress display */}
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-spotify-neutral">{formatTime(progress)}</span>
               <span className="text-spotify-neutral">{formatDuration(song?.duration)}</span>
             </div>
             
-            {/* Barre de progression */}
+            {/* Progress bar */}
             <div className="flex items-center">
               <Slider
                 value={[progress]}
@@ -521,7 +522,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 onValueChange={(value) => setProgress(value[0])}
               />
               
-              {/* Contrôles de lecture à droite de la barre */}
+              {/* Playback controls right of the bar */}
               <div className="flex items-center ml-4 space-x-3">
                 <Button 
                   variant="ghost"
@@ -558,7 +559,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           </div>
           
           <div className={cn(
-            "text-center md:text-left transition-all duration-300 w-full px-4 md:px-0",
+            "text-center md:text-left transition-all duration-200 w-full px-4 md:px-0",
             animationStage === "content" && contentVisible
               ? "opacity-100" 
               : "opacity-0"
@@ -589,10 +590,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           )}
         </div>
 
-        {/* Right side - Lyrics content with proper overflow handling - OPTIMISÉ */}
+        {/* Right side - Lyrics content with proper overflow handling - OPTIMIZED */}
         <div 
           className={cn(
-            "flex-grow transition-all duration-300 h-[70%] md:h-full md:max-h-full overflow-hidden",
+            "flex-grow transition-all duration-200 h-[70%] md:h-full md:max-h-full overflow-hidden",
             animationStage === "content" && contentVisible
               ? "opacity-100 md:w-2/3 md:pl-8 md:border-l border-white/10" 
               : "opacity-0"
@@ -606,14 +607,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               </div>
             ) : lyrics ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 animate-fade-in backdrop-blur-sm bg-black/20">
+                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20">
                   <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
                     {lyrics}
                   </div>
                 </div>
               </div>
             ) : error ? (
-              <div className="flex-grow max-w-3xl mx-auto w-full p-6 animate-fade-in">
+              <div className="flex-grow max-w-3xl mx-auto w-full p-6">
                 <Alert variant="destructive" className="mb-4">
                   <AlertTitle>Erreur</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -633,7 +634,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="flex-grow text-center p-4 md:p-6 w-full animate-fade-in">
+              <div className="flex-grow text-center p-4 md:p-6 w-full">
                 <p className="text-spotify-neutral text-lg md:text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
                 
                 <Button
@@ -655,17 +656,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      <div id="next-song-alert"
-        className="fixed bottom-28 right-4 bg-spotify-dark/90 text-white p-3 rounded-lg shadow-lg transition-all duration-300 transform opacity-0 translate-y-2 z-50"
-      >
-        <p className="text-xs text-spotify-neutral">À suivre :</p>
-        <p id="next-song-title" className="font-medium"></p>
-        <p id="next-song-artist" className="text-sm text-spotify-neutral"></p>
-      </div>
-
-      {/* CSS optimisé */}
-      <style>
-        {`
+      {/* Optimized CSS */}
+      <style jsx>{`
         .firefox-fullscreen {
           position: fixed !important;
           top: 0 !important;
@@ -684,8 +676,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
-        `}
-      </style>
+      `}</style>
     </div>
   );
 };
