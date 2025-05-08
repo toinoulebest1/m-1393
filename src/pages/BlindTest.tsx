@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -40,7 +40,8 @@ const BlindTest = () => {
   const [gameOver, setGameOver] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [currentSound, setCurrentSound] = useState<SoundType | null>(null);
-
+  const timerSoundRef = useRef(false);
+  
   // Fetch songs from Supabase
   useEffect(() => {
     const fetchSongs = async () => {
@@ -170,6 +171,8 @@ const BlindTest = () => {
   // Handle answer selection
   const handleAnswer = (answer: string) => {
     setTimerActive(false);
+    timerSoundRef.current = false;
+    
     const currentSongAnswer = gameMode === "title" 
       ? songs[currentIndex].title 
       : gameMode === "artist" 
@@ -189,21 +192,23 @@ const BlindTest = () => {
     
     setCorrectAnswer(currentSongAnswer);
     
-    // Wait before loading next song - now handled by sound effect end
     // The next question will be loaded when the sound effect ends
   };
 
   // Handle sound effect ending
   const handleSoundEnd = () => {
-    setCurrentSound(null);
-    
-    // If we just answered a question, load the next one
-    if (correctAnswer !== null) {
-      setTimeout(() => {
-        loadNextSong(currentIndex + 1);
-      }, 500);
-    } 
-    // If game is over, we don't need to do anything
+    // Only process non-timer sounds or final timer sound
+    if (currentSound !== 'timer' || remainingTime <= 0) {
+      setCurrentSound(null);
+      
+      // If we just answered a question, load the next one
+      if (correctAnswer !== null) {
+        setTimeout(() => {
+          loadNextSong(currentIndex + 1);
+        }, 500);
+      } 
+      // If game is over, we don't need to do anything
+    }
   };
 
   // End game
@@ -211,6 +216,7 @@ const BlindTest = () => {
     pause();
     setGameOver(true);
     setTimerActive(false);
+    timerSoundRef.current = false;
     toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
     setCurrentSound('gameover');
   };
@@ -218,6 +224,8 @@ const BlindTest = () => {
   // Skip current song
   const skipSong = () => {
     setTimerActive(false);
+    timerSoundRef.current = false;
+    setCurrentSound(null);
     toast.info("Chanson passée");
     loadNextSong(currentIndex + 1);
   };
@@ -232,6 +240,7 @@ const BlindTest = () => {
       }, 1000);
     } else if (remainingTime === 0 && timerActive) {
       setTimerActive(false);
+      timerSoundRef.current = false;
       toast.error("Temps écoulé !");
       
       const currentSongAnswer = gameMode === "title" 
@@ -251,10 +260,19 @@ const BlindTest = () => {
 
   // Add low time warning sound
   useEffect(() => {
-    if (timerActive && remainingTime <= 5 && remainingTime > 0) {
+    // Only play timer sound once when reaching 5 seconds
+    if (timerActive && remainingTime === 5 && !timerSoundRef.current) {
+      timerSoundRef.current = true;
       setCurrentSound('timer');
     }
   }, [timerActive, remainingTime]);
+
+  // Reset timer sound flag when starting a new question
+  useEffect(() => {
+    if (currentIndex >= 0) {
+      timerSoundRef.current = false;
+    }
+  }, [currentIndex]);
 
   // Update URL parameters based on game state
   useEffect(() => {

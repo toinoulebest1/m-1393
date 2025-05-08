@@ -21,6 +21,12 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
 
   useEffect(() => {
     if (sound && soundMap[sound]) {
+      // Stop any currently playing audio before creating a new one
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      
       // Create a new audio element each time
       const audio = new Audio(soundMap[sound]);
       audioRef.current = audio;
@@ -31,6 +37,10 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       // Play the sound
       audio.play().catch(err => {
         console.error("Error playing sound:", err);
+        // If there's an error playing the sound, still call onSoundEnd to avoid blocking the game
+        if (onSoundEnd) {
+          onSoundEnd();
+        }
       });
 
       // Handle sound ending
@@ -42,8 +52,11 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
 
       // Cleanup function
       return () => {
-        audio.pause();
-        audio.src = '';
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+          audioRef.current = null;
+        }
       };
     }
   }, [sound, onSoundEnd]);
