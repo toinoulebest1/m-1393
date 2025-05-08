@@ -54,11 +54,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const generateLyrics = async () => {
     if (!song?.title || !song?.artist) {
       setError("Impossible de récupérer les paroles sans le titre et l'artiste.");
-      toast({
-        title: "Erreur",
-        description: "Impossible de récupérer les paroles sans le titre et l'artiste.",
-        variant: "destructive"
-      });
+      toast.error("Impossible de récupérer les paroles sans le titre et l'artiste.");
       return;
     }
 
@@ -90,18 +86,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       }
 
       await refetch();
-      toast({
-        title: "Succès",
-        description: "Les paroles ont été récupérées avec succès",
-      });
+      toast.success("Les paroles ont été récupérées avec succès");
     } catch (error) {
       console.error("Error generating lyrics:", error);
       setError(error.message || "Impossible de récupérer les paroles");
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de récupérer les paroles",
-        variant: "destructive"
-      });
+      toast.error(error.message || "Impossible de récupérer les paroles");
     } finally {
       setIsGenerating(false);
     }
