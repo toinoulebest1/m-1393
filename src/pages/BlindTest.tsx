@@ -197,6 +197,8 @@ const BlindTest = () => {
 
   // Handle sound effect ending
   const handleSoundEnd = () => {
+    console.log("Sound ended:", currentSound);
+    
     // Only process non-timer sounds or final timer sound
     if (currentSound !== 'timer' || remainingTime <= 0) {
       setCurrentSound(null);
@@ -206,7 +208,7 @@ const BlindTest = () => {
         setTimeout(() => {
           loadNextSong(currentIndex + 1);
         }, 500);
-      } 
+      }
       // If game is over, we don't need to do anything
     }
   };
@@ -262,6 +264,7 @@ const BlindTest = () => {
   useEffect(() => {
     // Only play timer sound once when reaching 5 seconds
     if (timerActive && remainingTime === 5 && !timerSoundRef.current) {
+      console.log("Playing timer sound");
       timerSoundRef.current = true;
       setCurrentSound('timer');
     }
