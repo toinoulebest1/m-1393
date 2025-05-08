@@ -16,7 +16,7 @@ type Song = {
   artist: string;
   url: string;
   imageUrl?: string;
-  duration?: string;
+  duration: string;
 };
 
 type GameMode = "artist" | "title" | "both";
@@ -61,7 +61,7 @@ const BlindTest = () => {
             artist: song.artist || '',
             url: song.file_path,
             imageUrl: song.image_url,
-            duration: song.duration
+            duration: song.duration || '0:00'
           }));
           setSongs(formattedSongs);
         }
@@ -377,15 +377,9 @@ const BlindTest = () => {
               
               {currentSong && (
                 <div className="text-center text-xs text-spotify-neutral">
-                  {gameOver || correctAnswer ? (
-                    <div className="p-3 bg-spotify-dark/60 rounded-lg">
-                      En cours de lecture: {currentSong.title} - {currentSong.artist}
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-spotify-dark/60 rounded-lg">
-                      {gameMode === "title" ? "Titre masqué" : gameMode === "artist" ? "Artiste masqué" : "Titre et artiste masqués"}
-                    </div>
-                  )}
+                  <div className="p-3 bg-spotify-dark/60 rounded-lg">
+                    En cours de lecture: {currentSong.title} - {currentSong.artist}
+                  </div>
                 </div>
               )}
             </div>
