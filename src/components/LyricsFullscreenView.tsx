@@ -309,7 +309,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             animationStage === "entry"
               ? "opacity-0 transform translate-y-4" 
               : animationStage === "content"
-                ? "opacity-100 transform translate-y-0" 
+                ? "opacity-100 transform translate-y-0 delay-100" 
                 : "opacity-0 transform -translate-y-4"
           )}>
             <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
@@ -324,7 +324,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               <Button
                 onClick={generateLyrics}
                 disabled={isGenerating || !song?.artist}
-                className="mt-4 md:mt-8"
+                className={cn(
+                  "mt-4 md:mt-8",
+                  animationStage === "content" ? "animate-fade-in delay-200" : ""
+                )}
                 variant="outline"
               >
                 {isGenerating ? (
@@ -343,10 +346,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           className={cn(
             "flex-grow transition-all duration-500 ease-out h-[70%] md:h-full md:max-h-full overflow-hidden",
             animationStage === "entry" 
-              ? "opacity-0" 
+              ? "opacity-0 transform translate-y-4" 
               : animationStage === "content"
-                ? "opacity-100 md:w-2/3 md:pl-8 md:border-l border-white/10" 
-                : "opacity-0"
+                ? "opacity-100 transform translate-y-0 md:w-2/3 md:pl-8 md:border-l border-white/10 delay-200" 
+                : "opacity-0 transform translate-y-4"
           )}
         >
           <div className="h-full w-full flex items-center justify-center">
@@ -406,7 +409,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Ajouter du CSS spécifique pour Firefox en fallback - Fixed: removed jsx prop */}
+      {/* Ajouter du CSS spécifique pour Firefox en fallback */}
       {fullscreen && isFirefox && (
         <style>
           {`
