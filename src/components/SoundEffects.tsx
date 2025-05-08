@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 
 export type SoundType = 'correct' | 'wrong' | 'gameover' | 'timer';
@@ -10,30 +11,13 @@ interface SoundEffectsProps {
 export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Map of sound types to their audio files with highly reliable URLs as fallbacks
-  const soundMap: Record<SoundType, string[]> = {
-    correct: [
-      'https://www.soundjay.com/buttons/sounds/button-16.mp3',
-      'https://www.soundjay.com/buttons/button-09a.mp3',
-      'https://www.fesliyanstudios.com/play-mp3/387'
-    ],
-    wrong: [
-      'https://www.soundjay.com/buttons/sounds/button-10.mp3',
-      'https://www.soundjay.com/buttons/button-11.mp3',
-      'https://www.fesliyanstudios.com/play-mp3/6'
-    ],
-    gameover: [
-      'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3',
-      'https://www.soundjay.com/misc/sounds/fail-buzzer-01.mp3',
-      'https://www.fesliyanstudios.com/play-mp3/38'
-    ],
-    timer: [
-      'https://www.soundjay.com/mechanical/sounds/timer-tick-01.mp3',
-      'https://www.soundjay.com/mechanical/sounds/clock-ticking-2.mp3',
-      'https://www.fesliyanstudios.com/play-mp3/5694'
-    ]
+  // Map of sound types to their local audio files
+  const soundMap: Record<SoundType, string> = {
+    correct: '/sounds/correct.mp3',
+    wrong: '/sounds/wrong.mp3',
+    gameover: '/sounds/gameover.mp3',
+    timer: '/sounds/timer.mp3'
   };
 
   // Clean up function to properly dispose of audio elements
@@ -55,79 +39,29 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       }
       setIsPlaying(false);
     }
-    
-    // Also clean up AudioContext if it exists
-    if (audioContextRef.current) {
-      try {
-        if (audioContextRef.current.state !== 'closed') {
-          audioContextRef.current.close();
-        }
-      } catch (err) {
-        console.error("Error closing audio context:", err);
-      }
-      audioContextRef.current = null;
-    }
   };
 
-  const preloadAudio = (soundType: SoundType) => {
-    // Preload all URLs for this sound type to increase chance of success
-    soundMap[soundType].forEach(url => {
-      try {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audio.src = url;
-        // Don't need to keep a reference, just trigger browser caching
-      } catch (e) {
-        // Silent fail on preload
-      }
-    });
-  };
-
-  const tryPlaySound = async (soundType: SoundType, urlIndex = 0) => {
-    // Make sure we have valid URLs to try
-    if (!soundMap[soundType] || urlIndex >= soundMap[soundType].length) {
-      console.error(`No valid sound URL found for ${soundType}`);
-      setIsPlaying(false);
-      if (onSoundEnd) onSoundEnd();
-      return;
-    }
-    
+  const tryPlaySound = (soundType: SoundType) => {
     try {
+      console.log(`Attempting to play sound: ${soundType} from ${soundMap[soundType]}`);
+      
       // Create a new audio element
       const audio = new Audio();
       audioRef.current = audio;
       
       // Set up event handlers before setting source
-      audio.oncanplaythrough = async () => {
+      audio.oncanplaythrough = () => {
         try {
           console.log(`Sound ${soundType} ready to play, starting playback...`);
-          // Try to use Web Audio API for more reliable playback
-          try {
-            // Create a new AudioContext
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            audioContextRef.current = audioContext;
-            
-            // Create a MediaElementAudioSourceNode
-            const source = audioContext.createMediaElementSource(audio);
-            // Connect the source to the destination (speakers)
-            source.connect(audioContext.destination);
-            
-            // Resume the audio context (required by some browsers)
-            if (audioContext.state === 'suspended') {
-              await audioContext.resume();
-            }
-          } catch (err) {
-            console.warn('Web Audio API not supported, falling back to standard Audio playback', err);
-          }
-          
-          await audio.play();
+          audio.play().catch(err => {
+            console.error(`Error playing sound ${soundType}:`, err);
+            cleanupAudio();
+            if (onSoundEnd) onSoundEnd();
+          });
         } catch (err) {
           console.error(`Error playing sound ${soundType}:`, err);
-          // Try next URL if available
           cleanupAudio();
-          setTimeout(() => {
-            tryPlaySound(soundType, urlIndex + 1);
-          }, 300);  // Add delay before trying next URL
+          if (onSoundEnd) onSoundEnd();
         }
       };
       
@@ -138,16 +72,13 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       };
       
       audio.onerror = (e) => {
-        console.error(`Error with sound ${soundType} URL ${urlIndex}:`, e);
-        // Try next URL if available
+        console.error(`Error with sound ${soundType}:`, e);
         cleanupAudio();
-        setTimeout(() => {
-          tryPlaySound(soundType, urlIndex + 1);
-        }, 300);  // Add delay before trying next URL
+        if (onSoundEnd) onSoundEnd();
       };
       
-      audio.onabort = (e) => {
-        console.log(`Sound ${soundType} aborted:`, e);
+      audio.onabort = () => {
+        console.log(`Sound ${soundType} playback aborted`);
         cleanupAudio();
         if (onSoundEnd) onSoundEnd();
       };
@@ -156,14 +87,10 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       audio.volume = soundType === 'timer' ? 0.3 : 0.5;
       
       // Set the source and load
-      console.log(`Attempting to load sound: ${soundType} from ${soundMap[soundType][urlIndex]}`);
-      audio.src = soundMap[soundType][urlIndex];
-      
-      // Add credentials and crossOrigin
-      audio.crossOrigin = "anonymous";
+      audio.src = soundMap[soundType];
       
       // Force load
-      audio.load(); 
+      audio.load();
       
       setIsPlaying(true);
     } catch (err) {
@@ -172,11 +99,8 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
     }
   };
 
-  // On mount, preload all sounds to improve playback chances
+  // On mount, preload all sounds
   useEffect(() => {
-    const allSoundTypes: SoundType[] = ['correct', 'wrong', 'gameover', 'timer'];
-    allSoundTypes.forEach(preloadAudio);
-    
     // Clean up on unmount
     return cleanupAudio;
   }, []);
@@ -187,8 +111,11 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       // Clean up any existing audio before creating a new one
       cleanupAudio();
       
-      // Start trying to play the sound
-      tryPlaySound(sound);
+      // Wait a moment to ensure cleanup is complete
+      setTimeout(() => {
+        // Start trying to play the sound
+        tryPlaySound(sound);
+      }, 100);
     }
     
     // Cleanup function when component unmounts or effect re-runs
