@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -121,15 +120,19 @@
 @keyframes themeTransition {
   0% {
     background-position: 0% 50%;
-    opacity: 0.9;
+    opacity: 0.95;
+    transform: scale(1);
   }
   50% {
     background-position: 100% 50%;
-    opacity: 0.95;
+    opacity: 1;
+    transform: scale(1.005);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
   }
   100% {
     background-position: 0% 50%;
-    opacity: 1;
+    opacity: 0.95;
+    transform: scale(1);
   }
 }
 
@@ -138,8 +141,9 @@
 }
 
 .animate-theme-transition {
-  animation: themeTransition 3s ease-in-out infinite;
+  animation: themeTransition 8s ease-in-out infinite;
   background-size: 200% 200%;
+  transition: all 0.5s ease;
 }
 
 .sidebar-fixed {
