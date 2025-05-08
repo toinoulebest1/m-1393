@@ -31,8 +31,8 @@ interface LyricsFullscreenViewProps {
 
 // Couleurs pré-définies pour les chansons sans image ou pendant le chargement
 const DEFAULT_COLORS = {
-  dark: [48, 12, 61],
-  accent: [75, 20, 95]
+  dark: [48, 12, 61] as [number, number, number],
+  accent: [75, 20, 95] as [number, number, number]
 };
 
 // Map de cache pour stocker les couleurs extraites (jusqu'à 20 entrées max)
@@ -99,11 +99,18 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       const colorThief = new ColorThief();
       const dominantRgb = colorThief.getColor(img);
       
+      // Ensuring the color is properly typed as a tuple
+      const typedDominantRgb: [number, number, number] = [
+        dominantRgb[0], 
+        dominantRgb[1], 
+        dominantRgb[2]
+      ];
+      
       // Créer une version plus saturée pour l'accent
       const accentRgb: [number, number, number] = [
-        Math.min(255, dominantRgb[0] * 1.3),
-        Math.min(255, dominantRgb[1] * 1.3),
-        Math.min(255, dominantRgb[2] * 1.3)
+        Math.min(255, typedDominantRgb[0] * 1.3),
+        Math.min(255, typedDominantRgb[1] * 1.3),
+        Math.min(255, typedDominantRgb[2] * 1.3)
       ];
       
       // Mettre en cache les couleurs extraites
@@ -113,11 +120,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         colorCache.delete(firstKey);
       }
       colorCache.set(imageUrl, {
-        dominant: dominantRgb,
+        dominant: typedDominantRgb,
         accent: accentRgb
       });
       
-      setDominantColor(dominantRgb);
+      setDominantColor(typedDominantRgb);
       setAccentColor(accentRgb);
     } catch (error) {
       // Couleurs de secours si l'extraction échoue
