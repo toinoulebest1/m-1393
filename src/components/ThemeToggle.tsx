@@ -100,7 +100,7 @@ export function ThemeToggle() {
 
         console.log("Loading theme for user:", session.user.id);
         
-        const { data: profile, error: profileError } = await supabase
+        const { data, error: profileError } = await supabase
           .from('profiles')
           .select('theme, theme_animation')
           .eq('id', session.user.id)
@@ -111,9 +111,9 @@ export function ThemeToggle() {
           return;
         }
 
-        if (profile?.theme) {
-          console.log("Theme loaded from database:", profile.theme);
-          const themeData = profile.theme as Theme;
+        if (data?.theme) {
+          console.log("Theme loaded from database:", data.theme);
+          const themeData = data.theme as Theme;
           const savedTheme = themes.find(theme => theme.name === themeData.name);
           if (savedTheme) {
             setCurrentTheme(savedTheme);
@@ -121,8 +121,8 @@ export function ThemeToggle() {
         }
         
         // Charger la préférence d'animation
-        if (profile?.theme_animation !== undefined) {
-          setAnimatedTheme(profile.theme_animation);
+        if (data?.theme_animation !== undefined) {
+          setAnimatedTheme(data.theme_animation);
         }
       } catch (error) {
         console.error("Error in loadUserTheme:", error);

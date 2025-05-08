@@ -253,6 +253,7 @@ export type Database = {
           last_logins: Json[] | null
           signup_date: string | null
           theme: Json | null
+          theme_animation: boolean | null
           username: string | null
         }
         Insert: {
@@ -262,6 +263,7 @@ export type Database = {
           last_logins?: Json[] | null
           signup_date?: string | null
           theme?: Json | null
+          theme_animation?: boolean | null
           username?: string | null
         }
         Update: {
@@ -271,6 +273,7 @@ export type Database = {
           last_logins?: Json[] | null
           signup_date?: string | null
           theme?: Json | null
+          theme_animation?: boolean | null
           username?: string | null
         }
         Relationships: []
