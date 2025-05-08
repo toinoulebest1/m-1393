@@ -153,12 +153,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </Button>
       </div>
 
-      {/* Main content - split layout */}
-      <div className="flex flex-col md:flex-row h-full w-full p-6">
+      {/* Main content - split layout with proper height */}
+      <div className="flex flex-col md:flex-row h-full w-full p-6 overflow-hidden">
         {/* Left side - Song information with animation */}
         <div 
           className={cn(
-            "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out",
+            "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out h-full",
             animationStage === "entry" 
               ? "md:w-full transform scale-95 opacity-90" 
               : animationStage === "content" 
@@ -188,17 +188,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           )}
           
           <div className={cn(
-            "text-center md:text-left transition-all duration-500",
+            "text-center md:text-left transition-all duration-500 w-full",
             animationStage === "entry"
               ? "opacity-0 transform translate-y-4" 
               : animationStage === "content"
                 ? "opacity-100 transform translate-y-0" 
                 : "opacity-0 transform -translate-y-4"
           )}>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 break-words">
               {song?.title || "Titre inconnu"}
             </h1>
-            <p className="text-xl text-spotify-neutral">
+            <p className="text-xl text-spotify-neutral break-words">
               {song?.artist || "Artiste inconnu"}
             </p>
             
@@ -221,10 +221,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           </div>
         </div>
 
-        {/* Right side - Lyrics content */}
+        {/* Right side - Lyrics content with proper overflow handling */}
         <div 
           className={cn(
-            "flex-grow overflow-y-auto transition-all duration-500 ease-out",
+            "flex-grow overflow-y-auto transition-all duration-500 ease-out h-full",
             animationStage === "entry" 
               ? "opacity-0" 
               : animationStage === "content"
@@ -239,7 +239,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
               </div>
             ) : lyrics ? (
-              <div className="max-w-3xl w-full mx-auto whitespace-pre-line text-spotify-neutral text-xl leading-relaxed p-6">
+              <div className="max-w-3xl w-full mx-auto whitespace-pre-line text-spotify-neutral text-xl leading-relaxed p-6 overflow-y-auto max-h-full">
                 {lyrics}
               </div>
             ) : error ? (
@@ -265,6 +265,19 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             ) : (
               <div className="text-center p-6">
                 <p className="text-spotify-neutral text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
+                
+                <Button
+                  onClick={generateLyrics}
+                  disabled={isGenerating || !song?.artist}
+                  variant="outline"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Music className="h-4 w-4 mr-2" />
+                  )}
+                  Récupérer les paroles
+                </Button>
               </div>
             )}
           </div>
