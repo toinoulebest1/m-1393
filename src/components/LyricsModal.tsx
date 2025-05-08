@@ -63,7 +63,11 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         throw new Error(response.error.message);
       }
 
-      console.log('Generated lyrics:', response.data);
+      console.log('Generated lyrics response:', response.data);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
 
       const { error: insertError } = await supabase
         .from('lyrics')
@@ -86,7 +90,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de générer les paroles",
+        description: error.message || "Impossible de générer les paroles",
       });
     } finally {
       setIsGenerating(false);
