@@ -10,9 +10,11 @@ import { useEffect, useRef, useState } from "react";
 import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 import { Button } from "./ui/button";
 import { LyricsFullscreenView } from "./LyricsFullscreenView";
+import { useLocation } from "react-router-dom";
 
 export const Player = () => {
   const isMobile = useIsMobile();
+  const location = useLocation();
   const { 
     currentSong, 
     isPlaying, 
@@ -32,6 +34,9 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite
   } = usePlayer();
+  
+  // Check if the current page is the blind test page
+  const isBlindTest = location.pathname === '/blind-test';
   
   const positionUpdateIntervalRef = useRef<number | null>(null);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -123,6 +128,34 @@ export const Player = () => {
   const toggleLyrics = () => {
     setShowLyrics(!showLyrics);
   };
+  
+  // Function to get displayed song info for blind test mode
+  const getDisplayedSongInfo = () => {
+    if (!isBlindTest || !currentSong) {
+      return { title: currentSong?.title, artist: currentSong?.artist };
+    }
+    
+    // In blind test, hide information
+    const urlParams = new URLSearchParams(location.search);
+    const mode = urlParams.get('mode');
+    const gameState = urlParams.get('state');
+    
+    // If the game is over or answer was shown, display full info
+    if (gameState === 'over' || gameState === 'answered') {
+      return { title: currentSong.title, artist: currentSong.artist };
+    }
+    
+    // Otherwise mask based on game mode
+    if (mode === 'title') {
+      return { title: '••••••', artist: currentSong.artist };
+    } else if (mode === 'artist') {
+      return { title: currentSong.title, artist: '••••••' };
+    } else {
+      return { title: '••••••', artist: '••••••' };
+    }
+  };
+  
+  const songInfo = getDisplayedSongInfo();
 
   return (
     <>
@@ -141,10 +174,10 @@ export const Player = () => {
                     />
                     <div className="min-w-0">
                       <h3 className="font-medium text-white truncate">
-                        {currentSong.title}
+                        {songInfo.title || '••••••'}
                       </h3>
                       <p className="text-sm text-spotify-neutral truncate">
-                        {currentSong.artist}
+                        {songInfo.artist || '••••••'}
                       </p>
                     </div>
                     <button
@@ -265,10 +298,10 @@ export const Player = () => {
                     />
                     <div className="min-w-0 max-w-[50vw]">
                       <h3 className="font-medium text-white text-sm truncate">
-                        {currentSong.title}
+                        {songInfo.title || '••••••'}
                       </h3>
                       <p className="text-xs text-spotify-neutral truncate">
-                        {currentSong.artist}
+                        {songInfo.artist || '••••••'}
                       </p>
                     </div>
                   </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
@@ -9,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Gamepad2, Play, Pause, SkipForward, Trophy } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate, useLocation } from "react-router-dom";
 
 type Song = {
   id: string;
@@ -23,6 +23,8 @@ type GameMode = "artist" | "title" | "both";
 
 const BlindTest = () => {
   const { play, pause, isPlaying, currentSong, setQueue } = usePlayer();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,6 +235,28 @@ const BlindTest = () => {
       if (interval) clearInterval(interval);
     };
   }, [timerActive, remainingTime, currentIndex, songs, gameMode]);
+
+  // Update URL parameters based on game state
+  useEffect(() => {
+    const params = new URLSearchParams();
+    
+    if (gameStarted) {
+      params.set('mode', gameMode);
+      
+      if (gameOver) {
+        params.set('state', 'over');
+      } else if (correctAnswer !== null) {
+        params.set('state', 'answered');
+      } else {
+        params.set('state', 'playing');
+      }
+      
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    } else {
+      // Clear params when not playing
+      navigate(location.pathname, { replace: true });
+    }
+  }, [gameStarted, gameMode, gameOver, correctAnswer, navigate, location.pathname]);
 
   // Helper function to determine if song info should be shown
   const shouldShowSongInfo = () => {
