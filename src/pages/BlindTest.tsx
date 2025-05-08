@@ -234,6 +234,11 @@ const BlindTest = () => {
     };
   }, [timerActive, remainingTime, currentIndex, songs, gameMode]);
 
+  // Helper function to determine if song info should be shown
+  const shouldShowSongInfo = () => {
+    return gameOver || correctAnswer !== null;
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
@@ -378,7 +383,15 @@ const BlindTest = () => {
               {currentSong && (
                 <div className="text-center text-xs text-spotify-neutral">
                   <div className="p-3 bg-spotify-dark/60 rounded-lg">
-                    En cours de lecture: {currentSong.title} - {currentSong.artist}
+                    {shouldShowSongInfo() ? (
+                      `En cours de lecture: ${currentSong.title} - ${currentSong.artist}`
+                    ) : (
+                      gameMode === "title" 
+                        ? "Titre masqué - " + currentSong.artist
+                        : gameMode === "artist" 
+                          ? currentSong.title + " - Artiste masqué"
+                          : "Titre et artiste masqués"
+                    )}
                   </div>
                 </div>
               )}
