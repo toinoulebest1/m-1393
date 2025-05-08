@@ -41,6 +41,7 @@ const BlindTest = () => {
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [currentSound, setCurrentSound] = useState<SoundType | null>(null);
   const timerSoundRef = useRef(false);
+  const soundTimeoutRef = useRef<number | null>(null);
   
   // Fetch songs from Supabase
   useEffect(() => {
@@ -132,8 +133,17 @@ const BlindTest = () => {
     const shuffledSongs = shuffleArray(songs).slice(0, totalQuestions);
     setSongs(shuffledSongs);
     
-    // Start with first song
-    loadNextSong(0, shuffledSongs);
+    // Clear any existing sounds and timeouts
+    setCurrentSound(null);
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current);
+      soundTimeoutRef.current = null;
+    }
+    
+    // Start with first song after a short delay
+    setTimeout(() => {
+      loadNextSong(0, shuffledSongs);
+    }, 300);
     
     setGameStarted(true);
     setScore(0);
@@ -161,7 +171,13 @@ const BlindTest = () => {
     setTimerActive(true);
     setCurrentIndex(index);
     setCorrectAnswer(null);
-    setCurrentSound(null); // Ensure any previous sound is cleared
+    
+    // Clear any previous sound
+    setCurrentSound(null);
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current);
+      soundTimeoutRef.current = null;
+    }
     
     // Auto-play song
     setTimeout(() => {
@@ -182,11 +198,15 @@ const BlindTest = () => {
     
     const isCorrect = answer === currentSongAnswer;
     
-    // First clear any existing sound
+    // First clear any existing sound and timeouts
     setCurrentSound(null);
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current);
+      soundTimeoutRef.current = null;
+    }
     
-    // Wait a tiny bit to ensure previous sound is cleared
-    setTimeout(() => {
+    // Wait a bit to ensure previous sound is cleared
+    soundTimeoutRef.current = window.setTimeout(() => {
       if (isCorrect) {
         setScore(prev => prev + 1);
         toast.success("Bonne réponse !");
@@ -199,7 +219,8 @@ const BlindTest = () => {
       }
       
       setCorrectAnswer(currentSongAnswer);
-    }, 100);
+      soundTimeoutRef.current = null;
+    }, 300);
   };
 
   // Handle sound effect ending
@@ -213,9 +234,15 @@ const BlindTest = () => {
       
       // If we just answered a question, load the next one
       if (correctAnswer !== null) {
-        setTimeout(() => {
+        if (soundTimeoutRef.current) {
+          clearTimeout(soundTimeoutRef.current);
+          soundTimeoutRef.current = null;
+        }
+        
+        soundTimeoutRef.current = window.setTimeout(() => {
           loadNextSong(currentIndex + 1);
-        }, 500);
+          soundTimeoutRef.current = null;
+        }, 800);
       }
       // If game is over, we don't need to do anything
     }
@@ -228,28 +255,41 @@ const BlindTest = () => {
     setTimerActive(false);
     timerSoundRef.current = false;
     
-    // First clear any current sound
+    // Clear any current sound and timeouts
     setCurrentSound(null);
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current);
+      soundTimeoutRef.current = null;
+    }
     
     // Then set the game over sound after a short delay
-    setTimeout(() => {
+    soundTimeoutRef.current = window.setTimeout(() => {
       toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
       console.log("Setting sound to 'gameover'");
       setCurrentSound('gameover');
-    }, 100);
+      soundTimeoutRef.current = null;
+    }, 500);
   };
 
   // Skip current song
   const skipSong = () => {
     setTimerActive(false);
     timerSoundRef.current = false;
-    setCurrentSound(null); // Clear any current sound
+    
+    // Clear any current sound and timeouts
+    setCurrentSound(null);
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current);
+      soundTimeoutRef.current = null;
+    }
+    
     toast.info("Chanson passée");
     
     // Delay loading next song to ensure sound is cleared
-    setTimeout(() => {
+    soundTimeoutRef.current = window.setTimeout(() => {
       loadNextSong(currentIndex + 1);
-    }, 100);
+      soundTimeoutRef.current = null;
+    }, 300);
   };
 
   // Timer countdown
@@ -272,7 +312,19 @@ const BlindTest = () => {
           : `${songs[currentIndex].title} - ${songs[currentIndex].artist}`;
           
       setCorrectAnswer(currentSongAnswer);
-      setCurrentSound('wrong');
+      
+      // Clear any existing sound and timeouts
+      setCurrentSound(null);
+      if (soundTimeoutRef.current) {
+        clearTimeout(soundTimeoutRef.current);
+        soundTimeoutRef.current = null;
+      }
+      
+      // Add delay before playing the wrong sound
+      soundTimeoutRef.current = window.setTimeout(() => {
+        setCurrentSound('wrong');
+        soundTimeoutRef.current = null;
+      }, 300);
     }
     
     return () => {
@@ -287,15 +339,30 @@ const BlindTest = () => {
       console.log("Playing timer sound");
       timerSoundRef.current = true;
       
-      // Clear any existing sound first
+      // Clear any existing sound and timeouts
       setCurrentSound(null);
+      if (soundTimeoutRef.current) {
+        clearTimeout(soundTimeoutRef.current);
+        soundTimeoutRef.current = null;
+      }
       
       // Add a small delay before playing the timer sound
-      setTimeout(() => {
+      soundTimeoutRef.current = window.setTimeout(() => {
         setCurrentSound('timer');
-      }, 100);
+        soundTimeoutRef.current = null;
+      }, 300);
     }
   }, [timerActive, remainingTime]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (soundTimeoutRef.current) {
+        clearTimeout(soundTimeoutRef.current);
+        soundTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Reset timer sound flag when starting a new question
   useEffect(() => {

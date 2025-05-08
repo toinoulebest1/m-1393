@@ -12,7 +12,7 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Map of sound types to their local audio files
+  // Map of sound types to their file paths
   const soundMap: Record<SoundType, string> = {
     correct: '/sounds/correct.mp3',
     wrong: '/sounds/wrong.mp3',
@@ -41,6 +41,26 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
     }
   };
 
+  // Preload all sounds to ensure they're cached
+  const preloadSounds = () => {
+    Object.values(soundMap).forEach(soundSrc => {
+      try {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = soundSrc;
+        // Just trigger the load but don't play
+        audio.load();
+        // Remove the reference to allow garbage collection
+        setTimeout(() => {
+          audio.src = '';
+          audio.load();
+        }, 1000);
+      } catch (err) {
+        console.error(`Error preloading sound ${soundSrc}:`, err);
+      }
+    });
+  };
+
   const tryPlaySound = (soundType: SoundType) => {
     try {
       console.log(`Attempting to play sound: ${soundType} from ${soundMap[soundType]}`);
@@ -48,6 +68,9 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       // Create a new audio element
       const audio = new Audio();
       audioRef.current = audio;
+      
+      // Important: Set the MIME type explicitly
+      audio.type = 'audio/mpeg';
       
       // Set up event handlers before setting source
       audio.oncanplaythrough = () => {
@@ -73,6 +96,14 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       
       audio.onerror = (e) => {
         console.error(`Error with sound ${soundType}:`, e);
+        
+        // Try to provide more detailed error information
+        let errorMessage = "Unknown error";
+        if (audio.error) {
+          errorMessage = `Code: ${audio.error.code}, Message: ${audio.error.message}`;
+        }
+        console.error(`Audio error details: ${errorMessage}`);
+        
         cleanupAudio();
         if (onSoundEnd) onSoundEnd();
       };
@@ -101,6 +132,9 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
 
   // On mount, preload all sounds
   useEffect(() => {
+    // Preload sounds on component mount
+    preloadSounds();
+    
     // Clean up on unmount
     return cleanupAudio;
   }, []);
@@ -124,3 +158,4 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
 
   return null; // This component doesn't render anything
 };
+
