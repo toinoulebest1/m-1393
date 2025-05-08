@@ -40,6 +40,39 @@ const themes: Theme[] = [
   {
     name: "Sunset",
     classes: "from-orange-900 via-red-800 to-pink-900"
+  },
+  // Nouveaux thèmes ajoutés
+  {
+    name: "Aurore",
+    classes: "from-pink-600 via-purple-700 to-indigo-800"
+  },
+  {
+    name: "Néon",
+    classes: "from-[#ff00cc] via-[#333399] to-[#0033ff]"
+  },
+  {
+    name: "Rétro",
+    classes: "from-amber-600 via-yellow-500 to-orange-500"
+  },
+  {
+    name: "Minuit",
+    classes: "from-slate-900 via-[#0f172a] to-black"
+  },
+  {
+    name: "Pastel",
+    classes: "from-pink-300 via-purple-300 to-indigo-300"
+  },
+  {
+    name: "Cyber",
+    classes: "from-cyan-500 via-[#06b6d4] to-blue-600"
+  },
+  {
+    name: "Automne",
+    classes: "from-amber-700 via-orange-600 to-red-800"
+  },
+  {
+    name: "Glacé",
+    classes: "from-cyan-200 via-blue-200 to-indigo-200"
   }
 ];
 

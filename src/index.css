@@ -118,8 +118,28 @@
   }
 }
 
+@keyframes themeTransition {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.9;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 0.95;
+  }
+  100% {
+    background-position: 0% 50%;
+    opacity: 1;
+  }
+}
+
 .animate-gradient {
   animation: gradient 3s linear infinite;
+}
+
+.animate-theme-transition {
+  animation: themeTransition 2s ease-in-out;
+  background-size: 200% 200%;
 }
 
 .sidebar-fixed {
@@ -130,4 +150,3 @@
   z-index: 50;
   backdrop-filter: blur(8px);
 }
-

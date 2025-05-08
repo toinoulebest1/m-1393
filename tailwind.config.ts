@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -29,6 +30,21 @@ export default {
           light: "#D6BCFA",
           neutral: "#8E9196",
           accent: "#9b87f5",
+        },
+        // Nouvelles couleurs pour les thèmes
+        neon: {
+          pink: "#ff00cc",
+          blue: "#333399",
+          indigo: "#0033ff",
+        },
+        cyber: {
+          cyan: "#06b6d4",
+          blue: "#0284c7",
+        },
+        aurora: {
+          pink: "#db2777",
+          purple: "#7e22ce",
+          indigo: "#3730a3",
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
