@@ -31,7 +31,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
+  const [animationStage, setAnimationStage] = useState<"entry" | "content" | "exit">("entry");
 
   // Query to fetch lyrics from the database
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -97,35 +97,56 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   };
 
-  // Handle escape key to close
+  // Handle animation sequence
   useEffect(() => {
+    // Start with entry animation
+    setAnimationStage("entry");
+    
+    // After entry animation completes, switch to content stage
+    const entryTimer = setTimeout(() => {
+      setAnimationStage("content");
+    }, 400);
+    
+    // Handle escape key to close
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        // Trigger exit animation before closing
+        setAnimationStage("exit");
+        setTimeout(() => {
+          onClose();
+        }, 300);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     
-    // Start animation sequence
-    const timer = setTimeout(() => {
-      setIsAnimationComplete(true);
-    }, 300); // Delay to allow entry animation to complete
-
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      clearTimeout(timer);
+      clearTimeout(entryTimer);
     };
   }, [onClose]);
+  
+  // Handle close button click with animation
+  const handleClose = () => {
+    setAnimationStage("exit");
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col animate-fade-in">
+    <div className={cn(
+      "fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col",
+      animationStage === "entry" ? "animate-fade-in" : 
+      animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
+      "opacity-100"
+    )}>
       {/* Close button (top right) */}
       <div className="absolute top-4 right-4">
         <Button
           variant="ghost"
           size="icon"
-          onClick={onClose}
+          onClick={handleClose}
           className="text-white hover:bg-white/10 rounded-full"
         >
           <X className="w-6 h-6" />
@@ -138,9 +159,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         <div 
           className={cn(
             "flex flex-col items-center md:items-start justify-center transition-all duration-500 ease-out",
-            isAnimationComplete 
-              ? "md:w-1/3 md:pr-8" 
-              : "w-full md:w-full transform scale-95 opacity-90"
+            animationStage === "entry" 
+              ? "md:w-full transform scale-95 opacity-90" 
+              : animationStage === "content" 
+                ? "md:w-1/3 md:pr-8 opacity-100 transform scale-100" 
+                : "md:w-full transform scale-95 opacity-50"
           )}
         >
           {song?.imageUrl && (
@@ -149,22 +172,28 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 src={song.imageUrl || "https://picsum.photos/56/56"}
                 alt="Album art"
                 className={cn(
-                  "rounded-lg shadow-lg transition-all duration-700 ease-out",
-                  isAnimationComplete 
-                    ? "md:w-64 md:h-64 w-48 h-48" 
-                    : "w-32 h-32 opacity-90"
+                  "rounded-lg shadow-lg transition-all duration-500 ease-out",
+                  animationStage === "entry" 
+                    ? "w-32 h-32 opacity-90" 
+                    : animationStage === "content" 
+                      ? "md:w-64 md:h-64 w-48 h-48 opacity-100" 
+                      : "w-32 h-32 opacity-70"
                 )}
               />
               <div className={cn(
                 "absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg transition-opacity duration-700",
-                isAnimationComplete ? "opacity-70" : "opacity-0"
+                animationStage === "content" ? "opacity-70" : "opacity-0"
               )} />
             </div>
           )}
           
           <div className={cn(
             "text-center md:text-left transition-all duration-500",
-            isAnimationComplete ? "opacity-100 transform translate-y-0" : "opacity-0 transform translate-y-4"
+            animationStage === "entry"
+              ? "opacity-0 transform translate-y-4" 
+              : animationStage === "content"
+                ? "opacity-100 transform translate-y-0" 
+                : "opacity-0 transform -translate-y-4"
           )}>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
               {song?.title || "Titre inconnu"}
@@ -196,9 +225,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         <div 
           className={cn(
             "flex-grow overflow-y-auto transition-all duration-500 ease-out",
-            isAnimationComplete 
-              ? "opacity-100 md:w-2/3 md:pl-8 md:border-l border-white/10" 
-              : "opacity-0"
+            animationStage === "entry" 
+              ? "opacity-0" 
+              : animationStage === "content"
+                ? "opacity-100 md:w-2/3 md:pl-8 md:border-l border-white/10" 
+                : "opacity-0"
           )}
         >
           <div className="h-full flex items-center justify-center">
