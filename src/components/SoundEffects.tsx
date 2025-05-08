@@ -12,83 +12,121 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Map of sound types to their audio files
-  const soundMap: Record<SoundType, string> = {
-    correct: 'https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3',
-    wrong: 'https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3',
-    gameover: 'https://assets.mixkit.co/sfx/preview/mixkit-game-over-dark-orchestra-633.mp3',
-    timer: 'https://assets.mixkit.co/sfx/preview/mixkit-tick-tock-timer-606.mp3'
+  // Map of sound types to their audio files with alternate URLs as fallbacks
+  const soundMap: Record<SoundType, string[]> = {
+    correct: [
+      'https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3',
+      'https://www.soundjay.com/buttons/sounds/button-16.mp3' // Fallback URL
+    ],
+    wrong: [
+      'https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3',
+      'https://www.soundjay.com/buttons/sounds/button-10.mp3' // Fallback URL
+    ],
+    gameover: [
+      'https://assets.mixkit.co/sfx/preview/mixkit-game-over-dark-orchestra-633.mp3',
+      'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3' // Fallback URL
+    ],
+    timer: [
+      'https://assets.mixkit.co/sfx/preview/mixkit-tick-tock-timer-606.mp3',
+      'https://www.soundjay.com/mechanical/sounds/timer-tick-01.mp3' // Fallback URL
+    ]
   };
 
   // Clean up function to properly dispose of audio elements
   const cleanupAudio = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
+      try {
+        // Make sure to pause and reset the audio before cleaning up
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = '';
+        audioRef.current.load(); // Force reload to clear any resources
+        audioRef.current = null;
+      } catch (err) {
+        console.error("Error during audio cleanup:", err);
+      }
       setIsPlaying(false);
+    }
+  };
+
+  const tryPlaySound = async (soundType: SoundType, urlIndex = 0) => {
+    // Make sure we have valid URLs to try
+    if (!soundMap[soundType] || urlIndex >= soundMap[soundType].length) {
+      console.error(`No valid sound URL found for ${soundType}`);
+      setIsPlaying(false);
+      if (onSoundEnd) onSoundEnd();
+      return;
+    }
+    
+    try {
+      // Create a new audio element
+      const audio = new Audio();
+      audioRef.current = audio;
+      
+      // Set up event handlers before setting source
+      audio.oncanplaythrough = async () => {
+        try {
+          console.log(`Sound ${soundType} ready to play, starting playback...`);
+          await audio.play();
+        } catch (err) {
+          console.error(`Error playing sound ${soundType}:`, err);
+          // Try next URL if available
+          cleanupAudio();
+          tryPlaySound(soundType, urlIndex + 1);
+        }
+      };
+      
+      audio.onended = () => {
+        console.log(`Sound ${soundType} ended normally`);
+        cleanupAudio();
+        if (onSoundEnd) onSoundEnd();
+      };
+      
+      audio.onerror = (e) => {
+        console.error(`Error with sound ${soundType} URL ${urlIndex}:`, e);
+        // Try next URL if available
+        cleanupAudio();
+        tryPlaySound(soundType, urlIndex + 1);
+      };
+      
+      audio.onabort = (e) => {
+        console.log(`Sound ${soundType} aborted:`, e);
+        cleanupAudio();
+        if (onSoundEnd) onSoundEnd();
+      };
+      
+      // Set volume based on sound type
+      audio.volume = soundType === 'timer' ? 0.3 : 0.5;
+      
+      // Set the source and load
+      console.log(`Attempting to load sound: ${soundType} from ${soundMap[soundType][urlIndex]}`);
+      audio.src = soundMap[soundType][urlIndex];
+      audio.load(); // Force load
+      
+      setIsPlaying(true);
+    } catch (err) {
+      console.error(`Failed to initialize audio for ${soundType}:`, err);
+      if (onSoundEnd) onSoundEnd();
     }
   };
 
   useEffect(() => {
     // Only create a new audio instance if we have a sound to play and we're not already playing
-    if (sound && soundMap[sound] && !isPlaying) {
+    if (sound && !isPlaying) {
       // Clean up any existing audio before creating a new one
       cleanupAudio();
       
-      // Create and configure a new audio element
-      const audio = new Audio(soundMap[sound]);
-      audioRef.current = audio;
-      
-      // Set volume based on sound type
-      audio.volume = sound === 'timer' ? 0.3 : 0.5;
-      
-      // Set playing state to true
-      setIsPlaying(true);
-      
-      console.log(`Playing sound: ${sound}`); // Add logging
-      
-      // Play the sound immediately
-      const playSound = async () => {
-        try {
-          await audio.play();
-          console.log(`Sound ${sound} started playing`);
-        } catch (err) {
-          console.error("Error playing sound:", err);
-          // If there's an error, clean up and notify parent
-          cleanupAudio();
-          if (onSoundEnd) {
-            onSoundEnd();
-          }
-        }
-      };
-      
-      playSound();
-
-      // Handle sound ending
-      audio.onended = () => {
-        console.log(`Sound ${sound} ended`);
-        cleanupAudio();
-        if (onSoundEnd) {
-          onSoundEnd();
-        }
-      };
-
-      // Additional error handling
-      audio.onerror = (e) => {
-        console.error(`Error with sound ${sound}:`, e);
-        cleanupAudio();
-        if (onSoundEnd) {
-          onSoundEnd();
-        }
-      };
-
-      // Cleanup function when component unmounts or effect re-runs
-      return cleanupAudio;
+      // Start trying to play the sound
+      tryPlaySound(sound);
     }
-  }, [sound, onSoundEnd]);
+    
+    // Cleanup function when component unmounts or effect re-runs
+    return cleanupAudio;
+  }, [sound]);
 
-  // Additional cleanup on unmount
+  // Ensure cleanup when component unmounts
   useEffect(() => {
     return cleanupAudio;
   }, []);

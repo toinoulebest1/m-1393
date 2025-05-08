@@ -161,6 +161,7 @@ const BlindTest = () => {
     setTimerActive(true);
     setCurrentIndex(index);
     setCorrectAnswer(null);
+    setCurrentSound(null); // Ensure any previous sound is cleared
     
     // Auto-play song
     setTimeout(() => {
@@ -181,20 +182,24 @@ const BlindTest = () => {
     
     const isCorrect = answer === currentSongAnswer;
     
-    if (isCorrect) {
-      setScore(prev => prev + 1);
-      toast.success("Bonne réponse !");
-      console.log("Setting sound to 'correct'");
-      setCurrentSound('correct');
-    } else {
-      toast.error(`Mauvaise réponse ! La bonne réponse était: ${currentSongAnswer}`);
-      console.log("Setting sound to 'wrong'");
-      setCurrentSound('wrong');
-    }
+    // First clear any existing sound
+    setCurrentSound(null);
     
-    setCorrectAnswer(currentSongAnswer);
-    
-    // The next question will be loaded when the sound effect ends
+    // Wait a tiny bit to ensure previous sound is cleared
+    setTimeout(() => {
+      if (isCorrect) {
+        setScore(prev => prev + 1);
+        toast.success("Bonne réponse !");
+        console.log("Setting sound to 'correct'");
+        setCurrentSound('correct');
+      } else {
+        toast.error(`Mauvaise réponse ! La bonne réponse était: ${currentSongAnswer}`);
+        console.log("Setting sound to 'wrong'");
+        setCurrentSound('wrong');
+      }
+      
+      setCorrectAnswer(currentSongAnswer);
+    }, 100);
   };
 
   // Handle sound effect ending
@@ -203,6 +208,7 @@ const BlindTest = () => {
     
     // Only process non-timer sounds or final timer sound
     if (currentSound !== 'timer' || remainingTime <= 0) {
+      // Clear the current sound
       setCurrentSound(null);
       
       // If we just answered a question, load the next one
@@ -221,18 +227,29 @@ const BlindTest = () => {
     setGameOver(true);
     setTimerActive(false);
     timerSoundRef.current = false;
-    toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
-    console.log("Setting sound to 'gameover'");
-    setCurrentSound('gameover');
+    
+    // First clear any current sound
+    setCurrentSound(null);
+    
+    // Then set the game over sound after a short delay
+    setTimeout(() => {
+      toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
+      console.log("Setting sound to 'gameover'");
+      setCurrentSound('gameover');
+    }, 100);
   };
 
   // Skip current song
   const skipSong = () => {
     setTimerActive(false);
     timerSoundRef.current = false;
-    setCurrentSound(null);
+    setCurrentSound(null); // Clear any current sound
     toast.info("Chanson passée");
-    loadNextSong(currentIndex + 1);
+    
+    // Delay loading next song to ensure sound is cleared
+    setTimeout(() => {
+      loadNextSong(currentIndex + 1);
+    }, 100);
   };
 
   // Timer countdown
@@ -269,7 +286,14 @@ const BlindTest = () => {
     if (timerActive && remainingTime === 5 && !timerSoundRef.current) {
       console.log("Playing timer sound");
       timerSoundRef.current = true;
-      setCurrentSound('timer');
+      
+      // Clear any existing sound first
+      setCurrentSound(null);
+      
+      // Add a small delay before playing the timer sound
+      setTimeout(() => {
+        setCurrentSound('timer');
+      }, 100);
     }
   }, [timerActive, remainingTime]);
 
@@ -468,7 +492,6 @@ const BlindTest = () => {
         </div>
       </div>
       <Player />
-      {/* Add the SoundEffects component */}
       <SoundEffects 
         sound={currentSound} 
         onSoundEnd={handleSoundEnd} 
