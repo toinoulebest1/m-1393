@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from "react";
-import { X, Music, Loader2, Maximize } from "lucide-react";
+import { X, Music, Loader2, Maximize, Minimize } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
