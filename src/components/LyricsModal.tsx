@@ -54,7 +54,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
   const generateLyrics = async () => {
     setIsGenerating(true);
     try {
-      console.log('Generating lyrics for:', songTitle);
+      console.log('Generating lyrics for:', songTitle, 'by', artist);
       const response = await supabase.functions.invoke('generate-lyrics', {
         body: { songTitle, artist },
       });

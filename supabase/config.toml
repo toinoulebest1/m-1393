@@ -1,49 +1,9 @@
 
 project_id = "pwknncursthenghqgevl"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-
-[realtime]
-enabled = true
-
-[studio]
-enabled = true
-port = 54323
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[analytics]
-enabled = false
-
-[functions.deezer-search]
-verify_jwt = true
-
-[functions.deezer-proxy]
-verify_jwt = true
+[functions.send-weekly-reports]
+verify_jwt = false
 
 [functions.generate-lyrics]
 verify_jwt = true
 
-[functions.send-weekly-reports]
-verify_jwt = true
-
-[functions.voice-to-text]
-verify_jwt = true
-
-[functions.update-songs-metadata]
-verify_jwt = true
