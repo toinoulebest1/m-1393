@@ -95,20 +95,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       });
 
       const colorThief = new ColorThief();
-      const dominantRgb = colorThief.getColor(img);
-      
-      // Ensure color is properly typed as a tuple
-      const typedDominantRgb: [number, number, number] = [
-        dominantRgb[0], 
-        dominantRgb[1], 
-        dominantRgb[2]
-      ];
+      const dominantRgb = colorThief.getColor(img) as [number, number, number];
       
       // Create a more saturated version for accent
       const accentRgb: [number, number, number] = [
-        Math.min(255, typedDominantRgb[0] * 1.3),
-        Math.min(255, typedDominantRgb[1] * 1.3),
-        Math.min(255, typedDominantRgb[2] * 1.3)
+        Math.min(255, dominantRgb[0] * 1.3),
+        Math.min(255, dominantRgb[1] * 1.3),
+        Math.min(255, dominantRgb[2] * 1.3)
       ];
       
       // Cache the extracted colors
@@ -119,11 +112,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       }
       
       colorCache.set(imageUrl, {
-        dominant: typedDominantRgb,
+        dominant: dominantRgb,
         accent: accentRgb
       });
       
-      setDominantColor(typedDominantRgb);
+      setDominantColor(dominantRgb);
       setAccentColor(accentRgb);
     } catch (error) {
       // Fallback colors if extraction fails
@@ -376,6 +369,15 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   }, []);
 
+  // Fonction pour gérer la lecture/pause
+  const handlePlayPause = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  }, [isPlaying, play, pause]);
+
   // Ensure song data is populated
   const songTitle = song?.title || "Titre inconnu";
   const songArtist = song?.artist || "Artiste inconnu";
@@ -536,7 +538,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <Button
                   variant="default"
                   size="icon"
-                  onClick={() => isPlaying ? pause() : play()}
+                  onClick={handlePlayPause}
                   className="bg-white text-black hover:bg-white/90 rounded-full h-8 w-8 flex items-center justify-center p-1"
                 >
                   {isPlaying ? (
@@ -680,4 +682,3 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     </div>
   );
 };
-
