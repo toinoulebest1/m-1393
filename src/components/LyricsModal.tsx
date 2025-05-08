@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Wand2, ExternalLink } from 'lucide-react';
+import { Loader2, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -55,6 +55,16 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
   });
 
   const generateLyrics = async () => {
+    if (!artist) {
+      setError("Impossible de récupérer les paroles sans le nom de l'artiste.");
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de récupérer les paroles sans le nom de l'artiste.",
+      });
+      return;
+    }
+    
     setIsGenerating(true);
     setError(null);
     try {
@@ -113,15 +123,15 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={generateLyrics}
-                disabled={isGenerating}
+                disabled={isGenerating || !artist}
                 className="ml-2"
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (
-                  <Wand2 className="h-4 w-4 mr-2" />
+                  <Music className="h-4 w-4 mr-2" />
                 )}
-                Récupérer les paroles via Genius
+                Récupérer les paroles
               </Button>
             )}
           </DialogTitle>
@@ -143,20 +153,17 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>Erreur</AlertTitle>
               <AlertDescription>
-                {error.includes("API key") ? (
-                  <div>
-                    <p>{error}</p>
-                    <p className="mt-2">Veuillez contacter l'administrateur pour mettre à jour la clé API Genius.</p>
-                  </div>
-                ) : (
-                  <p>{error}</p>
-                )}
+                <p>{error}</p>
               </AlertDescription>
             </Alert>
           ) : (
             <div className="text-center text-spotify-neutral">
               <p>Aucune parole disponible pour cette chanson.</p>
-              <p className="text-sm mt-2">Cliquez sur "Récupérer les paroles via Genius" pour essayer de les trouver.</p>
+              <p className="text-sm mt-2">
+                {artist 
+                  ? "Cliquez sur \"Récupérer les paroles\" pour essayer de les trouver." 
+                  : "Impossible de récupérer les paroles sans le nom de l'artiste."}
+              </p>
             </div>
           )}
         </ScrollArea>
