@@ -256,7 +256,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
 
       await refetch();
       toast.success("Les paroles ont été récupérées avec succès");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating lyrics:", error);
       setError(error.message || "Impossible de récupérer les paroles");
       toast.error(error.message || "Impossible de récupérer les paroles");
@@ -656,8 +656,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Optimized CSS */}
-      <style jsx>{`
+      {/* Fixed inline styles - removed JSX property to fix TypeScript error */}
+      <style>{`
         .firefox-fullscreen {
           position: fixed !important;
           top: 0 !important;
@@ -680,3 +680,4 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     </div>
   );
 };
+
