@@ -377,6 +377,17 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       play();
     }
   }, [isPlaying, play, pause]);
+  
+  // Fonctions pour gérer les changements de musique
+  const handleNextSong = useCallback(() => {
+    console.log("Next song clicked in lyrics view");
+    nextSong();
+  }, [nextSong]);
+  
+  const handlePreviousSong = useCallback(() => {
+    console.log("Previous song clicked in lyrics view");
+    previousSong();
+  }, [previousSong]);
 
   // Ensure song data is populated
   const songTitle = song?.title || "Titre inconnu";
@@ -529,7 +540,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <Button 
                   variant="ghost"
                   size="icon"
-                  onClick={previousSong}
+                  onClick={handlePreviousSong}
                   className="text-white hover:bg-white/10 rounded-full h-8 w-8 p-1"
                 >
                   <SkipBack className="h-4 w-4" />
@@ -551,7 +562,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={nextSong}
+                  onClick={handleNextSong}
                   className="text-white hover:bg-white/10 rounded-full h-8 w-8 p-1"
                 >
                   <SkipForward className="h-4 w-4" />
@@ -659,7 +670,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       </div>
 
       {/* Fixed inline styles - removed JSX property to fix TypeScript error */}
-      <style>{`
+      <style>
+        {`
         .firefox-fullscreen {
           position: fixed !important;
           top: 0 !important;
@@ -678,7 +690,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
-      `}</style>
+      `}
+      </style>
     </div>
   );
 };
