@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import Reports from "./pages/Reports";
 import Search from "./pages/Search";
 import Auth from "./pages/Auth";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
+import BlindTest from "./pages/BlindTest";
 import "./i18n";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
@@ -169,6 +169,14 @@ const App = () => {
                       element={
                         <PrivateRoute>
                           <SongMetadataUpdate />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/blind-test"
+                      element={
+                        <PrivateRoute>
+                          <BlindTest />
                         </PrivateRoute>
                       }
                     />
