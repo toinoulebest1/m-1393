@@ -184,9 +184,11 @@ const BlindTest = () => {
     if (isCorrect) {
       setScore(prev => prev + 1);
       toast.success("Bonne réponse !");
+      console.log("Setting sound to 'correct'");
       setCurrentSound('correct');
     } else {
       toast.error(`Mauvaise réponse ! La bonne réponse était: ${currentSongAnswer}`);
+      console.log("Setting sound to 'wrong'");
       setCurrentSound('wrong');
     }
     
@@ -220,6 +222,7 @@ const BlindTest = () => {
     setTimerActive(false);
     timerSoundRef.current = false;
     toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
+    console.log("Setting sound to 'gameover'");
     setCurrentSound('gameover');
   };
 

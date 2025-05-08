@@ -46,18 +46,37 @@ export const SoundEffects: React.FC<SoundEffectsProps> = ({ sound, onSoundEnd })
       // Set playing state to true
       setIsPlaying(true);
       
-      // Play the sound
-      audio.play().catch(err => {
-        console.error("Error playing sound:", err);
-        // If there's an error, clean up and notify parent
+      console.log(`Playing sound: ${sound}`); // Add logging
+      
+      // Play the sound immediately
+      const playSound = async () => {
+        try {
+          await audio.play();
+          console.log(`Sound ${sound} started playing`);
+        } catch (err) {
+          console.error("Error playing sound:", err);
+          // If there's an error, clean up and notify parent
+          cleanupAudio();
+          if (onSoundEnd) {
+            onSoundEnd();
+          }
+        }
+      };
+      
+      playSound();
+
+      // Handle sound ending
+      audio.onended = () => {
+        console.log(`Sound ${sound} ended`);
         cleanupAudio();
         if (onSoundEnd) {
           onSoundEnd();
         }
-      });
+      };
 
-      // Handle sound ending
-      audio.onended = () => {
+      // Additional error handling
+      audio.onerror = (e) => {
+        console.error(`Error with sound ${sound}:`, e);
         cleanupAudio();
         if (onSoundEnd) {
           onSoundEnd();
