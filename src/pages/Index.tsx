@@ -18,13 +18,64 @@ const Index = () => {
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [previousSongId, setPreviousSongId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentSong) {
       // This will trigger a re-render when the current song changes
       setForceUpdate(prev => prev + 1);
+      
+      // Show mobile notification when song changes
+      if (isMobile && currentSong.id !== previousSongId) {
+        const formatDuration = (duration: string | undefined) => {
+          if (!duration) return "0:00";
+          
+          try {
+            if (duration.includes(':')) {
+              const [minutes, seconds] = duration.split(':').map(Number);
+              if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+              return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            const durationInSeconds = parseFloat(duration);
+            if (isNaN(durationInSeconds)) return "0:00";
+            
+            const minutes = Math.floor(durationInSeconds / 60);
+            const seconds = Math.floor(durationInSeconds % 60);
+            
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          } catch (error) {
+            console.error("Error formatting duration:", error);
+            return "0:00";
+          }
+        };
+
+        toast(
+          <div className="flex items-center gap-3">
+            <img 
+              src={currentSong.imageUrl || "https://picsum.photos/56/56"} 
+              alt="Album art" 
+              className="w-12 h-12 rounded-md" 
+            />
+            <div>
+              <h3 className="font-medium text-sm">{currentSong.title}</h3>
+              <div className="flex items-center justify-between w-full">
+                <p className="text-xs text-muted-foreground">{currentSong.artist}</p>
+                <p className="text-xs text-muted-foreground ml-2">{formatDuration(currentSong.duration)}</p>
+              </div>
+            </div>
+          </div>,
+          {
+            duration: 3000,
+            position: "top-center",
+            className: "bg-spotify-dark border border-white/10"
+          }
+        );
+        
+        setPreviousSongId(currentSong.id);
+      }
     }
-  }, [currentSong]);
+  }, [currentSong, isMobile, previousSongId]);
 
   useEffect(() => {
     const fetchProfile = async () => {
