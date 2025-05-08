@@ -47,6 +47,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     queryFn: async () => {
       if (!song?.id) return null;
       
+      console.log("Fetching lyrics for song ID:", song.id);
       const { data, error } = await supabase
         .from("lyrics")
         .select("content")
@@ -228,6 +229,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }, 300);
   };
 
+  // Log song data to help debug
+  useEffect(() => {
+    console.log("Current song data in LyricsFullscreenView:", song);
+  }, [song]);
+
   return (
     <div className={cn(
       "fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col",
@@ -281,7 +287,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             <div className="relative mb-4 md:mb-6 transition-all duration-500 ease-out">
               <img
                 src={song.imageUrl || "/placeholder.svg"}
-                alt={`${song.title} - Album art`}
+                alt={`${song.title || "Titre inconnu"} - Album art`}
                 className={cn(
                   "rounded-lg shadow-lg transition-all duration-500 ease-out object-cover",
                   animationStage === "entry" 

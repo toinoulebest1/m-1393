@@ -117,7 +117,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center justify-between">
-            <span className="break-words">{songTitle}</span>
+            <span className="break-words">{songTitle || "Titre inconnu"}</span>
             {!lyrics && !isLoading && (
               <Button
                 variant="outline"
@@ -136,7 +136,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
             )}
           </DialogTitle>
           <DialogDescription className="break-words">
-            {artist && `Par ${artist}`}
+            {artist ? `Par ${artist}` : "Artiste inconnu"}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[60vh] w-full rounded-md border p-4">
