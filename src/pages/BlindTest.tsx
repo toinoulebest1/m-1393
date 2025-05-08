@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Gamepad2, Play, Pause, SkipForward, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
+import { SoundEffects, SoundType } from "@/components/SoundEffects";
 
 type Song = {
   id: string;
@@ -38,6 +39,7 @@ const BlindTest = () => {
   const [gameMode, setGameMode] = useState<GameMode>("title");
   const [gameOver, setGameOver] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
+  const [currentSound, setCurrentSound] = useState<SoundType | null>(null);
 
   // Fetch songs from Supabase
   useEffect(() => {
@@ -179,16 +181,29 @@ const BlindTest = () => {
     if (isCorrect) {
       setScore(prev => prev + 1);
       toast.success("Bonne réponse !");
+      setCurrentSound('correct');
     } else {
       toast.error(`Mauvaise réponse ! La bonne réponse était: ${currentSongAnswer}`);
+      setCurrentSound('wrong');
     }
     
     setCorrectAnswer(currentSongAnswer);
     
-    // Wait before loading next song
-    setTimeout(() => {
-      loadNextSong(currentIndex + 1);
-    }, 2000);
+    // Wait before loading next song - now handled by sound effect end
+    // The next question will be loaded when the sound effect ends
+  };
+
+  // Handle sound effect ending
+  const handleSoundEnd = () => {
+    setCurrentSound(null);
+    
+    // If we just answered a question, load the next one
+    if (correctAnswer !== null) {
+      setTimeout(() => {
+        loadNextSong(currentIndex + 1);
+      }, 500);
+    } 
+    // If game is over, we don't need to do anything
   };
 
   // End game
@@ -197,6 +212,7 @@ const BlindTest = () => {
     setGameOver(true);
     setTimerActive(false);
     toast.info(`Partie terminée ! Votre score: ${score}/${totalQuestions}`);
+    setCurrentSound('gameover');
   };
 
   // Skip current song
@@ -225,16 +241,20 @@ const BlindTest = () => {
           : `${songs[currentIndex].title} - ${songs[currentIndex].artist}`;
           
       setCorrectAnswer(currentSongAnswer);
-      
-      setTimeout(() => {
-        loadNextSong(currentIndex + 1);
-      }, 2000);
+      setCurrentSound('wrong');
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [timerActive, remainingTime, currentIndex, songs, gameMode]);
+
+  // Add low time warning sound
+  useEffect(() => {
+    if (timerActive && remainingTime <= 5 && remainingTime > 0) {
+      setCurrentSound('timer');
+    }
+  }, [timerActive, remainingTime]);
 
   // Update URL parameters based on game state
   useEffect(() => {
@@ -424,6 +444,11 @@ const BlindTest = () => {
         </div>
       </div>
       <Player />
+      {/* Add the SoundEffects component */}
+      <SoundEffects 
+        sound={currentSound} 
+        onSoundEnd={handleSoundEnd} 
+      />
     </Layout>
   );
 };
