@@ -32,6 +32,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [animationStage, setAnimationStage] = useState<"entry" | "content" | "exit">("entry");
   const [fullscreen, setFullscreen] = useState(false);
+  const [isFirefox, setIsFirefox] = useState(false);
+
+  // Détection de Firefox au montage du composant
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    setIsFirefox(userAgent.indexOf('firefox') > -1);
+  }, []);
 
   // Query to fetch lyrics from the database
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -97,44 +104,64 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   };
 
-  // Toggle fullscreen function with improved browser compatibility
+  // Toggle fullscreen function with improved Firefox compatibility
   const toggleFullscreen = () => {
     try {
       if (!fullscreen) {
         // Trying to enter fullscreen
         const element = document.documentElement;
         
-        const requestFullscreen = element.requestFullscreen || 
-                               (element as any).mozRequestFullScreen ||
+        // Firefox spécifique
+        if (isFirefox) {
+          if ((element as any).mozRequestFullScreen) {
+            (element as any).mozRequestFullScreen();
+            console.log("Requesting fullscreen mode in Firefox");
+          } else {
+            throw new Error("Firefox fullscreen API not available");
+          }
+        } else {
+          // Pour les autres navigateurs
+          const requestFullscreen = element.requestFullscreen || 
                                (element as any).webkitRequestFullscreen || 
                                (element as any).msRequestFullscreen;
-        
-        if (requestFullscreen) {
-          requestFullscreen.call(element);
-          console.log("Requesting fullscreen mode");
-        } else {
-          console.error("Fullscreen API not available in this browser");
-          toast.error("Le mode plein écran n'est pas supporté par votre navigateur");
+          
+          if (requestFullscreen) {
+            requestFullscreen.call(element);
+            console.log("Requesting fullscreen mode");
+          } else {
+            throw new Error("Fullscreen API not available in this browser");
+          }
         }
       } else {
-        // Trying to exit fullscreen
-        const exitFullscreen = document.exitFullscreen || 
-                            (document as any).mozCancelFullScreen ||
-                            (document as any).webkitExitFullscreen || 
-                            (document as any).msExitFullscreen;
-        
-        if (exitFullscreen) {
-          exitFullscreen.call(document);
-          console.log("Exiting fullscreen mode");
+        // Exiting fullscreen
+        if (isFirefox) {
+          if ((document as any).mozCancelFullScreen) {
+            (document as any).mozCancelFullScreen();
+            console.log("Exiting Firefox fullscreen mode");
+          }
+        } else {
+          const exitFullscreen = document.exitFullscreen || 
+                              (document as any).webkitExitFullscreen || 
+                              (document as any).msExitFullscreen;
+          
+          if (exitFullscreen) {
+            exitFullscreen.call(document);
+            console.log("Exiting fullscreen mode");
+          }
         }
       }
     } catch (err) {
       console.error("Error toggling fullscreen:", err);
-      toast.error("Problème avec le mode plein écran");
+      // Fallback pour Firefox - utiliser un mode "pseudo-plein écran" CSS en cas d'échec
+      setFullscreen(!fullscreen);
+      toast.info(isFirefox ? 
+        "Mode plein écran simulé pour Firefox" : 
+        "Mode plein écran non supporté par votre navigateur"
+      );
     }
   };
 
-  // Handle fullscreen change events with improved browser compatibility
+  // Handle fullscreen change events with improved Firefox compatibility
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFullscreenNow = !!(
@@ -203,6 +230,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   return (
     <div className={cn(
       "fixed inset-0 z-[100] bg-black bg-opacity-95 flex flex-col",
+      fullscreen && isFirefox ? "firefox-fullscreen" : "",
       animationStage === "entry" ? "animate-fade-in" : 
       animationStage === "exit" ? "opacity-0 transition-opacity duration-300" : 
       "opacity-100"
@@ -233,7 +261,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       </div>
 
       {/* Main content container */}
-      <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden">
+      <div className={cn(
+        "flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden", 
+        fullscreen && isFirefox ? "firefox-content" : ""
+      )}>
         {/* Left side - Song information with animation */}
         <div 
           className={cn(
@@ -367,6 +398,25 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Ajouter du CSS spécifique pour Firefox en fallback */}
+      {fullscreen && isFirefox && (
+        <style jsx>{`
+          :global(.firefox-fullscreen) {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 9999 !important;
+          }
+          
+          :global(.firefox-content) {
+            height: 100vh !important;
+            width: 100vw !important;
+          }
+        `}</style>
+      )}
     </div>
   );
 };
