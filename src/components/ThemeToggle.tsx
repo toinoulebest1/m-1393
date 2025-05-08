@@ -6,10 +6,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 type Theme = {
   name: string;
@@ -78,6 +81,7 @@ const themes: Theme[] = [
 
 export function ThemeToggle() {
   const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]);
+  const [animatedTheme, setAnimatedTheme] = useState(false);
 
   useEffect(() => {
     const loadUserTheme = async () => {
@@ -98,7 +102,7 @@ export function ThemeToggle() {
         
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('theme')
+          .select('theme, theme_animation')
           .eq('id', session.user.id)
           .single();
 
@@ -115,6 +119,11 @@ export function ThemeToggle() {
             setCurrentTheme(savedTheme);
           }
         }
+        
+        // Charger la préférence d'animation
+        if (profile?.theme_animation !== undefined) {
+          setAnimatedTheme(profile.theme_animation);
+        }
       } catch (error) {
         console.error("Error in loadUserTheme:", error);
       }
@@ -130,19 +139,31 @@ export function ThemeToggle() {
       return;
     }
     
-    console.log("Applying theme:", currentTheme.name);
+    console.log("Applying theme:", currentTheme.name, "with animation:", animatedTheme);
     
-    // Retirer toutes les classes de thème existantes
+    // Retirer toutes les classes de thème existantes et d'animation
     app.className = app.className
       .split(' ')
-      .filter(cls => !cls.startsWith('from-') && !cls.startsWith('via-') && !cls.startsWith('to-'))
+      .filter(cls => 
+        !cls.startsWith('from-') && 
+        !cls.startsWith('via-') && 
+        !cls.startsWith('to-') && 
+        !cls.includes('animate-')
+      )
       .join(' ');
     
     // Ajouter les nouvelles classes de thème
-    app.className = `min-h-screen bg-gradient-to-br ${currentTheme.classes} ${app.className}`;
+    let classesToAdd = `min-h-screen bg-gradient-to-br ${currentTheme.classes}`;
     
-    console.log("Theme applied:", currentTheme.name);
-  }, [currentTheme]);
+    // Ajouter la classe d'animation si activée
+    if (animatedTheme) {
+      classesToAdd += ' animate-theme-transition';
+    }
+    
+    app.className = `${classesToAdd} ${app.className}`;
+    
+    console.log("Theme applied:", currentTheme.name, "with animation:", animatedTheme);
+  }, [currentTheme, animatedTheme]);
 
   const handleThemeChange = async (theme: Theme) => {
     try {
@@ -181,6 +202,37 @@ export function ThemeToggle() {
       toast.error("Erreur lors du changement de thème");
     }
   };
+  
+  const toggleAnimation = async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast.error("Vous devez être connecté pour modifier les paramètres");
+        return;
+      }
+      
+      const newAnimationState = !animatedTheme;
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ theme_animation: newAnimationState })
+        .eq('id', session.user.id);
+        
+      if (updateError) {
+        console.error("Error updating animation setting:", updateError);
+        toast.error("Erreur lors de la mise à jour des paramètres");
+        return;
+      }
+      
+      setAnimatedTheme(newAnimationState);
+      toast.success(newAnimationState ? "Animation activée" : "Animation désactivée");
+      console.log("Theme animation toggled:", newAnimationState);
+    } catch (error) {
+      console.error("Error toggling theme animation:", error);
+      toast.error("Erreur lors de la modification des paramètres");
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -193,7 +245,8 @@ export function ThemeToggle() {
           <span>Thèmes</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-36 bg-spotify-dark border-white/10">
+      <DropdownMenuContent align="end" className="w-60 bg-spotify-dark border-white/10">
+        <DropdownMenuLabel className="text-sm text-spotify-neutral">Sélection du thème</DropdownMenuLabel>
         {themes.map((theme) => (
           <DropdownMenuItem 
             key={theme.name}
@@ -206,6 +259,19 @@ export function ThemeToggle() {
             <span>{theme.name}</span>
           </DropdownMenuItem>
         ))}
+        
+        <DropdownMenuSeparator className="bg-white/10" />
+        
+        <DropdownMenuItem 
+          className="flex items-center justify-between cursor-pointer"
+          onClick={toggleAnimation}
+        >
+          <span className="text-spotify-neutral">Animation</span>
+          <Switch 
+            checked={animatedTheme}
+            className="ml-2 data-[state=checked]:bg-spotify-accent"
+          />
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
