@@ -1,12 +1,15 @@
 
 import React, { useState, useEffect } from "react";
-import { X, Music, Loader2, Maximize, Minimize } from "lucide-react";
+import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { Slider } from "@/components/ui/slider";
 
 // Define the Song interface since we can't import it from PlayerContext
 interface Song {
@@ -38,6 +41,18 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [entryAnimationTimeout, setEntryAnimationTimeout] = useState<number | null>(null);
   const [contentAnimationVisible, setContentAnimationVisible] = useState(false);
   const [renderCount, setRenderCount] = useState(0);
+
+  // Intégration du contexte Player pour contrôler la lecture
+  const { 
+    isPlaying, 
+    progress, 
+    volume,
+    play,
+    pause,
+    setProgress,
+    nextSong,
+    previousSong
+  } = usePlayer();
 
   // Détection de Firefox au montage du composant
   useEffect(() => {
@@ -265,6 +280,60 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }, 300);
   };
 
+  // Formatage du temps pour afficher la progression de la lecture
+  const formatTime = (progress: number) => {
+    if (!song) return "0:00";
+    
+    try {
+      if (song.duration && song.duration.includes(':')) {
+        const [minutes, seconds] = song.duration.split(':').map(Number);
+        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+        
+        const totalSeconds = minutes * 60 + seconds;
+        const currentTime = (progress / 100) * totalSeconds;
+        const currentMinutes = Math.floor(currentTime / 60);
+        const currentSeconds = Math.floor(currentTime % 60);
+        
+        return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+      }
+      
+      const duration = parseFloat(song.duration);
+      if (isNaN(duration)) return "0:00";
+      
+      const currentTime = (progress / 100) * duration;
+      const currentMinutes = Math.floor(currentTime / 60);
+      const currentSeconds = Math.floor(currentTime % 60);
+      
+      return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "0:00";
+    }
+  };
+
+  const formatDuration = (duration: string | undefined) => {
+    if (!duration) return "0:00";
+    
+    try {
+      if (duration.includes(':')) {
+        const [minutes, seconds] = duration.split(':').map(Number);
+        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      
+      const durationInSeconds = parseFloat(duration);
+      if (isNaN(durationInSeconds)) return "0:00";
+      
+      const minutes = Math.floor(durationInSeconds / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting duration:", error);
+      return "0:00";
+    }
+  };
+
   // Ensure song data is populated
   const songTitle = song?.title || "Titre inconnu";
   const songArtist = song?.artist || "Artiste inconnu";
@@ -408,9 +477,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               "translateZ(0) translateY(16px)"
           }}
         >
-          <div className="h-full w-full flex items-center justify-center">
+          <div className="h-full w-full flex flex-col">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center text-center">
+              <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
               </div>
@@ -423,7 +492,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </div>
               </div>
             ) : error ? (
-              <div className="max-w-3xl mx-auto w-full p-6 animate-fade-in">
+              <div className="flex-grow max-w-3xl mx-auto w-full p-6 animate-fade-in">
                 <Alert variant="destructive" className="mb-4">
                   <AlertTitle>Erreur</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -443,7 +512,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="text-center p-4 md:p-6 w-full animate-fade-in">
+              <div className="flex-grow text-center p-4 md:p-6 w-full animate-fade-in">
                 <p className="text-spotify-neutral text-lg md:text-xl mb-6">Aucune parole disponible pour cette chanson.</p>
                 
                 <Button
@@ -465,7 +534,61 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Fix for the style tag - removed jsx property */}
+      {/* Nouvelle barre de contrôle de lecture en bas de l'écran */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black/70 backdrop-blur-md p-4 border-t border-white/10 z-50 animate-fade-in">
+        <div className="max-w-3xl mx-auto">
+          {/* Affichage de la progression */}
+          <div className="flex items-center justify-between text-xs px-1 mb-1">
+            <span className="text-spotify-neutral">{formatTime(progress)}</span>
+            <span className="text-spotify-neutral">{formatDuration(song?.duration)}</span>
+          </div>
+          
+          {/* Barre de progression */}
+          <Slider
+            value={[progress]}
+            max={100}
+            step={1}
+            className="mb-3"
+            onValueChange={(value) => setProgress(value[0])}
+          />
+          
+          {/* Contrôles de lecture */}
+          <div className="flex items-center justify-center space-x-6">
+            <Button 
+              variant="ghost"
+              size="icon"
+              onClick={previousSong}
+              className="text-white hover:bg-white/10 rounded-full"
+            >
+              <SkipBack className="h-5 w-5" />
+            </Button>
+            
+            <Button
+              variant="default"
+              size="icon"
+              onClick={() => isPlaying ? pause() : play()}
+              className="bg-white text-black hover:bg-white/90 rounded-full w-12 h-12 flex items-center justify-center"
+            >
+              {isPlaying ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Play className="h-5 w-5" />
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={nextSong}
+              className="text-white hover:bg-white/10 rounded-full"
+            >
+              <SkipForward className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fix for the style tag */}
       <style>
         {`
         .firefox-fullscreen {
