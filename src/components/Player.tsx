@@ -1,4 +1,4 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Music } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -351,7 +351,7 @@ export const Player = () => {
                     onClick={toggleLyrics}
                     title="Afficher les paroles"
                   >
-                    <Music className="w-5 h-5" />
+                    <Mic className="w-5 h-5" />
                   </Button>
                 )}
                 <CastButton />
@@ -426,7 +426,7 @@ export const Player = () => {
                         )}
                         onClick={toggleLyrics}
                       >
-                        <Music className="w-4 h-4" />
+                        <Mic className="w-4 h-4" />
                       </Button>
                     )}
                     <CastButton />
