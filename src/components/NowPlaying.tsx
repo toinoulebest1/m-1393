@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { LyricsModal } from "@/components/LyricsModal";
+import { LyricsFullscreenView } from "@/components/LyricsFullscreenView";
 
 interface ReportDialogProps {
   songTitle: string;
@@ -144,7 +145,7 @@ export const NowPlaying = () => {
     delay: number;
   }>>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
+  const [showLyricsFullscreen, setShowLyricsFullscreen] = useState(false);
   const [selectedSongForLyrics, setSelectedSongForLyrics] = useState<any>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
@@ -298,7 +299,7 @@ export const NowPlaying = () => {
 
   const handleViewLyrics = (song: any) => {
     setSelectedSongForLyrics(song);
-    setLyricsModalOpen(true);
+    setShowLyricsFullscreen(true);
   };
 
   return (
@@ -470,17 +471,10 @@ export const NowPlaying = () => {
         </div>
       </div>
 
-      {selectedSongForLyrics && (
-        <LyricsModal
-          isOpen={lyricsModalOpen}
-          onClose={() => setLyricsModalOpen(false)}
-          songId={selectedSongForLyrics.id}
-          songTitle={selectedSongForLyrics.title}
-          artist={selectedSongForLyrics.artist}
-          onEditRequest={() => {
-            setLyricsModalOpen(false);
-            // Note: If you want to open the edit dialog here, you would need to add that functionality
-          }}
+      {showLyricsFullscreen && selectedSongForLyrics && (
+        <LyricsFullscreenView 
+          song={selectedSongForLyrics}
+          onClose={() => setShowLyricsFullscreen(false)}
         />
       )}
     </div>
