@@ -183,6 +183,27 @@ export const Player = () => {
     return currentSong?.imageUrl || "https://picsum.photos/56/56";
   };
   
+  const handleSkipForward = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Next song button clicked");
+    nextSong();
+  };
+  
+  const handleSkipBack = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Previous song button clicked");
+    previousSong();
+  };
+  
+  const handlePlayPause = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Play/pause button clicked");
+    isPlaying ? pause() : play();
+  };
+  
   const songInfo = getDisplayedSongInfo();
   const blurImage = shouldBlurImage();
 
@@ -254,13 +275,13 @@ export const Player = () => {
                   </button>
                   <button 
                     className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
-                    onClick={previousSong}
+                    onClick={handleSkipBack}
                   >
                     <SkipBack className="w-5 h-5" />
                   </button>
                   <button 
                     className="bg-white rounded-full p-2 hover:scale-110 transition-all shadow-lg hover:shadow-white/20"
-                    onClick={() => isPlaying ? pause() : play()}
+                    onClick={handlePlayPause}
                   >
                     {isPlaying ? (
                       <Pause className="w-6 h-6 text-spotify-dark" />
@@ -270,7 +291,7 @@ export const Player = () => {
                   </button>
                   <button 
                     className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
-                    onClick={nextSong}
+                    onClick={handleSkipForward}
                   >
                     <SkipForward className="w-5 h-5" />
                   </button>
@@ -427,14 +448,14 @@ export const Player = () => {
 
                 <button 
                   className="text-spotify-neutral hover:text-white p-1.5 transition-all"
-                  onClick={previousSong}
+                  onClick={handleSkipBack}
                 >
                   <SkipBack className="w-5 h-5" />
                 </button>
                 
                 <button 
                   className="bg-white rounded-full p-2 hover:scale-105 transition-all"
-                  onClick={() => isPlaying ? pause() : play()}
+                  onClick={handlePlayPause}
                 >
                   {isPlaying ? (
                     <Pause className="w-5 h-5 text-spotify-dark" />
@@ -445,7 +466,7 @@ export const Player = () => {
                 
                 <button 
                   className="text-spotify-neutral hover:text-white p-1.5 transition-all"
-                  onClick={nextSong}
+                  onClick={handleSkipForward}
                 >
                   <SkipForward className="w-5 h-5" />
                 </button>

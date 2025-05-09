@@ -27,10 +27,12 @@ const Index = () => {
       updateMediaSessionMetadata(currentSong);
       
       // Set up media session action handlers
-      navigator.mediaSession.setActionHandler('play', () => play());
-      navigator.mediaSession.setActionHandler('pause', () => pause());
-      navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
-      navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => play());
+        navigator.mediaSession.setActionHandler('pause', () => pause());
+        navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+        navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
+      }
       
       // Set up position state updates
       if (isPlaying) {
@@ -43,7 +45,7 @@ const Index = () => {
     return () => {
       stopPositionUpdates();
     };
-  }, [currentSong, play, pause, nextSong, previousSong]);
+  }, [currentSong, play, pause, nextSong, previousSong, isPlaying]);
 
   // Update MediaSession playback state when isPlaying changes
   useEffect(() => {
