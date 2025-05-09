@@ -224,6 +224,9 @@ export const Player = () => {
   const songInfo = getDisplayedSongInfo();
   const blurImage = shouldBlurImage();
 
+  // Determine if the lyrics button should be shown (hide during blind test)
+  const shouldShowLyricsButton = !isBlindTest;
+
   return (
     <>
       {/* La bannière "En cours de lecture" a été supprimée */}
@@ -342,7 +345,7 @@ export const Player = () => {
               </div>
 
               <div className="flex items-center space-x-4">
-                {currentSong && (
+                {currentSong && shouldShowLyricsButton && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -418,7 +421,7 @@ export const Player = () => {
                         )}
                       />
                     </button>
-                    {currentSong && (
+                    {currentSong && shouldShowLyricsButton && (
                       <Button
                         variant="ghost"
                         size="icon"
