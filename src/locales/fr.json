@@ -75,6 +75,15 @@
     "loadingLyrics": "Chargement des paroles...",
     "noLyricsAvailable": "Aucune parole disponible pour cette chanson.",
     "clickFetchLyrics": "Cliquez sur \"Récupérer les paroles\" pour essayer de les trouver.",
-    "cannotFetchWithoutArtist": "Impossible de récupérer les paroles sans le nom de l'artiste."
+    "cannotFetchWithoutArtist": "Impossible de récupérer les paroles sans le nom de l'artiste.",
+    "findMissingLyrics": "Trouver les paroles manquantes",
+    "findingMissingLyrics": "Recherche des paroles manquantes...",
+    "missingLyricsFound": "Paroles manquantes trouvées",
+    "noMissingLyrics": "Aucune parole manquante trouvée",
+    "processingLyrics": "Traitement de {{current}}/{{total}} chansons",
+    "lyricsUpdated": "Paroles mises à jour pour {{count}} chanson",
+    "lyricsUpdated_plural": "Paroles mises à jour pour {{count}} chansons",
+    "lyricsErrors": "{{count}} chanson en échec",
+    "lyricsErrors_plural": "{{count}} chansons en échec"
   }
 }

@@ -75,6 +75,15 @@
     "loadingLyrics": "Loading lyrics...",
     "noLyricsAvailable": "No lyrics available for this song.",
     "clickFetchLyrics": "Click on \"Fetch Lyrics\" to try to find them.",
-    "cannotFetchWithoutArtist": "Cannot fetch lyrics without artist name."
+    "cannotFetchWithoutArtist": "Cannot fetch lyrics without artist name.",
+    "findMissingLyrics": "Find Missing Lyrics",
+    "findingMissingLyrics": "Finding Missing Lyrics...",
+    "missingLyricsFound": "Missing lyrics found",
+    "noMissingLyrics": "No missing lyrics found",
+    "processingLyrics": "Processing {{current}}/{{total}} songs",
+    "lyricsUpdated": "Updated lyrics for {{count}} song",
+    "lyricsUpdated_plural": "Updated lyrics for {{count}} songs",
+    "lyricsErrors": "{{count}} song failed",
+    "lyricsErrors_plural": "{{count}} songs failed"
   }
 }

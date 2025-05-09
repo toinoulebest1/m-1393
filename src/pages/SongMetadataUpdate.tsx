@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { LoaderIcon, MusicIcon, Search, FileText } from "lucide-react";
+import { LoaderIcon, MusicIcon, Search, FileText, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "react-i18next";
@@ -36,6 +36,8 @@ const SongMetadataUpdate = () => {
   const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
   const [lyricsEditOpen, setLyricsEditOpen] = useState(false);
   const [currentLyrics, setCurrentLyrics] = useState<string | null>(null);
+  const [findingLyrics, setFindingLyrics] = useState(false);
+  const [lyricsProgress, setLyricsProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -240,6 +242,92 @@ const SongMetadataUpdate = () => {
     }
   };
 
+  const handleFindMissingLyrics = async () => {
+    try {
+      setFindingLyrics(true);
+      toast.info(t("common.findingMissingLyrics"));
+      
+      // Récupérer les chansons sans paroles
+      const { data: songsWithLyrics } = await supabase
+        .from('lyrics')
+        .select('song_id');
+
+      const songsWithLyricsIds = songsWithLyrics?.map(item => item.song_id) || [];
+      
+      // Filtrer les chansons qui n'ont pas de paroles et qui ont un artiste
+      const songsWithoutLyrics = songs.filter(
+        song => !songsWithLyricsIds.includes(song.id) && song.artist && song.artist !== "Unknown Artist"
+      );
+      
+      if (songsWithoutLyrics.length === 0) {
+        toast.info(t("common.noMissingLyrics"));
+        setFindingLyrics(false);
+        return;
+      }
+
+      toast.info(t("common.missingLyricsFound"), {
+        description: `${songsWithoutLyrics.length} ${songsWithoutLyrics.length > 1 ? t('common.tracks') : t('common.track')}`
+      });
+
+      // Traiter chaque chanson séquentiellement
+      let successCount = 0;
+      let errorCount = 0;
+      
+      setLyricsProgress({ current: 0, total: songsWithoutLyrics.length });
+      
+      for (let i = 0; i < songsWithoutLyrics.length; i++) {
+        const song = songsWithoutLyrics[i];
+        setLyricsProgress({ current: i + 1, total: songsWithoutLyrics.length });
+        
+        try {
+          // Appeler l'edge function pour générer les paroles
+          const { data, error } = await supabase.functions.invoke('generate-lyrics', {
+            body: { songTitle: song.title, artist: song.artist }
+          });
+          
+          if (error || !data.lyrics) {
+            console.error(`Erreur récupération paroles pour ${song.title}:`, error || 'Pas de paroles trouvées');
+            errorCount++;
+            continue;
+          }
+          
+          // Sauvegarder les paroles dans la base de données
+          if (data.lyrics) {
+            const { error: insertError } = await supabase
+              .from('lyrics')
+              .insert({ song_id: song.id, content: data.lyrics });
+              
+            if (insertError) {
+              console.error(`Erreur sauvegarde paroles pour ${song.title}:`, insertError);
+              errorCount++;
+            } else {
+              successCount++;
+            }
+          }
+        } catch (error) {
+          console.error(`Erreur traitement paroles pour ${song.title}:`, error);
+          errorCount++;
+        }
+      }
+      
+      // Afficher les résultats
+      if (successCount > 0) {
+        toast.success(t('common.lyricsUpdated', { count: successCount }));
+      }
+      
+      if (errorCount > 0) {
+        toast.error(t('common.lyricsErrors', { count: errorCount }));
+      }
+      
+    } catch (error) {
+      console.error("Erreur lors de la recherche des paroles manquantes:", error);
+      toast.error(t("common.updateError"));
+    } finally {
+      setFindingLyrics(false);
+      setLyricsProgress({ current: 0, total: 0 });
+    }
+  };
+
   if (isCheckingRole) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-spotify-dark">
@@ -272,6 +360,16 @@ const SongMetadataUpdate = () => {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={handleFindMissingLyrics}
+                  disabled={findingLyrics || loading}
+                  className="flex items-center gap-2"
+                >
+                  {findingLyrics ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {findingLyrics ? t("common.findingMissingLyrics") : t("common.findMissingLyrics")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleSelectWithoutImages}
                 >
                   {t("common.selectNoImage")}
@@ -301,6 +399,23 @@ const SongMetadataUpdate = () => {
             {updating && (
               <div className="mb-4">
                 <Progress value={updateProgress} className="h-2" />
+              </div>
+            )}
+
+            {findingLyrics && lyricsProgress.total > 0 && (
+              <div className="mb-4">
+                <div className="flex justify-between mb-1">
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.processingLyrics", { current: lyricsProgress.current, total: lyricsProgress.total })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {Math.round((lyricsProgress.current / lyricsProgress.total) * 100)}%
+                  </p>
+                </div>
+                <Progress 
+                  value={(lyricsProgress.current / lyricsProgress.total) * 100} 
+                  className="h-2" 
+                />
               </div>
             )}
             
