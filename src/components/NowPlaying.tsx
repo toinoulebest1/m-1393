@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
-import { Music, Clock, Signal, Heart, Flag } from "lucide-react";
+import { Music, Clock, Signal, Heart, Flag, Mic } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import ColorThief from 'colorthief';
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
+import { LyricsModal } from "@/components/LyricsModal";
 
 interface ReportDialogProps {
   songTitle: string;
@@ -143,6 +144,8 @@ export const NowPlaying = () => {
     delay: number;
   }>>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
+  const [selectedSongForLyrics, setSelectedSongForLyrics] = useState<any>(null);
 
   const extractDominantColor = async (imageUrl: string) => {
     try {
@@ -293,6 +296,11 @@ export const NowPlaying = () => {
     }
   };
 
+  const handleViewLyrics = (song: any) => {
+    setSelectedSongForLyrics(song);
+    setLyricsModalOpen(true);
+  };
+
   return (
     <div className="flex min-h-screen relative">
       <div className="flex-1 p-8 relative overflow-hidden">
@@ -437,6 +445,16 @@ export const NowPlaying = () => {
                       />
                     </button>
 
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewLyrics(song);
+                      }}
+                      className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                    >
+                      <Mic className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 group-hover:scale-110" />
+                    </button>
+
                     <div onClick={(e) => e.stopPropagation()}>
                       <ReportDialog
                         songTitle={song.title}
@@ -451,6 +469,20 @@ export const NowPlaying = () => {
           })}
         </div>
       </div>
+
+      {selectedSongForLyrics && (
+        <LyricsModal
+          isOpen={lyricsModalOpen}
+          onClose={() => setLyricsModalOpen(false)}
+          songId={selectedSongForLyrics.id}
+          songTitle={selectedSongForLyrics.title}
+          artist={selectedSongForLyrics.artist}
+          onEditRequest={() => {
+            setLyricsModalOpen(false);
+            // Note: If you want to open the edit dialog here, you would need to add that functionality
+          }}
+        />
+      )}
     </div>
   );
 };
