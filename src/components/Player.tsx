@@ -215,10 +215,10 @@ export const Player = () => {
     
     if (isPlaying) {
       pause();
-      toast.info("Lecture en pause");
+      // Removed toast notification for pause
     } else {
       play();
-      toast.info("Lecture en cours");
+      // Removed toast notification for play
     }
   };
   
