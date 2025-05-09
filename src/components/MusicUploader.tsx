@@ -112,6 +112,46 @@ export const MusicUploader = () => {
     }
   };
 
+  const fetchLyrics = async (title: string, artist: string, songId: string) => {
+    try {
+      console.log(`Récupération des paroles pour: ${title} de ${artist}`);
+      
+      const { data, error } = await supabase.functions.invoke('generate-lyrics', {
+        body: { songTitle: title, artist: artist }
+      });
+      
+      if (error) {
+        console.error("Erreur lors de la récupération des paroles:", error);
+        return null;
+      }
+      
+      if (data && data.lyrics) {
+        console.log("Paroles récupérées avec succès");
+        
+        // Enregistrer les paroles dans la base de données
+        const { error: saveLyricsError } = await supabase
+          .from('lyrics')
+          .insert({
+            song_id: songId,
+            content: data.lyrics
+          });
+        
+        if (saveLyricsError) {
+          console.error("Erreur lors de l'enregistrement des paroles:", saveLyricsError);
+        } else {
+          console.log("Paroles enregistrées avec succès pour:", songId);
+        }
+        
+        return data.lyrics;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des paroles:", error);
+      return null;
+    }
+  };
+
   const checkIfSongExists = async (artist: string, title: string): Promise<boolean> => {
     try {
       const { data: existingSongs, error } = await supabase
@@ -218,6 +258,25 @@ export const MusicUploader = () => {
         console.error("Erreur lors de l'enregistrement dans la base de données:", songError);
         toast.error("Erreur lors de l'enregistrement de la chanson");
         return null;
+      }
+      
+      // Récupération et stockage des paroles après l'enregistrement de la chanson
+      if (artist !== "Unknown Artist") {
+        // Toast de chargement des paroles
+        const lyricsToastId = toast.loading(`Récupération des paroles pour "${title}"...`);
+        
+        // Récupération des paroles en arrière-plan
+        fetchLyrics(title, artist, fileId).then(lyrics => {
+          if (lyrics) {
+            toast.success(`Paroles récupérées pour "${title}"`, {
+              id: lyricsToastId
+            });
+          } else {
+            toast.error(`Impossible de trouver les paroles pour "${title}"`, {
+              id: lyricsToastId
+            });
+          }
+        });
       }
 
       setIsUploading(false);
