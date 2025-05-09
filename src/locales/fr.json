@@ -58,6 +58,23 @@
     "metadataUpdated": "Métadonnées de la chanson mises à jour avec succès",
     "updateError": "Erreur lors de la mise à jour des métadonnées",
     "noChangesNeeded": "Aucune modification nécessaire",
-    "searchManually": "Rechercher manuellement"
+    "searchManually": "Rechercher manuellement",
+    "editLyrics": "Modifier les paroles",
+    "viewLyrics": "Voir les paroles",
+    "lyrics": "Paroles",
+    "enterLyrics": "Entrez les paroles de la chanson ici...",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "lyricsSaved": "Paroles enregistrées avec succès",
+    "error": "Erreur",
+    "success": "Succès",
+    "lyricsRequired": "Les paroles ne peuvent pas être vides",
+    "errorSavingLyrics": "Erreur lors de l'enregistrement des paroles",
+    "edit": "Modifier",
+    "fetchLyrics": "Récupérer les paroles",
+    "loadingLyrics": "Chargement des paroles...",
+    "noLyricsAvailable": "Aucune parole disponible pour cette chanson.",
+    "clickFetchLyrics": "Cliquez sur \"Récupérer les paroles\" pour essayer de les trouver.",
+    "cannotFetchWithoutArtist": "Impossible de récupérer les paroles sans le nom de l'artiste."
   }
 }

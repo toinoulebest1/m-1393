@@ -58,6 +58,23 @@
     "metadataUpdated": "Song metadata updated successfully",
     "updateError": "Error updating song metadata",
     "noChangesNeeded": "No changes needed",
-    "searchManually": "Search manually"
+    "searchManually": "Search manually",
+    "editLyrics": "Edit Lyrics",
+    "viewLyrics": "View Lyrics",
+    "lyrics": "Lyrics",
+    "enterLyrics": "Enter song lyrics here...",
+    "save": "Save",
+    "saving": "Saving...",
+    "lyricsSaved": "Lyrics saved successfully",
+    "error": "Error",
+    "success": "Success",
+    "lyricsRequired": "Lyrics cannot be empty",
+    "errorSavingLyrics": "Error saving lyrics",
+    "edit": "Edit",
+    "fetchLyrics": "Fetch Lyrics",
+    "loadingLyrics": "Loading lyrics...",
+    "noLyricsAvailable": "No lyrics available for this song.",
+    "clickFetchLyrics": "Click on \"Fetch Lyrics\" to try to find them.",
+    "cannotFetchWithoutArtist": "Cannot fetch lyrics without artist name."
   }
 }

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -14,11 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { LoaderIcon, MusicIcon, Search } from "lucide-react";
+import { LoaderIcon, MusicIcon, Search, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "react-i18next";
 import DeezerSearchDialog from "@/components/DeezerSearchDialog";
+import { LyricsModal } from "@/components/LyricsModal"; 
+import { LyricsEditDialog } from "@/components/LyricsEditDialog";
 
 const SongMetadataUpdate = () => {
   const { t } = useTranslation();
@@ -32,6 +33,9 @@ const SongMetadataUpdate = () => {
   const [updateProgress, setUpdateProgress] = useState(0);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState<any>(null);
+  const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
+  const [lyricsEditOpen, setLyricsEditOpen] = useState(false);
+  const [currentLyrics, setCurrentLyrics] = useState<string | null>(null);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -192,6 +196,50 @@ const SongMetadataUpdate = () => {
     }
   };
 
+  const handleViewLyrics = async (song: any) => {
+    setSelectedSong(song);
+    
+    try {
+      const { data, error } = await supabase
+        .from('lyrics')
+        .select('content')
+        .eq('song_id', song.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Erreur lors de la récupération des paroles:", error);
+      }
+
+      setCurrentLyrics(data?.content || null);
+      setLyricsModalOpen(true);
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la récupération des paroles");
+    }
+  };
+
+  const handleEditLyrics = async (song: any) => {
+    setSelectedSong(song);
+    
+    try {
+      const { data, error } = await supabase
+        .from('lyrics')
+        .select('content')
+        .eq('song_id', song.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Erreur lors de la récupération des paroles:", error);
+      }
+
+      setCurrentLyrics(data?.content || null);
+      setLyricsEditOpen(true);
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de la récupération des paroles");
+    }
+  };
+
   if (isCheckingRole) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-spotify-dark">
@@ -302,7 +350,7 @@ const SongMetadataUpdate = () => {
                       <TableHead className="text-foreground">{t("common.artist")}</TableHead>
                       <TableHead className="text-foreground">{t("common.genre")}</TableHead>
                       <TableHead className="text-foreground">{t("common.duration")}</TableHead>
-                      <TableHead className="w-24"></TableHead>
+                      <TableHead className="w-36"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -341,14 +389,24 @@ const SongMetadataUpdate = () => {
                         <TableCell className="text-foreground">{song.genre || "—"}</TableCell>
                         <TableCell className="text-foreground">{song.duration || "—"}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenSearchDialog(song)}
-                            title={t("common.searchManually")}
-                          >
-                            <Search className="h-4 w-4" />
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewLyrics(song)}
+                              title={t("common.viewLyrics")}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenSearchDialog(song)}
+                              title={t("common.searchManually")}
+                            >
+                              <Search className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -362,12 +420,36 @@ const SongMetadataUpdate = () => {
       <Player />
       
       {selectedSong && (
-        <DeezerSearchDialog
-          open={searchDialogOpen}
-          onClose={() => setSearchDialogOpen(false)}
-          song={selectedSong}
-          onUpdateSuccess={refreshSongsList}
-        />
+        <>
+          <DeezerSearchDialog
+            open={searchDialogOpen}
+            onClose={() => setSearchDialogOpen(false)}
+            song={selectedSong}
+            onUpdateSuccess={refreshSongsList}
+          />
+          
+          <LyricsModal
+            isOpen={lyricsModalOpen}
+            onClose={() => setLyricsModalOpen(false)}
+            songId={selectedSong.id}
+            songTitle={selectedSong.title}
+            artist={selectedSong.artist}
+            onEditRequest={() => {
+              setLyricsModalOpen(false);
+              setLyricsEditOpen(true);
+            }}
+          />
+          
+          <LyricsEditDialog
+            isOpen={lyricsEditOpen}
+            onClose={() => setLyricsEditOpen(false)}
+            songId={selectedSong.id}
+            songTitle={selectedSong.title}
+            artist={selectedSong.artist}
+            initialLyrics={currentLyrics || undefined}
+            onSaved={() => refreshSongsList()}
+          />
+        </>
       )}
     </div>
   );
