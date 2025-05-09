@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -227,17 +226,7 @@ export const Player = () => {
 
   return (
     <>
-      {/* Ajout de la bannière "En cours de lecture" */}
-      {currentSong && (
-        <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-900 to-black bg-opacity-95 p-2 z-40 border-b border-white/5">
-          <div className="max-w-7xl mx-auto flex items-center">
-            <div className="flex items-center text-purple-400 font-medium">
-              <span className="mr-2">🎵</span>
-              <span>En cours de lecture</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* La bannière "En cours de lecture" a été supprimée */}
 
       <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-95 border-t border-white/5 p-4 z-50">
         <div className="max-w-7xl mx-auto">
