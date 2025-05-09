@@ -250,7 +250,7 @@ export const Player = () => {
                           className="absolute inset-0 flex items-center justify-center z-10"
                           onContextMenu={handleContextMenu}
                         >
-                          <Music className="w-6 h-6 text-white/50" />
+                          <Mic className="w-6 h-6 text-white/50" />
                         </div>
                       )}
                     </div>
@@ -389,7 +389,7 @@ export const Player = () => {
                           className="absolute inset-0 flex items-center justify-center z-10"
                           onContextMenu={handleContextMenu}
                         >
-                          <Music className="w-5 h-5 text-white/50" />
+                          <Mic className="w-5 h-5 text-white/50" />
                         </div>
                       )}
                     </div>
