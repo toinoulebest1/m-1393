@@ -190,8 +190,15 @@ const History = () => {
       return;
     }
 
+    console.log(`Playing song from history: ${song.title}`);
+    
+    // Create a new queue with just this song and make it the current queue
     setQueue([song]);
+    
+    // Start playing the song
     play(song);
+    
+    toast.success(`Lecture de : ${song.title}`);
   };
 
   return (

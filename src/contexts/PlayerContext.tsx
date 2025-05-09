@@ -437,10 +437,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
   };
 
-  const nextSong = () => {
-    if (!currentSong || queue.length === 0) return;
-    
-    // Annuler tout fondu en cours
+  const nextSong = async () => {
+    // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
@@ -448,7 +446,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     fadingRef.current = false;
     
-    // Réinitialiser les volumes
+    // Reset volumes
     if (nextAudioRef.current) {
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
@@ -457,36 +455,52 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.volume = volume / 100;
     }
     
+    console.log("Executing nextSong function");
+    
+    if (!currentSong || queue.length === 0) {
+      console.log("No current song or queue is empty");
+      return;
+    }
+    
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1) return;
+    console.log(`Current song index: ${currentIndex}, Queue length: ${queue.length}`);
+    
+    if (currentIndex === -1) {
+      console.log("Current song not found in queue");
+      return;
+    }
     
     const nextIndex = currentIndex + 1;
     if (nextIndex < queue.length) {
       const nextTrack = queue[nextIndex];
+      console.log(`Playing next track: ${nextTrack.title} by ${nextTrack.artist}`);
+      toast.success(`Lecture de : ${nextTrack.title}`);
       play(nextTrack);
       // Ensure MediaSession is updated
       if ('mediaSession' in navigator && nextTrack) {
         updateMediaSessionMetadata(nextTrack);
       }
-    } else if (repeatMode === 'all') {
+    } else if (repeatMode === 'all' && queue.length > 0) {
       const firstTrack = queue[0];
+      console.log(`Repeating playlist from beginning: ${firstTrack.title}`);
+      toast.success(`Retour au début de la playlist : ${firstTrack.title}`);
       play(firstTrack);
       // Ensure MediaSession is updated
       if ('mediaSession' in navigator && firstTrack) {
         updateMediaSessionMetadata(firstTrack);
       }
     } else {
-      // Fin de la queue et pas de répétition
+      // End of queue and no repeat
+      console.log("End of queue reached with no repeat");
+      toast.info("Fin de la liste de lecture");
       audioRef.current.pause();
       setIsPlaying(false);
       setProgress(0);
     }
   };
 
-  const previousSong = () => {
-    if (!currentSong || queue.length === 0) return;
-    
-    // Annuler tout fondu en cours
+  const previousSong = async () => {
+    // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
@@ -494,7 +508,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     fadingRef.current = false;
     
-    // Réinitialiser les volumes
+    // Reset volumes
     if (nextAudioRef.current) {
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
@@ -503,21 +517,64 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.volume = volume / 100;
     }
     
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1) return;
+    console.log("Executing previousSong function");
     
-    // Si la chanson en cours est jouée depuis plus de 3 secondes, on recommence au début
-    if (audioRef.current.currentTime > 3) {
-      audioRef.current.currentTime = 0;
+    if (!currentSong || queue.length === 0) {
+      console.log("No current song or queue is empty");
       return;
     }
     
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    console.log(`Current song index: ${currentIndex}, Total songs in queue: ${queue.length}`);
+    
+    if (currentIndex === -1) {
+      console.log("Current song not found in queue");
+      return;
+    }
+    
+    // If current song has played for more than 3 seconds, restart it
+    if (audioRef.current.currentTime > 3) {
+      console.log("Restarting current song from beginning");
+      toast.info("Redémarrage de la chanson");
+      audioRef.current.currentTime = 0;
+      // Make sure we're playing
+      if (!isPlaying) {
+        audioRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(err => console.error("Error playing audio:", err));
+      }
+      return;
+    }
+    
+    // Go to previous track
     if (currentIndex > 0) {
       const prevTrack = queue[currentIndex - 1];
+      console.log(`Playing previous track: ${prevTrack.title} by ${prevTrack.artist}`);
+      toast.success(`Lecture de : ${prevTrack.title}`);
       play(prevTrack);
       // Ensure MediaSession is updated
       if ('mediaSession' in navigator && prevTrack) {
         updateMediaSessionMetadata(prevTrack);
+      }
+    } else if (repeatMode === 'all' && queue.length > 0) {
+      // If we're at the first track and repeat is on, go to the last track
+      const lastTrack = queue[queue.length - 1];
+      console.log(`Looping to last track: ${lastTrack.title}`);
+      toast.success(`Aller à la dernière piste : ${lastTrack.title}`);
+      play(lastTrack);
+      // Update MediaSession
+      if ('mediaSession' in navigator && lastTrack) {
+        updateMediaSessionMetadata(lastTrack);
+      }
+    } else {
+      // Already at first track, just restart it
+      console.log("Already at first track, restarting");
+      toast.info("Première piste de la liste");
+      audioRef.current.currentTime = 0;
+      if (!isPlaying) {
+        audioRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(err => console.error("Error playing audio:", err));
       }
     }
   };

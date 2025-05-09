@@ -187,6 +187,11 @@ export const Player = () => {
     e.preventDefault();
     e.stopPropagation();
     console.log("Next song button clicked");
+    
+    // Add a toast to provide feedback
+    toast.info("Passer à la chanson suivante");
+    
+    // Call the nextSong function from PlayerContext
     nextSong();
   };
   
@@ -194,6 +199,11 @@ export const Player = () => {
     e.preventDefault();
     e.stopPropagation();
     console.log("Previous song button clicked");
+    
+    // Add a toast to provide feedback
+    toast.info("Revenir à la chanson précédente");
+    
+    // Call the previousSong function from PlayerContext
     previousSong();
   };
   
@@ -201,7 +211,14 @@ export const Player = () => {
     e.preventDefault();
     e.stopPropagation();
     console.log("Play/pause button clicked");
-    isPlaying ? pause() : play();
+    
+    if (isPlaying) {
+      pause();
+      toast.info("Lecture en pause");
+    } else {
+      play();
+      toast.info("Lecture en cours");
+    }
   };
   
   const songInfo = getDisplayedSongInfo();
