@@ -27,6 +27,7 @@ import { SongPicker } from "@/components/SongPicker";
 import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Song {
   id: string;
@@ -153,7 +154,7 @@ const PlaylistDetail = () => {
   const [editedName, setEditedName] = useState('');
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { play, addToQueue, queue, setQueue, currentSong, favorites } = usePlayer();
+  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
 
   // Create or update playlist cover based on song images
@@ -489,6 +490,32 @@ const PlaylistDetail = () => {
     
     setQueue(playlistSongs);
     play(playlistSongs[0]);
+    
+    // Add toast notification
+    toast.success(t('player.playingPlaylist'));
+  };
+  
+  // Improved function to play a specific song
+  const playSong = (song: Song) => {
+    // First, create queue from the entire playlist
+    const playlistSongs = songs.map(item => ({
+      id: item.songs.id,
+      title: item.songs.title,
+      artist: item.songs.artist,
+      duration: item.songs.duration,
+      url: item.songs.url,
+      imageUrl: item.songs.imageUrl,
+      genre: item.songs.genre
+    }));
+    
+    // Update the queue with all songs
+    setQueue(playlistSongs);
+    
+    // Then start playing the selected song
+    play(song);
+    
+    // Add toast notification
+    toast.success(`${t('player.playing')}: ${song.title}`);
   };
 
   const isCurrentSong = (song: Song) => {
@@ -693,17 +720,21 @@ const PlaylistDetail = () => {
       
       {songs.length > 0 ? (
         <div className="space-y-2">
-          {/* Display songs using SongCard component for enhanced visual experience */}
           {songs.map((song) => (
-            <SongCard
-              key={song.id}
-              song={song.songs}
-              isCurrentSong={isCurrentSong(song.songs)}
-              isFavorite={isFavoriteSong(song.songs)}
-              dominantColor={dominantColors[song.songs.id] || null}
-              onLyricsClick={handleLyricsClick}
-              onReportClick={handleReportClick}
-            />
+            <div 
+              key={song.id} 
+              className="cursor-pointer"
+              onClick={() => playSong(song.songs)}
+            >
+              <SongCard
+                song={song.songs}
+                isCurrentSong={isCurrentSong(song.songs)}
+                isFavorite={isFavoriteSong(song.songs)}
+                dominantColor={dominantColors[song.songs.id] || null}
+                onLyricsClick={handleLyricsClick}
+                onReportClick={handleReportClick}
+              />
+            </div>
           ))}
         </div>
       ) : (
