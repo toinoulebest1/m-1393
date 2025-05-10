@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { PlusCircle, MoreHorizontal, Music2 } from "lucide-react";
@@ -44,7 +44,8 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const handleDelete = async () => {
+  // Use useCallback to prevent recreating this function on every render
+  const handleDelete = useCallback(async () => {
     if (isDeleting) return; // Prevent multiple clicks
     
     setIsDeleting(true);
@@ -66,6 +67,7 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
       
       if (error) throw error;
       
+      // Success toast
       toast({
         title: t('playlists.deleted'),
         description: t('playlists.playlistDeleted')
@@ -76,8 +78,9 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
       
       // Then notify parent after a short delay
       setTimeout(() => {
-        onDeleted();
-      }, 100);
+        if (onDeleted) onDeleted();
+      }, 300); // Increased delay to give UI time to update
+      
     } catch (error) {
       console.error("Error deleting playlist:", error);
       toast({
@@ -85,17 +88,19 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         description: t('playlists.errorDeleting'),
         variant: "destructive"
       });
+      // Always make sure to close dialog and reset deletion state in case of error
+      setShowDeleteDialog(false);
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [isDeleting, playlist.id, toast, t, onDeleted]);
   
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
     // Only navigate if the click wasn't on the dropdown
     if (!(e.target as Element).closest('.playlist-actions')) {
       navigate(`/playlist/${playlist.id}`);
     }
-  };
+  }, [navigate, playlist.id]);
   
   return (
     <div 
@@ -344,8 +349,9 @@ const PlaylistsPage = () => {
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
   const { toast } = useToast();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const fetchPlaylists = async () => {
+  const fetchPlaylists = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -385,12 +391,16 @@ const PlaylistsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast, t]);
 
-  useEffect(() => {
-    fetchPlaylists();
+  // Create a separate function to set up the subscription
+  const setupRealtimeSubscription = useCallback(() => {
+    // Clean up any existing subscription first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
     
-    // Set up realtime subscription for playlist changes
+    // Create a new subscription
     const channel = supabase
       .channel('playlist-changes')
       .on(
@@ -404,15 +414,31 @@ const PlaylistsPage = () => {
       )
       .subscribe();
     
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    // Store the channel reference for cleanup
+    channelRef.current = channel;
+  }, [fetchPlaylists]);
 
-  const handlePlaylistDeleted = () => {
-    // Refresh the playlist list without full page rerender
+  useEffect(() => {
+    // Fetch playlists when component mounts
     fetchPlaylists();
-  };
+    
+    // Set up realtime subscription
+    setupRealtimeSubscription();
+    
+    // Clean up subscription when component unmounts
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [fetchPlaylists, setupRealtimeSubscription]);
+
+  const handlePlaylistDeleted = useCallback(() => {
+    // Use setTimeout to ensure this doesn't conflict with any ongoing state updates
+    setTimeout(() => {
+      fetchPlaylists();
+    }, 500);
+  }, [fetchPlaylists]);
 
   return (
     <div className="container p-6">
