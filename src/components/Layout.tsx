@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLocation } from "react-router-dom";
+import { Player } from "./Player"; // Import the Player component
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -47,6 +48,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </div>
       </div>
+      
+      {/* Add Player component at the bottom of the layout */}
+      <Player />
       
       {/* Add some global protection against inspecting elements in blind test mode */}
       {isBlindTest && (
