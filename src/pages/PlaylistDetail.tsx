@@ -52,6 +52,72 @@ interface Playlist {
   updated_at: string;
 }
 
+// Create a canvas with the song images in a grid layout
+const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | null> => {
+  try {
+    // Filter songs that have images
+    const songsWithImages = songs.filter(song => song.songs.imageUrl);
+    if (songsWithImages.length === 0) return null;
+    
+    // Create a canvas element
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Fill with dark background
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Determine grid size based on number of images (up to 4)
+    const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
+    const imageSize = canvas.width / gridSize;
+
+    // Load images
+    const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
+      return new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          // Calculate position in the grid
+          const row = Math.floor(index / gridSize);
+          const col = index % gridSize;
+          ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
+          resolve();
+        };
+        img.onerror = (e) => {
+          console.error('Error loading image:', e);
+          resolve(); // Still resolve to not block other images
+        };
+        img.src = song.songs.imageUrl || '';
+      });
+    });
+
+    // Wait for all images to be drawn
+    await Promise.all(imagePromises);
+
+    // Convert to data URL
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch (error) {
+    console.error('Error generating playlist cover:', error);
+    return null;
+  }
+};
+
+// Convert data URL to File object
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
+
 const PlaylistDetail = () => {
   const { playlistId } = useParams<{ playlistId: string }>();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -63,6 +129,60 @@ const PlaylistDetail = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue } = usePlayer();
+
+  // Create or update playlist cover based on song images
+  const updatePlaylistCover = async () => {
+    if (!playlistId || songs.length === 0) return;
+    
+    try {
+      setUploading(true);
+      
+      // Generate the cover image
+      const coverDataUrl = await generatePlaylistCover(songs);
+      if (!coverDataUrl) {
+        setUploading(false);
+        return;
+      }
+      
+      // Convert to file
+      const file = dataURLtoFile(coverDataUrl, `playlist-cover-${playlistId}.jpg`);
+      const fileExtension = 'jpg';
+      const fileName = `playlist-covers/${playlistId}.${fileExtension}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, {
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+      
+      // Update playlist record
+      const { error: updateError } = await supabase
+        .from('playlists')
+        .update({ cover_image_url: publicUrl })
+        .eq('id', playlistId);
+      
+      if (updateError) throw updateError;
+      
+      setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
+      
+      toast({
+        description: t('playlists.coverGenerated')
+      });
+    } catch (error) {
+      console.error("Error updating playlist cover:", error);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const fetchPlaylistDetails = async () => {
     if (!playlistId) return;
@@ -129,6 +249,11 @@ const PlaylistDetail = () => {
       }));
       
       setSongs(formattedSongs);
+      
+      // Generate cover if songs are present but playlist has no cover
+      if (formattedSongs.length > 0 && !playlistData.cover_image_url) {
+        updatePlaylistCover();
+      }
     } catch (error) {
       console.error("Error fetching playlist details:", error);
       toast({
@@ -240,7 +365,7 @@ const PlaylistDetail = () => {
         .filter(song => song.id !== playlistSongId)
         .sort((a, b) => a.position - b.position);
       
-      // Update positions in database - FIX: Include all required fields for upsert
+      // Update positions in database
       const updates = remainingSongs.map((song, index) => ({
         id: song.id,
         playlist_id: playlistId,
@@ -261,6 +386,11 @@ const PlaylistDetail = () => {
       toast({
         description: t('playlists.songRemoved')
       });
+      
+      // Update the cover if needed when songs are removed
+      if (remainingSongs.length > 0 && remainingSongs.length < songs.length) {
+        updatePlaylistCover();
+      }
     } catch (error) {
       console.error("Error removing song:", error);
       toast({
@@ -293,7 +423,10 @@ const PlaylistDetail = () => {
       if (error) throw error;
       
       // Refresh playlist songs
-      fetchPlaylistDetails();
+      await fetchPlaylistDetails();
+      
+      // Update the cover image when adding new songs
+      updatePlaylistCover();
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`

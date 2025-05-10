@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
+import { searchDeezerTrack } from "@/utils/storage";
 
 interface Playlist {
   id: string;
@@ -110,6 +111,47 @@ const CreatePlaylistDialog = ({ onCreated }: { onCreated: () => void }) => {
   const { toast } = useToast();
   const { t } = useTranslation();
 
+  // Create a placeholder cover image for the new playlist
+  const createPlaceholderCover = async (playlistId: string) => {
+    try {
+      // Use a placeholder image from a service like Picsum Photos
+      const placeholderUrl = `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/400/400`;
+      const response = await fetch(placeholderUrl);
+      if (!response.ok) throw new Error('Failed to fetch placeholder image');
+      
+      const blob = await response.blob();
+      const file = new File([blob], `playlist-${playlistId}.jpg`, { type: 'image/jpeg' });
+      
+      const fileName = `playlist-covers/${playlistId}.jpg`;
+      
+      // Upload the placeholder to storage
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, {
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+      
+      // Update playlist record
+      await supabase
+        .from('playlists')
+        .update({ cover_image_url: publicUrl })
+        .eq('id', playlistId);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Error creating placeholder cover:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -132,7 +174,7 @@ const CreatePlaylistDialog = ({ onCreated }: { onCreated: () => void }) => {
         throw new Error("No authentication session found");
       }
       
-      // FIX: Include the user_id in the insert
+      // Insert the new playlist
       const { data, error } = await supabase
         .from('playlists')
         .insert({ 
@@ -144,6 +186,9 @@ const CreatePlaylistDialog = ({ onCreated }: { onCreated: () => void }) => {
         .single();
       
       if (error) throw error;
+      
+      // Create a placeholder cover image for the new playlist
+      await createPlaceholderCover(data.id);
       
       toast({
         title: t('playlists.created'),
