@@ -220,23 +220,20 @@ const Index = () => {
   }, [userId, username, refreshCurrentSong]);
 
   return (
-    <div className="flex min-h-screen relative">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        {!isMobile && (
-          <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-            {username && (
-              <span className="text-spotify-neutral hover:text-white transition-colors">
-                {username}
-              </span>
-            )}
-            <AccountSettingsDialog />
-          </div>
-        )}
-        {/* Pass forceUpdate to force re-render when metadata changes */}
-        <NowPlaying key={`now-playing-${forceUpdate}`} />
-        <Player />
-      </div>
+    <div className="w-full">
+      {!isMobile && (
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+          {username && (
+            <span className="text-spotify-neutral hover:text-white transition-colors">
+              {username}
+            </span>
+          )}
+          <AccountSettingsDialog />
+        </div>
+      )}
+      {/* Pass forceUpdate to force re-render when metadata changes */}
+      <NowPlaying key={`now-playing-${forceUpdate}`} />
+      <Player />
       <Toaster />
     </div>
   );

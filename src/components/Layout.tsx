@@ -32,18 +32,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [isBlindTest]);
 
   return (
-    <div className="min-h-screen bg-spotify-base">
+    <div className="flex h-screen bg-spotify-base overflow-hidden">
       <Sidebar />
       <div 
-        className={`pt-6 pb-24 ${isMobile ? 'ml-0' : 'ml-64'}`}
+        className={`flex-1 overflow-y-auto ${isMobile ? 'w-full' : 'ml-64'}`}
         style={{ 
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
           paddingLeft: 'env(safe-area-inset-left)',
           paddingRight: 'env(safe-area-inset-right)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 6rem)'
         }}
       >
-        {children}
+        <div className="px-6 pb-24">
+          {children}
+        </div>
       </div>
       
       {/* Add some global protection against inspecting elements in blind test mode */}
