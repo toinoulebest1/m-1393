@@ -1,6 +1,6 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2 } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -44,6 +44,7 @@ export const Sidebar = () => {
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
     { to: "/search", icon: Search, label: "Rechercher" },
+    { to: "/playlists", icon: ListMusic, label: t('playlists.title') }, // Add playlists link
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') },

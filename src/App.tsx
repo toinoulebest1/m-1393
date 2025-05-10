@@ -1,194 +1,194 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState, Suspense } from "react";
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import Auth from "./pages/Auth";
 import Index from "./pages/Index";
+import { PlayerProvider } from "./contexts/PlayerContext";
+import { Layout } from "./components/Layout";
 import Favorites from "./pages/Favorites";
+import Search from "./pages/Search";
 import History from "./pages/History";
 import Top100 from "./pages/Top100";
-import Reports from "./pages/Reports";
-import Search from "./pages/Search";
-import Auth from "./pages/Auth";
-import SongMetadataUpdate from "./pages/SongMetadataUpdate";
 import BlindTest from "./pages/BlindTest";
-import "./i18n";
-import { I18nextProvider } from "react-i18next";
-import i18n from "./i18n";
-import { PlayerProvider } from "./contexts/PlayerContext";
-import CastProvider from "./contexts/CastContext";
+import Reports from "./pages/Reports";
+import SongMetadataUpdate from "./pages/SongMetadataUpdate";
+import { ThemeProvider } from "next-themes";
+import { CastProvider } from "./contexts/CastContext";
+import './App.css';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-    },
-  },
-});
+// Add new imports
+import Playlists from "./pages/Playlists";
+import PlaylistDetail from "./pages/PlaylistDetail";
 
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+function App() {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Session error:", error);
-          setIsAuthenticated(false);
-        } else {
-          setIsAuthenticated(!!session);
-        }
-      } catch (error) {
-        console.error("Session check error:", error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setLoading(false);
       }
+    );
+
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setLoading(false);
     };
 
     checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
-      setIsAuthenticated(!!session);
-      if (event === 'SIGNED_OUT') {
-        queryClient.clear();
-      }
-    });
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" />;
-};
-
-const App = () => {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const initI18n = async () => {
-      if (i18n.isInitialized) {
-        setIsLoading(false);
-      } else {
-        i18n.on('initialized', () => {
-          setIsLoading(false);
-        });
-      }
-    };
-    initI18n();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      <div className="flex items-center justify-center h-screen bg-spotify-base">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-accent"></div>
       </div>
     );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <I18nextProvider i18n={i18n}>
-        <TooltipProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark">
+      <CastProvider>
+        <Router>
           <PlayerProvider>
-            <CastProvider>
-              <Toaster />
-              <Sonner />
-              <Suspense fallback={
-                <div className="flex items-center justify-center min-h-screen">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                </div>
-              }>
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/auth" element={<Auth />} />
-                    <Route
-                      path="/"
-                      element={
-                        <PrivateRoute>
-                          <Index />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/search"
-                      element={
-                        <PrivateRoute>
-                          <Search />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/favorites"
-                      element={
-                        <PrivateRoute>
-                          <Favorites />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/history"
-                      element={
-                        <PrivateRoute>
-                          <History />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/top100"
-                      element={
-                        <PrivateRoute>
-                          <Top100 />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/reports"
-                      element={
-                        <PrivateRoute>
-                          <Reports />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/metadata-update"
-                      element={
-                        <PrivateRoute>
-                          <SongMetadataUpdate />
-                        </PrivateRoute>
-                      }
-                    />
-                    <Route
-                      path="/blind-test"
-                      element={
-                        <PrivateRoute>
-                          <BlindTest />
-                        </PrivateRoute>
-                      }
-                    />
-                  </Routes>
-                </BrowserRouter>
-              </Suspense>
-            </CastProvider>
+            <Routes>
+              <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
+              <Route 
+                path="/" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Index />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/favorites" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Favorites />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/search" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Search />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/history" 
+                element={
+                  session ? (
+                    <Layout>
+                      <History />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/top100" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Top100 />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/blind-test" 
+                element={
+                  session ? (
+                    <Layout>
+                      <BlindTest />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/reports" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Reports />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/metadata-update" 
+                element={
+                  session ? (
+                    <Layout>
+                      <SongMetadataUpdate />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+
+              {/* New playlist routes */}
+              <Route 
+                path="/playlists" 
+                element={
+                  session ? (
+                    <Layout>
+                      <Playlists />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/playlist/:playlistId" 
+                element={
+                  session ? (
+                    <Layout>
+                      <PlaylistDetail />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+            </Routes>
           </PlayerProvider>
-        </TooltipProvider>
-      </I18nextProvider>
-    </QueryClientProvider>
+        </Router>
+      </CastProvider>
+    </ThemeProvider>
   );
-};
+}
 
 export default App;
