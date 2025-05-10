@@ -56,9 +56,10 @@ function App() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark">
-      <CastProvider>
-        <Router>
-          <PlayerProvider>
+      <Router>
+        {/* Fixed provider order: PlayerProvider should wrap CastProvider */}
+        <PlayerProvider>
+          <CastProvider>
             <Routes>
               <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
               <Route 
@@ -184,9 +185,9 @@ function App() {
                 } 
               />
             </Routes>
-          </PlayerProvider>
-        </Router>
-      </CastProvider>
+          </CastProvider>
+        </PlayerProvider>
+      </Router>
     </ThemeProvider>
   );
 }

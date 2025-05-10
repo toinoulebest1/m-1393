@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { usePlayer } from './PlayerContext';
+import { usePlayerContext } from './PlayerContext';
 
 interface CastDevice {
   id: string;
@@ -22,7 +22,8 @@ interface CastContextType {
 const CastContext = createContext<CastContextType | null>(null);
 
 export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentSong, isPlaying, progress, play, pause } = usePlayer();
+  // Use usePlayerContext instead of usePlayer to match the export name
+  const { currentSong, isPlaying, progress, play, pause } = usePlayerContext();
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [activeDevice, setActiveDevice] = useState<CastDevice | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
