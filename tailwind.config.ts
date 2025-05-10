@@ -30,6 +30,9 @@ export default {
           light: "#D6BCFA",
           neutral: "#8E9196",
           accent: "#9b87f5",
+          "accent-hover": "#8472d9", // Nouvelle couleur pour hover
+          input: "#282c37", // Couleur pour les champs de formulaire
+          card: "#222836", // Couleur pour les cartes
         },
         // Nouvelles couleurs pour les thèmes
         neon: {
@@ -142,6 +145,11 @@ export default {
         "appear": {
           from: { opacity: "0" },
           to: { opacity: "1" }
+        },
+        "theme-transition": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" }
         }
       },
       animation: {
@@ -160,6 +168,7 @@ export default {
         "glow": "glow 1.5s ease-in-out infinite",
         "gradient": "gradient 3s linear infinite",
         "appear": "appear 0.3s ease-out forwards",
+        "theme-transition": "gradient 15s ease infinite"
       },
     },
   },
