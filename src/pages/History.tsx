@@ -4,9 +4,7 @@ import { cn } from "@/lib/utils";
 import { Music, Clock, Signal, Heart, Trash2, Flag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ColorThief from 'colorthief';
-import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
-import { getAudioFile } from '@/utils/storage';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -202,176 +200,177 @@ const History = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 ml-64 p-8 pb-32">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
-            <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
-              {t('common.history')}
-            </h2>
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto w-full">
+        <div className="max-w-6xl mx-auto p-8 pb-32">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
+              <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
+                {t('common.history')}
+              </h2>
+            </div>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button 
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  <span>{t('common.deleteHistory')}</span>
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-spotify-dark border-spotify-light">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">
+                    {t('common.confirmDeleteHistory')}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-spotify-neutral">
+                    {t('common.confirmDeleteHistoryMessage')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
+                    {t('common.cancel')}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={clearHistory}
+                    className="bg-red-500 hover:bg-red-600 text-white"
+                  >
+                    {t('common.delete')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <button 
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
-              >
-                <Trash2 className="w-5 h-5" />
-                <span>{t('common.deleteHistory')}</span>
-              </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-spotify-dark border-spotify-light">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="text-white">
-                  {t('common.confirmDeleteHistory')}
-                </AlertDialogTitle>
-                <AlertDialogDescription className="text-spotify-neutral">
-                  {t('common.confirmDeleteHistoryMessage')}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
-                  {t('common.cancel')}
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={clearHistory}
-                  className="bg-red-500 hover:bg-red-600 text-white"
-                >
-                  {t('common.delete')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-
-        <div className="space-y-2">
-          {isLoading ? (
-            <p className="text-spotify-neutral text-center py-8">
-              {t('common.loading')}
-            </p>
-          ) : history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
-              <Music className="w-16 h-16 text-spotify-neutral opacity-50" />
-              <p className="text-spotify-neutral text-lg">
-                {t('common.emptyHistory')}
+          <div className="space-y-2">
+            {isLoading ? (
+              <p className="text-spotify-neutral text-center py-8">
+                {t('common.loading')}
               </p>
-              <p className="text-spotify-neutral text-sm">
-                {t('common.startListening')}
-              </p>
-            </div>
-          ) : (
-            history.map((song) => {
-              const isFavorite = favorites.some(s => s.id === song.id);
-              const isCurrentSong = currentSong?.id === song.id;
-              const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
-              
-              const glowStyle = isCurrentSong && dominantColor ? {
-                boxShadow: `
-                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                `,
-                transition: 'box-shadow 0.3s ease-in-out',
-                transform: 'scale(1.02)',
-              } : {};
+            ) : history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
+                <Music className="w-16 h-16 text-spotify-neutral opacity-50" />
+                <p className="text-spotify-neutral text-lg">
+                  {t('common.emptyHistory')}
+                </p>
+                <p className="text-spotify-neutral text-sm">
+                  {t('common.startListening')}
+                </p>
+              </div>
+            ) : (
+              history.map((song) => {
+                const isFavorite = favorites.some(s => s.id === song.id);
+                const isCurrentSong = currentSong?.id === song.id;
+                const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
+                
+                const glowStyle = isCurrentSong && dominantColor ? {
+                  boxShadow: `
+                    0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                    0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                    0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                  `,
+                  transition: 'box-shadow 0.3s ease-in-out',
+                  transform: 'scale(1.02)',
+                } : {};
 
-              return (
-                <div
-                  key={song.id}
-                  className={cn(
-                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
-                    isCurrentSong 
-                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                      : "bg-transparent"
-                  )}
-                  onClick={() => handlePlay(song)}
-                >
-                  {isCurrentSong && (
-                    <div className="absolute inset-0 z-0 overflow-hidden">
-                      <div 
-                        className="absolute inset-0 animate-gradient opacity-20" 
-                        style={{
-                          backgroundSize: '200% 200%',
-                          animation: 'gradient 3s linear infinite',
-                          background: dominantColor 
-                            ? `linear-gradient(45deg, 
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
-                              )`
-                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <img
-                        src={imageSource}
-                        alt={`Pochette de ${song.title}`}
-                        className={cn(
-                          "w-14 h-14 rounded-lg shadow-lg object-cover",
-                          isCurrentSong && "animate-pulse"
-                        )}
-                        style={glowStyle}
-                        loading="lazy"
-                      />
-                      <div>
-                        <h3 className={cn(
-                          "font-medium transition-colors",
-                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
-                        )}>
-                          {song.title}
-                        </h3>
-                        <p className="text-sm text-spotify-neutral">{song.artist}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-6">
-                      <div className="flex items-center space-x-1 text-spotify-neutral">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">{song.duration || "0:00"}</span>
-                      </div>
-
-                      <div className="flex items-center space-x-1 text-spotify-neutral">
-                        <Signal className="w-4 h-4" />
-                        <span className="text-sm">{song.bitrate || "320 kbps"}</span>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(song);
-                        }}
-                        className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                      >
-                        <Heart
-                          className={cn(
-                            "w-5 h-5 transition-all duration-300 group-hover:scale-110",
-                            isFavorite
-                              ? "text-red-500 fill-red-500"
-                              : "text-spotify-neutral hover:text-white"
-                          )}
+                return (
+                  <div
+                    key={song.id}
+                    className={cn(
+                      "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                      isCurrentSong 
+                        ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                        : "bg-transparent"
+                    )}
+                    onClick={() => handlePlay(song)}
+                  >
+                    {isCurrentSong && (
+                      <div className="absolute inset-0 z-0 overflow-hidden">
+                        <div 
+                          className="absolute inset-0 animate-gradient opacity-20" 
+                          style={{
+                            backgroundSize: '200% 200%',
+                            animation: 'gradient 3s linear infinite',
+                            background: dominantColor 
+                              ? `linear-gradient(45deg, 
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                                )`
+                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                          }}
                         />
-                      </button>
+                      </div>
+                    )}
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSongToReport(song);
-                        }}
-                        className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                      >
-                        <Flag className="w-5 h-5 text-spotify-neutral group-hover:text-white transition-all duration-300 group-hover:scale-110" />
-                      </button>
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <img
+                          src={imageSource}
+                          alt={`Pochette de ${song.title}`}
+                          className={cn(
+                            "w-14 h-14 rounded-lg shadow-lg object-cover",
+                            isCurrentSong && "animate-pulse"
+                          )}
+                          style={glowStyle}
+                          loading="lazy"
+                        />
+                        <div>
+                          <h3 className={cn(
+                            "font-medium transition-colors",
+                            isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                          )}>
+                            {song.title}
+                          </h3>
+                          <p className="text-sm text-spotify-neutral">{song.artist}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-6">
+                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                          <Clock className="w-4 h-4" />
+                          <span className="text-sm">{song.duration || "0:00"}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                          <Signal className="w-4 h-4" />
+                          <span className="text-sm">{song.bitrate || "320 kbps"}</span>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(song);
+                          }}
+                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                        >
+                          <Heart
+                            className={cn(
+                              "w-5 h-5 transition-all duration-300 group-hover:scale-110",
+                              isFavorite
+                                ? "text-red-500 fill-red-500"
+                                : "text-spotify-neutral hover:text-white"
+                            )}
+                          />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSongToReport(song);
+                          }}
+                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                        >
+                          <Flag className="w-5 h-5 text-spotify-neutral group-hover:text-white transition-all duration-300 group-hover:scale-110" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
       <Player />

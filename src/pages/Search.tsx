@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -232,10 +231,9 @@ const Search = () => {
   };
 
   return (
-    <div className="flex min-h-screen relative">
-      <Sidebar />
-      <div className="flex-1 ml-64 p-8 pb-32">
-        <div className="w-full">
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto w-full">
+        <div className="max-w-6xl mx-auto p-8 pb-32">
           <style>
             {`
             @keyframes pulse-glow {
