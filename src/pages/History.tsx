@@ -1,13 +1,15 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
-import { Music, Clock, Signal, Heart, Trash2, Flag } from "lucide-react";
+import { Music, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import ColorThief from 'colorthief';
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
+import { SongCard } from "@/components/SongCard";
+import { extractDominantColor } from "@/utils/colorExtractor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +21,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useEffect, useState } from "react";
 
 const History = () => {
   const { t } = useTranslation();
@@ -121,34 +122,10 @@ const History = () => {
     };
   }, []);
 
-  const extractDominantColor = async (imageUrl: string) => {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const colorThief = new ColorThief();
-      const color = colorThief.getColor(img);
-      const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2),
-        Math.min(255, color[1] * 1.2),
-        Math.min(255, color[2] * 1.2)
-      ];
-      setDominantColor(saturatedColor);
-    } catch (error) {
-      console.error('Erreur lors de l\'extraction de la couleur:', error);
-      setDominantColor(null);
-    }
-  };
-
-  React.useEffect(() => {
+  // Update to use extracted utility
+  useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
-      extractDominantColor(currentSong.imageUrl);
+      extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
     } else {
       setDominantColor(null);
     }
@@ -187,13 +164,8 @@ const History = () => {
       }
       return;
     }
-
-    console.log(`Playing song from history: ${song.title}`);
     
-    // Create a new queue with just this song and make it the current queue
     setQueue([song]);
-    
-    // Start playing the song
     play(song);
     
     toast.success(`Lecture de : ${song.title}`);
@@ -263,109 +235,16 @@ const History = () => {
               history.map((song) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
                 const isCurrentSong = currentSong?.id === song.id;
-                const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
                 
-                const glowStyle = isCurrentSong && dominantColor ? {
-                  boxShadow: `
-                    0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                    0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                    0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                  `,
-                  transition: 'box-shadow 0.3s ease-in-out',
-                  transform: 'scale(1.02)',
-                } : {};
-
                 return (
-                  <div
-                    key={song.id}
-                    className={cn(
-                      "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
-                      isCurrentSong 
-                        ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                        : "bg-transparent"
-                    )}
-                    onClick={() => handlePlay(song)}
-                  >
-                    {isCurrentSong && (
-                      <div className="absolute inset-0 z-0 overflow-hidden">
-                        <div 
-                          className="absolute inset-0 animate-gradient opacity-20" 
-                          style={{
-                            backgroundSize: '200% 200%',
-                            animation: 'gradient 3s linear infinite',
-                            background: dominantColor 
-                              ? `linear-gradient(45deg, 
-                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
-                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
-                                )`
-                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="relative z-10 flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <img
-                          src={imageSource}
-                          alt={`Pochette de ${song.title}`}
-                          className={cn(
-                            "w-14 h-14 rounded-lg shadow-lg object-cover",
-                            isCurrentSong && "animate-pulse"
-                          )}
-                          style={glowStyle}
-                          loading="lazy"
-                        />
-                        <div>
-                          <h3 className={cn(
-                            "font-medium transition-colors",
-                            isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
-                          )}>
-                            {song.title}
-                          </h3>
-                          <p className="text-sm text-spotify-neutral">{song.artist}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-6">
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{song.duration || "0:00"}</span>
-                        </div>
-
-                        <div className="flex items-center space-x-1 text-spotify-neutral">
-                          <Signal className="w-4 h-4" />
-                          <span className="text-sm">{song.bitrate || "320 kbps"}</span>
-                        </div>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(song);
-                          }}
-                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                        >
-                          <Heart
-                            className={cn(
-                              "w-5 h-5 transition-all duration-300 group-hover:scale-110",
-                              isFavorite
-                                ? "text-red-500 fill-red-500"
-                                : "text-spotify-neutral hover:text-white"
-                            )}
-                          />
-                        </button>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSongToReport(song);
-                          }}
-                          className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
-                        >
-                          <Flag className="w-5 h-5 text-spotify-neutral group-hover:text-white transition-all duration-300 group-hover:scale-110" />
-                        </button>
-                      </div>
-                    </div>
+                  <div key={song.id} onClick={() => handlePlay(song)}>
+                    <SongCard
+                      song={song}
+                      isCurrentSong={isCurrentSong}
+                      isFavorite={isFavorite}
+                      dominantColor={dominantColor}
+                      onReportClick={() => setSongToReport(song)}
+                    />
                   </div>
                 );
               })
