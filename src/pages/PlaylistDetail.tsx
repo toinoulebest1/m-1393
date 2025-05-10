@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
+import { storePlaylistCover } from "@/utils/storage";
 
 interface Song {
   id: string;
@@ -57,14 +57,22 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
   try {
     // Filter songs that have images
     const songsWithImages = songs.filter(song => song.songs.imageUrl);
-    if (songsWithImages.length === 0) return null;
+    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
+    
+    if (songsWithImages.length === 0) {
+      console.log("No songs with images found for cover generation");
+      return null;
+    }
     
     // Create a canvas element
     const canvas = document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 400;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return null;
+    }
 
     // Fill with dark background
     ctx.fillStyle = '#121212';
@@ -77,6 +85,12 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
     // Load images
     const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
       return new Promise<void>((resolve, reject) => {
+        if (!song.songs.imageUrl) {
+          resolve();
+          return;
+        }
+        
+        console.log(`Loading image for song ${index + 1}:`, song.songs.imageUrl);
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
@@ -84,21 +98,30 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
           const row = Math.floor(index / gridSize);
           const col = index % gridSize;
           ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
+          console.log(`Image ${index + 1} drawn successfully`);
           resolve();
         };
         img.onerror = (e) => {
-          console.error('Error loading image:', e);
+          console.error(`Error loading image ${index + 1}:`, e);
           resolve(); // Still resolve to not block other images
         };
-        img.src = song.songs.imageUrl || '';
+        img.src = song.songs.imageUrl;
       });
     });
 
-    // Wait for all images to be drawn
-    await Promise.all(imagePromises);
+    try {
+      // Wait for all images to be drawn
+      await Promise.all(imagePromises);
+      console.log("All images drawn to canvas");
 
-    // Convert to data URL
-    return canvas.toDataURL('image/jpeg', 0.85);
+      // Convert to data URL
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      console.log("Canvas converted to data URL successfully");
+      return dataUrl;
+    } catch (err) {
+      console.error("Error during image processing:", err);
+      return null;
+    }
   } catch (error) {
     console.error('Error generating playlist cover:', error);
     return null;
@@ -136,35 +159,23 @@ const PlaylistDetail = () => {
     
     try {
       setUploading(true);
+      console.log("Starting playlist cover update for", playlistId);
       
       // Generate the cover image
       const coverDataUrl = await generatePlaylistCover(songs);
       if (!coverDataUrl) {
+        console.log("No cover data URL generated");
         setUploading(false);
         return;
       }
       
-      // Convert to file
-      const file = dataURLtoFile(coverDataUrl, `playlist-cover-${playlistId}.jpg`);
-      const fileExtension = 'jpg';
-      const fileName = `playlist-covers/${playlistId}.${fileExtension}`;
+      console.log("Cover data URL generated, uploading to storage");
       
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, {
-          upsert: true,
-          contentType: 'image/jpeg'
-        });
-      
-      if (uploadError) throw uploadError;
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
+      // Upload using the new storage function
+      const publicUrl = await storePlaylistCover(playlistId, coverDataUrl);
       
       // Update playlist record
+      console.log("Updating playlist record with new cover URL:", publicUrl);
       const { error: updateError } = await supabase
         .from('playlists')
         .update({ cover_image_url: publicUrl })
@@ -172,8 +183,10 @@ const PlaylistDetail = () => {
       
       if (updateError) throw updateError;
       
+      // Update local state
       setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
       
+      console.log("Playlist cover updated successfully");
       toast({
         description: t('playlists.coverGenerated')
       });
@@ -249,10 +262,12 @@ const PlaylistDetail = () => {
       }));
       
       setSongs(formattedSongs);
+      console.log(`Fetched ${formattedSongs.length} songs for playlist`);
       
       // Generate cover if songs are present but playlist has no cover
       if (formattedSongs.length > 0 && !playlistData.cover_image_url) {
-        updatePlaylistCover();
+        console.log("Playlist has songs but no cover, generating cover");
+        setTimeout(() => updatePlaylistCover(), 500);
       }
     } catch (error) {
       console.error("Error fetching playlist details:", error);
@@ -425,8 +440,11 @@ const PlaylistDetail = () => {
       // Refresh playlist songs
       await fetchPlaylistDetails();
       
-      // Update the cover image when adding new songs
-      updatePlaylistCover();
+      console.log("Songs added, triggering cover update");
+      // Force trigger the cover update with a short delay to ensure songs are loaded
+      setTimeout(() => {
+        updatePlaylistCover();
+      }, 500);
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`

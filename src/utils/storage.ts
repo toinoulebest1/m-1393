@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
@@ -114,5 +115,68 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
   } catch (error) {
     console.error("Erreur lors de la recherche Deezer:", error);
     return "https://picsum.photos/240/240";
+  }
+};
+
+// New function to store playlist cover images
+export const storePlaylistCover = async (playlistId: string, file: File | string | Blob) => {
+  console.log("Stockage de la pochette de playlist:", playlistId);
+  
+  try {
+    let fileToUpload: File;
+    
+    if (file instanceof Blob) {
+      fileToUpload = new File([file], `playlist-${playlistId}.jpg`, { 
+        type: 'image/jpeg' 
+      });
+    } else if (typeof file === 'string') {
+      // Handle data URL or remote URL
+      if (file.startsWith('data:')) {
+        // Convert data URL to Blob
+        const response = await fetch(file);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
+          type: 'image/jpeg' 
+        });
+      } else {
+        // Fetch remote URL
+        const response = await fetch(file);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
+          type: blob.type || 'image/jpeg' 
+        });
+      }
+    } else {
+      fileToUpload = file;
+    }
+    
+    const fileName = `playlist-covers/${playlistId}.jpg`;
+    
+    console.log("Uploading playlist cover to storage:", fileName);
+    const { data, error } = await supabase.storage
+      .from('media')
+      .upload(fileName, fileToUpload, {
+        upsert: true,
+        contentType: fileToUpload.type || 'image/jpeg'
+      });
+    
+    if (error) {
+      console.error("Erreur lors du stockage de la pochette:", error);
+      throw error;
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('media')
+      .getPublicUrl(fileName);
+    
+    console.log("Playlist cover uploaded successfully:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("Erreur lors du stockage de la pochette:", error);
+    throw error;
   }
 };
