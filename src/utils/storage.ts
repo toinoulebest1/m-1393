@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
@@ -118,9 +117,9 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
   }
 };
 
-// New function to store playlist cover images
+// Enhanced function to store playlist cover images
 export const storePlaylistCover = async (playlistId: string, file: File | string | Blob) => {
-  console.log("Stockage de la pochette de playlist:", playlistId);
+  console.log("Storing playlist cover for:", playlistId, typeof file);
   
   try {
     let fileToUpload: File;
@@ -129,16 +128,20 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
       fileToUpload = new File([file], `playlist-${playlistId}.jpg`, { 
         type: 'image/jpeg' 
       });
+      console.log("Converted Blob to File object");
     } else if (typeof file === 'string') {
       // Handle data URL or remote URL
       if (file.startsWith('data:')) {
+        console.log("Processing data URL");
         // Convert data URL to Blob
         const response = await fetch(file);
         const blob = await response.blob();
         fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
           type: 'image/jpeg' 
         });
+        console.log("Converted data URL to File object", blob.size, "bytes");
       } else {
+        console.log("Fetching remote URL:", file);
         // Fetch remote URL
         const response = await fetch(file);
         if (!response.ok) {
@@ -148,35 +151,166 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
         fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
           type: blob.type || 'image/jpeg' 
         });
+        console.log("Converted remote URL to File object", blob.size, "bytes");
       }
     } else {
       fileToUpload = file;
+      console.log("Using provided File object");
+    }
+    
+    // Make sure we have a valid image file before proceeding
+    if (!fileToUpload || fileToUpload.size === 0) {
+      console.error("Invalid file or empty file");
+      throw new Error("Invalid or empty file");
     }
     
     const fileName = `playlist-covers/${playlistId}.jpg`;
+    console.log(`Uploading playlist cover to storage: ${fileName}, size: ${fileToUpload.size} bytes`);
     
-    console.log("Uploading playlist cover to storage:", fileName);
+    // Upload the file
     const { data, error } = await supabase.storage
       .from('media')
       .upload(fileName, fileToUpload, {
         upsert: true,
-        contentType: fileToUpload.type || 'image/jpeg'
+        contentType: fileToUpload.type || 'image/jpeg',
+        cacheControl: '3600'
       });
     
     if (error) {
-      console.error("Erreur lors du stockage de la pochette:", error);
+      console.error("Error during storage upload:", error);
       throw error;
     }
     
-    // Get public URL
+    console.log("Upload succeeded, path:", data.path);
+    
+    // Get public URL with cache-busting parameter
+    const timestamp = new Date().getTime();
     const { data: { publicUrl } } = supabase.storage
       .from('media')
-      .getPublicUrl(fileName);
+      .getPublicUrl(`${fileName}?t=${timestamp}`);
     
-    console.log("Playlist cover uploaded successfully:", publicUrl);
+    console.log("Public URL generated:", publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error("Erreur lors du stockage de la pochette:", error);
+    console.error("Error storing playlist cover:", error);
     throw error;
+  }
+};
+
+// New function to fetch an existing playlist cover
+export const getPlaylistCover = async (playlistId: string): Promise<string | null> => {
+  try {
+    const fileName = `playlist-covers/${playlistId}.jpg`;
+    
+    // Check if the file exists
+    const { data: fileExists } = await supabase.storage
+      .from('media')
+      .list('playlist-covers', {
+        search: `${playlistId}.jpg`,
+        limit: 1
+      });
+      
+    if (!fileExists || fileExists.length === 0) {
+      console.log("No existing cover found for playlist:", playlistId);
+      return null;
+    }
+    
+    // Get public URL with cache-busting parameter
+    const timestamp = new Date().getTime();
+    const { data: { publicUrl } } = supabase.storage
+      .from('media')
+      .getPublicUrl(`${fileName}?t=${timestamp}`);
+    
+    console.log("Existing cover found:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("Error checking for playlist cover:", error);
+    return null;
+  }
+};
+
+// Better image generation with error handling and higher quality
+export const generateImageFromSongs = async (songs: any[]): Promise<string | null> => {
+  try {
+    // Filter songs that have images
+    const songsWithImages = songs.filter(song => 
+      song.songs?.imageUrl && song.songs.imageUrl.startsWith('http')
+    );
+    
+    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
+    
+    if (songsWithImages.length === 0) {
+      console.log("No songs with valid image URLs found");
+      return null;
+    }
+    
+    // Create canvas with higher resolution
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;  // Higher resolution
+    canvas.height = 600; // Higher resolution
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return null;
+    }
+
+    // Fill with dark background
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Determine grid size based on number of images (up to 4)
+    const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
+    const imageSize = canvas.width / gridSize;
+    
+    console.log(`Using grid size: ${gridSize}x${gridSize}, image size: ${imageSize}px`);
+
+    // Load images with proper error handling
+    const loadImage = (url: string): Promise<HTMLImageElement | null> => {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+          console.error(`Error loading image ${url}:`, e);
+          resolve(null);
+        };
+        // Add cache-busting parameter
+        const cacheBuster = `?t=${new Date().getTime()}`;
+        img.src = url.includes('?') ? `${url}&cb=${cacheBuster}` : `${url}${cacheBuster}`;
+      });
+    };
+
+    // Process images in parallel with proper error handling
+    const imagePromises = await Promise.all(
+      songsWithImages.slice(0, 4).map(song => loadImage(song.songs.imageUrl))
+    );
+    
+    // Filter out any failed images
+    const validImages = imagePromises.filter(img => img !== null) as HTMLImageElement[];
+    
+    console.log(`Successfully loaded ${validImages.length} images out of ${songsWithImages.length} attempted`);
+    
+    if (validImages.length === 0) {
+      console.log("No images could be loaded successfully");
+      return null;
+    }
+
+    // Draw valid images to the canvas
+    validImages.forEach((img, index) => {
+      const row = Math.floor(index / gridSize);
+      const col = index % gridSize;
+      ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
+      console.log(`Drew image ${index + 1} at position [${row},${col}]`);
+    });
+
+    // Convert to high-quality data URL
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    console.log(`Generated data URL of length ${dataUrl.length}`);
+    
+    return dataUrl;
+  } catch (error) {
+    console.error('Error generating playlist cover:', error);
+    return null;
   }
 };
