@@ -5,6 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { PlusCircle, MoreHorizontal, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,9 +43,19 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   const handleDelete = async () => {
     try {
+      // Delete all playlist songs first
+      const { error: songsError } = await supabase
+        .from('playlist_songs')
+        .delete()
+        .eq('playlist_id', playlist.id);
+      
+      if (songsError) throw songsError;
+      
+      // Then delete the playlist itself
       const { error } = await supabase
         .from('playlists')
         .delete()
@@ -47,6 +68,7 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         description: t('playlists.playlistDeleted')
       });
       
+      setShowDeleteDialog(false);
       onDeleted();
     } catch (error) {
       console.error("Error deleting playlist:", error);
@@ -93,11 +115,36 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleDelete} className="text-red-500">
+            <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-500">
               {t('playlists.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent className="bg-spotify-dark text-white border-spotify-card">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('common.delete')} {playlist.name}?</AlertDialogTitle>
+              <AlertDialogDescription className="text-spotify-neutral">
+                {t('common.confirmDeleteMessage')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-transparent border-spotify-border text-white hover:bg-spotify-card">
+                {t('common.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }} 
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {t('common.delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

@@ -91,7 +91,8 @@
     "reports": "Signalements",
     "language": "Langue",
     "logoutSuccess": "Déconnexion réussie",
-    "logoutError": "Erreur lors de la déconnexion"
+    "logoutError": "Erreur lors de la déconnexion",
+    "confirmDeleteMessage": "Cette action est irréversible et supprimera définitivement cette playlist."
   },
   "playlists": {
     "title": "Playlists",
