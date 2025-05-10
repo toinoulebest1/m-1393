@@ -14,7 +14,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +27,6 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
-import { searchDeezerTrack } from "@/utils/storage";
 
 interface Playlist {
   id: string;
@@ -44,8 +42,13 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const handleDelete = async () => {
+    if (isDeleting) return; // Prevent multiple clicks
+    
+    setIsDeleting(true);
+    
     try {
       // Delete all playlist songs first
       const { error: songsError } = await supabase
@@ -68,8 +71,13 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         description: t('playlists.playlistDeleted')
       });
       
+      // Close dialog first
       setShowDeleteDialog(false);
-      onDeleted();
+      
+      // Then notify parent after a short delay
+      setTimeout(() => {
+        onDeleted();
+      }, 100);
     } catch (error) {
       console.error("Error deleting playlist:", error);
       toast({
@@ -77,13 +85,22 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         description: t('playlists.errorDeleting'),
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Only navigate if the click wasn't on the dropdown
+    if (!(e.target as Element).closest('.playlist-actions')) {
+      navigate(`/playlist/${playlist.id}`);
     }
   };
   
   return (
     <div 
       className="bg-spotify-card p-4 rounded-lg hover:bg-spotify-card-hover transition-colors cursor-pointer group relative"
-      onClick={() => navigate(`/playlist/${playlist.id}`)}
+      onClick={handleCardClick}
     >
       <div className="aspect-square bg-spotify-dark rounded-md mb-4 flex items-center justify-center overflow-hidden">
         {playlist.cover_image_url ? (
@@ -107,7 +124,10 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         {playlist.song_count || 0} {playlist.song_count === 1 ? t('common.track') : t('common.tracks')}
       </p>
       
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 
+        onClick={(e) => e.stopPropagation()}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/60">
@@ -121,7 +141,11 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
+          if (!isDeleting) {
+            setShowDeleteDialog(open);
+          }
+        }}>
           <AlertDialogContent className="bg-spotify-dark text-white border-spotify-card">
             <AlertDialogHeader>
               <AlertDialogTitle>{t('common.delete')} {playlist.name}?</AlertDialogTitle>
@@ -130,7 +154,10 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-spotify-border text-white hover:bg-spotify-card">
+              <AlertDialogCancel 
+                disabled={isDeleting}
+                className="bg-transparent border-spotify-border text-white hover:bg-spotify-card"
+              >
                 {t('common.cancel')}
               </AlertDialogCancel>
               <AlertDialogAction 
@@ -138,9 +165,10 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
                   e.preventDefault();
                   handleDelete();
                 }} 
+                disabled={isDeleting}
                 className="bg-red-500 hover:bg-red-600"
               >
-                {t('common.delete')}
+                {isDeleting ? t('common.loading') : t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -381,6 +409,11 @@ const PlaylistsPage = () => {
     };
   }, []);
 
+  const handlePlaylistDeleted = () => {
+    // Refresh the playlist list without full page rerender
+    fetchPlaylists();
+  };
+
   return (
     <div className="container p-6">
       <div className="flex items-center justify-between mb-6">
@@ -404,7 +437,7 @@ const PlaylistsPage = () => {
             <PlaylistCard 
               key={playlist.id} 
               playlist={playlist} 
-              onDeleted={fetchPlaylists} 
+              onDeleted={handlePlaylistDeleted} 
             />
           ))}
         </div>
