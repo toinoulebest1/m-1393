@@ -80,11 +80,17 @@
     "findingMissingLyrics": "Recherche des paroles manquantes...",
     "missingLyricsFound": "Paroles manquantes trouvées",
     "noMissingLyrics": "Aucune parole manquante trouvée",
-    "processingLyrics": "Traitement de {{current}}/{{total}} chansons",
+    "processingLyrics": "Traitement de {{count}}/{{total}} chansons",
     "lyricsUpdated": "Paroles mises à jour pour {{count}} chanson",
     "lyricsUpdated_plural": "Paroles mises à jour pour {{count}} chansons",
     "lyricsErrors": "{{count}} chanson en échec",
     "lyricsErrors_plural": "{{count}} chansons en échec",
-    "play": "Lire"
+    "play": "Lire",
+    "playlists": "Playlists",
+    "blindTest": "Blind Test",
+    "reports": "Signalements",
+    "language": "Langue",
+    "logoutSuccess": "Déconnexion réussie",
+    "logoutError": "Erreur lors de la déconnexion"
   }
 }

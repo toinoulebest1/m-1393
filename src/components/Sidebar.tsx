@@ -44,15 +44,15 @@ export const Sidebar = () => {
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
     { to: "/search", icon: Search, label: t('common.search') },
-    { to: "/playlists", icon: ListMusic, label: t('playlists.title') },
+    { to: "/playlists", icon: ListMusic, label: t('common.playlists') },
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/blind-test", icon: Gamepad2, label: "Blind Test" }
+    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
   ];
 
   if (isAdmin) {
-    links.push({ to: "/reports", icon: Flag, label: "Signalements" });
+    links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
     links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
   }
 
@@ -64,10 +64,10 @@ export const Sidebar = () => {
     try {
       await supabase.auth.signOut();
       navigate('/auth');
-      toast.success("Déconnexion réussie");
+      toast.success(t('common.logoutSuccess'));
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
-      toast.error("Erreur lors de la déconnexion");
+      toast.error(t('common.logoutError'));
     }
   };
 
@@ -102,7 +102,7 @@ export const Sidebar = () => {
         <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
           <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
             <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-              <SelectValue placeholder="Langue" />
+              <SelectValue placeholder={t('common.language')} />
             </SelectTrigger>
             <SelectContent className="bg-spotify-dark border-white/10">
               <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
