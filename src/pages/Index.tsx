@@ -1,5 +1,5 @@
+
 import { Player } from "@/components/Player";
-import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect, useRef } from "react";
@@ -220,7 +220,7 @@ const Index = () => {
   }, [userId, username, refreshCurrentSong]);
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full flex flex-col">
       {!isMobile && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
           {username && (
@@ -232,7 +232,9 @@ const Index = () => {
         </div>
       )}
       {/* Pass forceUpdate to force re-render when metadata changes */}
-      <NowPlaying key={`now-playing-${forceUpdate}`} />
+      <div className="flex-1 w-full">
+        <NowPlaying key={`now-playing-${forceUpdate}`} />
+      </div>
       <Player />
       <Toaster />
     </div>

@@ -32,10 +32,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [isBlindTest]);
 
   return (
-    <div className="flex h-screen bg-spotify-base overflow-hidden">
+    <div className="flex h-screen w-full bg-spotify-base overflow-hidden">
       <Sidebar />
       <div 
-        className={`flex-1 overflow-y-auto ${isMobile ? 'w-full' : 'ml-64'}`}
+        className={`flex-1 overflow-y-auto w-full ${isMobile ? '' : 'ml-64'}`}
         style={{ 
           paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
           paddingLeft: 'env(safe-area-inset-left)',
@@ -43,7 +43,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 6rem)'
         }}
       >
-        <div className="px-6 pb-24">
+        <div className="w-full px-6 pb-24">
           {children}
         </div>
       </div>
