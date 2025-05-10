@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
-import { storePlaylistCover } from "@/utils/storage";
+import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
 
 interface Song {
   id: string;
@@ -161,18 +161,25 @@ const PlaylistDetail = () => {
       setUploading(true);
       console.log("Starting playlist cover update for", playlistId);
       
-      // Generate the cover image
-      const coverDataUrl = await generatePlaylistCover(songs);
+      // First check if we can use the enhanced generation function
+      const coverDataUrl = await generateImageFromSongs(songs);
       if (!coverDataUrl) {
-        console.log("No cover data URL generated");
-        setUploading(false);
-        return;
+        console.log("No cover data URL generated via enhanced method, trying legacy method");
+        // Fallback to older method
+        const legacyCoverDataUrl = await generatePlaylistCover(songs);
+        if (!legacyCoverDataUrl) {
+          console.log("No cover could be generated");
+          setUploading(false);
+          return;
+        }
       }
       
+      // Use whichever data URL we got
+      const finalCoverDataUrl = coverDataUrl || await generatePlaylistCover(songs);
       console.log("Cover data URL generated, uploading to storage");
       
-      // Upload using the new storage function
-      const publicUrl = await storePlaylistCover(playlistId, coverDataUrl);
+      // Upload using the storage function
+      const publicUrl = await storePlaylistCover(playlistId, finalCoverDataUrl);
       
       // Update playlist record
       console.log("Updating playlist record with new cover URL:", publicUrl);
@@ -192,6 +199,11 @@ const PlaylistDetail = () => {
       });
     } catch (error) {
       console.error("Error updating playlist cover:", error);
+      toast({
+        title: t('common.error'),
+        description: t('playlists.errorUploadingCover'),
+        variant: "destructive"
+      });
     } finally {
       setUploading(false);
     }
@@ -441,10 +453,10 @@ const PlaylistDetail = () => {
       await fetchPlaylistDetails();
       
       console.log("Songs added, triggering cover update");
-      // Force trigger the cover update with a short delay to ensure songs are loaded
+      // Force trigger the cover update with a longer delay to ensure songs are loaded
       setTimeout(() => {
         updatePlaylistCover();
-      }, 500);
+      }, 1000); // Increased delay to ensure data is ready
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
