@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -123,14 +122,11 @@ const Favorites = () => {
 
   if (favorites.length === 0) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex-1 ml-64">
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
-              <Heart className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
-              <p className="text-spotify-neutral text-lg">{t('common.noFavorites')}</p>
-            </div>
+      <div className="w-full h-full flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
+            <Heart className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
+            <p className="text-spotify-neutral text-lg">{t('common.noFavorites')}</p>
           </div>
         </div>
         <Player />
@@ -139,9 +135,8 @@ const Favorites = () => {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 ml-64">
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
           <div className="flex items-center space-x-6 mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">

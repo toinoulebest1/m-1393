@@ -1,5 +1,4 @@
 import { Player } from "@/components/Player";
-import { Sidebar } from "@/components/Sidebar";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
@@ -386,8 +385,7 @@ const Top100 = () => {
 
   if (favoriteStats.length === 0) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
+      <div className="w-full h-full flex flex-col">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-4 animate-fade-in p-8 rounded-lg bg-white/5 backdrop-blur-sm">
             <Award className="w-16 h-16 text-spotify-accent mx-auto animate-pulse" />
@@ -402,9 +400,8 @@ const Top100 = () => {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 overflow-hidden ml-64">
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto w-full">
         <div className="p-6 animate-fade-in">
           {isAdmin && (
             <Alert className="border-spotify-accent bg-spotify-accent/10">
