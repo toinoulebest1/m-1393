@@ -21,9 +21,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       document.body.classList.remove('blind-test');
     }
     
+    // Setup for mobile native app
+    document.body.classList.add('capacitor-app');
+    
     // Cleanup function to remove the class when component unmounts
     return () => {
       document.body.classList.remove('blind-test');
+      document.body.classList.remove('capacitor-app');
     };
   }, [isBlindTest]);
 
@@ -32,6 +36,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar />
       <div 
         className={`pt-6 pb-24 ${isMobile ? 'ml-0' : 'ml-64'}`}
+        style={{ 
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 6rem)'
+        }}
       >
         {children}
       </div>
@@ -52,6 +62,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           `
         }} />
       )}
+      
+      {/* Add mobile styles */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          /* Mobile app specific styles */
+          body.capacitor-app {
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+          }
+          
+          /* Handle notch and safe areas */
+          @supports (padding-top: env(safe-area-inset-top)) {
+            body.capacitor-app {
+              padding-top: env(safe-area-inset-top);
+              padding-left: env(safe-area-inset-left);
+              padding-right: env(safe-area-inset-right);
+              padding-bottom: env(safe-area-inset-bottom);
+            }
+          }
+        `
+      }} />
     </div>
   );
 };
