@@ -43,8 +43,8 @@ export const Sidebar = () => {
 
   const links = [
     { to: "/", icon: Home, label: t('common.home') },
-    { to: "/search", icon: Search, label: "Rechercher" },
-    { to: "/playlists", icon: ListMusic, label: t('playlists.title') }, // Add playlists link
+    { to: "/search", icon: Search, label: t('common.search') },
+    { to: "/playlists", icon: ListMusic, label: t('playlists.title') },
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') },
@@ -53,7 +53,7 @@ export const Sidebar = () => {
 
   if (isAdmin) {
     links.push({ to: "/reports", icon: Flag, label: "Signalements" });
-    links.push({ to: "/metadata-update", icon: Database, label: "Métadonnées" });
+    links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
   }
 
   const handleLanguageChange = (value: string) => {
@@ -76,7 +76,7 @@ export const Sidebar = () => {
       <div className="mb-8">
         <div className="flex items-center gap-2">
           <Music2 className="w-8 h-8 text-spotify-accent" />
-          <h1 className="text-xl font-bold text-white">Spotify Clone</h1>
+          <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
         </div>
       </div>
 

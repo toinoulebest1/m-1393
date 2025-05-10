@@ -84,6 +84,7 @@
     "lyricsUpdated": "Paroles mises à jour pour {{count}} chanson",
     "lyricsUpdated_plural": "Paroles mises à jour pour {{count}} chansons",
     "lyricsErrors": "{{count}} chanson en échec",
-    "lyricsErrors_plural": "{{count}} chansons en échec"
+    "lyricsErrors_plural": "{{count}} chansons en échec",
+    "play": "Lire"
   }
 }
