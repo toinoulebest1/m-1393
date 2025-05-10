@@ -27,7 +27,6 @@ import { SongPicker } from "@/components/SongPicker";
 import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 interface Song {
   id: string;
@@ -491,8 +490,10 @@ const PlaylistDetail = () => {
     setQueue(playlistSongs);
     play(playlistSongs[0]);
     
-    // Add toast notification
-    toast.success(t('player.playingPlaylist'));
+    // Fix: Replace sonner toast.success with shadcn toast
+    toast({
+      description: t('player.playingPlaylist')
+    });
   };
   
   // Improved function to play a specific song
@@ -514,8 +515,10 @@ const PlaylistDetail = () => {
     // Then start playing the selected song
     play(song);
     
-    // Add toast notification
-    toast.success(`${t('player.playing')}: ${song.title}`);
+    // Fix: Replace sonner toast.success with shadcn toast
+    toast({
+      description: `${t('player.playing')}: ${song.title}`
+    });
   };
 
   const isCurrentSong = (song: Song) => {
