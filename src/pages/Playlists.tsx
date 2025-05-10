@@ -125,11 +125,20 @@ const CreatePlaylistDialog = ({ onCreated }: { onCreated: () => void }) => {
     setIsSubmitting(true);
     
     try {
+      // Get the current user's ID
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No authentication session found");
+      }
+      
+      // FIX: Include the user_id in the insert
       const { data, error } = await supabase
         .from('playlists')
         .insert({ 
           name, 
-          description: description || null 
+          description: description || null,
+          user_id: session.user.id 
         })
         .select()
         .single();

@@ -240,9 +240,11 @@ const PlaylistDetail = () => {
         .filter(song => song.id !== playlistSongId)
         .sort((a, b) => a.position - b.position);
       
-      // Update positions in database
+      // Update positions in database - FIX: Include all required fields for upsert
       const updates = remainingSongs.map((song, index) => ({
         id: song.id,
+        playlist_id: playlistId,
+        song_id: song.songs.id,
         position: index + 1
       }));
       
