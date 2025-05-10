@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Song {
   id: string;
@@ -29,6 +32,7 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
+  const { play, currentSong, favorites } = usePlayer();
 
   useEffect(() => {
     fetchSongs();
@@ -59,6 +63,7 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
       setSongs(formattedSongs);
     } catch (error) {
       console.error("Error fetching songs:", error);
+      toast.error(t('errors.fetchingSongs'));
     } finally {
       setLoading(false);
     }
@@ -97,6 +102,7 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
       setSongs(formattedSongs);
     } catch (error) {
       console.error("Error searching songs:", error);
+      toast.error(t('errors.searchingSongs'));
     } finally {
       setLoading(false);
     }
@@ -115,7 +121,14 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
   };
 
   const handleConfirm = () => {
+    toast.success(`${selectedSongs.length} ${t('playlists.songsAdded')}`);
     onSelectionConfirmed(selectedSongs);
+  };
+  
+  const handlePlaySong = (e: React.MouseEvent, song: Song) => {
+    e.stopPropagation(); // Prevent triggering the song selection toggle
+    play(song);
+    toast.success(`${t('player.playing')}: ${song.title}`);
   };
 
   const filteredSongs = searchQuery.trim() 
@@ -165,13 +178,17 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
           <div className="space-y-1">
             {filteredSongs.map(song => {
               const isSelected = selectedSongs.some(s => s.id === song.id);
+              const isCurrentlyPlaying = currentSong?.id === song.id;
+              const isFavorite = favorites.some(s => s.id === song.id);
               
               return (
                 <div
                   key={song.id}
-                  className={`flex items-center p-2 hover:bg-spotify-card/30 rounded-md cursor-pointer ${
-                    isSelected ? 'bg-spotify-card/60' : ''
-                  }`}
+                  className={cn(
+                    "flex items-center p-2 hover:bg-spotify-card/30 rounded-md cursor-pointer transition-all duration-200",
+                    isSelected ? "bg-spotify-card/60" : "",
+                    isCurrentlyPlaying ? "border-l-2 border-spotify-accent" : ""
+                  )}
                   onClick={() => toggleSongSelection(song)}
                 >
                   <div className="mr-3">
@@ -182,25 +199,58 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
                     )}
                   </div>
                   <div className="flex items-center gap-3 flex-1">
-                    {song.imageUrl ? (
-                      <img 
-                        src={song.imageUrl} 
-                        alt={song.title} 
-                        className="w-10 h-10 rounded"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-spotify-card flex items-center justify-center">
-                        <Music2 className="w-5 h-5 text-spotify-neutral" />
-                      </div>
-                    )}
+                    <div 
+                      className="relative w-10 h-10 rounded overflow-hidden group cursor-pointer"
+                      onClick={(e) => handlePlaySong(e, song)}
+                    >
+                      {song.imageUrl ? (
+                        <>
+                          <img 
+                            src={song.imageUrl} 
+                            alt={song.title} 
+                            className="w-full h-full object-cover transition-opacity group-hover:opacity-50"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                            {isCurrentlyPlaying ? (
+                              <div className="w-5 h-5 flex items-center justify-center">
+                                <span className="block w-1 h-3 bg-spotify-accent mx-0.5 animate-pulse"></span>
+                                <span className="block w-1 h-5 bg-spotify-accent mx-0.5 animate-pulse delay-75"></span>
+                                <span className="block w-1 h-3 bg-spotify-accent mx-0.5 animate-pulse delay-150"></span>
+                              </div>
+                            ) : (
+                              <div className="w-5 h-5 border-2 border-white rounded-full flex items-center justify-center">
+                                <div className="w-0 h-0 border-t-transparent border-t-4 border-b-transparent border-b-4 border-l-white border-l-6 ml-0.5"></div>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-spotify-card flex items-center justify-center">
+                          <Music2 className="w-5 h-5 text-spotify-neutral" />
+                        </div>
+                      )}
+                      {isCurrentlyPlaying && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-spotify-accent"></div>
+                      )}
+                    </div>
                     <div>
-                      <p className="text-white font-medium">{song.title}</p>
+                      <p className={cn(
+                        "text-white font-medium",
+                        isCurrentlyPlaying && "text-spotify-accent"
+                      )}>{song.title}</p>
                       <p className="text-spotify-neutral text-sm">
                         {song.artist || t('common.noArtist')}
                       </p>
                     </div>
                   </div>
-                  <div className="text-spotify-neutral text-sm ml-2">
+                  <div className="text-spotify-neutral text-sm ml-2 flex items-center gap-2">
+                    {isFavorite && (
+                      <div className="text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                          <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                        </svg>
+                      </div>
+                    )}
                     {song.duration}
                   </div>
                 </div>
