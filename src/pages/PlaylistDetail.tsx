@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -25,6 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
 import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
+import { SongCard } from "@/components/SongCard";
+import { cn } from "@/lib/utils";
 
 interface Song {
   id: string;
@@ -151,7 +153,8 @@ const PlaylistDetail = () => {
   const [editedName, setEditedName] = useState('');
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { play, addToQueue, queue, setQueue } = usePlayer();
+  const { play, addToQueue, queue, setQueue, currentSong, favorites } = usePlayer();
+  const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
 
   // Create or update playlist cover based on song images
   const updatePlaylistCover = async () => {
@@ -488,6 +491,26 @@ const PlaylistDetail = () => {
     play(playlistSongs[0]);
   };
 
+  const isCurrentSong = (song: Song) => {
+    return currentSong && currentSong.id === song.id;
+  };
+
+  const isFavoriteSong = (song: Song) => {
+    return favorites.some(fav => fav.id === song.id);
+  };
+  
+  // Function to handle showing song lyrics
+  const handleLyricsClick = (song: Song) => {
+    console.log("Show lyrics for:", song.title);
+    // Here we could implement opening lyrics modal, similar to how it's done in other pages
+  };
+
+  // Function to handle reporting a song
+  const handleReportClick = (song: Song) => {
+    console.log("Report song:", song.title);
+    // Here we could implement report functionality, similar to how it's done in other pages
+  };
+
   useEffect(() => {
     fetchPlaylistDetails();
     
@@ -669,72 +692,20 @@ const PlaylistDetail = () => {
       </div>
       
       {songs.length > 0 ? (
-        <Table className="w-full">
-          <TableHeader>
-            <TableRow className="border-b border-spotify-card hover:bg-transparent">
-              <TableHead className="text-spotify-neutral w-12 text-center">#</TableHead>
-              <TableHead className="text-spotify-neutral">{t('common.title')}</TableHead>
-              <TableHead className="text-spotify-neutral hidden md:table-cell">{t('common.artist')}</TableHead>
-              <TableHead className="text-spotify-neutral hidden lg:table-cell">{t('common.duration')}</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {songs.map((song, index) => (
-              <TableRow 
-                key={song.id} 
-                className="border-b border-spotify-card hover:bg-spotify-card/20 group cursor-pointer"
-                onClick={() => play(song.songs)}
-              >
-                <TableCell className="text-spotify-neutral text-center">{song.position}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    {song.songs.imageUrl ? (
-                      <img 
-                        src={song.songs.imageUrl} 
-                        alt={song.songs.title} 
-                        className="w-10 h-10 rounded"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-spotify-card flex items-center justify-center">
-                        <Music2 className="w-5 h-5 text-spotify-neutral" />
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-white font-medium">{song.songs.title}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-spotify-neutral hidden md:table-cell">
-                  {song.songs.artist || t('common.noArtist')}
-                </TableCell>
-                <TableCell className="text-spotify-neutral hidden lg:table-cell">
-                  {song.songs.duration}
-                </TableCell>
-                <TableCell className="opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => play(song.songs)}>
-                        {t('playlists.play')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addToQueue(song.songs)}>
-                        {t('playlists.addToQueue')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleRemoveSong(song.id)} className="text-red-500">
-                        {t('playlists.remove')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="space-y-2">
+          {/* Display songs using SongCard component for enhanced visual experience */}
+          {songs.map((song) => (
+            <SongCard
+              key={song.id}
+              song={song.songs}
+              isCurrentSong={isCurrentSong(song.songs)}
+              isFavorite={isFavoriteSong(song.songs)}
+              dominantColor={dominantColors[song.songs.id] || null}
+              onLyricsClick={handleLyricsClick}
+              onReportClick={handleReportClick}
+            />
+          ))}
+        </div>
       ) : (
         <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
           <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
