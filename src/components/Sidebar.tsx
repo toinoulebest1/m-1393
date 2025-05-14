@@ -1,138 +1,215 @@
-
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { Home, Heart, Search, Clock, ListMusic, BarChart3, Bug, Settings, Database } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { MusicUploader } from "./MusicUploader";
-import { ThemeToggle } from "./ThemeToggle";
-import { AdBanner } from "./AdBanner";
-import { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export const Sidebar = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
+      if (session) {
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
 
-      setIsAdmin(userRole?.role === 'admin');
+        setIsAdmin(userRole?.role === 'admin');
+      } else {
+        setIsAdmin(false);
+      }
     };
 
     checkAdminStatus();
   }, []);
 
-  const links = [
-    { to: "/", icon: Home, label: t('common.home') },
-    { to: "/search", icon: Search, label: t('common.search') },
-    { to: "/playlists", icon: ListMusic, label: t('common.playlists') },
-    { to: "/favorites", icon: Heart, label: t('common.favorites') },
-    { to: "/history", icon: History, label: t('common.history') },
-    { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
-  ];
-
-  if (isAdmin) {
-    links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
-    links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
-    links.push({ to: "/dropbox-settings", icon: CloudUpload, label: "Dropbox" });
-  }
-
-  const handleLanguageChange = (value: string) => {
-    i18n.changeLanguage(value);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-      toast.success(t('common.logoutSuccess'));
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-      toast.error(t('common.logoutError'));
-    }
-  };
-
   return (
-    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
-      <div className="mb-8">
-        <div className="flex items-center gap-2">
-          <Music2 className="w-8 h-8 text-spotify-accent" />
-          <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
-        </div>
+    <div className="w-64 flex-shrink-0 bg-spotify-base text-spotify-neutral py-4">
+      <div className="px-4 mb-6">
+        <h1 className="text-white text-2xl font-bold">Spotify</h1>
       </div>
-
-      <nav className="space-y-2">
-        {links.map(({ to, icon: Icon, label }) => (
-          <Link
-            key={to}
-            to={to}
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors",
-              location.pathname === to
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/10"
-            )}
+      <ul className="space-y-1">
+        <li>
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
           >
-            <Icon className="w-5 h-5" />
-            <span className="font-medium">{label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
-          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-            <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-              <SelectValue placeholder={t('common.language')} />
-            </SelectTrigger>
-            <SelectContent className="bg-spotify-dark border-white/10">
-              <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-                Français
-              </SelectItem>
-              <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-                English
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          <ThemeToggle />
-
-          <MusicUploader />
-          
-          <AdBanner />
-        </div>
-
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
-            onClick={handleLogout}
+            <Home className="h-5 w-5 mr-3" />
+            <span>{t('common.home')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/search"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
           >
-            <LogOut className="w-5 h-5 mr-2" />
-            <span>{t('common.logout')}</span>
-          </Button>
-        </div>
-      </div>
+            <Search className="h-5 w-5 mr-3" />
+            <span>{t('common.search')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/favorites"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
+          >
+            <Heart className="h-5 w-5 mr-3" />
+            <span>{t('common.favorites')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/history"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
+          >
+            <Clock className="h-5 w-5 mr-3" />
+            <span>{t('common.history')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/playlists"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
+          >
+            <ListMusic className="h-5 w-5 mr-3" />
+            <span>{t('common.playlists')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/top100"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
+          >
+            <BarChart3 className="h-5 w-5 mr-3" />
+            <span>{t('common.top100')}</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to="/blind-test"
+            className={({ isActive }) =>
+              `flex items-center px-4 py-3 transition-colors ${
+                isActive
+                  ? "text-white bg-white/10"
+                  : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              }`
+            }
+          >
+            <Bug className="h-5 w-5 mr-3" />
+            <span>{t('common.blindTest')}</span>
+          </NavLink>
+        </li>
+      </ul>
+
+      {isAdmin && (
+        <>
+          <div className="px-4 mt-6 mb-2 text-spotify-neutral uppercase text-xs font-bold">
+            Admin
+          </div>
+          <ul className="space-y-1">
+            <li>
+              <NavLink
+                to="/reports"
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 transition-colors ${
+                    isActive
+                      ? "text-white bg-white/10"
+                      : "text-spotify-neutral hover:text-white hover:bg-white/5"
+                  }`
+                }
+              >
+                <BarChart3 className="h-5 w-5 mr-3" />
+                <span>Reports</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/metadata-update"
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 transition-colors ${
+                    isActive
+                      ? "text-white bg-white/10"
+                      : "text-spotify-neutral hover:text-white hover:bg-white/5"
+                  }`
+                }
+              >
+                <Settings className="h-5 w-5 mr-3" />
+                <span>Metadata Update</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/dropbox-settings"
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 transition-colors ${
+                    isActive
+                      ? "text-white bg-white/10"
+                      : "text-spotify-neutral hover:text-white hover:bg-white/5"
+                  }`
+                }
+              >
+                <Settings className="h-5 w-5 mr-3" />
+                <span>Dropbox Settings</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/data-migration"
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-3 transition-colors ${
+                    isActive
+                      ? "text-white bg-white/10"
+                      : "text-spotify-neutral hover:text-white hover:bg-white/5"
+                  }`
+                }
+              >
+                <Database className="h-5 w-5 mr-3" />
+                <span>Migration des données</span>
+              </NavLink>
+            </li>
+          </ul>
+        </>
+      )}
     </div>
   );
 };

@@ -215,3 +215,86 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     throw error;
   }
 };
+
+// Nouvelle fonction pour migrer les fichiers de Supabase vers Dropbox
+export const migrateFilesFromSupabaseToDropbox = async (songIds: string[]): Promise<{
+  success: string[];
+  failures: {id: string, error: string}[];
+}> => {
+  console.log(`Démarrage de la migration de ${songIds.length} fichiers audio vers Dropbox`);
+  
+  if (!isDropboxEnabled()) {
+    toast.error("Dropbox n'est pas configuré. Veuillez configurer Dropbox dans les paramètres.");
+    throw new Error("Dropbox not configured");
+  }
+  
+  const results = {
+    success: [] as string[],
+    failures: [] as {id: string, error: string}[]
+  };
+  
+  // Process songs one by one to avoid overloading
+  for (const songId of songIds) {
+    const toastId = toast.loading(`Migration du fichier ${songId} (${songIds.indexOf(songId) + 1}/${songIds.length})...`);
+    
+    try {
+      console.log(`Traitement du fichier: ${songId}`);
+      
+      // 1. Fetch the file from Supabase storage
+      const { data: bucketsList } = await supabase.storage.listBuckets();
+      const audioBucket = bucketsList?.find(bucket => bucket.name === 'audio');
+      
+      if (!audioBucket) {
+        throw new Error("Le bucket 'audio' n'existe pas dans Supabase");
+      }
+      
+      // 2. Get the signed URL for the file
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('audio')
+        .createSignedUrl(songId, 3600);
+        
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        throw new Error(`Impossible d'obtenir l'URL signée pour le fichier ${songId}: ${signedUrlError?.message || 'URL non générée'}`);
+      }
+      
+      console.log(`URL signée obtenue: ${signedUrlData.signedUrl}`);
+      
+      // 3. Download the file
+      const fileResponse = await fetch(signedUrlData.signedUrl);
+      if (!fileResponse.ok) {
+        throw new Error(`Impossible de télécharger le fichier depuis Supabase: ${fileResponse.status} ${fileResponse.statusText}`);
+      }
+      
+      const blob = await fileResponse.blob();
+      const fileType = blob.type || 'audio/mpeg';
+      const file = new File([blob], `${songId}`, { type: fileType });
+      
+      console.log(`Fichier téléchargé: ${file.size} bytes, type: ${file.type}`);
+      
+      // 4. Upload the file to Dropbox
+      const dropboxPath = await uploadFileToDropbox(file, `audio/${songId}`);
+      console.log(`Fichier uploadé vers Dropbox: ${dropboxPath}`);
+      
+      // 5. Update toast and add to success list
+      results.success.push(songId);
+      toast.success(`Fichier ${songId} migré avec succès`, { id: toastId });
+    } catch (error) {
+      console.error(`Erreur lors de la migration du fichier ${songId}:`, error);
+      results.failures.push({
+        id: songId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      toast.error(`Échec de la migration du fichier ${songId}: ${error instanceof Error ? error.message : String(error)}`, { id: toastId });
+    }
+  }
+  
+  // Final notification
+  if (results.success.length > 0) {
+    toast.success(`${results.success.length} fichier(s) migré(s) avec succès vers Dropbox`);
+  }
+  if (results.failures.length > 0) {
+    toast.error(`${results.failures.length} fichier(s) n'ont pas pu être migré(s)`);
+  }
+  
+  return results;
+};
