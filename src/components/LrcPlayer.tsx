@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { findCurrentLyricLine, LrcLine } from '@/utils/lrcParser';
+import { Progress } from '@/components/ui/progress';
 
 interface LrcPlayerProps {
   parsedLyrics: { lines: LrcLine[], offset?: number } | null;
@@ -20,6 +21,11 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const scrollTimeoutRef = useRef<number | null>(null);
   const previousTimeRef = useRef<number>(0);
   const activeLineRef = useRef<HTMLDivElement | null>(null);
+  
+  // States for loading bar
+  const [firstLyricTime, setFirstLyricTime] = useState<number | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isWaitingForFirstLyric, setIsWaitingForFirstLyric] = useState(false);
 
   // Ajout de logs pour diagnostiquer la synchronisation
   useEffect(() => {
@@ -28,6 +34,40 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       previousTimeRef.current = currentTime;
     }
   }, [currentTime]);
+
+  // Determine the first lyric time and setup loading bar
+  useEffect(() => {
+    if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) return;
+    
+    // Find the first non-empty lyric line with a time greater than 0
+    const firstLine = parsedLyrics.lines.find(line => line.text && line.text.trim() !== '' && line.time > 0);
+    
+    if (firstLine) {
+      setFirstLyricTime(firstLine.time);
+      
+      // Check if we're before the first lyric
+      if (currentTime < firstLine.time) {
+        setIsWaitingForFirstLyric(true);
+      } else {
+        setIsWaitingForFirstLyric(false);
+        setLoadingProgress(100);
+      }
+    }
+  }, [parsedLyrics, currentTime]);
+
+  // Update loading progress based on current time
+  useEffect(() => {
+    if (isWaitingForFirstLyric && firstLyricTime && firstLyricTime > 0) {
+      // Calculate progress as a percentage of time until first lyric
+      const progress = Math.min(100, (currentTime / firstLyricTime) * 100);
+      setLoadingProgress(progress);
+      
+      // If we've reached the first lyric, stop showing the loading bar
+      if (currentTime >= firstLyricTime) {
+        setIsWaitingForFirstLyric(false);
+      }
+    }
+  }, [currentTime, firstLyricTime, isWaitingForFirstLyric]);
 
   // Mise à jour de la ligne active en fonction du temps de lecture avec plus de précision
   useEffect(() => {
@@ -106,40 +146,61 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   }
 
   return (
-    <div 
-      className={`overflow-y-auto h-full relative ${className}`}
-      ref={containerRef}
-      onScroll={handleScroll}
-    >
-      {/* Spacer at top to allow centering of first lines */}
-      <div className="h-[40vh]"></div>
-      
-      <div className="py-8">
-        {parsedLyrics.lines.map((line, index) => (
-          <div 
-            key={`${index}-${line.time}`}
-            data-line-index={index}
-            data-time={line.time}
-            ref={currentLineIndex === index ? activeLineRef : null}
-            className={`
-              py-2 px-4 transition-all duration-300 text-center my-3
-              ${currentLineIndex === index 
-                ? 'text-spotify-accent font-bold text-2xl' 
-                : nextLines.some(nextLine => nextLine.time === line.time)
-                  ? 'text-white/90 text-xl'
-                  : index < currentLineIndex 
-                    ? 'text-white/30 text-lg'
-                    : 'text-white/60 text-lg'
-              }
-            `}
-          >
-            {line.text || " "}
+    <div className="flex flex-col h-full">
+      {/* Loading progress bar before the first lyric */}
+      {isWaitingForFirstLyric && firstLyricTime && (
+        <div className="w-full px-4 py-2 mb-4 animate-fade-in">
+          <div className="text-center text-white/70 mb-2">
+            Préparation des paroles...
           </div>
-        ))}
-      </div>
+          <Progress 
+            value={loadingProgress} 
+            className="h-2 bg-white/10" 
+            indicatorClassName="bg-spotify-accent" 
+          />
+          <div className="flex justify-between text-xs text-white/50 mt-1">
+            <span>0:00</span>
+            <span>{Math.floor(firstLyricTime / 60)}:{String(Math.floor(firstLyricTime % 60)).padStart(2, '0')}</span>
+          </div>
+        </div>
+      )}
       
-      {/* Spacer at bottom to allow centering of last lines */}
-      <div className="h-[40vh]"></div>
+      {/* Lyrics content */}
+      <div 
+        className={`overflow-y-auto h-full relative ${className}`}
+        ref={containerRef}
+        onScroll={handleScroll}
+      >
+        {/* Spacer at top to allow centering of first lines */}
+        <div className="h-[40vh]"></div>
+        
+        <div className="py-8">
+          {parsedLyrics.lines.map((line, index) => (
+            <div 
+              key={`${index}-${line.time}`}
+              data-line-index={index}
+              data-time={line.time}
+              ref={currentLineIndex === index ? activeLineRef : null}
+              className={`
+                py-2 px-4 transition-all duration-300 text-center my-3
+                ${currentLineIndex === index 
+                  ? 'text-spotify-accent font-bold text-2xl' 
+                  : nextLines.some(nextLine => nextLine.time === line.time)
+                    ? 'text-white/90 text-xl'
+                    : index < currentLineIndex 
+                      ? 'text-white/30 text-lg'
+                      : 'text-white/60 text-lg'
+                }
+              `}
+            >
+              {line.text || " "}
+            </div>
+          ))}
+        </div>
+        
+        {/* Spacer at bottom to allow centering of last lines */}
+        <div className="h-[40vh]"></div>
+      </div>
     </div>
   );
 };
