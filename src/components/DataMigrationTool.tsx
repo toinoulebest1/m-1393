@@ -4,11 +4,12 @@ import { migrateFilesFromSupabaseToDropbox, isDropboxEnabled } from '@/utils/dro
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Upload, Check, X } from 'lucide-react';
+import { Loader2, Upload, Check, X, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Song {
   id: string;
@@ -28,7 +29,9 @@ export const DataMigrationTool = () => {
   } | null>(null);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [dropboxReady, setDropboxReady] = useState(false);
+  const [bucketStatus, setBucketStatus] = useState<{exists: boolean, error?: string} | null>(null);
   
+  // Check if Dropbox is configured
   useEffect(() => {
     const checkDropbox = () => {
       setDropboxReady(isDropboxEnabled());
@@ -42,6 +45,28 @@ export const DataMigrationTool = () => {
     };
   }, []);
   
+  // Check if the audio bucket exists
+  useEffect(() => {
+    const checkBucket = async () => {
+      try {
+        const { data: bucketsList, error: bucketsError } = await supabase.storage.listBuckets();
+        
+        if (bucketsError) {
+          setBucketStatus({ exists: false, error: `Erreur lors de la vérification des buckets: ${bucketsError.message}` });
+          return;
+        }
+        
+        const audioBucket = bucketsList?.find(bucket => bucket.name === 'audio');
+        setBucketStatus({ exists: !!audioBucket });
+      } catch (error) {
+        setBucketStatus({ exists: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    };
+    
+    checkBucket();
+  }, []);
+  
+  // Fetch songs from Supabase database
   useEffect(() => {
     const fetchSongs = async () => {
       setIsLoading(true);
@@ -97,63 +122,31 @@ export const DataMigrationTool = () => {
       return;
     }
     
+    if (!bucketStatus?.exists) {
+      toast.error('Le bucket audio n\'existe pas dans Supabase Storage.');
+      return;
+    }
+    
     setIsMigrating(true);
     setMigrationResults(null);
     
     try {
       const songIdsArray = Array.from(selectedSongs);
-      let processed = 0;
       
-      // Set up progress tracking
-      const updateProgress = () => {
-        processed++;
-        const progressPercentage = (processed / songIdsArray.length) * 100;
-        setCurrentProgress(progressPercentage);
-      };
+      // Start with progress at 0
+      setCurrentProgress(0);
       
-      // Add an event listener to update progress
-      const originalMigrate = migrateFilesFromSupabaseToDropbox;
-      const wrappedMigrate = async (songIds: string[]) => {
-        const result = await originalMigrate(songIds);
-        updateProgress();
-        return result;
-      };
+      // Get migration results
+      const results = await migrateFilesFromSupabaseToDropbox(songIdsArray);
       
-      // Start migration with batches of 1 to show progress
-      const results = {
-        success: [] as string[],
-        failures: [] as {id: string, error: string}[]
-      };
-      
-      for (const songId of songIdsArray) {
-        try {
-          const batchResult = await wrappedMigrate([songId]);
-          results.success.push(...batchResult.success);
-          results.failures.push(...batchResult.failures);
-        } catch (error) {
-          results.failures.push({
-            id: songId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-          updateProgress();
-        }
-      }
-      
+      // Set full progress when complete
+      setCurrentProgress(100);
       setMigrationResults(results);
-      
-      // Final notification summary
-      if (results.success.length > 0) {
-        toast.success(`${results.success.length} fichier(s) migré(s) avec succès vers Dropbox`);
-      }
-      if (results.failures.length > 0) {
-        toast.error(`${results.failures.length} fichier(s) n'ont pas pu être migré(s)`);
-      }
     } catch (error) {
       console.error('Erreur lors de la migration:', error);
       toast.error(`Erreur lors de la migration: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsMigrating(false);
-      setCurrentProgress(0);
     }
   };
   
@@ -167,9 +160,21 @@ export const DataMigrationTool = () => {
       </CardHeader>
       <CardContent>
         {!dropboxReady && (
-          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-yellow-600 dark:text-yellow-400">
-            <p className="text-sm">Dropbox n'est pas configuré. Veuillez configurer Dropbox dans les paramètres pour activer la migration.</p>
-          </div>
+          <Alert variant="warning" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Dropbox n'est pas configuré. Veuillez configurer Dropbox dans les paramètres pour activer la migration.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {!bucketStatus?.exists && bucketStatus !== null && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {bucketStatus.error || "Le bucket 'audio' n'existe pas dans Supabase Storage. Veuillez créer le bucket avant de continuer."}
+            </AlertDescription>
+          </Alert>
         )}
         
         {isLoading ? (
@@ -246,7 +251,9 @@ export const DataMigrationTool = () => {
                           </Badge>
                         )}
                         {migrationResults.failures.some(f => f.id === song.id) && (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                          <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" title={
+                            migrationResults.failures.find(f => f.id === song.id)?.error
+                          }>
                             <X className="h-3 w-3 mr-1" /> Échec
                           </Badge>
                         )}
@@ -264,7 +271,8 @@ export const DataMigrationTool = () => {
             </ScrollArea>
             
             {migrationResults && (
-              <div className="mt-4 text-sm">
+              <div className="mt-4 p-3 bg-slate-50 rounded-md dark:bg-slate-900">
+                <h3 className="font-medium mb-2">Résultats de la migration</h3>
                 <div className="flex space-x-4">
                   <div className="flex items-center">
                     <Badge variant="outline" className="mr-2 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
@@ -279,6 +287,21 @@ export const DataMigrationTool = () => {
                     {migrationResults.failures.length} échecs
                   </div>
                 </div>
+                
+                {migrationResults.failures.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-sm font-medium mb-1">Détails des erreurs:</h4>
+                    <ScrollArea className="h-[100px] w-full rounded-md border p-2 mt-1">
+                      <ul className="space-y-1 text-sm">
+                        {migrationResults.failures.map((failure, index) => (
+                          <li key={index} className="text-red-600 dark:text-red-400">
+                            <span className="font-medium">{failure.id}</span>: {failure.error}
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -287,7 +310,7 @@ export const DataMigrationTool = () => {
       <CardFooter className="flex justify-end">
         <Button
           onClick={handleMigration}
-          disabled={selectedSongs.size === 0 || isMigrating || !dropboxReady}
+          disabled={selectedSongs.size === 0 || isMigrating || !dropboxReady || !bucketStatus?.exists}
           className="flex items-center"
         >
           {isMigrating ? (

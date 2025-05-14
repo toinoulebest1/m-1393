@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -216,7 +215,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   }
 };
 
-// Nouvelle fonction pour migrer les fichiers de Supabase vers Dropbox
+// Improved function to migrate files from Supabase to Dropbox with better error handling
 export const migrateFilesFromSupabaseToDropbox = async (songIds: string[]): Promise<{
   success: string[];
   failures: {id: string, error: string}[];
@@ -240,15 +239,62 @@ export const migrateFilesFromSupabaseToDropbox = async (songIds: string[]): Prom
     try {
       console.log(`Traitement du fichier: ${songId}`);
       
-      // 1. Fetch the file from Supabase storage
-      const { data: bucketsList } = await supabase.storage.listBuckets();
+      // 1. Check if this file already exists in Dropbox
+      try {
+        const { data: existingFile } = await supabase
+          .from('dropbox_files')
+          .select('*')
+          .eq('local_id', `audio/${songId}`)
+          .maybeSingle();
+          
+        if (existingFile) {
+          console.log(`Fichier déjà migré vers Dropbox: ${existingFile.dropbox_path}`);
+          results.success.push(songId);
+          toast.success(`Fichier ${songId} déjà présent sur Dropbox`, { id: toastId });
+          continue;
+        }
+      } catch (checkError) {
+        console.log('Erreur lors de la vérification si le fichier existe déjà:', checkError);
+        // Continue anyway to try uploading
+      }
+      
+      // 2. Fetch the file from Supabase storage
+      console.log('Vérification des buckets Supabase');
+      const { data: bucketsList, error: bucketsError } = await supabase.storage.listBuckets();
+      
+      if (bucketsError) {
+        throw new Error(`Erreur lors de la récupération des buckets: ${bucketsError.message}`);
+      }
+      
       const audioBucket = bucketsList?.find(bucket => bucket.name === 'audio');
       
       if (!audioBucket) {
         throw new Error("Le bucket 'audio' n'existe pas dans Supabase");
       }
       
-      // 2. Get the signed URL for the file
+      console.log('Bucket audio trouvé:', audioBucket.name);
+      
+      // Verify the file exists in the bucket
+      console.log('Vérification si le fichier existe dans le bucket');
+      const { data: filesList, error: filesError } = await supabase.storage
+        .from('audio')
+        .list('', {
+          search: songId
+        });
+        
+      if (filesError) {
+        throw new Error(`Erreur lors de la vérification du fichier: ${filesError.message}`);
+      }
+      
+      const fileExists = filesList?.some(file => file.name === songId);
+      if (!fileExists) {
+        throw new Error(`Fichier ${songId} non trouvé dans le bucket Supabase`);
+      }
+      
+      console.log(`Fichier ${songId} trouvé dans le bucket`);
+      
+      // 3. Get the signed URL for the file
+      console.log('Génération de l\'URL signée');
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('audio')
         .createSignedUrl(songId, 3600);
@@ -259,23 +305,29 @@ export const migrateFilesFromSupabaseToDropbox = async (songIds: string[]): Prom
       
       console.log(`URL signée obtenue: ${signedUrlData.signedUrl}`);
       
-      // 3. Download the file
+      // 4. Download the file
+      console.log('Téléchargement du fichier depuis Supabase');
       const fileResponse = await fetch(signedUrlData.signedUrl);
       if (!fileResponse.ok) {
         throw new Error(`Impossible de télécharger le fichier depuis Supabase: ${fileResponse.status} ${fileResponse.statusText}`);
       }
       
       const blob = await fileResponse.blob();
+      if (blob.size === 0) {
+        throw new Error('Le fichier téléchargé est vide (0 bytes)');
+      }
+      
       const fileType = blob.type || 'audio/mpeg';
       const file = new File([blob], `${songId}`, { type: fileType });
       
       console.log(`Fichier téléchargé: ${file.size} bytes, type: ${file.type}`);
       
-      // 4. Upload the file to Dropbox
+      // 5. Upload the file to Dropbox
+      console.log('Upload vers Dropbox');
       const dropboxPath = await uploadFileToDropbox(file, `audio/${songId}`);
       console.log(`Fichier uploadé vers Dropbox: ${dropboxPath}`);
       
-      // 5. Update toast and add to success list
+      // 6. Update toast and add to success list
       results.success.push(songId);
       toast.success(`Fichier ${songId} migré avec succès`, { id: toastId });
     } catch (error) {
