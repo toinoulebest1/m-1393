@@ -267,6 +267,23 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, [song?.imageUrl, extractDominantColor]);
 
+  // Détection plus robuste du format LRC
+  const isLrcFormat = (text: string): boolean => {
+    if (!text) return false;
+    
+    // Expression régulière plus robuste pour détecter les timestamps LRC
+    const timeRegex = /\[\d{1,2}[\.\:]\d{2}(?:[\.\:]\d{2})?\]/;
+    
+    // Vérifier les 5 premières lignes non vides
+    const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, 5);
+    
+    // Si au moins 2 lignes contiennent un timestamp, considérer comme format LRC
+    const matchCount = lines.filter(line => timeRegex.test(line)).length;
+    console.log(`Détection LRC: ${matchCount} lignes sur ${lines.length} contiennent des timestamps`);
+    
+    return matchCount >= 2;
+  };
+
   // Query to fetch lyrics - optimized with caching
   const { data: lyrics, isLoading, refetch } = useQuery({
     queryKey: ["lyrics", song?.id],
