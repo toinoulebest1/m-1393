@@ -301,24 +301,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Fonction play modifiée pour gérer correctement les transitions
   const play = async (song?: Song) => {
-    // Nettoyer les transitions précédentes si en cours
+    // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
     }
     
-    if (fadingRef.current) {
-      console.log("Annulation de la transition en cours");
-      fadingRef.current = false;
-    }
-
-    // Réinitialiser le volume des éléments audio
-    if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
-    }
+    fadingRef.current = false;
+    
+    // Reset volumes
     if (nextAudioRef.current) {
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
     }
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
@@ -352,7 +349,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await addToHistory(song);
         }
 
-        const audioUrl = await getAudioFile(song.url);
+        const audioUrl = await getAudioFile(song.url).catch(error => {
+          console.error(`Erreur lors de la récupération du fichier audio pour ${song.title}:`, error);
+          toast.error(`Impossible de lire "${song.title}". Fichier non trouvé.`);
+          throw error;
+        });
+        
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');
         }
@@ -372,11 +374,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }).catch(error => {
             console.error("Error starting playback:", error);
             setIsPlaying(false);
+            toast.error(`Erreur de lecture pour "${song.title}"`);
           });
         }
       } catch (error) {
         console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce titre");
+        // More descriptive error message
+        if (error.message && error.message.includes("Fichier audio non trouvé")) {
+          toast.error(`Impossible de trouver le fichier audio pour "${song.title}"`);
+        } else {
+          toast.error(`Impossible de lire "${song.title}". Erreur: ${error.message || 'Inconnue'}`);
+        }
+        
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
         setIsPlaying(false);
@@ -391,6 +400,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }).catch(error => {
             console.error("Error resuming playback:", error);
             setIsPlaying(false);
+            toast.error("Erreur lors de la reprise de la lecture");
           });
         }
       } catch (error) {

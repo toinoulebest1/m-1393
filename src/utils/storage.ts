@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 
@@ -75,44 +76,58 @@ export const getAudioFile = async (path: string) => {
 
   try {
     if (useDropbox) {
-      // Gestion améliorée des chemins pour les structures de dossiers
-      let dropboxPath = path;
+      // Enhanced path handling for different folder structures
+      const tryPaths = [];
       
-      // Si le chemin ne contient pas de '/', ajouter le préfixe 'audio/'
-      if (!path.includes('/')) {
-        dropboxPath = `audio/${path}`;
-      }
-      
-      // Vérifier si le chemin contient déjà un fichier ou s'il s'agit d'un dossier
-      // Si le chemin se termine par une extension de fichier audio (.mp3, .wav, etc.), c'est un fichier
+      // Case 1: Direct path (already includes file extension)
       const audioFileExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac'];
-      const isFilePath = audioFileExtensions.some(ext => path.toLowerCase().endsWith(ext));
+      const hasAudioExtension = audioFileExtensions.some(ext => path.toLowerCase().endsWith(ext));
       
-      // Si c'est un chemin de dossier et non un fichier, chercher le fichier audio dans le dossier
-      if (!isFilePath && path.includes('/')) {
-        const folderPath = path;
-        // Essayer de récupérer le fichier audio du dossier (on suppose qu'il a le même nom que le dossier)
-        const folderId = folderPath.split('/').pop();
-        if (folderId) {
-          // Essayer plusieurs extensions courantes pour le fichier audio
-          for (const ext of audioFileExtensions) {
-            try {
-              const audioFilePath = `${folderPath}/${folderId}${ext}`;
-              console.log(`Tentative de récupération du fichier audio: ${audioFilePath}`);
-              return await getDropboxSharedLink(audioFilePath);
-            } catch (error) {
-              console.log(`Fichier ${ext} non trouvé, essai suivant...`);
-              // Continue to try the next extension
-            }
-          }
+      if (hasAudioExtension) {
+        // If path already has audio extension, use it directly
+        tryPaths.push(path);
+      } else {
+        // Case 2: Path might be a folder (songs/id)
+        if (path.includes('/')) {
+          const folderId = path.split('/').pop() || '';
+          
+          // Try with the folder name as filename with different extensions
+          audioFileExtensions.forEach(ext => {
+            tryPaths.push(`${path}/${folderId}${ext}`);
+          });
+          
+          // Also try with just the folder path
+          tryPaths.push(path);
+        } else {
+          // Case 3: Simple ID (needs to be prefixed with audio/)
+          tryPaths.push(`audio/${path}`);
+          
+          // Try with different extensions if no extension specified
+          audioFileExtensions.forEach(ext => {
+            tryPaths.push(`audio/${path}${ext}`);
+          });
         }
-        
-        // Si aucune extension ne fonctionne, on tente avec le chemin original
-        console.log("Aucun fichier audio trouvé avec les extensions courantes, tentative avec le chemin original");
       }
       
-      console.log(`Récupération du fichier depuis Dropbox: ${dropboxPath}`);
-      return await getDropboxSharedLink(dropboxPath);
+      console.log("Attempting to retrieve file using paths:", tryPaths);
+      
+      // Try each path in sequence until one works
+      for (const tryPath of tryPaths) {
+        try {
+          console.log(`Trying path: ${tryPath}`);
+          const url = await getDropboxSharedLink(tryPath);
+          if (url) {
+            console.log(`Successfully found file at: ${tryPath}`);
+            return url;
+          }
+        } catch (error) {
+          console.log(`Path ${tryPath} failed:`, error);
+          // Continue to next path
+        }
+      }
+      
+      // If we get here, none of the paths worked
+      throw new Error(`Fichier audio non trouvé: ${path}. Chemins essayés: ${tryPaths.join(', ')}`);
     }
     
     // Original Supabase implementation

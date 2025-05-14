@@ -1,560 +1,203 @@
-import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-
-// Add a simple local storage helper for Dropbox configuration
-export const getDropboxConfig = (): DropboxConfig => {
-  const configStr = localStorage.getItem('dropbox_config');
-  if (!configStr) {
-    return { accessToken: '', isEnabled: false };
-  }
-  
-  try {
-    return JSON.parse(configStr) as DropboxConfig;
-  } catch (e) {
-    console.error('Error parsing Dropbox config:', e);
-    return { accessToken: '', isEnabled: false };
-  }
-};
-
-export const saveDropboxConfig = (config: DropboxConfig): void => {
-  localStorage.setItem('dropbox_config', JSON.stringify(config));
-};
+import { toast } from 'sonner';
 
 export const isDropboxEnabled = (): boolean => {
-  const config = getDropboxConfig();
-  return config.isEnabled && !!config.accessToken;
+  return localStorage.getItem('use_dropbox_storage') === 'true';
 };
 
-// Function to check if a file exists on Dropbox
-export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
-  const config = getDropboxConfig();
-  
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    return false;
-  }
-  
+export const uploadFileToDropbox = async (file: File, path: string, folderPath?: string) => {
   try {
-    // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
-    
-    try {
-      const { data: fileRef, error } = await supabase
-        .from('dropbox_files')
-        .select('dropbox_path')
-        .eq('local_id', path)
-        .maybeSingle();
-        
-      if (error) {
-        console.error('Error fetching Dropbox file reference:', error);
-      } else if (fileRef) {
-        dropboxPath = fileRef.dropbox_path;
-        console.log('Found stored Dropbox path:', dropboxPath);
-      }
-    } catch (dbError) {
-      console.error('Database error when fetching reference:', dbError);
+    console.log(`Uploading file to Dropbox: ${file.name} to path: ${path}`);
+
+    const accessToken = localStorage.getItem('dropbox_access_token');
+    if (!accessToken) {
+      throw new Error('Dropbox access token not found. Please authenticate with Dropbox.');
     }
-    
-    // Check if the file exists on Dropbox using the get_metadata API
-    const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        path: dropboxPath
-      })
-    });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('Error checking if file exists on Dropbox:', error);
-    return false;
-  }
-};
 
-// Updated function to upload a file to Dropbox
-// Now supports better folder organization with optional folderPath parameter
-export const uploadFileToDropbox = async (
-  file: File,
-  path: string,
-  folderPath?: string
-): Promise<string> => {
-  const config = getDropboxConfig();
-  
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    toast.error("Token d'accès Dropbox non configuré");
-    throw new Error('Dropbox access token not configured');
-  }
-  
-  // Construct full path based on folderPath parameter
-  const fullPath = folderPath ? `/${folderPath}/${path}` : `/${path}`;
-  
-  console.log(`Uploading file to Dropbox: ${fullPath}`, file);
-  console.log(`File size: ${file.size} bytes, type: ${file.type}`);
-  
-  try {
-    // Using Dropbox API v2 with fetch
+    let dropboxPath = `/${path}`;
+    if (folderPath) {
+      dropboxPath = `/${folderPath}/${file.name}`;
+    }
+
     const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': JSON.stringify({
-          path: fullPath,
-          mode: 'overwrite',
+          path: dropboxPath,
+          mode: 'add',
           autorename: true,
-          mute: false
-        })
+          mute: false,
+          strict_conflict: false,
+        }),
       },
-      body: file
+      body: file,
     });
-    
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox upload error status:', response.status, response.statusText);
-      console.error('Dropbox upload error details:', errorText);
-      
-      // More specific error messages based on status code
-      if (response.status === 400) {
-        toast.error("Erreur 400: Requête invalide. Vérifiez la taille du fichier et les permissions Dropbox.");
-        console.error("Possible causes: invalid file format, file too large, or incorrect parameters");
-      } else if (response.status === 401) {
-        toast.error("Erreur 401: Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
-      } else if (response.status === 403) {
-        toast.error("Erreur 403: Accès refusé. Vérifiez les permissions de votre app Dropbox.");
-      } else if (response.status === 429) {
-        toast.error("Erreur 429: Trop de requêtes. Veuillez réessayer plus tard.");
-      } else {
-        toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
-      }
-      
-      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText} - ${errorText}`);
+      const errorData = await response.json();
+      console.error('Dropbox upload error:', errorData);
+      throw new Error(`Dropbox upload failed: ${errorData.error_summary || 'Unknown error'}`);
     }
-    
+
     const data = await response.json();
-    console.log('Dropbox upload successful:', data);
-    toast.success("Fichier téléchargé avec succès vers Dropbox");
-    
-    // Store the reference in Supabase
-    try {
-      // Store the path without the leading slash to be consistent
-      const pathToStore = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
-      
-      // Insert using a raw query instead of the typed client
-      const { error } = await supabase
-        .from('dropbox_files')
-        .insert({
-          local_id: path,
-          dropbox_path: data.path_display || fullPath
-        });
-        
-      if (error) {
-        console.error('Error saving Dropbox reference:', error);
-        // Continue anyway since the upload succeeded
-      }
-    } catch (dbError) {
-      console.error('Database error when saving reference:', dbError);
-      // Continue anyway since the upload succeeded
-    }
-    
-    return data.path_display || fullPath;
+    console.log('Dropbox upload success:', data);
+    toast.success(`${file.name} uploaded to Dropbox successfully!`);
+    return data;
   } catch (error) {
-    console.error('Error uploading to Dropbox:', error);
-    toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
+    console.error('Dropbox upload error:', error);
+    toast.error(`Failed to upload ${file.name} to Dropbox. See console for details.`);
     throw error;
   }
 };
 
-// Function to get a shared link for a file on Dropbox
-export const getDropboxSharedLink = async (path: string): Promise<string> => {
-  const config = getDropboxConfig();
-  
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    toast.error("Token d'accès Dropbox non configuré");
-    throw new Error('Dropbox access token not configured');
-  }
-  
+export const getDropboxSharedLink = async (path: string) => {
   try {
-    // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
+    console.log(`Retrieving Dropbox shared link for: ${path}`);
     
+    // First try to see if a shared link already exists
     try {
-      const { data: fileRef, error } = await supabase
-        .from('dropbox_files')
-        .select('dropbox_path')
-        .eq('local_id', path)
-        .maybeSingle();
-        
-      if (error) {
-        console.error('Error fetching Dropbox file reference:', error);
-      } else if (fileRef) {
-        dropboxPath = fileRef.dropbox_path;
-        console.log('Found stored Dropbox path:', dropboxPath);
-      }
-    } catch (dbError) {
-      console.error('Database error when fetching reference:', dbError);
-    }
-    
-    const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        path: dropboxPath,
-        settings: {
-          requested_visibility: "public"
-        }
-      })
-    });
-    
-    // If link already exists, fetch it
-    if (response.status === 409) {
-      console.log('Shared link already exists, fetching it');
-      const listResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+      console.log("Checking if shared link already exists");
+      const response = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          path: dropboxPath
-        })
-      });
-      
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        console.error('Failed to list shared links:', errorText);
-        toast.error("Impossible de récupérer le lien de partage");
-        throw new Error('Failed to list shared links');
-      }
-      
-      const listData = await listResponse.json();
-      
-      if (listData.links && listData.links.length > 0) {
-        // Convert the shared link to a direct download link
-        let url = listData.links[0].url;
-        url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-        url = url.replace('?dl=0', '');
-        
-        return url;
-      }
-      
-      toast.error("Aucun lien de partage trouvé");
-      throw new Error('No shared links found');
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox shared link error:', errorText);
-      toast.error("Impossible de créer un lien de partage");
-      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    // Convert the shared link to a direct download link
-    let url = data.url;
-    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-    url = url.replace('?dl=0', '');
-    
-    return url;
-  } catch (error) {
-    console.error('Error getting Dropbox shared link:', error);
-    toast.error("Impossible d'obtenir un lien de partage Dropbox");
-    throw error;
-  }
-};
-
-// Fonction améliorée pour migrer les fichiers audio de Supabase vers Dropbox
-export const migrateFilesToDropbox = async (
-  files: Array<{ id: string; file_path: string }>,
-  callbacks?: {
-    onProgress?: (processed: number, total: number) => void;
-    onSuccess?: (fileId: string) => void;
-    onError?: (fileId: string, error: string) => void;
-  }
-): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> => {
-  const config = getDropboxConfig();
-  
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    throw new Error('Dropbox access token not configured');
-  }
-  
-  console.log(`Starting migration of ${files.length} files from Supabase to Dropbox`);
-  
-  let successCount = 0;
-  let failedCount = 0;
-  const failedFiles: Array<{ id: string; error: string }> = [];
-
-  // Vérifier si le fichier existe déjà dans Dropbox
-  const checkFileExistsInDropbox = async (path: string): Promise<boolean> => {
-    try {
-      const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${localStorage.getItem('dropbox_access_token')}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           path: `/${path}`
         })
       });
       
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  };
-  
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const processedCount = i + 1;
-    
-    // Appeler la callback de progression si elle existe
-    if (callbacks?.onProgress) {
-      callbacks.onProgress(processedCount, files.length);
-    }
-    
-    try {
-      console.log(`Processing file ${processedCount}/${files.length}: ${file.id}`);
-      
-      // Vérifier si le fichier existe déjà dans Dropbox
-      const fileExists = await checkFileExistsInDropbox(`audio/${file.id}`);
-      
-      if (fileExists) {
-        console.log(`File already exists in Dropbox: ${file.id}`);
-        
-        // Enregistrer la référence dans la base de données
-        await supabase
-          .from('dropbox_files')
-          .upsert({
-            local_id: `audio/${file.id}`,
-            dropbox_path: `/audio/${file.id}`
-          });
-        
-        successCount++;
-        if (callbacks?.onSuccess) {
-          callbacks.onSuccess(file.id);
-        }
-        continue;
-      }
-      
-      // Télécharger le fichier depuis Supabase
-      const { data: fileData, error: fileError } = await supabase.storage
-        .from('audio')
-        .download(file.file_path || file.id);
-      
-      if (fileError || !fileData) {
-        console.error(`Error downloading file ${file.id} from Supabase:`, fileError);
-        failedCount++;
-        const errorMessage = fileError ? fileError.message : "Fichier introuvable dans Supabase";
-        failedFiles.push({ id: file.id, error: errorMessage });
-        
-        if (callbacks?.onError) {
-          callbacks.onError(file.id, errorMessage);
-        }
-        continue;
-      }
-      
-      // Créer un objet File à partir du Blob
-      const audioFile = new File([fileData], file.id, { 
-        type: fileData.type || 'audio/mpeg' 
-      });
-      
-      console.log(`Successfully downloaded file from Supabase: ${file.id}, size: ${audioFile.size} bytes`);
-      
-      // Uploader vers Dropbox
-      if (audioFile.size > 0) {
-        const dropboxPath = await uploadFileToDropbox(audioFile, `audio/${file.id}`);
-        console.log(`Successfully uploaded ${file.id} to Dropbox: ${dropboxPath}`);
-        
-        successCount++;
-        if (callbacks?.onSuccess) {
-          callbacks.onSuccess(file.id);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.links && data.links.length > 0) {
+          console.log("Shared link already exists, fetching it");
+          // Use the existing shared link
+          let url = data.links[0].url;
+          // Convert www.dropbox.com to dl.dropboxusercontent.com for direct download
+          url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+          return url;
         }
       } else {
-        console.error(`File ${file.id} has zero size, skipping upload`);
-        failedCount++;
-        failedFiles.push({ id: file.id, error: "Fichier de taille nulle" });
-        
-        if (callbacks?.onError) {
-          callbacks.onError(file.id, "Fichier de taille nulle");
-        }
+        console.error("Failed to list shared links:", await response.json());
       }
     } catch (error) {
-      console.error(`Error migrating file ${file.id}:`, error);
-      failedCount++;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      failedFiles.push({ id: file.id, error: errorMessage });
-      
-      if (callbacks?.onError) {
-        callbacks.onError(file.id, errorMessage);
-      }
-    }
-  }
-  
-  console.log(`Migration completed: ${successCount} successful, ${failedCount} failed`);
-  
-  return {
-    success: successCount,
-    failed: failedCount,
-    failedFiles
-  };
-};
-
-// Nouvelle fonction pour récupérer un fichier LRC associé à une chanson
-export const getLrcFile = async (songId: string, folderPath?: string): Promise<string | null> => {
-  const config = getDropboxConfig();
-  
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    return null;
-  }
-  
-  try {
-    // Construire le chemin du fichier LRC
-    let lrcPath: string;
-    
-    if (folderPath) {
-      // Si un chemin de dossier est fourni, utiliser ce chemin
-      lrcPath = `/${folderPath}/${songId}.lrc`;
-    } else {
-      // Sinon, vérifier d'abord dans le dossier songs/songId
-      lrcPath = `/songs/${songId}/${songId}.lrc`;
-      
-      try {
-        // Vérifier si le fichier existe à cet emplacement
-        const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${config.accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            path: lrcPath
-          })
-        });
-        
-        if (!response.ok) {
-          // Si le fichier n'existe pas dans le dossier songs, essayer le chemin audio/songId.lrc
-          console.log(`Fichier LRC non trouvé dans ${lrcPath}, tentative dans audio/`);
-          lrcPath = `/audio/${songId}.lrc`;
-        }
-      } catch (error) {
-        // Si une erreur se produit, essayer le chemin audio/songId.lrc
-        console.log(`Erreur en vérifiant ${lrcPath}, tentative dans audio/`);
-        lrcPath = `/audio/${songId}.lrc`;
-      }
+      console.error("Error getting Dropbox shared links:", error);
     }
     
-    console.log(`Tentative de récupération du fichier LRC: ${lrcPath}`);
-    
-    // Vérifier si le fichier LRC existe
-    const metadataResponse = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+    // If no shared link exists or we couldn't retrieve it, create a new one
+    console.log("Creating new shared link");
+    const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${localStorage.getItem('dropbox_access_token')}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        path: lrcPath
+        path: `/${path}`,
+        settings: {
+          requested_visibility: "public"
+        }
       })
     });
     
-    if (!metadataResponse.ok) {
-      console.log(`Fichier LRC non trouvé: ${lrcPath}`);
-      return null;
+    if (!response.ok) {
+      const errorResponse = await response.json();
+      console.error("Error creating shared link:", errorResponse);
+      
+      // Check if the path doesn't exist - rethrow for better handling
+      if (errorResponse.error && errorResponse.error.path && 
+          errorResponse.error.path['.tag'] === 'not_found') {
+        throw new Error(`File not found at path: ${path}`);
+      }
+      
+      throw new Error(`Failed to create shared link: ${errorResponse.error_summary}`);
     }
     
-    // Obtenir un lien de téléchargement pour le fichier LRC
-    const url = await getDropboxSharedLink(lrcPath.substring(1)); // Supprimer le premier '/'
+    const data = await response.json();
+    let url = data.url;
     
-    // Télécharger le contenu du fichier LRC
-    const fileResponse = await fetch(url);
-    if (!fileResponse.ok) {
-      console.error(`Erreur lors du téléchargement du fichier LRC: ${fileResponse.statusText}`);
-      return null;
-    }
+    // Convert www.dropbox.com to dl.dropboxusercontent.com for direct download
+    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
     
-    const lrcContent = await fileResponse.text();
-    console.log(`Fichier LRC récupéré avec succès (${lrcContent.length} caractères)`);
-    return lrcContent;
+    return url;
   } catch (error) {
-    console.error('Erreur lors de la récupération du fichier LRC:', error);
+    console.error("Error getting Dropbox shared link:", error);
+    throw error;
+  }
+};
+
+export const getLrcFile = async (songId: string): Promise<string | null> => {
+  try {
+    const accessToken = localStorage.getItem('dropbox_access_token');
+    if (!accessToken) {
+      console.warn('Dropbox access token not found.');
+      return null;
+    }
+
+    const filePath = `songs/${songId}/${songId}.lrc`;
+    console.log(`Attempting to fetch LRC file from Dropbox: ${filePath}`);
+
+    const url = await getDropboxSharedLink(filePath);
+    if (!url) {
+      console.warn('Could not generate a shared link for the LRC file.');
+      return null;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`Failed to fetch LRC file: ${response.status} - ${response.statusText}`);
+      return null;
+    }
+
+    const content = await response.text();
+    console.log('LRC file content fetched successfully.');
+    return content;
+  } catch (error) {
+    console.error('Error fetching LRC file from Dropbox:', error);
     return null;
   }
 };
 
-// Fonction pour télécharger un fichier LRC vers Dropbox
-export const uploadLrcFile = async (
-  content: string, 
-  songId: string, 
-  folderPath?: string
-): Promise<string | null> => {
-  const config = getDropboxConfig();
+export const uploadLrcFile = async (songId: string, lrcContent: string): Promise<void> => {
+    try {
+      const accessToken = localStorage.getItem('dropbox_access_token');
+      if (!accessToken) {
+        throw new Error('Dropbox access token not found. Please authenticate with Dropbox.');
+      }
   
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    toast.error("Token d'accès Dropbox non configuré");
-    return null;
-  }
+      const filePath = `songs/${songId}/${songId}.lrc`;
+      console.log(`Uploading LRC file to Dropbox: ${filePath}`);
   
-  try {
-    // Créer un objet File à partir du contenu
-    const file = new File([content], `${songId}.lrc`, { 
-      type: 'text/plain' 
-    });
-    
-    // Déterminer le chemin de destination
-    let fullPath: string;
-    if (folderPath) {
-      fullPath = `/${folderPath}/${songId}.lrc`;
-    } else {
-      // Par défaut, sauvegarder dans le dossier songs/songId
-      fullPath = `/songs/${songId}/${songId}.lrc`;
+      const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            path: `/${filePath}`,
+            mode: 'overwrite',
+            autorename: false,
+            mute: true,
+            strict_conflict: false,
+          }),
+        },
+        body: new Blob([lrcContent], { type: 'text/plain' }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Dropbox upload error:', errorData);
+        throw new Error(`Dropbox upload failed: ${errorData.error_summary || 'Unknown error'}`);
+      }
+  
+      const data = await response.json();
+      console.log('Dropbox upload success:', data);
+      toast.success(`LRC file for song ${songId} uploaded to Dropbox successfully!`);
+    } catch (error) {
+      console.error('Dropbox upload error:', error);
+      toast.error(`Failed to upload LRC file for song ${songId} to Dropbox. See console for details.`);
+      throw error;
     }
-    
-    console.log(`Téléchargement du fichier LRC vers: ${fullPath}`);
-    
-    // Utiliser l'API Dropbox pour télécharger le fichier
-    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: fullPath,
-          mode: 'overwrite',
-          autorename: true,
-          mute: false
-        })
-      },
-      body: file
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox upload error:', errorText);
-      toast.error("Erreur lors du téléchargement du fichier LRC");
-      return null;
-    }
-    
-    const data = await response.json();
-    console.log('Fichier LRC téléchargé avec succès:', data);
-    toast.success("Fichier LRC téléchargé avec succès");
-    
-    return data.path_display || fullPath;
-  } catch (error) {
-    console.error('Erreur lors du téléchargement du fichier LRC:', error);
-    toast.error("Échec du téléchargement du fichier LRC");
-    return null;
-  }
-};
+  };

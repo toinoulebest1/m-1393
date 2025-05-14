@@ -134,9 +134,13 @@ const Search = () => {
       return;
     }
 
-    setQueue([song]);
-    
-    play(song);
+    try {
+      setQueue([song]);
+      play(song);
+    } catch (error) {
+      console.error("Erreur lors de la lecture:", error);
+      toast.error(`Impossible de lire "${song.title}"`);
+    }
   };
 
   useEffect(() => {
