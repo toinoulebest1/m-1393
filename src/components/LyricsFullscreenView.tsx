@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -206,6 +205,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           
           if (lrcFormatDetected) {
             try {
+              // Fix: Call parseLrc directly instead of trying to call isLrcFormat as a function
               const parsed = parseLrc(data);
               setParsedLyrics(parsed);
             } catch (error) {
