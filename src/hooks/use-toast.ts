@@ -146,12 +146,12 @@ interface ToastWithMethods {
     dismiss: () => void
     update: (props: ToasterToast) => void
   }
-  success: (props: Omit<Toast, "variant">) => {
+  success: (props: Toast | string) => {
     id: string
     dismiss: () => void
     update: (props: ToasterToast) => void
   }
-  error: (props: Omit<Toast, "variant">) => {
+  error: (props: Toast | string) => {
     id: string
     dismiss: () => void
     update: (props: ToasterToast) => void
@@ -188,20 +188,30 @@ const toast = (function(props: Toast) {
 }) as ToastWithMethods
 
 // Add success and error methods
-toast.success = (props: Omit<Toast, "variant">) => {
+toast.success = (props: Toast | string) => {
+  // If props is a string, convert it to a Toast object
+  const toastProps: Toast = typeof props === 'string' 
+    ? { description: props } 
+    : props;
+    
   return toast({
-    ...props,
+    ...toastProps,
     variant: "default",
     className: "bg-green-100 border-green-500 dark:bg-green-900/50 dark:border-green-800",
-  })
-}
+  });
+};
 
-toast.error = (props: Omit<Toast, "variant">) => {
+toast.error = (props: Toast | string) => {
+  // If props is a string, convert it to a Toast object
+  const toastProps: Toast = typeof props === 'string' 
+    ? { description: props } 
+    : props;
+    
   return toast({
-    ...props,
+    ...toastProps,
     variant: "destructive",
-  })
-}
+  });
+};
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
