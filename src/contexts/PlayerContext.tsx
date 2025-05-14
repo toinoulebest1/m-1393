@@ -1281,7 +1281,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeFavorite,
       setSearchQuery,
       setPlaybackRate: updatePlaybackRate,
-      setQueue,
       refreshCurrentSong,
     }}>
       {children}
