@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -139,7 +140,25 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+interface ToastWithMethods {
+  (props: Toast): {
+    id: string
+    dismiss: () => void
+    update: (props: ToasterToast) => void
+  }
+  success: (props: Omit<Toast, "variant">) => {
+    id: string
+    dismiss: () => void
+    update: (props: ToasterToast) => void
+  }
+  error: (props: Omit<Toast, "variant">) => {
+    id: string
+    dismiss: () => void
+    update: (props: ToasterToast) => void
+  }
+}
+
+const toast = (function(props: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -166,6 +185,22 @@ function toast({ ...props }: Toast) {
     dismiss,
     update,
   }
+}) as ToastWithMethods
+
+// Add success and error methods
+toast.success = (props: Omit<Toast, "variant">) => {
+  return toast({
+    ...props,
+    variant: "default",
+    className: "bg-green-100 border-green-500 dark:bg-green-900/50 dark:border-green-800",
+  })
+}
+
+toast.error = (props: Omit<Toast, "variant">) => {
+  return toast({
+    ...props,
+    variant: "destructive",
+  })
 }
 
 function useToast() {
