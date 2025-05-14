@@ -349,14 +349,53 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await addToHistory(song);
         }
 
-        const audioUrl = await getAudioFile(song.url).catch(error => {
-          console.error(`Erreur lors de la récupération du fichier audio pour ${song.title}:`, error);
-          toast.error(`Impossible de lire "${song.title}". Fichier non trouvé.`);
-          throw error;
-        });
+        // More detailed error handling for file retrieval
+        console.log(`Tentative de récupération du fichier audio pour ${song.title} via: ${song.url}`);
+        let audioUrl;
+        try {
+          audioUrl = await getAudioFile(song.url);
+        } catch (getAudioError: any) {
+          console.error(`Erreur détaillée: ${getAudioError.message}`);
+          
+          // If the error indicates a missing path, try fallback paths
+          if (getAudioError.message.includes("Fichier audio non trouvé") || 
+              getAudioError.message.includes("File not found")) {
+              
+            // Try alternative path formats
+            const tryPaths = [
+              `songs/${song.id}/${song.id}`,
+              `songs/${song.id}`,
+              `audio/${song.id}`,
+              song.id
+            ];
+            
+            console.log(`Essai de chemins alternatifs pour ${song.id}:`, tryPaths);
+            
+            for (const tryPath of tryPaths) {
+              if (tryPath === song.url) continue; // Skip the original path
+            
+              try {
+                console.log(`Tentative avec chemin alternatif: ${tryPath}`);
+                audioUrl = await getAudioFile(tryPath);
+                if (audioUrl) {
+                  console.log(`Succès avec le chemin alternatif: ${tryPath}`);
+                  break;
+                }
+              } catch (fallbackError) {
+                console.log(`Échec avec le chemin alternatif ${tryPath}:`, fallbackError.message);
+              }
+            }
+            
+            if (!audioUrl) {
+              throw new Error(`Impossible de trouver "${song.title}". Essayez de réimporter le fichier ou vérifiez votre connexion Dropbox.`);
+            }
+          } else {
+            throw getAudioError;
+          }
+        }
         
         if (!audioUrl) {
-          throw new Error('Fichier audio non trouvé');
+          throw new Error(`Fichier audio non trouvé pour "${song.title}"`);
         }
 
         audioRef.current.src = audioUrl;
@@ -369,22 +408,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
             console.log("Lecture démarrée avec succès:", song.title);
-            // Précharger la prochaine chanson une fois celle-ci d��marrée
+            // Précharger la prochaine chanson une fois celle-ci démarrée
             setTimeout(() => preloadNextSong(), 1000);
           }).catch(error => {
             console.error("Error starting playback:", error);
             setIsPlaying(false);
-            toast.error(`Erreur de lecture pour "${song.title}"`);
+            toast.error(`Erreur de lecture pour "${song.title}". Vérifiez les paramètres de votre navigateur.`);
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error playing audio:", error);
         // More descriptive error message
-        if (error.message && error.message.includes("Fichier audio non trouvé")) {
-          toast.error(`Impossible de trouver le fichier audio pour "${song.title}"`);
-        } else {
-          toast.error(`Impossible de lire "${song.title}". Erreur: ${error.message || 'Inconnue'}`);
-        }
+        const errorMessage = error.message || 'Erreur inconnue';
+        toast.error(`Impossible de lire "${song.title}". ${errorMessage}`);
         
         setCurrentSong(null);
         localStorage.removeItem('currentSong');

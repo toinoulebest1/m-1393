@@ -34,6 +34,8 @@ export const uploadFileToDropbox = async (file: File, path: string, folderPath?:
       dropboxPath = `/${folderPath}/${file.name}`;
     }
 
+    console.log(`Final Dropbox path for upload: ${dropboxPath}`);
+
     const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
@@ -78,6 +80,11 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
       return false;
     }
 
+    // Clean the path by ensuring it starts with a slash
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
+    console.log(`Checking path existence: ${cleanPath}`);
+
     // Using Dropbox API to check if the file exists
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
@@ -86,13 +93,16 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        path: `/${path}`,
+        path: cleanPath,
         include_media_info: false
       })
     });
 
+    const exists = response.ok;
+    console.log(`File ${exists ? 'exists' : 'does not exist'} at path: ${cleanPath}`);
+    
     // If response is OK, the file exists
-    return response.ok;
+    return exists;
   } catch (error) {
     console.error('Error checking if file exists on Dropbox:', error);
     return false;
@@ -103,17 +113,32 @@ export const getDropboxSharedLink = async (path: string) => {
   try {
     console.log(`Retrieving Dropbox shared link for: ${path}`);
     
+    // Clean the path by ensuring it starts with a slash if provided
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
+    // First check if the file exists
+    const fileExists = await checkFileExistsOnDropbox(cleanPath);
+    if (!fileExists) {
+      console.warn(`File does not exist at path: ${cleanPath}`);
+      return null;
+    }
+    
+    const accessToken = localStorage.getItem('dropbox_access_token');
+    if (!accessToken) {
+      throw new Error('Dropbox access token not found');
+    }
+    
     // First try to see if a shared link already exists
     try {
       console.log("Checking if shared link already exists");
       const response = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('dropbox_access_token')}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          path: `/${path}`
+          path: cleanPath
         })
       });
       
@@ -139,11 +164,11 @@ export const getDropboxSharedLink = async (path: string) => {
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('dropbox_access_token')}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        path: `/${path}`,
+        path: cleanPath,
         settings: {
           requested_visibility: "public"
         }

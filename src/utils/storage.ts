@@ -83,28 +83,49 @@ export const getAudioFile = async (path: string) => {
       const audioFileExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac'];
       const hasAudioExtension = audioFileExtensions.some(ext => path.toLowerCase().endsWith(ext));
       
+      // Check if path looks like songs/id format
+      const isSongFolder = path.startsWith('songs/') && path.split('/').length === 2;
+      
       if (hasAudioExtension) {
         // If path already has audio extension, use it directly
         tryPaths.push(path);
+      } else if (isSongFolder) {
+        // Case 2: It's a song folder format (songs/id)
+        const songId = path.split('/')[1];
+        
+        // Try with the folder ID as filename with different extensions
+        audioFileExtensions.forEach(ext => {
+          tryPaths.push(`${path}/${songId}${ext}`);
+        });
+        
+        // Also try common filenames
+        tryPaths.push(`${path}/audio.mp3`);
+        tryPaths.push(`${path}/track.mp3`);
+        tryPaths.push(`${path}/song.mp3`);
       } else {
-        // Case 2: Path might be a folder (songs/id)
+        // Case 3: Simple ID or path without extension
         if (path.includes('/')) {
-          const folderId = path.split('/').pop() || '';
+          const segments = path.split('/');
+          const lastSegment = segments[segments.length - 1];
           
-          // Try with the folder name as filename with different extensions
+          // Try with the last segment as filename with different extensions
           audioFileExtensions.forEach(ext => {
-            tryPaths.push(`${path}/${folderId}${ext}`);
+            tryPaths.push(`${path}${ext}`);
           });
           
-          // Also try with just the folder path
-          tryPaths.push(path);
+          // Also try with last segment and extensions
+          audioFileExtensions.forEach(ext => {
+            tryPaths.push(`${segments.slice(0, -1).join('/')}/${lastSegment}${ext}`);
+          });
         } else {
-          // Case 3: Simple ID (needs to be prefixed with audio/)
+          // Simple ID - try with different paths
           tryPaths.push(`audio/${path}`);
+          tryPaths.push(`songs/${path}/${path}`);
           
           // Try with different extensions if no extension specified
           audioFileExtensions.forEach(ext => {
             tryPaths.push(`audio/${path}${ext}`);
+            tryPaths.push(`songs/${path}/${path}${ext}`);
           });
         }
       }
@@ -112,22 +133,27 @@ export const getAudioFile = async (path: string) => {
       console.log("Attempting to retrieve file using paths:", tryPaths);
       
       // Try each path in sequence until one works
+      let foundPath = null;
+      let lastError = null;
+      
       for (const tryPath of tryPaths) {
         try {
           console.log(`Trying path: ${tryPath}`);
           const url = await getDropboxSharedLink(tryPath);
           if (url) {
             console.log(`Successfully found file at: ${tryPath}`);
+            foundPath = tryPath;
             return url;
           }
         } catch (error) {
           console.log(`Path ${tryPath} failed:`, error);
+          lastError = error;
           // Continue to next path
         }
       }
       
       // If we get here, none of the paths worked
-      throw new Error(`Fichier audio non trouvé: ${path}. Chemins essayés: ${tryPaths.join(', ')}`);
+      throw new Error(`Fichier audio non trouvé: ${path}. Chemins essayés: ${tryPaths.join(', ')}. ${lastError ? 'Dernière erreur: ' + lastError.message : ''}`);
     }
     
     // Original Supabase implementation
