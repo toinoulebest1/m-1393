@@ -137,6 +137,7 @@ export const LyricsEditDialog: React.FC<LyricsEditDialogProps> = ({
                         {...field}
                         className="min-h-[50vh] resize-none font-mono text-sm"
                         placeholder={t("common.enterLyrics")}
+                        spellCheck={false}
                       />
                     </ScrollArea>
                   </FormControl>
