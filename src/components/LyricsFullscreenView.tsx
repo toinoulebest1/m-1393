@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Slider } from "@/components/ui/slider";
 import ColorThief from "colorthief";
 import { parseLrc, findCurrentLyricLine, isLrcFormat as checkIsLrcFormat, convertTextToLrc, ParsedLrc, LrcLine } from "@/utils/lrcParser";
+import { LrcPlayer } from "./LrcPlayer";
 
 // Define the Song interface since we can't import it from PlayerContext
 interface Song {
@@ -53,18 +55,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   
   // États pour les paroles synchronisées
   const [parsedLyrics, setParsedLyrics] = useState<ParsedLrc | null>(null);
-  const [currentLineIndex, setCurrentLineIndex] = useState<number>(-1);
-  const [nextLines, setNextLines] = useState<LrcLine[]>([]);
   const [isLrcFormat, setIsLrcFormat] = useState(false);
-  const [userScrolling, setUserScrolling] = useState(false);
-  const [scrollTimeout, setScrollTimeout] = useState<number | null>(null);
-  const lyricsContainerRef = useRef<HTMLDivElement>(null);
   
   // Référence à l'élément audio et temps de lecture actuel
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
   
-  // Utiliser useRef pour l'intervalle de synchronisation et le timeout de scroll
+  // Utiliser useRef pour l'intervalle de synchronisation
   const syncIntervalRef = useRef<number | null>(null);
 
   // Integrate Player context to control playback
@@ -85,7 +82,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     setIsFirefox(userAgent.indexOf('firefox') > -1);
   }, []);
 
-  // Optimisation: Obtenir une référence à l'élément audio dès que possible
+  // Obtenir une référence à l'élément audio dès que possible
   useEffect(() => {
     const findAudioElement = () => {
       const audioElement = document.querySelector('audio');
@@ -93,8 +90,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         audioRef.current = audioElement;
         setCurrentAudioTime(audioElement.currentTime);
         console.log("Élément audio trouvé, temps initial:", audioElement.currentTime);
-      } else {
-        console.log("Élément audio non trouvé");
       }
     };
 
@@ -103,7 +98,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     
     if (!audioRef.current) {
       let attempts = 0;
-      const maxAttempts = 20; // 20 * 100ms = 2 secondes max
+      const maxAttempts = 20; // 2 secondes max
       
       const interval = setInterval(() => {
         findAudioElement();
@@ -111,7 +106,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         
         if (audioRef.current || attempts >= maxAttempts) {
           clearInterval(interval);
-          console.log("Recherche audio terminée, élément trouvé:", !!audioRef.current);
         }
       }, 100);
       
@@ -146,38 +140,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     
     // Synchronisation plus fréquente pour une meilleure précision (60 fois par seconde)
     if (isPlaying && isLrcFormat && parsedLyrics) {
-      console.log("Démarrage de la synchronisation des paroles - Intervalle actif");
       syncIntervalRef.current = window.setInterval(() => {
-        const currentTime = updateCurrentTime();
-        if (currentTime !== null && parsedLyrics) {
-          // Mise à jour directe de la ligne active pour une synchronisation plus réactive
-          const { current, next } = findCurrentLyricLine(
-            parsedLyrics.lines,
-            currentTime,
-            parsedLyrics.offset || 0
-          );
-          
-          if (current !== currentLineIndex) {
-            setCurrentLineIndex(current);
-            setNextLines(next);
-            
-            // Faire défiler vers la ligne active si l'utilisateur ne fait pas de défilement manuel
-            if (current >= 0 && lyricsContainerRef.current && !userScrolling) {
-              const container = lyricsContainerRef.current;
-              const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
-              
-              if (currentLineElement) {
-                currentLineElement.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center',
-                });
-              }
-            }
-          }
-        }
+        updateCurrentTime();
       }, 16.67); // ~60 fps pour une synchronisation parfaitement fluide
-    } else {
-      console.log("Synchronisation des paroles désactivée ou mise en pause");
     }
     
     // Faire une mise à jour initiale
@@ -189,7 +154,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         syncIntervalRef.current = null;
       }
     };
-  }, [isPlaying, isLrcFormat, parsedLyrics, song?.id, currentLineIndex, userScrolling]);
+  }, [isPlaying, isLrcFormat, parsedLyrics, song?.id]);
 
   // Optimized dominant color extraction with memoization
   const extractDominantColor = useCallback(async (imageUrl: string) => {
@@ -247,7 +212,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     }
   }, []);
 
-  // Extract color when song changes - with debounce
+  // Extract color when song changes
   useEffect(() => {
     let timeout: number;
     
@@ -267,21 +232,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, [song?.imageUrl, extractDominantColor]);
 
-  // Détection plus robuste du format LRC - renamed to avoid conflict with state variable
+  // Détection du format LRC
   const detectLrcFormat = (text: string): boolean => {
-    if (!text) return false;
-    
-    // Expression régulière plus robuste pour détecter les timestamps LRC
-    const timeRegex = /\[\d{1,2}[\.\:]\d{2}(?:[\.\:]\d{2})?\]/;
-    
-    // Vérifier les 5 premières lignes non vides
-    const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, 5);
-    
-    // Si au moins 2 lignes contiennent un timestamp, considérer comme format LRC
-    const matchCount = lines.filter(line => timeRegex.test(line)).length;
-    console.log(`Détection LRC: ${matchCount} lignes sur ${lines.length} contiennent des timestamps`);
-    
-    return matchCount >= 2;
+    return checkIsLrcFormat(text);
   };
 
   // Query to fetch lyrics - optimized with caching
@@ -306,27 +259,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
         if (data) {
-          // Détection plus robuste du format LRC
           const lrcFormatDetected = detectLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
-          console.log(`Format LRC détecté: ${lrcFormatDetected}`);
           
           if (lrcFormatDetected) {
             try {
               const parsed = parseLrc(data);
               setParsedLyrics(parsed);
               console.log("Paroles LRC parsées avec succès:", parsed.lines.length, "lignes");
-              
-              // Mise à jour immédiate de la position actuelle
-              if (audioRef.current) {
-                const { current, next } = findCurrentLyricLine(
-                  parsed.lines,
-                  audioRef.current.currentTime,
-                  parsed.offset || 0
-                );
-                setCurrentLineIndex(current);
-                setNextLines(next);
-              }
             } catch (error) {
               console.error("Erreur lors du parsing des paroles LRC:", error);
               setIsLrcFormat(false);
@@ -357,8 +297,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       // Reduced delay for content display
       setTimeout(() => {
         setContentVisible(true);
-      }, 10); // Reduced from 30ms
-    }, 100); // Reduced from 200ms
+      }, 10);
+    }, 100);
     
     // Handle escape key to close
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -381,7 +321,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     // Faster animation
     setTimeout(() => {
       onClose();
-    }, 150); // Reduced from 200ms
+    }, 150);
   };
 
   // Function to generate lyrics
@@ -561,35 +501,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     previousSong();
   }, [previousSong]);
 
-  // Fonction pour gérer le défilement manuel des paroles
-  const handleUserScroll = useCallback(() => {
-    setUserScrolling(true);
-    console.log("Utilisateur en train de défiler manuellement");
-    
-    // Réinitialiser le scroll automatique après un certain délai
-    if (scrollTimeout) {
-      window.clearTimeout(scrollTimeout);
-    }
-    
-    const timeout = window.setTimeout(() => {
-      setUserScrolling(false);
-      console.log("Reprise du défilement automatique");
-    }, 5000); // 5 secondes avant de reprendre le défilement automatique
-    
-    setScrollTimeout(timeout);
-  }, [scrollTimeout]);
-
   // Nettoyage des timeouts au démontage
   useEffect(() => {
     return () => {
-      if (scrollTimeout) {
-        window.clearTimeout(scrollTimeout);
-      }
       if (syncIntervalRef.current) {
         window.clearInterval(syncIntervalRef.current);
       }
     };
-  }, [scrollTimeout]);
+  }, []);
 
   // Ensure song data is populated
   const songTitle = song?.title || "Titre inconnu";
@@ -823,14 +742,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               </div>
             ) : lyrics ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                <div 
-                  className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20"
-                  onScroll={handleUserScroll}
-                  ref={lyricsContainerRef}
-                >
+                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20">
                   {isLrcFormat && parsedLyrics ? (
-                    <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
-                      {/* Affichage amélioré des paroles synchronisées */}
+                    <>
                       <div className="mb-6 text-spotify-neutral/80 text-sm">
                         {parsedLyrics.artist && <p>Artiste: {parsedLyrics.artist}</p>}
                         {parsedLyrics.title && <p>Titre: {parsedLyrics.title}</p>}
@@ -838,29 +752,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                         {parsedLyrics.offset && <p>Décalage: {parsedLyrics.offset}ms</p>}
                       </div>
                       
-                      {parsedLyrics.lines.map((line, index) => (
-                        <div 
-                          key={`${index}-${line.time}`}
-                          data-line-index={index}
-                          data-time={line.time}
-                          className={cn(
-                            "py-2 transition-all duration-300",
-                            currentLineIndex === index 
-                              ? "text-white font-semibold text-xl md:text-2xl opacity-100 translate-x-2 border-l-4 border-spotify-accent pl-3 animate-pulse-subtle" 
-                              : nextLines.some(nextLine => nextLine.time === line.time)
-                                ? "text-spotify-neutral opacity-85"
-                                : index < currentLineIndex 
-                                  ? "text-spotify-neutral/40"
-                                  : "text-spotify-neutral/60"
-                          )}
-                          style={{
-                            transition: 'all 0.3s ease-out',
-                          }}
-                        >
-                          {line.text || " "}
-                        </div>
-                      ))}
-                    </div>
+                      <LrcPlayer 
+                        parsedLyrics={parsedLyrics}
+                        currentTime={currentAudioTime}
+                        className="h-full"
+                      />
+                    </>
                   ) : (
                     <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
                       {lyrics}
