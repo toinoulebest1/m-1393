@@ -267,8 +267,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, [song?.imageUrl, extractDominantColor]);
 
-  // Détection plus robuste du format LRC
-  const isLrcFormat = (text: string): boolean => {
+  // Détection plus robuste du format LRC - renamed to avoid conflict with state variable
+  const detectLrcFormat = (text: string): boolean => {
     if (!text) return false;
     
     // Expression régulière plus robuste pour détecter les timestamps LRC
@@ -307,7 +307,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         // Vérifier si les paroles sont au format LRC
         if (data) {
           // Détection plus robuste du format LRC
-          const lrcFormatDetected = isLrcFormat(data);
+          const lrcFormatDetected = detectLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
           console.log(`Format LRC détecté: ${lrcFormatDetected}`);
           

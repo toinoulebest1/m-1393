@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import * as LrcLib from 'react-lrc';
+import { Lrc } from 'react-lrc';
 
 interface LrcPlayerProps {
   lrcContent: string;
@@ -17,7 +17,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
 
   return (
     <div className={`overflow-y-auto h-full ${className}`}>
-      <LrcLib.default
+      <Lrc
         lrc={lrcContent}
         currentTime={currentTime}
         lineRenderer={({ index, active, line }) => (
