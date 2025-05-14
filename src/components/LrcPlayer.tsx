@@ -30,7 +30,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const [isWaitingForFirstLyric, setIsWaitingForFirstLyric] = useState(false);
   const [remainingTime, setRemainingTime] = useState<string>("");
 
-  // Ajout de logs pour diagnostiquer la synchronisation
+  // Log for debugging time synchronization
   useEffect(() => {
     if (currentTime !== previousTimeRef.current) {
       console.log(`LrcPlayer: Temps mis à jour - ${currentTime.toFixed(2)}s`);
@@ -51,19 +51,22 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       // Check if we're before the first lyric
       if (currentTime < firstLine.time) {
         setIsWaitingForFirstLyric(true);
+        console.log(`LrcPlayer: En attente de la première parole à ${firstLine.time}s, temps actuel: ${currentTime}s`);
       } else {
         setIsWaitingForFirstLyric(false);
         setLoadingProgress(100);
+        console.log(`LrcPlayer: Les paroles ont déjà commencé`);
       }
     }
   }, [parsedLyrics, currentTime]);
 
   // Update loading progress and remaining time based on current time
   useEffect(() => {
-    if (isWaitingForFirstLyric && firstLyricTime && firstLyricTime > 0) {
+    if (isWaitingForFirstLyric && firstLyricTime !== null && firstLyricTime > 0) {
       // Calculate progress as a percentage of time until first lyric
       const progress = Math.min(100, (currentTime / firstLyricTime) * 100);
       setLoadingProgress(progress);
+      console.log(`LrcPlayer: Progression du chargement: ${progress.toFixed(1)}%, temps actuel: ${currentTime.toFixed(1)}s, premier lyric à: ${firstLyricTime.toFixed(1)}s`);
       
       // Calculate remaining time in seconds
       const timeRemaining = Math.max(0, firstLyricTime - currentTime);
@@ -74,16 +77,17 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       
       // If we've reached the first lyric, stop showing the loading bar
       if (currentTime >= firstLyricTime) {
+        console.log(`LrcPlayer: Première parole atteinte`);
         setIsWaitingForFirstLyric(false);
       }
     }
   }, [currentTime, firstLyricTime, isWaitingForFirstLyric]);
 
-  // Mise à jour de la ligne active en fonction du temps de lecture avec plus de précision
+  // Update active line based on current playback time
   useEffect(() => {
     if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) return;
 
-    // Appliquer l'offset s'il existe
+    // Apply offset if it exists
     const adjustedTime = parsedLyrics.offset 
       ? currentTime + (parsedLyrics.offset / 1000) 
       : currentTime;
@@ -93,7 +97,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
       adjustedTime,
-      0 // L'offset est déjà appliqué
+      0 // Offset is already applied
     );
     
     if (current !== currentLineIndex) {
@@ -101,7 +105,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       setCurrentLineIndex(current);
       setNextLines(next);
       
-      // Auto-scroll vers la ligne active si l'utilisateur ne fait pas défiler manuellement
+      // Auto-scroll to active line if user is not manually scrolling
       if (current >= 0 && containerRef.current && !userScrolling) {
         setTimeout(() => {
           if (activeLineRef.current && containerRef.current) {
@@ -123,22 +127,22 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     }
   }, [currentTime, parsedLyrics, currentLineIndex, userScrolling]);
 
-  // Gestion du défilement manuel de l'utilisateur
+  // Handle user manual scrolling
   const handleScroll = () => {
     setUserScrolling(true);
     
-    // Réinitialiser le délai de scroll automatique
+    // Reset auto-scroll timeout
     if (scrollTimeoutRef.current) {
       window.clearTimeout(scrollTimeoutRef.current);
     }
     
-    // Reprendre le défilement automatique après 5 secondes d'inactivité
+    // Resume auto-scroll after 5 seconds of inactivity
     scrollTimeoutRef.current = window.setTimeout(() => {
       setUserScrolling(false);
     }, 5000);
   };
 
-  // Nettoyage du timeout
+  // Clean up timeout on unmount
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current) {
