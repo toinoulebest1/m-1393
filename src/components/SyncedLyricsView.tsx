@@ -6,12 +6,14 @@ import { ArrowLeft, Mic } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export const SyncedLyricsView: React.FC = () => {
   const { currentSong, progress, isPlaying } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [lyricsText, setLyricsText] = useState<string | null>(null);
 
   // Calcul du temps actuel basé sur le pourcentage de progression
   useEffect(() => {
@@ -33,22 +35,43 @@ export const SyncedLyricsView: React.FC = () => {
     
   }, [currentSong, progress]);
 
-  // Effet pour récupérer et parser les paroles au chargement
+  // Effet pour récupérer les paroles depuis la base de données
   useEffect(() => {
     const fetchLyrics = async () => {
-      if (!currentSong || !currentSong.lyricsText) {
+      if (!currentSong) {
         setParsedLyrics(null);
+        setLyricsText(null);
         return;
       }
       
       try {
         console.log('SyncedLyricsView: Récupération des paroles pour', currentSong.title);
-        const parsed = parseLrc(currentSong.lyricsText);
+        
+        // Récupérer les paroles depuis Supabase
+        const { data, error } = await supabase
+          .from('lyrics')
+          .select('content')
+          .eq('song_id', currentSong.id)
+          .single();
+          
+        if (error || !data) {
+          console.log('SyncedLyricsView: Pas de paroles trouvées dans la base de données');
+          setParsedLyrics(null);
+          setLyricsText(null);
+          return;
+        }
+        
+        const lyrics = data.content;
+        setLyricsText(lyrics);
+        
+        // Parser les paroles au format LRC
+        const parsed = parseLrc(lyrics);
         setParsedLyrics(parsed);
         console.log('SyncedLyricsView: Paroles parsées', parsed);
       } catch (error) {
         console.error('SyncedLyricsView: Erreur lors du parsing des paroles', error);
         setParsedLyrics(null);
+        setLyricsText(null);
       }
     };
     
