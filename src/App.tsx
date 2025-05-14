@@ -21,7 +21,6 @@ import './App.css';
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
-import { DataMigrationPage } from "./pages/DataMigrationPage";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -194,20 +193,6 @@ function App() {
                   session ? (
                     <Layout>
                       <DropboxSettings />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* New data migration route */}
-              <Route 
-                path="/data-migration" 
-                element={
-                  session ? (
-                    <Layout>
-                      <DataMigrationPage />
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />
