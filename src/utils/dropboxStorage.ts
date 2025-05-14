@@ -1,3 +1,4 @@
+
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -400,4 +401,220 @@ export const migrateFilesToDropbox = async (
     failed: failedCount,
     failedFiles
   };
+};
+
+// Nouvelles fonctions pour gérer les paroles dans Dropbox
+
+/**
+ * Télécharge les paroles d'une chanson vers Dropbox
+ * @param songId ID de la chanson
+ * @param lyricsContent Contenu des paroles
+ * @returns Chemin Dropbox des paroles
+ */
+export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log(`Uploading lyrics for song ${songId} to Dropbox`);
+  
+  try {
+    // Convertir le contenu des paroles en fichier
+    const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
+    const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
+    
+    // Chemin Dropbox pour les paroles
+    const path = `lyrics/${songId}`;
+    
+    // Utiliser la fonction existante pour télécharger le fichier
+    const dropboxPath = await uploadFileToDropbox(lyricsFile, path);
+    
+    // Enregistrer la référence dans la base de données
+    try {
+      const { error } = await supabase
+        .from('dropbox_files')
+        .upsert({
+          local_id: `lyrics/${songId}`,
+          dropbox_path: dropboxPath
+        });
+        
+      if (error) {
+        console.error('Error saving lyrics reference:', error);
+      }
+    } catch (dbError) {
+      console.error('Database error when saving lyrics reference:', dbError);
+    }
+    
+    return dropboxPath;
+  } catch (error) {
+    console.error('Error uploading lyrics to Dropbox:', error);
+    toast.error("Échec de l'upload des paroles vers Dropbox");
+    throw error;
+  }
+};
+
+/**
+ * Récupère les paroles d'une chanson depuis Dropbox
+ * @param songId ID de la chanson
+ * @returns Contenu des paroles
+ */
+export const getLyricsFromDropbox = async (songId: string): Promise<string | null> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    return null;
+  }
+  
+  try {
+    // Vérifier d'abord si nous avons déjà une référence dans la base de données
+    let dropboxPath = `/lyrics/${songId}`;
+    
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', `lyrics/${songId}`)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching lyrics reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox lyrics path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching lyrics reference:', dbError);
+    }
+    
+    // Obtenir un lien partagé pour télécharger les paroles
+    const url = await getDropboxSharedLink(dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath);
+    
+    // Télécharger le contenu des paroles
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('Error downloading lyrics from Dropbox:', response.status, response.statusText);
+      return null;
+    }
+    
+    const lyrics = await response.text();
+    return lyrics;
+  } catch (error) {
+    console.error('Error retrieving lyrics from Dropbox:', error);
+    return null;
+  }
+};
+
+/**
+ * Migre les paroles de Supabase vers Dropbox
+ * @param callbacks Callbacks pour suivre la progression
+ * @returns Résultats de la migration
+ */
+export const migrateLyricsToDropbox = async (
+  callbacks?: {
+    onProgress?: (processed: number, total: number) => void;
+    onSuccess?: (songId: string) => void;
+    onError?: (songId: string, error: string) => void;
+  }
+): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log('Starting migration of lyrics from Supabase to Dropbox');
+  
+  try {
+    // Récupérer toutes les paroles stockées dans Supabase
+    const { data: lyrics, error } = await supabase
+      .from('lyrics')
+      .select('song_id, content');
+    
+    if (error) {
+      console.error('Error fetching lyrics from Supabase:', error);
+      throw error;
+    }
+    
+    if (!lyrics || lyrics.length === 0) {
+      console.log('No lyrics found in Supabase');
+      return { success: 0, failed: 0, failedItems: [] };
+    }
+    
+    console.log(`Found ${lyrics.length} lyrics to migrate`);
+    
+    let successCount = 0;
+    let failedCount = 0;
+    const failedItems: Array<{ id: string; error: string }> = [];
+    
+    for (let i = 0; i < lyrics.length; i++) {
+      const lyric = lyrics[i];
+      const processedCount = i + 1;
+      
+      // Appeler la callback de progression si elle existe
+      if (callbacks?.onProgress) {
+        callbacks.onProgress(processedCount, lyrics.length);
+      }
+      
+      try {
+        console.log(`Processing lyrics ${processedCount}/${lyrics.length}: ${lyric.song_id}`);
+        
+        // Vérifier si les paroles existent déjà dans Dropbox
+        const fileExists = await checkFileExistsOnDropbox(`lyrics/${lyric.song_id}`);
+        
+        if (fileExists) {
+          console.log(`Lyrics already exist in Dropbox: ${lyric.song_id}`);
+          successCount++;
+          if (callbacks?.onSuccess) {
+            callbacks.onSuccess(lyric.song_id);
+          }
+          continue;
+        }
+        
+        // Télécharger les paroles vers Dropbox
+        if (lyric.content) {
+          await uploadLyricsToDropbox(lyric.song_id, lyric.content);
+          console.log(`Successfully uploaded lyrics for ${lyric.song_id} to Dropbox`);
+          
+          successCount++;
+          if (callbacks?.onSuccess) {
+            callbacks.onSuccess(lyric.song_id);
+          }
+        } else {
+          console.error(`Lyrics for ${lyric.song_id} are empty, skipping upload`);
+          failedCount++;
+          failedItems.push({ id: lyric.song_id, error: "Paroles vides" });
+          
+          if (callbacks?.onError) {
+            callbacks.onError(lyric.song_id, "Paroles vides");
+          }
+        }
+      } catch (error) {
+        console.error(`Error migrating lyrics for ${lyric.song_id}:`, error);
+        failedCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        failedItems.push({ id: lyric.song_id, error: errorMessage });
+        
+        if (callbacks?.onError) {
+          callbacks.onError(lyric.song_id, errorMessage);
+        }
+      }
+    }
+    
+    console.log(`Lyrics migration completed: ${successCount} successful, ${failedCount} failed`);
+    
+    return {
+      success: successCount,
+      failed: failedCount,
+      failedItems
+    };
+  } catch (error) {
+    console.error('Error migrating lyrics to Dropbox:', error);
+    throw error;
+  }
 };

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTranslation } from "react-i18next";
+import { isDropboxEnabled, getLyricsFromDropbox, uploadLyricsToDropbox } from '@/utils/dropboxStorage';
 
 interface LyricsModalProps {
   isOpen: boolean;
@@ -37,11 +38,37 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
   const { t } = useTranslation();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useDropbox, setUseDropbox] = useState(false);
+
+  // Vérifier si Dropbox est activé
+  useEffect(() => {
+    setUseDropbox(isDropboxEnabled());
+  }, []);
 
   const { data: lyrics, isLoading, refetch } = useQuery({
-    queryKey: ['lyrics', songId],
+    queryKey: ['lyrics', songId, useDropbox],
     queryFn: async () => {
       console.log('Fetching lyrics for song:', songId);
+      
+      // Si Dropbox est activé, essayer de récupérer les paroles depuis Dropbox
+      if (useDropbox) {
+        try {
+          console.log('Attempting to fetch lyrics from Dropbox');
+          const dropboxLyrics = await getLyricsFromDropbox(songId);
+          
+          if (dropboxLyrics) {
+            console.log('Lyrics fetched from Dropbox successfully');
+            return dropboxLyrics;
+          }
+          
+          console.log('No lyrics found in Dropbox, falling back to database');
+        } catch (error) {
+          console.error('Error fetching lyrics from Dropbox:', error);
+          // En cas d'erreur, continuer avec la base de données
+        }
+      }
+      
+      // Si Dropbox n'est pas activé ou si la récupération a échoué, utiliser la base de données
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
@@ -87,15 +114,29 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         throw new Error(response.data.error);
       }
 
+      const lyricsContent = response.data.lyrics;
+      
+      // Enregistrer les paroles dans la base de données
       const { error: insertError } = await supabase
         .from('lyrics')
         .upsert({
           song_id: songId,
-          content: response.data.lyrics,
+          content: lyricsContent,
         });
 
       if (insertError) {
         throw insertError;
+      }
+      
+      // Si Dropbox est activé, également enregistrer les paroles dans Dropbox
+      if (useDropbox) {
+        try {
+          await uploadLyricsToDropbox(songId, lyricsContent);
+          console.log('Lyrics uploaded to Dropbox successfully');
+        } catch (dropboxError) {
+          console.error('Failed to upload lyrics to Dropbox:', dropboxError);
+          // Ne pas faire échouer l'opération si le téléchargement Dropbox échoue
+        }
       }
 
       await refetch();

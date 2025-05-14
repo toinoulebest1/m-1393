@@ -5,7 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { getDropboxConfig, saveDropboxConfig, migrateFilesToDropbox } from '@/utils/dropboxStorage';
+import { 
+  getDropboxConfig, 
+  saveDropboxConfig, 
+  migrateFilesToDropbox,
+  migrateLyricsToDropbox
+} from '@/utils/dropboxStorage';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -24,7 +30,7 @@ export const DropboxSettings = () => {
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const navigate = useNavigate();
   
-  // Nouveaux états pour la migration
+  // États pour la migration des fichiers audio
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
@@ -34,6 +40,17 @@ export const DropboxSettings = () => {
     failed: number;
     failedFiles: Array<{ id: string; error: string }>;
   }>({ success: 0, failed: 0, failedFiles: [] });
+  
+  // Nouveaux états pour la migration des paroles
+  const [isMigratingLyrics, setIsMigratingLyrics] = useState(false);
+  const [lyricsProgress, setLyricsProgress] = useState(0);
+  const [totalLyrics, setTotalLyrics] = useState(0);
+  const [processedLyrics, setProcessedLyrics] = useState(0);
+  const [lyricsResults, setLyricsResults] = useState<{
+    success: number;
+    failed: number;
+    failedItems: Array<{ id: string; error: string }>;
+  }>({ success: 0, failed: 0, failedItems: [] });
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -121,7 +138,7 @@ export const DropboxSettings = () => {
     }
   };
 
-  // Nouvelle fonction pour gérer la migration
+  // Fonction pour la migration des fichiers audio
   const handleMigrateFiles = async () => {
     if (!accessToken) {
       toast({
@@ -218,6 +235,95 @@ export const DropboxSettings = () => {
       setIsMigrating(false);
     }
   };
+  
+  // Nouvelle fonction pour la migration des paroles
+  const handleMigrateLyrics = async () => {
+    if (!accessToken) {
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton Dropbox valide',
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsMigratingLyrics(true);
+    setLyricsProgress(0);
+    setProcessedLyrics(0);
+    setLyricsResults({ success: 0, failed: 0, failedItems: [] });
+
+    try {
+      // Vérifier si des paroles existent dans la base de données
+      const { count, error: countError } = await supabase
+        .from('lyrics')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) {
+        console.error('Erreur lors du comptage des paroles:', countError);
+        toast({
+          title: "Erreur",
+          description: 'Erreur lors du comptage des paroles',
+          variant: "destructive"
+        });
+        setIsMigratingLyrics(false);
+        return;
+      }
+
+      if (!count || count === 0) {
+        toast({
+          title: "Information",
+          description: 'Aucune parole à migrer'
+        });
+        setIsMigratingLyrics(false);
+        return;
+      }
+
+      setTotalLyrics(count);
+      toast({
+        title: "Information", 
+        description: `Démarrage de la migration de ${count} paroles...`
+      });
+      
+      // Lancer la migration avec des callbacks de progression
+      const results = await migrateLyricsToDropbox({
+        onProgress: (processed, total) => {
+          setProcessedLyrics(processed);
+          setLyricsProgress(Math.round((processed / total) * 100));
+        },
+        onSuccess: (songId) => {
+          console.log(`Migration réussie pour les paroles: ${songId}`);
+          setLyricsResults(prev => ({ 
+            ...prev, 
+            success: prev.success + 1 
+          }));
+        },
+        onError: (songId, error) => {
+          console.error(`Échec de la migration pour les paroles: ${songId}`, error);
+          setLyricsResults(prev => ({ 
+            ...prev, 
+            failed: prev.failed + 1,
+            failedItems: [...prev.failedItems, { id: songId, error }]
+          }));
+        }
+      });
+
+      console.log('Résultats de la migration des paroles:', results);
+      toast({
+        title: "Succès",
+        description: `Migration des paroles terminée: ${results.success} paroles migrées, ${results.failed} échecs`
+      });
+      
+    } catch (error) {
+      console.error('Erreur lors de la migration des paroles:', error);
+      toast({
+        title: "Erreur",
+        description: 'Échec de la migration des paroles',
+        variant: "destructive"
+      });
+    } finally {
+      setIsMigratingLyrics(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -236,7 +342,7 @@ export const DropboxSettings = () => {
       <CardHeader>
         <CardTitle>Intégration Dropbox</CardTitle>
         <CardDescription>
-          Configurer Dropbox pour stocker vos fichiers musicaux au lieu d'utiliser le stockage Supabase.
+          Configurer Dropbox pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -281,64 +387,127 @@ export const DropboxSettings = () => {
           </Alert>
         )}
 
-        {/* Nouvelle section pour la migration */}
+        {/* Section des migrations avec onglets */}
         <div className="border-t border-border pt-4 mt-4">
-          <h3 className="text-lg font-semibold mb-2">Migration des fichiers</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Transférez tous les fichiers audio de Supabase vers Dropbox. Cette opération peut prendre du temps selon le nombre de fichiers.
-          </p>
+          <Tabs defaultValue="audio">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="audio">Fichiers Audio</TabsTrigger>
+              <TabsTrigger value="lyrics">Paroles</TabsTrigger>
+            </TabsList>
+            
+            {/* Onglet migration audio */}
+            <TabsContent value="audio" className="pt-4">
+              <h3 className="text-lg font-semibold mb-2">Migration des fichiers audio</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Transférez tous les fichiers audio de Supabase vers Dropbox. Cette opération peut prendre du temps selon le nombre de fichiers.
+              </p>
 
-          {isMigrating ? (
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
-                <span>{migrationProgress}%</span>
-              </div>
-              <Progress value={migrationProgress} className="h-2" />
-              
-              <div className="flex justify-between text-sm mt-2">
-                <span className="text-green-500">Succès: {migrationResults.success}</span>
-                <span className="text-red-500">Échecs: {migrationResults.failed}</span>
-              </div>
-            </div>
-          ) : (
-            <Button 
-              onClick={handleMigrateFiles} 
-              disabled={!accessToken || isSaving || isTesting} 
-              className="w-full mt-2"
-            >
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Démarrer la migration des fichiers
-            </Button>
-          )}
+              {isMigrating ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
+                    <span>{migrationProgress}%</span>
+                  </div>
+                  <Progress value={migrationProgress} className="h-2" />
+                  
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-green-500">Succès: {migrationResults.success}</span>
+                    <span className="text-red-500">Échecs: {migrationResults.failed}</span>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleMigrateFiles} 
+                  disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
+                  className="w-full mt-2"
+                >
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Démarrer la migration des fichiers audio
+                </Button>
+              )}
 
-          {/* Afficher les erreurs de migration s'il y en a */}
-          {migrationResults.failedFiles.length > 0 && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <details>
-                  <summary className="cursor-pointer font-medium">
-                    {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
-                  </summary>
-                  <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
-                    {migrationResults.failedFiles.map((file, index) => (
-                      <li key={index} className="break-all">
-                        ID: {file.id} - <span className="text-red-400">{file.error}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </AlertDescription>
-            </Alert>
-          )}
+              {/* Afficher les erreurs de migration audio s'il y en a */}
+              {migrationResults.failedFiles.length > 0 && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <details>
+                      <summary className="cursor-pointer font-medium">
+                        {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
+                      </summary>
+                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {migrationResults.failedFiles.map((file, index) => (
+                          <li key={index} className="break-all">
+                            ID: {file.id} - <span className="text-red-400">{file.error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+            
+            {/* Onglet migration paroles */}
+            <TabsContent value="lyrics" className="pt-4">
+              <h3 className="text-lg font-semibold mb-2">Migration des paroles</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Transférez toutes les paroles de Supabase vers Dropbox pour permettre leur synchronisation.
+              </p>
+
+              {isMigratingLyrics ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Progression: {processedLyrics}/{totalLyrics} paroles</span>
+                    <span>{lyricsProgress}%</span>
+                  </div>
+                  <Progress value={lyricsProgress} className="h-2" />
+                  
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-green-500">Succès: {lyricsResults.success}</span>
+                    <span className="text-red-500">Échecs: {lyricsResults.failed}</span>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleMigrateLyrics} 
+                  disabled={!accessToken || isSaving || isTesting || isMigrating} 
+                  className="w-full mt-2"
+                >
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Démarrer la migration des paroles
+                </Button>
+              )}
+
+              {/* Afficher les erreurs de migration des paroles s'il y en a */}
+              {lyricsResults.failedItems.length > 0 && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <details>
+                      <summary className="cursor-pointer font-medium">
+                        {lyricsResults.failedItems.length} paroles ont échoué lors de la migration
+                      </summary>
+                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {lyricsResults.failedItems.map((item, index) => (
+                          <li key={index} className="break-all">
+                            ID: {item.id} - <span className="text-red-400">{item.error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </CardContent>
       <CardFooter className="flex space-x-2">
         <Button 
           variant="outline" 
           onClick={testDropboxToken} 
-          disabled={isTesting || !accessToken || isSaving || isMigrating}
+          disabled={isTesting || !accessToken || isSaving || isMigrating || isMigratingLyrics}
         >
           {isTesting ? (
             <>
@@ -351,7 +520,7 @@ export const DropboxSettings = () => {
         </Button>
         <Button 
           onClick={handleSaveConfig} 
-          disabled={isSaving || isMigrating}
+          disabled={isSaving || isMigrating || isMigratingLyrics}
         >
           {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>
