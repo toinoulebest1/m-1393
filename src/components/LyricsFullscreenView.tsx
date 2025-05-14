@@ -64,7 +64,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
   
-  // Utiliser useRef pour l'intervalle de synchronisation
+  // Utiliser useRef pour l'intervalle de synchronisation et le timeout de scroll
   const syncIntervalRef = useRef<number | null>(null);
 
   // Integrate Player context to control playback
@@ -144,7 +144,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       syncIntervalRef.current = null;
     }
     
-    // Synchronisation plus fréquente lorsque nécessaire (30 fois par seconde)
+    // Synchronisation plus fréquente pour une meilleure précision (60 fois par seconde)
     if (isPlaying && isLrcFormat && parsedLyrics) {
       console.log("Démarrage de la synchronisation des paroles - Intervalle actif");
       syncIntervalRef.current = window.setInterval(() => {
@@ -175,7 +175,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             }
           }
         }
-      }, 33); // ~30 fps pour une synchronisation très fluide
+      }, 16.67); // ~60 fps pour une synchronisation parfaitement fluide
     } else {
       console.log("Synchronisation des paroles désactivée ou mise en pause");
     }
@@ -290,7 +290,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         // Vérifier si les paroles sont au format LRC
         if (data) {
           // Détection plus robuste du format LRC
-          const lrcFormatDetected = checkIsLrcFormat(data);
+          const lrcFormatDetected = isLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
           console.log(`Format LRC détecté: ${lrcFormatDetected}`);
           
@@ -814,7 +814,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                   {isLrcFormat && parsedLyrics ? (
                     <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
                       {/* Affichage amélioré des paroles synchronisées */}
-                      <div className="mb-4 text-spotify-neutral/80 text-sm">
+                      <div className="mb-6 text-spotify-neutral/80 text-sm">
                         {parsedLyrics.artist && <p>Artiste: {parsedLyrics.artist}</p>}
                         {parsedLyrics.title && <p>Titre: {parsedLyrics.title}</p>}
                         {parsedLyrics.album && <p>Album: {parsedLyrics.album}</p>}
@@ -829,7 +829,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                           className={cn(
                             "py-2 transition-all duration-300",
                             currentLineIndex === index 
-                              ? "text-white font-semibold text-xl md:text-2xl opacity-100 translate-x-2 border-l-4 border-spotify-accent pl-3" 
+                              ? "text-white font-semibold text-xl md:text-2xl opacity-100 translate-x-2 border-l-4 border-spotify-accent pl-3 animate-pulse-subtle" 
                               : nextLines.some(nextLine => nextLine.time === line.time)
                                 ? "text-spotify-neutral opacity-85"
                                 : index < currentLineIndex 
@@ -923,6 +923,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           50% {
             border-color: rgba(137, 90, 240, 1);
           }
+        }
+        
+        @keyframes pulse-subtle {
+          0% { opacity: 1; }
+          50% { opacity: 0.95; }
+          100% { opacity: 1; }
         }
       `}
       </style>
