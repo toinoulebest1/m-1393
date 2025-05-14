@@ -20,6 +20,7 @@ import './App.css';
 // Add new imports
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
+import { DropboxSettings } from "./components/DropboxSettings";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -178,6 +179,20 @@ function App() {
                   session ? (
                     <Layout>
                       <PlaylistDetail />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
+              {/* New dropbox settings route */}
+              <Route 
+                path="/dropbox-settings" 
+                element={
+                  session ? (
+                    <Layout>
+                      <DropboxSettings />
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />

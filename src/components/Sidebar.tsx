@@ -1,6 +1,6 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -54,6 +54,7 @@ export const Sidebar = () => {
   if (isAdmin) {
     links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
     links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
+    links.push({ to: "/dropbox-settings", icon: CloudUpload, label: "Dropbox" });
   }
 
   const handleLanguageChange = (value: string) => {

@@ -7,17 +7,51 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDropboxConfig, saveDropboxConfig } from '@/utils/dropboxStorage';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const config = getDropboxConfig();
-    setAccessToken(config.accessToken || '');
-    setIsEnabled(config.isEnabled || false);
-  }, []);
+    const checkAdminStatus = async () => {
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      const hasAdminRole = userRole?.role === 'admin';
+      setIsAdmin(hasAdminRole);
+      
+      // If not admin, redirect to home
+      if (!hasAdminRole) {
+        navigate('/');
+        toast.error('Accès non autorisé');
+      } else {
+        // Load config only if admin
+        const config = getDropboxConfig();
+        setAccessToken(config.accessToken || '');
+        setIsEnabled(config.isEnabled || false);
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkAdminStatus();
+  }, [navigate]);
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
@@ -26,35 +60,47 @@ export const DropboxSettings = () => {
         accessToken,
         isEnabled
       });
-      toast.success('Dropbox configuration saved');
+      toast.success('Configuration Dropbox enregistrée');
     } catch (error) {
-      console.error('Error saving Dropbox config:', error);
-      toast.error('Failed to save Dropbox configuration');
+      console.error('Erreur lors de l\'enregistrement de la configuration Dropbox:', error);
+      toast.error('Échec de l\'enregistrement de la configuration Dropbox');
     } finally {
       setIsSaving(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-spotify-accent"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Dropbox Integration</CardTitle>
+        <CardTitle>Intégration Dropbox</CardTitle>
         <CardDescription>
-          Configure Dropbox to store your music files instead of using Supabase storage.
+          Configurer Dropbox pour stocker vos fichiers musicaux au lieu d'utiliser le stockage Supabase.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="dropbox-token">Dropbox Access Token</Label>
+          <Label htmlFor="dropbox-token">Jeton d'accès Dropbox</Label>
           <Input
             id="dropbox-token"
             type="password"
-            placeholder="Enter your Dropbox access token"
+            placeholder="Entrez votre jeton d'accès Dropbox"
             value={accessToken}
             onChange={(e) => setAccessToken(e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            Generate an access token from the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="underline">Dropbox App Console</a>.
+            Générez un jeton d'accès depuis la <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="underline">Console d'applications Dropbox</a>.
           </p>
         </div>
         
@@ -64,12 +110,12 @@ export const DropboxSettings = () => {
             checked={isEnabled}
             onCheckedChange={setIsEnabled}
           />
-          <Label htmlFor="enable-dropbox">Use Dropbox for file storage</Label>
+          <Label htmlFor="enable-dropbox">Utiliser Dropbox pour le stockage de fichiers</Label>
         </div>
       </CardContent>
       <CardFooter>
         <Button onClick={handleSaveConfig} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save Settings'}
+          {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>
       </CardFooter>
     </Card>
