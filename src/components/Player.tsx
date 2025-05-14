@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -34,7 +35,8 @@ export const Player = () => {
     previousSong,
     toggleShuffle,
     toggleRepeat,
-    toggleFavorite
+    toggleFavorite,
+    isChangingSong
   } = usePlayer();
   
   // Check if the current page is the blind test page
@@ -196,8 +198,11 @@ export const Player = () => {
     e.stopPropagation();
     console.log("Next song button clicked");
     
-    // Add a toast to provide feedback
-    toast.info("Passer à la chanson suivante");
+    // Désactiver temporairement le bouton si un changement est déjà en cours
+    if (isChangingSong) {
+      toast.info("Changement de piste en cours...");
+      return;
+    }
     
     // Call the nextSong function from PlayerContext
     nextSong();
@@ -208,8 +213,11 @@ export const Player = () => {
     e.stopPropagation();
     console.log("Previous song button clicked");
     
-    // Add a toast to provide feedback
-    toast.info("Revenir à la chanson précédente");
+    // Désactiver temporairement le bouton si un changement est déjà en cours
+    if (isChangingSong) {
+      toast.info("Changement de piste en cours...");
+      return;
+    }
     
     // Call the previousSong function from PlayerContext
     previousSong();
@@ -222,10 +230,8 @@ export const Player = () => {
     
     if (isPlaying) {
       pause();
-      // Removed toast notification for pause
     } else {
       play();
-      // Removed toast notification for play
     }
   };
   
@@ -300,18 +306,30 @@ export const Player = () => {
                       shuffleMode && "text-spotify-accent"
                     )}
                     onClick={toggleShuffle}
+                    disabled={isChangingSong}
                   >
-                    <Shuffle className="w-4 h-4" />
+                    <Shuffle className={cn(
+                      "w-4 h-4",
+                      isChangingSong && "opacity-50"
+                    )} />
                   </button>
                   <button 
                     className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
                     onClick={handleSkipBack}
+                    disabled={isChangingSong}
                   >
-                    <SkipBack className="w-5 h-5" />
+                    <SkipBack className={cn(
+                      "w-5 h-5",
+                      isChangingSong && "opacity-50"
+                    )} />
                   </button>
                   <button 
-                    className="bg-white rounded-full p-2 hover:scale-110 transition-all shadow-lg hover:shadow-white/20"
+                    className={cn(
+                      "bg-white rounded-full p-2 hover:scale-110 transition-all shadow-lg hover:shadow-white/20",
+                      isChangingSong && "opacity-70"
+                    )}
                     onClick={handlePlayPause}
+                    disabled={isChangingSong}
                   >
                     {isPlaying ? (
                       <Pause className="w-6 h-6 text-spotify-dark" />
@@ -322,8 +340,12 @@ export const Player = () => {
                   <button 
                     className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
                     onClick={handleSkipForward}
+                    disabled={isChangingSong}
                   >
-                    <SkipForward className="w-5 h-5" />
+                    <SkipForward className={cn(
+                      "w-5 h-5",
+                      isChangingSong && "opacity-50"
+                    )} />
                   </button>
                   <button 
                     className={cn(
@@ -331,11 +353,18 @@ export const Player = () => {
                       repeatMode !== 'none' && "text-spotify-accent"
                     )}
                     onClick={toggleRepeat}
+                    disabled={isChangingSong}
                   >
                     {repeatMode === 'one' ? (
-                      <Repeat1 className="w-4 h-4" />
+                      <Repeat1 className={cn(
+                        "w-4 h-4",
+                        isChangingSong && "opacity-50"
+                      )} />
                     ) : (
-                      <Repeat className="w-4 h-4" />
+                      <Repeat className={cn(
+                        "w-4 h-4",
+                        isChangingSong && "opacity-50"
+                      )} />
                     )}
                   </button>
                 </div>
@@ -347,6 +376,7 @@ export const Player = () => {
                     step={1}
                     className="w-full"
                     onValueChange={(value) => setProgress(value[0])}
+                    disabled={isChangingSong}
                   />
                   <span className="text-xs text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
                 </div>
@@ -365,6 +395,7 @@ export const Player = () => {
                       )}
                       onClick={toggleLyrics}
                       title="Afficher les paroles"
+                      disabled={isChangingSong}
                     >
                       <Mic className="w-5 h-5" />
                     </Button>
@@ -379,6 +410,7 @@ export const Player = () => {
                       )}
                       onClick={navigateToSyncedLyrics}
                       title="Paroles synchronisées"
+                      disabled={isChangingSong}
                     >
                       <svg 
                         xmlns="http://www.w3.org/2000/svg" 
@@ -452,13 +484,15 @@ export const Player = () => {
                     <button
                       onClick={handleFavorite}
                       className="p-1.5 hover:bg-white/5 rounded-full transition-colors"
+                      disabled={isChangingSong}
                     >
                       <Heart
                         className={cn(
                           "w-4 h-4 transition-all duration-300",
                           favorites.some(s => s.id === currentSong.id)
                             ? "text-red-500 fill-red-500"
-                            : "text-spotify-neutral hover:text-white"
+                            : "text-spotify-neutral hover:text-white",
+                          isChangingSong && "opacity-50"
                         )}
                       />
                     </button>
@@ -469,9 +503,11 @@ export const Player = () => {
                       size="icon"
                       className={cn(
                         "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                        showLyrics && "text-spotify-accent"
+                        showLyrics && "text-spotify-accent",
+                        isChangingSong && "opacity-50"
                       )}
                       onClick={toggleLyrics}
+                      disabled={isChangingSong}
                     >
                       <Mic className="w-4 h-4" />
                     </Button>
@@ -482,9 +518,11 @@ export const Player = () => {
                       size="icon"
                       className={cn(
                         "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                        isSyncedLyricsPage && "text-spotify-accent"
+                        isSyncedLyricsPage && "text-spotify-accent",
+                        isChangingSong && "opacity-50"
                       )}
                       onClick={navigateToSyncedLyrics}
+                      disabled={isChangingSong}
                     >
                       <svg 
                         xmlns="http://www.w3.org/2000/svg" 
@@ -520,6 +558,7 @@ export const Player = () => {
                 value={progress} 
                 className="h-1.5 w-full bg-secondary/30" 
                 onClick={(e) => {
+                  if (isChangingSong) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const percent = ((e.clientX - rect.left) / rect.width) * 100;
                   setProgress(Math.max(0, Math.min(100, percent)));
@@ -531,23 +570,33 @@ export const Player = () => {
                 <button 
                   className={cn(
                     "text-spotify-neutral p-1.5 hover:text-white transition-all",
-                    shuffleMode && "text-spotify-accent"
+                    shuffleMode && "text-spotify-accent",
+                    isChangingSong && "opacity-50"
                   )}
                   onClick={toggleShuffle}
+                  disabled={isChangingSong}
                 >
                   <Shuffle className="w-3.5 h-3.5" />
                 </button>
 
                 <button 
-                  className="text-spotify-neutral hover:text-white p-1.5 transition-all"
+                  className={cn(
+                    "text-spotify-neutral hover:text-white p-1.5 transition-all",
+                    isChangingSong && "opacity-50"
+                  )}
                   onClick={handleSkipBack}
+                  disabled={isChangingSong}
                 >
                   <SkipBack className="w-5 h-5" />
                 </button>
                 
                 <button 
-                  className="bg-white rounded-full p-2 hover:scale-105 transition-all"
+                  className={cn(
+                    "bg-white rounded-full p-2 hover:scale-105 transition-all",
+                    isChangingSong && "opacity-70"
+                  )}
                   onClick={handlePlayPause}
+                  disabled={isChangingSong}
                 >
                   {isPlaying ? (
                     <Pause className="w-5 h-5 text-spotify-dark" />
@@ -557,8 +606,12 @@ export const Player = () => {
                 </button>
                 
                 <button 
-                  className="text-spotify-neutral hover:text-white p-1.5 transition-all"
+                  className={cn(
+                    "text-spotify-neutral hover:text-white p-1.5 transition-all",
+                    isChangingSong && "opacity-50"
+                  )}
                   onClick={handleSkipForward}
+                  disabled={isChangingSong}
                 >
                   <SkipForward className="w-5 h-5" />
                 </button>
@@ -566,9 +619,11 @@ export const Player = () => {
                 <button 
                   className={cn(
                     "text-spotify-neutral p-1.5 hover:text-white transition-all",
-                    repeatMode !== 'none' && "text-spotify-accent"
+                    repeatMode !== 'none' && "text-spotify-accent",
+                    isChangingSong && "opacity-50"
                   )}
                   onClick={toggleRepeat}
+                  disabled={isChangingSong}
                 >
                   {repeatMode === 'one' ? (
                     <Repeat1 className="w-3.5 h-3.5" />
@@ -604,6 +659,17 @@ export const Player = () => {
           song={currentSong} 
           onClose={() => setShowLyrics(false)} 
         />
+      )}
+
+      {/* Indicateur visuel de chargement */}
+      {isChangingSong && (
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-sm px-4 py-2 rounded-full z-50 flex items-center">
+          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Changement de piste...
+        </div>
       )}
     </>
   );

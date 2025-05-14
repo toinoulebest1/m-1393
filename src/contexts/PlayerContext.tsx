@@ -35,6 +35,7 @@ interface PlayerContextType {
   favoriteStats: FavoriteStat[];
   playbackRate: number;
   history: Song[];
+  isChangingSong: boolean; // Nouvelle propriété pour indiquer une transition en cours
   setQueue: (songs: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
@@ -63,7 +64,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fadingRef = useRef(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  
+  const [isChangingSong, setIsChangingSong] = useState(false); // État pour suivre les transitions
+  const changeTimeoutRef = useRef<number | null>(null); // Pour suivre le timeout de changement
+
   const [currentSong, setCurrentSong] = useState<Song | null>(() => {
     const savedSong = localStorage.getItem('currentSong');
     return savedSong ? JSON.parse(savedSong) : null;
@@ -152,7 +155,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentSong]);
 
-  // Fonction préchargement modifiée
+  // Fonction préchargement modifiée avec gestion d'erreurs améliorée
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -166,19 +169,43 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     try {
       const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) return;
+      if (!audioUrl) {
+        throw new Error("URL audio non disponible");
+      }
 
       nextAudioRef.current.src = audioUrl;
+      
+      // Augmenter la priorité du préchargement
+      nextAudioRef.current.preload = "auto";
+      
       nextAudioRef.current.load();
       nextAudioRef.current.volume = 0;
-      setNextSongPreloaded(true);
-      console.log("Préchargement réussi");
+      
+      // Écouter l'événement canplaythrough pour confirmer le préchargement
+      const canPlayHandler = () => {
+        console.log("Préchargement réussi et audio prêt à jouer");
+        setNextSongPreloaded(true);
+        nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
+      };
+      
+      nextAudioRef.current.addEventListener('canplaythrough', canPlayHandler);
+      
+      // Définir un délai maximum pour le préchargement
+      setTimeout(() => {
+        if (!nextSongPreloaded) {
+          console.log("Timeout du préchargement, marquage comme prêt par sécurité");
+          setNextSongPreloaded(true);
+          nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
+        }
+      }, 3000);
+      
     } catch (error) {
       console.error("Erreur lors du préchargement:", error);
       setNextSongPreloaded(false);
     }
   };
 
+  // Fonction pour ajouter une chanson à l'historique
   const addToHistory = async (song: Song) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -223,6 +250,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Fonction pour calculer la durée en secondes
   const calculateDurationInSeconds = (duration: string): number => {
     if (!duration) return 0;
     
@@ -238,6 +266,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Fonction pour mettre à jour les statistiques d'écoute
   const updateListeningStats = async (song: Song, actualListeningTime: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -299,8 +328,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction play modifiée pour gérer correctement les transitions
+  // Fonction play modifiée pour gérer correctement les transitions avec état d'attente
   const play = async (song?: Song) => {
+    // Si on est déjà en train de changer de chanson, éviter les appels multiples
+    if (isChangingSong) {
+      console.log("Changement de chanson déjà en cours, ignorer l'appel");
+      return;
+    }
+    
     // Nettoyer les transitions précédentes si en cours
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
@@ -310,6 +345,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (fadingRef.current) {
       console.log("Annulation de la transition en cours");
       fadingRef.current = false;
+    }
+
+    // Nettoyer tout timeout de changement de chanson précédent
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
+      changeTimeoutRef.current = null;
     }
 
     // Réinitialiser le volume des éléments audio
@@ -322,6 +363,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
+      // Marquer que nous sommes en train de changer de chanson
+      setIsChangingSong(true);
+      
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
@@ -359,6 +403,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
+        
+        // Augmenter la priorité du chargement
+        audioRef.current.preload = "auto";
+        
         audioRef.current.load();
         
         const playPromise = audioRef.current.play();
@@ -367,11 +415,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
             console.log("Lecture démarrée avec succès:", song.title);
-            // Précharger la prochaine chanson une fois celle-ci d��marrée
+            
+            // Précharger la prochaine chanson une fois celle-ci démarrée
             setTimeout(() => preloadNextSong(), 1000);
+            
+            // Désactiver l'état de changement après un court délai pour l'UX
+            changeTimeoutRef.current = window.setTimeout(() => {
+              setIsChangingSong(false);
+              changeTimeoutRef.current = null;
+            }, 1200); // Délai court mais suffisant pour éviter les clics multiples
+            
           }).catch(error => {
             console.error("Error starting playback:", error);
             setIsPlaying(false);
+            setIsChangingSong(false);
           });
         }
       } catch (error) {
@@ -380,6 +437,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
         setIsPlaying(false);
+        setIsChangingSong(false);
       }
     } else if (audioRef.current) {
       try {
@@ -437,7 +495,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
   };
 
+  // Fonction nextSong() modifiée avec gestion de l'état de chargement
   const nextSong = async () => {
+    // Éviter les appels multiples pendant le changement de chanson
+    if (isChangingSong) {
+      console.log("Changement de chanson déjà en cours, ignorer nextSong()");
+      return;
+    }
+    
+    // Indiquer que le changement est en cours
+    setIsChangingSong(true);
+    
     // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
@@ -459,6 +527,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
+      setIsChangingSong(false);
       return;
     }
     
@@ -467,6 +536,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
+      setIsChangingSong(false);
       return;
     }
     
@@ -474,12 +544,68 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (nextIndex < queue.length) {
       const nextTrack = queue[nextIndex];
       console.log(`Playing next track: ${nextTrack.title} by ${nextTrack.artist}`);
-      toast.success(`Lecture de : ${nextTrack.title}`);
-      play(nextTrack);
+      
+      if (nextSongPreloaded && nextAudioRef.current.src) {
+        console.log("Utilisation de l'audio préchargé pour une transition plus rapide");
+        
+        try {
+          // Échanger les références audio pour une transition instantanée
+          const tempAudio = audioRef.current;
+          audioRef.current = nextAudioRef.current;
+          nextAudioRef.current = tempAudio;
+          
+          // Réinitialiser l'ancien audio principal (maintenant nextAudioRef)
+          nextAudioRef.current.pause();
+          nextAudioRef.current.src = '';
+          nextAudioRef.current.load();
+          
+          // Mettre à jour l'état
+          setCurrentSong(nextTrack);
+          localStorage.setItem('currentSong', JSON.stringify(nextTrack));
+          setNextSongPreloaded(false);
+          
+          // Démarrer la lecture du nouvel audio
+          const playPromise = audioRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              setIsPlaying(true);
+              
+              // Précharger la prochaine chanson
+              setTimeout(() => preloadNextSong(), 1000);
+              
+              // Mettre fin à l'état de chargement après un court délai
+              setTimeout(() => {
+                setIsChangingSong(false);
+              }, 1000);
+              
+            }).catch(error => {
+              console.error("Error playing next track:", error);
+              setIsPlaying(false);
+              setIsChangingSong(false);
+              
+              // Tomber sur la méthode standard en cas d'échec
+              play(nextTrack);
+            });
+          }
+        } catch (error) {
+          console.error("Error during optimized track change:", error);
+          setIsChangingSong(false);
+          
+          // Utiliser la méthode standard en cas d'erreur
+          play(nextTrack);
+        }
+      } else {
+        // Méthode standard si pas de préchargement
+        play(nextTrack);
+      }
+      
       // Ensure MediaSession is updated
       if ('mediaSession' in navigator && nextTrack) {
         updateMediaSessionMetadata(nextTrack);
       }
+      
+      toast.success(`Lecture de : ${nextTrack.title}`);
+      
     } else if (repeatMode === 'all' && queue.length > 0) {
       const firstTrack = queue[0];
       console.log(`Repeating playlist from beginning: ${firstTrack.title}`);
@@ -496,10 +622,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.pause();
       setIsPlaying(false);
       setProgress(0);
+      setIsChangingSong(false);
     }
   };
 
+  // Fonction previousSong() modifiée avec gestion de l'état de chargement
   const previousSong = async () => {
+    // Éviter les appels multiples pendant le changement de chanson
+    if (isChangingSong) {
+      console.log("Changement de chanson déjà en cours, ignorer previousSong()");
+      return;
+    }
+    
+    // Indiquer que le changement est en cours
+    setIsChangingSong(true);
+    
     // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
@@ -521,6 +658,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
+      setIsChangingSong(false);
       return;
     }
     
@@ -529,6 +667,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
+      setIsChangingSong(false);
       return;
     }
     
@@ -540,8 +679,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Make sure we're playing
       if (!isPlaying) {
         audioRef.current.play()
-          .then(() => setIsPlaying(true))
-          .catch(err => console.error("Error playing audio:", err));
+          .then(() => {
+            setIsPlaying(true);
+            setIsChangingSong(false);
+          })
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            setIsChangingSong(false);
+          });
+      } else {
+        setIsChangingSong(false);
       }
       return;
     }
@@ -573,8 +720,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.currentTime = 0;
       if (!isPlaying) {
         audioRef.current.play()
-          .then(() => setIsPlaying(true))
-          .catch(err => console.error("Error playing audio:", err));
+          .then(() => {
+            setIsPlaying(true);
+            setIsChangingSong(false);
+          })
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            setIsChangingSong(false);
+          });
+      } else {
+        setIsChangingSong(false);
       }
     }
   };
@@ -1166,6 +1321,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       favoriteStats,
       playbackRate,
       history,
+      isChangingSong,
       setHistory,
       play,
       pause,
