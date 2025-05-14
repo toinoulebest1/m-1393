@@ -1,4 +1,3 @@
-
 /**
  * Utilitaire pour parser les fichiers LRC (Lyrics)
  * Format LRC: [MM:SS.xx]Paroles

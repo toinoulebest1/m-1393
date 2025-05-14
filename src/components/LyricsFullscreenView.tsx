@@ -199,7 +199,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
         if (data) {
-          // Correction : appeler la fonction isLrcFormat comme une fonction normale
+          // Fixed: Call isLrcFormat as a function and pass data as an argument
           const lrcFormatDetected = isLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
           
