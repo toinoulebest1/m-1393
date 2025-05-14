@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
-import { toast } from 'sonner';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
@@ -64,103 +63,45 @@ export const getAudioFile = async (path: string) => {
     throw new Error("Chemin du fichier non fourni");
   }
 
+  // Check if we should use Dropbox instead of Supabase
+  const useDropbox = isDropboxEnabled();
+  console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
+
   try {
-    // Detect if this is a Dropbox path
-    const isDropboxPath = path.includes('audio/');
-    const useDropbox = isDropboxEnabled() && isDropboxPath;
-    
-    console.log(`Source détectée: ${useDropbox ? 'Dropbox' : 'Supabase'} pour le chemin ${path}`);
-
-    let audioUrl = null;
-
-    // Try Dropbox first if enabled and path is a Dropbox path
     if (useDropbox) {
-      console.log("Tentative de récupération depuis Dropbox:", path);
-      try {
-        const dropboxUrl = await getDropboxSharedLink(path);
-        console.log("Dropbox URL retrieved:", dropboxUrl);
-        audioUrl = dropboxUrl;
-        // Return immediately if Dropbox retrieval is successful
-        if (audioUrl) {
-          console.log("Successfully retrieved audio from Dropbox:", audioUrl);
-          return audioUrl;
-        }
-      } catch (dropboxError) {
-        console.error("Erreur lors de la récupération depuis Dropbox:", dropboxError);
-        toast.error("Erreur Dropbox. Essai avec Supabase...");
-        // Continue to Supabase fallback
-      }
+      return await getDropboxSharedLink(`audio/${path}`);
     }
     
-    // Get from Supabase as primary or fallback method
-    console.log("Récupération depuis Supabase:", path);
-    
-    // Verify audio bucket existence
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error("Erreur lors de la vérification des buckets:", bucketsError);
-      throw bucketsError;
-    }
-    
-    const audioBucketExists = buckets?.some(bucket => bucket.name === 'audio');
-    
-    if (!audioBucketExists) {
-      console.log("Audio bucket doesn't exist. Creating now...");
-      const { error: createBucketError } = await supabase.storage.createBucket('audio', {
-        public: true,
-        fileSizeLimit: 52428800 // 50MB
+    // Original Supabase implementation
+    // First check if the file exists
+    const { data: fileExists } = await supabase.storage
+      .from('audio')
+      .list('', {
+        search: path
       });
-      
-      if (createBucketError) {
-        console.error("Erreur lors de la création du bucket audio:", createBucketError);
-        throw createBucketError;
-      }
-      console.log("Audio bucket created successfully");
+
+    if (!fileExists || fileExists.length === 0) {
+      console.error("Fichier non trouvé dans le stockage:", path);
+      throw new Error("Fichier audio non trouvé");
     }
-    
-    // Get the pure path without 'audio/' prefix if it exists
-    const purePath = path.replace(/^audio\//, '');
-    console.log("Recherche du fichier avec le chemin pur:", purePath);
-    
-    // Try to create a signed URL
-    try {
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('audio')
-        .createSignedUrl(purePath, 3600);
-      
-      if (signedUrlError) {
-        throw signedUrlError;
-      }
-      
-      if (signedUrlData?.signedUrl) {
-        console.log("Signed URL generated successfully:", signedUrlData.signedUrl);
-        return signedUrlData.signedUrl;
-      }
-    } catch (signedUrlError) {
-      console.warn("Couldn't create signed URL, trying public URL:", signedUrlError);
+
+    const { data, error } = await supabase.storage
+      .from('audio')
+      .createSignedUrl(path, 3600);
+
+    if (error) {
+      console.error("Erreur lors de la récupération du fichier:", error);
+      throw error;
     }
-    
-    // Fallback to public URL
-    try {
-      console.log("Trying to get public URL as fallback...");
-      const { data: publicUrlData } = supabase.storage
-        .from('audio')
-        .getPublicUrl(purePath);
-      
-      if (publicUrlData?.publicUrl) {
-        console.log("Using public URL from Supabase:", publicUrlData.publicUrl);
-        return publicUrlData.publicUrl;
-      } else {
-        throw new Error("Public URL not generated");
-      }
-    } catch (publicUrlError) {
-      console.error("Error getting public URL:", publicUrlError);
-      throw new Error("Failed to retrieve audio file URL");
+
+    if (!data?.signedUrl) {
+      throw new Error("URL signée non générée");
     }
+
+    console.log("Signed URL generated successfully:", data.signedUrl);
+    return data.signedUrl;
   } catch (error) {
     console.error("Erreur lors de la récupération du fichier:", error);
-    toast.error(`Erreur de lecture: ${error.message || 'Erreur inconnue'}`);
     throw error;
   }
 };

@@ -128,7 +128,6 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     let dropboxPath = `/${path}`;
     
     try {
-      console.log("Checking for saved Dropbox reference with local_id:", path);
       const { data: fileRef, error } = await supabase
         .from('dropbox_files')
         .select('dropbox_path')
@@ -145,7 +144,6 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
       console.error('Database error when fetching reference:', dbError);
     }
     
-    console.log("Creating shared link for Dropbox path:", dropboxPath);
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
@@ -178,7 +176,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
         const errorText = await listResponse.text();
         console.error('Failed to list shared links:', errorText);
         toast.error("Impossible de récupérer le lien de partage");
-        throw new Error(`Failed to list shared links: ${listResponse.status} ${listResponse.statusText} - ${errorText}`);
+        throw new Error('Failed to list shared links');
       }
       
       const listData = await listResponse.json();
@@ -189,21 +187,21 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
         url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
         url = url.replace('?dl=0', '');
         
-        console.log('Successfully retrieved existing shared link:', url);
         return url;
       }
       
       toast.error("Aucun lien de partage trouvé");
       throw new Error('No shared links found');
-    } else if (!response.ok) {
+    }
+    
+    if (!response.ok) {
       const errorText = await response.text();
       console.error('Dropbox shared link error:', errorText);
-      toast.error(`Impossible de créer un lien de partage: ${response.status}`);
-      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText} - ${errorText}`);
+      toast.error("Impossible de créer un lien de partage");
+      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    console.log('Successfully created new shared link:', data);
     
     // Convert the shared link to a direct download link
     let url = data.url;
@@ -213,7 +211,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     return url;
   } catch (error) {
     console.error('Error getting Dropbox shared link:', error);
-    toast.error(`Impossible d'obtenir un lien de partage Dropbox: ${error.message}`);
+    toast.error("Impossible d'obtenir un lien de partage Dropbox");
     throw error;
   }
 };

@@ -2,7 +2,6 @@
 import { Player } from "@/components/Player";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
-import { AudioTest } from "@/components/AudioTest"; // Add import for the test component
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,7 +13,6 @@ import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } fr
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [showAudioTest, setShowAudioTest] = useState(false); // State to toggle audio test component
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
   const isMobile = useIsMobile();
   const positionUpdateIntervalRef = useRef<number | null>(null);
@@ -214,51 +212,17 @@ const Index = () => {
       )
       .subscribe();
 
-    // Abonnement aux changements pour les fichiers Dropbox 
-    const dropboxFilesChannel = supabase
-      .channel('dropbox-files-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'dropbox_files',
-        },
-        (payload: any) => {
-          console.log("Dropbox file reference change detected:", payload);
-          // On peut rafraîchir si nécessaire
-          if (refreshCurrentSong && currentSong) {
-            refreshCurrentSong();
-          }
-        }
-      )
-      .subscribe();
-
     // Nettoyage des abonnements
     return () => {
       supabase.removeChannel(profileChannel);
       supabase.removeChannel(songsChannel);
-      supabase.removeChannel(dropboxFilesChannel);
     };
-  }, [userId, username, refreshCurrentSong, currentSong]);
-
-  // Function to toggle audio test component visibility
-  const toggleAudioTest = () => {
-    setShowAudioTest(prev => !prev);
-  };
+  }, [userId, username, refreshCurrentSong]);
 
   return (
     <div className="w-full h-full flex flex-col">
       {!isMobile && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-          {/* Debug button for audio test */}
-          <button 
-            onClick={toggleAudioTest}
-            className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
-          >
-            {showAudioTest ? 'Cacher' : 'Tester'} Audio
-          </button>
-          
           {username && (
             <span className="text-spotify-neutral hover:text-white transition-colors">
               {username}
@@ -267,14 +231,6 @@ const Index = () => {
           <AccountSettingsDialog />
         </div>
       )}
-      
-      {/* Audio test component */}
-      {showAudioTest && (
-        <div className="absolute left-4 top-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
-          <AudioTest />
-        </div>
-      )}
-      
       {/* Pass forceUpdate to force re-render when metadata changes */}
       <div className="flex-1 w-full">
         <NowPlaying key={`now-playing-${forceUpdate}`} />
