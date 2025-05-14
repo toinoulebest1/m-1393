@@ -1,4 +1,3 @@
-
 {
   "common": {
     "appName": "Spotify Clone",
@@ -92,7 +91,17 @@
     "language": "Langue",
     "logoutSuccess": "Déconnexion réussie",
     "logoutError": "Erreur lors de la déconnexion",
-    "confirmDeleteMessage": "Cette action est irréversible et supprimera définitivement cette playlist."
+    "confirmDeleteMessage": "Cette action est irréversible et supprimera définitivement cette playlist.",
+    "syncLibrary": "Synchroniser la médiathèque",
+    "syncingLibrary": "Synchronisation en cours...",
+    "syncingProgress": "Vérification {{current}}/{{total}} fichiers",
+    "dropboxNotEnabled": "Dropbox n'est pas activé. Veuillez configurer Dropbox dans les paramètres.",
+    "errorFetchingSongs": "Erreur lors de la récupération des chansons",
+    "noSongsToSync": "Aucune chanson à synchroniser",
+    "songsDeletedSuccess": "{{count}} chanson(s) supprimée(s) car fichiers introuvables",
+    "errorDeletingSongs": "Erreur lors de la suppression des chansons",
+    "libraryUpToDate": "Médiathèque à jour, tous les fichiers sont présents",
+    "syncError": "Erreur lors de la synchronisation de la médiathèque"
   },
   "playlists": {
     "title": "Playlists",

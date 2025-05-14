@@ -1,4 +1,3 @@
-
 {
   "common": {
     "appName": "Spotify Clone",
@@ -85,7 +84,17 @@
     "lyricsUpdated_plural": "Updated lyrics for {{count}} songs",
     "lyricsErrors": "{{count}} song failed",
     "lyricsErrors_plural": "{{count}} songs failed",
-    "play": "Play"
+    "play": "Play",
+    "syncLibrary": "Sync Library",
+    "syncingLibrary": "Syncing Library...",
+    "syncingProgress": "Checking {{current}}/{{total}} files",
+    "dropboxNotEnabled": "Dropbox is not enabled. Please configure Dropbox in settings.",
+    "errorFetchingSongs": "Error fetching songs",
+    "noSongsToSync": "No songs to sync",
+    "songsDeletedSuccess": "{{count}} song(s) deleted because files not found",
+    "errorDeletingSongs": "Error deleting songs",
+    "libraryUpToDate": "Library up to date, all files are present",
+    "syncError": "Error syncing library"
   },
   "playlists": {
     "title": "Playlists",

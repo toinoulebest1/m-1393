@@ -26,6 +26,55 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
+// Function to check if a file exists on Dropbox
+export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    return false;
+  }
+  
+  try {
+    // First check if we have this file path saved in our database
+    let dropboxPath = `/${path}`;
+    
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', path)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching Dropbox file reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching reference:', dbError);
+    }
+    
+    // Check if the file exists on Dropbox using the get_metadata API
+    const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: dropboxPath
+      })
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error checking if file exists on Dropbox:', error);
+    return false;
+  }
+};
+
 // Function to upload a file to Dropbox
 export const uploadFileToDropbox = async (
   file: File,

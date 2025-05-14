@@ -13,13 +13,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { LoaderIcon, MusicIcon, Search, FileText, RefreshCw } from "lucide-react";
+import { LoaderIcon, MusicIcon, Search, FileText, RefreshCw, Library } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "react-i18next";
 import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 import { LyricsModal } from "@/components/LyricsModal"; 
 import { LyricsEditDialog } from "@/components/LyricsEditDialog";
+import { isDropboxEnabled, checkFileExistsOnDropbox } from "@/utils/dropboxStorage";
 
 const SongMetadataUpdate = () => {
   const { t } = useTranslation();
@@ -38,6 +39,8 @@ const SongMetadataUpdate = () => {
   const [currentLyrics, setCurrentLyrics] = useState<string | null>(null);
   const [findingLyrics, setFindingLyrics] = useState(false);
   const [lyricsProgress, setLyricsProgress] = useState({ current: 0, total: 0 });
+  const [syncingLibrary, setSyncingLibrary] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -328,6 +331,102 @@ const SongMetadataUpdate = () => {
     }
   };
 
+  const handleSyncLibrary = async () => {
+    try {
+      setSyncingLibrary(true);
+      
+      // Vérifie si Dropbox est activé
+      if (!isDropboxEnabled()) {
+        toast.error(t("common.dropboxNotEnabled"));
+        setSyncingLibrary(false);
+        return;
+      }
+      
+      toast.info(t("common.syncingLibrary"));
+      
+      // Récupère toutes les chansons
+      const { data: allSongs, error: songsError } = await supabase
+        .from('songs')
+        .select('*');
+        
+      if (songsError) {
+        console.error("Erreur lors de la récupération des chansons:", songsError);
+        toast.error(t("common.errorFetchingSongs"));
+        setSyncingLibrary(false);
+        return;
+      }
+      
+      if (!allSongs || allSongs.length === 0) {
+        toast.info(t("common.noSongsToSync"));
+        setSyncingLibrary(false);
+        return;
+      }
+      
+      setSyncProgress({ current: 0, total: allSongs.length });
+      
+      // Liste des chansons à supprimer
+      let songsToDelete: string[] = [];
+      
+      // Vérifie chaque chanson
+      for (let i = 0; i < allSongs.length; i++) {
+        const song = allSongs[i];
+        setSyncProgress({ current: i + 1, total: allSongs.length });
+        
+        // Vérifie si le fichier existe sur Dropbox
+        const filePath = `audio/${song.id}`;
+        const exists = await checkFileExistsOnDropbox(filePath);
+        
+        if (!exists) {
+          console.log(`Le fichier ${filePath} n'existe pas sur Dropbox, marqué pour suppression`);
+          songsToDelete.push(song.id);
+        }
+      }
+      
+      // Supprime les chansons qui n'existent plus sur Dropbox
+      if (songsToDelete.length > 0) {
+        // Supprime d'abord les références dans les tables associées
+        for (const songId of songsToDelete) {
+          // Supprime les paroles
+          await supabase.from('lyrics').delete().eq('song_id', songId);
+          
+          // Supprime de l'historique de lecture
+          await supabase.from('play_history').delete().eq('song_id', songId);
+          
+          // Supprime des playlists
+          await supabase.from('playlist_songs').delete().eq('song_id', songId);
+          
+          // Supprime des favoris
+          await supabase.from('favorite_stats').delete().eq('song_id', songId);
+        }
+        
+        // Supprime les chansons
+        const { error: deleteError } = await supabase
+          .from('songs')
+          .delete()
+          .in('id', songsToDelete);
+          
+        if (deleteError) {
+          console.error("Erreur lors de la suppression des chansons:", deleteError);
+          toast.error(t("common.errorDeletingSongs"));
+        } else {
+          toast.success(t("common.songsDeletedSuccess", { count: songsToDelete.length }));
+          
+          // Rafraîchit la liste des chansons
+          refreshSongsList();
+        }
+      } else {
+        toast.success(t("common.libraryUpToDate"));
+      }
+      
+    } catch (error) {
+      console.error("Erreur lors de la synchronisation de la médiathèque:", error);
+      toast.error(t("common.syncError"));
+    } finally {
+      setSyncingLibrary(false);
+      setSyncProgress({ current: 0, total: 0 });
+    }
+  };
+
   if (isCheckingRole) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-spotify-dark">
@@ -360,8 +459,18 @@ const SongMetadataUpdate = () => {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={handleSyncLibrary}
+                  disabled={syncingLibrary || loading}
+                  className="flex items-center gap-2"
+                >
+                  {syncingLibrary ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <Library className="h-4 w-4" />}
+                  {syncingLibrary ? t("common.syncingLibrary") : t("common.syncLibrary")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleFindMissingLyrics}
-                  disabled={findingLyrics || loading}
+                  disabled={findingLyrics || loading || syncingLibrary}
                   className="flex items-center gap-2"
                 >
                   {findingLyrics ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -371,6 +480,7 @@ const SongMetadataUpdate = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleSelectWithoutImages}
+                  disabled={syncingLibrary}
                 >
                   {t("common.selectNoImage")}
                 </Button>
@@ -378,6 +488,7 @@ const SongMetadataUpdate = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleSelectAll}
+                  disabled={syncingLibrary}
                 >
                   {selectedSongs.length === songs.length ? t("common.deselectAll") : t("common.selectAll")}
                 </Button>
@@ -385,7 +496,7 @@ const SongMetadataUpdate = () => {
                   variant="default"
                   size="sm"
                   onClick={handleUpdateMetadata}
-                  disabled={updating || selectedSongs.length === 0}
+                  disabled={updating || selectedSongs.length === 0 || syncingLibrary}
                   className="flex items-center gap-2"
                 >
                   {updating && <LoaderIcon className="h-4 w-4 animate-spin" />}
@@ -414,6 +525,23 @@ const SongMetadataUpdate = () => {
                 </div>
                 <Progress 
                   value={(lyricsProgress.current / lyricsProgress.total) * 100} 
+                  className="h-2" 
+                />
+              </div>
+            )}
+            
+            {syncingLibrary && syncProgress.total > 0 && (
+              <div className="mb-4">
+                <div className="flex justify-between mb-1">
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.syncingProgress", { current: syncProgress.current, total: syncProgress.total })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {Math.round((syncProgress.current / syncProgress.total) * 100)}%
+                  </p>
+                </div>
+                <Progress 
+                  value={(syncProgress.current / syncProgress.total) * 100} 
                   className="h-2" 
                 />
               </div>
