@@ -35,6 +35,7 @@ interface PlayerContextType {
   favoriteStats: FavoriteStat[];
   playbackRate: number;
   history: Song[];
+  isReady: boolean; // Added missing property
   setQueue: (songs: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
@@ -63,6 +64,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fadingRef = useRef(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+  const [isReady, setIsReady] = useState(false); // Added state for audio readiness
   
   const [currentSong, setCurrentSong] = useState<Song | null>(() => {
     const savedSong = localStorage.getItem('currentSong');
@@ -325,6 +327,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
+      setIsReady(false); // Reset ready state when changing songs
 
       // Update MediaSession metadata here when song changes
       if ('mediaSession' in navigator) {
@@ -380,6 +383,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
         setIsPlaying(false);
+        setIsReady(false); // Reset ready state on error
       }
     } else if (audioRef.current) {
       try {
@@ -1166,6 +1170,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       favoriteStats,
       playbackRate,
       history,
+      isReady, // Added to the provider value
       setHistory,
       play,
       pause,
