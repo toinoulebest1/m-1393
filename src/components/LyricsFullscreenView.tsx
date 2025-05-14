@@ -60,6 +60,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [userScrolling, setUserScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<number | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const [currentAudioTime, setCurrentAudioTime] = useState(0);
 
   // Integrate Player context to control playback
   const { 
@@ -70,8 +71,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     pause,
     setProgress,
     nextSong,
-    previousSong,
-    currentTime
+    previousSong
   } = usePlayer();
 
   // Detect Firefox on component mount (only once)
@@ -79,6 +79,28 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     const userAgent = navigator.userAgent.toLowerCase();
     setIsFirefox(userAgent.indexOf('firefox') > -1);
   }, []);
+
+  // Get current audio time from the audio element
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      const audioElement = document.querySelector('audio');
+      if (audioElement) {
+        setCurrentAudioTime(audioElement.currentTime);
+      }
+    };
+
+    // Update time frequently when playing
+    const interval = setInterval(() => {
+      if (isPlaying) {
+        updateCurrentTime();
+      }
+    }, 100);
+
+    // Initial update
+    updateCurrentTime();
+
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
   // Optimized dominant color extraction with memoization
   const extractDominantColor = useCallback(async (imageUrl: string) => {
@@ -178,10 +200,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
         if (data) {
-          const isLrc = isLrcFormat(data);
-          setIsLrcFormat(isLrc);
+          const lrcFormatDetected = isLrcFormat(data);
+          setIsLrcFormat(lrcFormatDetected);
           
-          if (isLrc) {
+          if (lrcFormatDetected) {
             try {
               const parsed = convertTextToLrc(data);
               setParsedLyrics(parsed);
@@ -441,7 +463,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     // Trouver la ligne actuelle basée sur le temps de lecture
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
-      currentTime,
+      currentAudioTime,
       parsedLyrics.offset
     );
     
@@ -460,7 +482,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         });
       }
     }
-  }, [currentTime, isPlaying, parsedLyrics, userScrolling]);
+  }, [currentAudioTime, isPlaying, parsedLyrics, userScrolling]);
 
   // Nettoyage du timeout au démontage
   useEffect(() => {
