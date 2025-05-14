@@ -104,57 +104,95 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Référence à l'élément audio pour obtenir directement le temps actuel
+  // Référence directe à l'élément audio pour un contrôle précis
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Amélioration: Obtenir une référence à l'élément audio et mettre à jour le temps actuel
+  // Optimisation: Obtenir une référence à l'élément audio dès que possible
   useEffect(() => {
     const findAudioElement = () => {
       const audioElement = document.querySelector('audio');
       if (audioElement) {
         audioRef.current = audioElement;
-        // Initialiser le temps actuel
+        // Initialiser le temps actuel immédiatement
         setCurrentAudioTime(audioElement.currentTime);
+        console.log("Élément audio trouvé, temps initial:", audioElement.currentTime);
+      } else {
+        console.log("Élément audio non trouvé");
       }
     };
 
-    // Essayer de trouver l'élément audio immédiatement
+    // Essayer de trouver l'élément audio immédiatement et régulièrement
     findAudioElement();
-
-    // Si on ne le trouve pas, essayer à nouveau après un court délai
+    
+    // Si on ne le trouve pas, réessayer toutes les 100ms pendant 2 secondes
     if (!audioRef.current) {
-      const timeout = setTimeout(() => {
+      let attempts = 0;
+      const maxAttempts = 20; // 20 * 100ms = 2 secondes max
+      
+      const interval = setInterval(() => {
         findAudioElement();
-      }, 500);
-      return () => clearTimeout(timeout);
+        attempts++;
+        
+        if (audioRef.current || attempts >= maxAttempts) {
+          clearInterval(interval);
+          console.log("Recherche audio terminée, élément trouvé:", !!audioRef.current);
+        }
+      }, 100);
+      
+      return () => clearInterval(interval);
     }
   }, [song?.id]);
 
-  // Amélioration: Synchroniser les paroles plus précisément avec la lecture
+  // Mise à jour régulière du temps de lecture pour une meilleure synchronisation
   useEffect(() => {
-    const syncLyrics = () => {
-      if (!audioRef.current || !isPlaying) return;
-      
-      // Mise à jour plus précise du temps de lecture
-      setCurrentAudioTime(audioRef.current.currentTime);
+    // Fonction pour mettre à jour le temps de lecture actuel
+    const updateCurrentTime = () => {
+      // Priorité à l'élément audio référencé
+      if (audioRef.current) {
+        const newTime = audioRef.current.currentTime;
+        setCurrentAudioTime(newTime);
+        return newTime;
+      } else {
+        // Fallback: rechercher à nouveau l'élément audio
+        const audioElement = document.querySelector('audio');
+        if (audioElement) {
+          audioRef.current = audioElement;
+          setCurrentAudioTime(audioElement.currentTime);
+          return audioElement.currentTime;
+        }
+      }
+      return null;
     };
 
-    // Nettoyer l'intervalle précédent si existant
+    // Nettoyage de l'intervalle précédent si existant
     if (syncIntervalRef.current) {
       window.clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
     }
-
-    // Synchroniser plus fréquemment lorsque la musique est en lecture
+    
+    // Synchronisation plus fréquente uniquement lorsque nécessaire
     if (isPlaying && isLrcFormat && parsedLyrics) {
-      syncIntervalRef.current = window.setInterval(syncLyrics, 50); // Intervalle plus court pour plus de précision
+      console.log("Démarrage de la synchronisation des paroles - Intervalle actif");
+      syncIntervalRef.current = window.setInterval(() => {
+        const currentTime = updateCurrentTime();
+        if (currentTime !== null) {
+          console.log("Temps de lecture mis à jour:", currentTime);
+        }
+      }, 40); // 25 fps pour une mise à jour fluide
+    } else {
+      console.log("Synchronisation des paroles désactivée ou mise en pause");
     }
-
+    
+    // Faire une mise à jour initiale
+    updateCurrentTime();
+    
     return () => {
       if (syncIntervalRef.current) {
         window.clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
       }
     };
-  }, [isPlaying, isLrcFormat, parsedLyrics]);
+  }, [isPlaying, isLrcFormat, parsedLyrics, song?.id]);
 
   // Optimized dominant color extraction with memoization
   const extractDominantColor = useCallback(async (imageUrl: string) => {
@@ -499,6 +537,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   // Fonction pour gérer le défilement des paroles
   const handleUserScroll = useCallback(() => {
     setUserScrolling(true);
+    console.log("Utilisateur en train de défiler manuellement");
     
     // Réinitialiser le scroll automatique après un certain délai
     if (scrollTimeout) {
@@ -507,55 +546,69 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     
     const timeout = window.setTimeout(() => {
       setUserScrolling(false);
+      console.log("Reprise du défilement automatique");
     }, 5000); // 5 secondes avant de reprendre le défilement automatique
     
     setScrollTimeout(timeout);
   }, [scrollTimeout]);
 
-  // Améliorons la synchronisation des paroles avec la musique
+  // Optimisation de la synchronisation des paroles avec la musique
   useEffect(() => {
-    if (!isPlaying || !parsedLyrics || !parsedLyrics.lines.length) return;
+    if (!parsedLyrics || !parsedLyrics.lines.length) {
+      console.log("Pas de paroles à synchroniser");
+      return;
+    }
     
     // Si l'utilisateur est en train de défiler manuellement, ne pas interférer
-    if (userScrolling) return;
+    if (userScrolling) {
+      console.log("Défilement manuel actif, pas de synchronisation automatique");
+      return;
+    }
     
-    console.log("Mise à jour des paroles - Temps actuel:", currentAudioTime, "Offset:", parsedLyrics.offset);
+    // Ne synchroniser que si le temps a changé significativement ou si la chanson est en cours de lecture
+    console.log(`Synchronisation des paroles - Temps: ${currentAudioTime}s, Offset: ${parsedLyrics.offset || 0}ms`);
     
-    // Trouver la ligne actuelle basée sur le temps de lecture
+    // Trouver la ligne actuelle basée sur le temps de lecture avec une marge de tolérance
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
       currentAudioTime,
       parsedLyrics.offset || 0
     );
     
-    console.log("Ligne active:", current, "Lignes suivantes:", next);
-    
-    // Mise à jour des états pour le rendu
-    setCurrentLineIndex(current);
-    setNextLines(next);
-    
-    // Faire défiler automatiquement vers la ligne active seulement si elle change
-    if (current >= 0 && lyricsContainerRef.current) {
-      const container = lyricsContainerRef.current;
-      const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
+    // Mise à jour des états uniquement si nécessaire pour éviter les re-rendus inutiles
+    if (current !== currentLineIndex) {
+      console.log(`Nouvelle ligne active: ${current}, texte: "${current >= 0 ? parsedLyrics.lines[current].text : 'avant le début'}"`)
+      setCurrentLineIndex(current);
+      setNextLines(next);
       
-      if (currentLineElement) {
-        // Utiliser scrollIntoView avec un comportement smooth pour une animation plus fluide
-        requestAnimationFrame(() => {
-          currentLineElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
+      // Faire défiler automatiquement vers la ligne active
+      if (current >= 0 && lyricsContainerRef.current && !userScrolling) {
+        const container = lyricsContainerRef.current;
+        const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
+        
+        if (currentLineElement) {
+          requestAnimationFrame(() => {
+            currentLineElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+            });
           });
-        });
+        }
       }
+    } else if (JSON.stringify(next) !== JSON.stringify(nextLines)) {
+      // Mettre à jour uniquement les lignes suivantes si elles ont changé
+      setNextLines(next);
     }
-  }, [currentAudioTime, isPlaying, parsedLyrics, userScrolling]);
+  }, [currentAudioTime, parsedLyrics, userScrolling, currentLineIndex]);
 
   // Nettoyage du timeout au démontage
   useEffect(() => {
     return () => {
       if (scrollTimeout) {
         window.clearTimeout(scrollTimeout);
+      }
+      if (syncIntervalRef.current) {
+        window.clearInterval(syncIntervalRef.current);
       }
     };
   }, [scrollTimeout]);
@@ -594,11 +647,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       "opacity-100"
     )}
     style={{
-      contain: 'content', // Performance optimization
-      transform: "translateZ(0)", // Hardware acceleration
-      willChange: "transform, opacity", // Hint to browser
+      contain: 'content', 
+      transform: "translateZ(0)", 
+      willChange: "transform, opacity",
     }}>
-      {/* Background with album art color - SIMPLIFIED */}
+      {/* Background with album art color */}
       <div 
         className="absolute inset-0 z-0"
         style={bgStyle}
@@ -646,12 +699,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </Button>
       </div>
 
-      {/* Main content container - OPTIMIZED */}
+      {/* Main content container */}
       <div className={cn(
         "flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden relative z-10", 
         fullscreen && isFirefox ? "firefox-content" : ""
       )}>
-        {/* Left side - Song information with simpler animation */}
+        {/* Left side - Song information */}
         <div 
           className={cn(
             "flex flex-col items-center md:items-start justify-center transition-all duration-200",
@@ -774,7 +827,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           )}
         </div>
 
-        {/* Right side - Lyrics content with proper overflow handling - OPTIMIZED */}
+        {/* Right side - Lyrics content */}
         <div 
           className={cn(
             "flex-grow transition-all duration-200 h-[70%] md:h-full md:max-h-full overflow-hidden",
@@ -798,25 +851,34 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 >
                   {isLrcFormat && parsedLyrics ? (
                     <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
-                      {/* Affichage des paroles synchronisées avec visualisation améliorée */}
+                      {/* Affichage amélioré des paroles synchronisées */}
+                      <div className="mb-4 text-spotify-neutral/80 text-sm">
+                        {parsedLyrics.artist && <p>Artiste: {parsedLyrics.artist}</p>}
+                        {parsedLyrics.title && <p>Titre: {parsedLyrics.title}</p>}
+                        {parsedLyrics.album && <p>Album: {parsedLyrics.album}</p>}
+                        {parsedLyrics.offset && <p>Décalage: {parsedLyrics.offset}ms</p>}
+                      </div>
+                      
                       {parsedLyrics.lines.map((line, index) => (
                         <div 
                           key={`${index}-${line.time}`}
                           data-line-index={index}
+                          data-time={line.time}
                           className={cn(
-                            "py-2 transition-all duration-300 opacity-70",
+                            "py-2 transition-all duration-300",
                             currentLineIndex === index 
                               ? "text-white font-semibold text-xl md:text-2xl opacity-100 translate-x-2 border-l-4 border-spotify-accent pl-3" 
-                              : nextLines.some(nextLine => nextLine.time === line.time) // Vérification plus précise
+                              : nextLines.some(nextLine => nextLine.time === line.time)
                                 ? "text-spotify-neutral opacity-85"
-                                : "text-spotify-neutral/60"
+                                : index < currentLineIndex 
+                                  ? "text-spotify-neutral/40"
+                                  : "text-spotify-neutral/60"
                           )}
                           style={{
-                            // Transition plus fluide pour le changement de lignes
                             transition: 'all 0.3s ease-out',
                           }}
                         >
-                          {line.text || " "} {/* Espace pour les lignes vides */}
+                          {line.text || " "}
                         </div>
                       ))}
                     </div>
@@ -870,7 +932,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         </div>
       </div>
 
-      {/* Fixed inline styles - removed JSX property to fix TypeScript error */}
+      {/* Fixed inline styles */}
       <style>
         {`
         .firefox-fullscreen {

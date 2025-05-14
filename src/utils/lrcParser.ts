@@ -1,3 +1,4 @@
+
 /**
  * Utilitaire pour parser les fichiers LRC (Lyrics)
  * Format LRC: [MM:SS.xx]Paroles
@@ -129,7 +130,7 @@ export const lrcToPlainText = (parsedLrc: ParsedLrc): string => {
  * Trouve la ligne de paroles correspondant à la position actuelle de lecture
  * @param lines Tableau de lignes de paroles
  * @param currentTime Temps actuel de lecture en secondes
- * @param offset Décalage en millisecondes
+ * @param offset Décalage en millisecondes (positif = retard, négatif = avance)
  * @returns Index de la ligne actuelle et les 3 prochaines lignes
  */
 export const findCurrentLyricLine = (
@@ -137,46 +138,67 @@ export const findCurrentLyricLine = (
   currentTime: number,
   offset: number = 0
 ): { current: number; next: LrcLine[] } => {
-  // Amélioration: Appliquer l'offset de façon plus précise
-  // L'offset est généralement négatif dans les fichiers LRC pour avancer les paroles
+  // Correction: Convertir l'offset de millisecondes à secondes et l'appliquer correctement
+  // Note: Dans le format LRC, un offset négatif signifie avancer les paroles (les afficher plus tôt)
   const adjustedTime = currentTime - (offset / 1000);
+
+  console.log(`findCurrentLyricLine - Temps actuel: ${currentTime}s, Offset: ${offset}ms, Temps ajusté: ${adjustedTime}s`);
   
   // Si nous n'avons pas de lignes, retourner valeurs par défaut
   if (lines.length === 0) {
+    console.log("Aucune ligne de paroles trouvée");
     return { current: -1, next: [] };
   }
   
   // Cas spécial: avant la première ligne
   if (adjustedTime < lines[0].time) {
+    console.log(`Avant la première ligne (${lines[0].time}s), retourne index -1`);
     return { current: -1, next: lines.slice(0, Math.min(3, lines.length)) };
   }
   
   // Cas spécial: après la dernière ligne
   if (adjustedTime >= lines[lines.length - 1].time) {
+    console.log(`Après la dernière ligne (${lines[lines.length - 1].time}s), retourne index ${lines.length - 1}`);
     return { current: lines.length - 1, next: [] };
   }
   
-  // Trouver la ligne active avec une recherche linéaire plus précise
+  // Recherche binaire pour trouver la ligne active plus efficacement
+  let low = 0;
+  let high = lines.length - 1;
   let currentIndex = -1;
   
-  // Parcourir chaque ligne pour trouver celle qui correspond au temps actuel
-  for (let i = 0; i < lines.length - 1; i++) {
-    if (adjustedTime >= lines[i].time && adjustedTime < lines[i + 1].time) {
-      currentIndex = i;
-      break;
+  // Trouver la dernière ligne dont le temps est <= au temps actuel
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (lines[mid].time <= adjustedTime) {
+      currentIndex = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
     }
   }
   
-  // Si on n'a pas trouvé et qu'on est après la dernière ligne
-  if (currentIndex === -1 && adjustedTime >= lines[lines.length - 1].time) {
-    currentIndex = lines.length - 1;
+  // Vérification supplémentaire: si nous sommes plus proches de la ligne suivante, utiliser celle-ci
+  // Cela permet une meilleure synchronisation perçue en avançant légèrement l'affichage
+  if (currentIndex < lines.length - 1) {
+    const currentDiff = adjustedTime - lines[currentIndex].time;
+    const nextDiff = lines[currentIndex + 1].time - adjustedTime;
+    
+    // Si nous sommes à moins de 200ms de la prochaine ligne, anticiper
+    if (nextDiff < 0.2 && nextDiff < currentDiff) {
+      currentIndex++;
+    }
   }
+  
+  console.log(`Ligne active trouvée: ${currentIndex} (temps: ${currentIndex >= 0 ? lines[currentIndex].time : 'N/A'}s)`);
   
   // Récupérer les 3 prochaines lignes
   const nextLines: LrcLine[] = [];
   for (let i = currentIndex + 1; i < Math.min(currentIndex + 4, lines.length); i++) {
     nextLines.push(lines[i]);
   }
+  
+  console.log(`Prochaines lignes: ${nextLines.length} (temps: ${nextLines.map(l => l.time).join(', ')})`);
   
   return { current: currentIndex, next: nextLines };
 };
