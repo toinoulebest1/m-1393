@@ -9,6 +9,8 @@ import { getDropboxConfig, saveDropboxConfig } from '@/utils/dropboxStorage';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -16,6 +18,8 @@ export const DropboxSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,11 +65,46 @@ export const DropboxSettings = () => {
         isEnabled
       });
       toast.success('Configuration Dropbox enregistrée');
+      setTestResult(null); // Reset test result when saving new token
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration Dropbox:', error);
       toast.error('Échec de l\'enregistrement de la configuration Dropbox');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const testDropboxToken = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    
+    try {
+      // Use Dropbox API to test the token by getting account information
+      const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(null)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Dropbox account info:', data);
+        setTestResult('success');
+        toast.success('Jeton Dropbox valide');
+      } else {
+        console.error('Erreur lors du test du jeton Dropbox:', response.status, response.statusText);
+        setTestResult('error');
+        toast.error('Jeton Dropbox invalide');
+      }
+    } catch (error) {
+      console.error('Erreur lors du test du jeton Dropbox:', error);
+      setTestResult('error');
+      toast.error('Erreur lors du test du jeton Dropbox');
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -112,8 +151,40 @@ export const DropboxSettings = () => {
           />
           <Label htmlFor="enable-dropbox">Utiliser Dropbox pour le stockage de fichiers</Label>
         </div>
+
+        {testResult === 'success' && (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="text-green-800 dark:text-green-400">
+              Le jeton Dropbox est valide et fonctionne correctement.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {testResult === 'error' && (
+          <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-400">
+              Le jeton Dropbox est invalide ou n'a pas les permissions requises.
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex space-x-2">
+        <Button 
+          variant="outline" 
+          onClick={testDropboxToken} 
+          disabled={isTesting || !accessToken || isSaving}
+        >
+          {isTesting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Test en cours...
+            </>
+          ) : (
+            'Tester le jeton'
+          )}
+        </Button>
         <Button onClick={handleSaveConfig} disabled={isSaving}>
           {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>
