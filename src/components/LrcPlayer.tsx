@@ -7,12 +7,14 @@ interface LrcPlayerProps {
   parsedLyrics: { lines: LrcLine[], offset?: number } | null;
   currentTime: number;
   className?: string;
+  accentColor?: [number, number, number] | null;
 }
 
 export const LrcPlayer: React.FC<LrcPlayerProps> = ({ 
   parsedLyrics, 
   currentTime, 
-  className = ""
+  className = "",
+  accentColor = null
 }) => {
   const [currentLineIndex, setCurrentLineIndex] = useState<number>(-1);
   const [nextLines, setNextLines] = useState<LrcLine[]>([]);
@@ -145,6 +147,18 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     };
   }, []);
 
+  // Generate styles based on accentColor
+  const getAccentColor = () => {
+    if (!accentColor) return 'rgb(137, 90, 240)'; // Default Spotify accent color
+    return `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`;
+  };
+
+  // Style for active line with accent color
+  const activeLineStyle = accentColor ? {
+    color: getAccentColor(),
+    textShadow: `0 0 8px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.5)`
+  } : undefined;
+
   if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) {
     return (
       <div className={`text-center p-4 ${className}`}>
@@ -164,7 +178,10 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
           <Progress 
             value={loadingProgress} 
             className="h-2 bg-white/10" 
-            indicatorClassName="bg-spotify-accent" 
+            indicatorClassName={accentColor ? 
+              `bg-[rgb(${accentColor[0]},${accentColor[1]},${accentColor[2]})]` : 
+              "bg-spotify-accent"
+            }
           />
           <div className="flex justify-between text-xs text-white/50 mt-1">
             <span>0:00</span>
@@ -192,7 +209,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
               className={`
                 py-2 px-4 transition-all duration-300 text-center my-3
                 ${currentLineIndex === index 
-                  ? 'text-spotify-accent font-bold text-2xl' 
+                  ? 'font-bold text-2xl' 
                   : nextLines.some(nextLine => nextLine.time === line.time)
                     ? 'text-white/90 text-xl'
                     : index < currentLineIndex 
@@ -200,6 +217,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
                       : 'text-white/60 text-lg'
                 }
               `}
+              style={currentLineIndex === index ? activeLineStyle : undefined}
             >
               {line.text || " "}
             </div>

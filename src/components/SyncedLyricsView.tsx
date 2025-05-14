@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
+import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
   const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress } = usePlayer();
@@ -70,20 +71,40 @@ export const SyncedLyricsView: React.FC = () => {
   
   // Extract colors from the album art
   useEffect(() => {
-    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('placeholder')) {
-      try {
-        // Default colors for now (simple implementation)
-        setDominantColor([75, 20, 95]); // Purple-ish color
-        setAccentColor([137, 90, 240]); // Lighter purple
-      } catch (error) {
-        console.error('Error extracting colors:', error);
+    const extractColors = async () => {
+      if (currentSong?.imageUrl && !currentSong.imageUrl.includes('placeholder')) {
+        try {
+          const dominantRgb = await extractDominantColor(currentSong.imageUrl);
+          
+          if (dominantRgb) {
+            setDominantColor(dominantRgb);
+            
+            // Create a more vibrant accent color
+            const accentRgb: [number, number, number] = [
+              Math.min(255, dominantRgb[0] * 1.4),
+              Math.min(255, dominantRgb[1] * 1.4),
+              Math.min(255, dominantRgb[2] * 1.4)
+            ];
+            setAccentColor(accentRgb);
+            
+            console.log('Extracted colors:', {dominant: dominantRgb, accent: accentRgb});
+          } else {
+            // Fallback colors
+            setDominantColor(DEFAULT_COLORS.dark);
+            setAccentColor(DEFAULT_COLORS.accent);
+          }
+        } catch (error) {
+          console.error('Error extracting colors:', error);
+          setDominantColor(DEFAULT_COLORS.dark);
+          setAccentColor(DEFAULT_COLORS.accent);
+        }
+      } else {
         setDominantColor(DEFAULT_COLORS.dark);
         setAccentColor(DEFAULT_COLORS.accent);
       }
-    } else {
-      setDominantColor(DEFAULT_COLORS.dark);
-      setAccentColor(DEFAULT_COLORS.accent);
-    }
+    };
+    
+    extractColors();
   }, [currentSong?.imageUrl]);
 
   // Effet pour récupérer les paroles depuis la base de données
@@ -429,15 +450,30 @@ export const SyncedLyricsView: React.FC = () => {
               </div>
             ) : lyricsText ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20">
+                <div 
+                  className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm" 
+                  style={{
+                    backgroundColor: accentColor 
+                      ? `rgba(${accentColor[0] * 0.15}, ${accentColor[1] * 0.15}, ${accentColor[2] * 0.15}, 0.3)`
+                      : 'rgba(0, 0, 0, 0.2)'
+                  }}
+                >
                   {parsedLyrics && parsedLyrics.lines && parsedLyrics.lines.length > 0 ? (
                     <LrcPlayer 
                       parsedLyrics={parsedLyrics} 
                       currentTime={currentTime}
                       className="h-full text-lg"
+                      accentColor={accentColor}
                     />
                   ) : (
-                    <div className="whitespace-pre-line text-spotify-neutral text-base md:text-lg leading-relaxed">
+                    <div 
+                      className="whitespace-pre-line text-base md:text-lg leading-relaxed"
+                      style={{
+                        color: accentColor 
+                          ? `rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 1)`
+                          : 'var(--spotify-neutral)'
+                      }}
+                    >
                       {lyricsText}
                     </div>
                   )}
