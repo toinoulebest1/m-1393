@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
+import { Button } from "@/components/ui/button";
 
 interface Song {
   id: string;
@@ -490,6 +491,7 @@ export const MusicUploader = () => {
     e.stopPropagation();
   };
 
+  // Modified function to handle both single file and directory uploads
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -510,19 +512,35 @@ export const MusicUploader = () => {
       onDragLeave={handleDragLeave}
     >
       <div className="flex items-center justify-between mb-2">
-        <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-          <Upload className="w-5 h-5" />
-          <span>{t('common.upload')}</span>
-          <input
-            type="file"
-            accept="audio/*,.lrc"
-            multiple
-            webkitdirectory=""
-            directory=""
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-        </label>
+        <div className="flex gap-2">
+          {/* Single file upload button */}
+          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
+            <Upload className="w-5 h-5" />
+            <span>{t('common.upload')} un fichier</span>
+            <input
+              type="file"
+              accept="audio/*,.lrc"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+          
+          {/* Directory upload button */}
+          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
+            <Upload className="w-5 h-5" />
+            <span>{t('common.upload')} un dossier</span>
+            <input
+              type="file"
+              accept="audio/*,.lrc"
+              multiple
+              webkitdirectory=""
+              directory=""
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+        </div>
         <div className="text-xs text-spotify-neutral">
           Using: {storageProvider}
         </div>
