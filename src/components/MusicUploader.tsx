@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
+import { isDropboxEnabled } from "@/utils/dropboxStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,27 +26,27 @@ export const MusicUploader = () => {
   const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
+  const [storageProvider, setStorageProvider] = useState<string>("Supabase");
 
   useEffect(() => {
-    if (isUploading && uploadProgress > 0) {
-      if (!uploadToastId) {
-        const id = toast.loading("Upload en cours...", {
-          description: `${uploadProgress}%`
-        }).toString();
-        setUploadToastId(id);
-      } else {
-        toast.loading("Upload en cours...", {
-          id: uploadToastId,
-          description: `${uploadProgress}%`
-        });
-      }
-    } else if (!isUploading && uploadToastId) {
-      toast.success("Upload terminé!", {
-        id: uploadToastId
-      });
-      setUploadToastId(null);
-    }
-  }, [uploadProgress, isUploading]);
+    // Check which storage provider is active
+    const checkStorageProvider = () => {
+      const useDropbox = isDropboxEnabled();
+      setStorageProvider(useDropbox ? "Dropbox" : "Supabase");
+    };
+    
+    checkStorageProvider();
+    
+    // Re-check when the window gets focus
+    const handleFocus = () => {
+      checkStorageProvider();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -423,19 +424,24 @@ export const MusicUploader = () => {
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
     >
-      <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-        <Upload className="w-5 h-5" />
-        <span>{t('common.upload')}</span>
-        <input
-          type="file"
-          accept="audio/*"
-          multiple
-          webkitdirectory=""
-          directory=""
-          className="hidden"
-          onChange={handleFileUpload}
-        />
-      </label>
+      <div className="flex items-center justify-between mb-2">
+        <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
+          <Upload className="w-5 h-5" />
+          <span>{t('common.upload')}</span>
+          <input
+            type="file"
+            accept="audio/*"
+            multiple
+            webkitdirectory=""
+            directory=""
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+        </label>
+        <div className="text-xs text-spotify-neutral">
+          Using: {storageProvider}
+        </div>
+      </div>
       {isDragging && (
         <div 
           className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"

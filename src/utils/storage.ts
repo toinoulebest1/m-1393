@@ -1,8 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
+  
+  // Check if we should use Dropbox instead of Supabase
+  const useDropbox = isDropboxEnabled();
+  console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
   
   let fileToUpload: File;
   if (typeof file === 'string') {
@@ -23,22 +27,28 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   }
 
   try {
-    console.log("Uploading file to Supabase storage:", id);
-    const { data, error } = await supabase.storage
-      .from('audio')
-      .upload(id, fileToUpload, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: fileToUpload.type || 'audio/mpeg'
-      });
+    if (useDropbox) {
+      console.log("Uploading file to Dropbox storage:", id);
+      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+      return `audio/${id}`;
+    } else {
+      console.log("Uploading file to Supabase storage:", id);
+      const { data, error } = await supabase.storage
+        .from('audio')
+        .upload(id, fileToUpload, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: fileToUpload.type || 'audio/mpeg'
+        });
 
-    if (error) {
-      console.error("Erreur lors du stockage du fichier:", error);
-      throw error;
+      if (error) {
+        console.error("Erreur lors du stockage du fichier:", error);
+        throw error;
+      }
+
+      console.log("File uploaded successfully:", data);
+      return data.path;
     }
-
-    console.log("File uploaded successfully:", data);
-    return data.path;
   } catch (error) {
     console.error("Erreur lors du stockage du fichier:", error);
     throw error;
@@ -53,7 +63,16 @@ export const getAudioFile = async (path: string) => {
     throw new Error("Chemin du fichier non fourni");
   }
 
+  // Check if we should use Dropbox instead of Supabase
+  const useDropbox = isDropboxEnabled();
+  console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
+
   try {
+    if (useDropbox) {
+      return await getDropboxSharedLink(`audio/${path}`);
+    }
+    
+    // Original Supabase implementation
     // First check if the file exists
     const { data: fileExists } = await supabase.storage
       .from('audio')
