@@ -34,15 +34,13 @@ export const SyncedLyricsView: React.FC = () => {
 
   // Monitorer l'état de chargement de l'audio et afficher un message d'attente si nécessaire
   useEffect(() => {
-    // Si la chanson est définie mais pas encore prête et que la lecture n'a pas commencé,
-    // afficher un message de chargement
-    if (currentSong && !isReady && !isPlaying) {
+    // Si la chanson est définie mais pas encore prête, afficher un message de chargement
+    if (currentSong && !isReady) {
       setShowLoadingMessage(true);
     } else {
-      // Si la lecture a démarré ou si l'audio est prêt, ne plus afficher le message de chargement
       setShowLoadingMessage(false);
     }
-  }, [currentSong, isReady, isPlaying, progress]);
+  }, [currentSong, isReady]);
 
   // Calcul du temps actuel basé sur le pourcentage de progression
   useEffect(() => {
@@ -470,7 +468,7 @@ export const SyncedLyricsView: React.FC = () => {
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Génération des paroles en cours...</span>
               </div>
-            ) : lyricsText && (isReady || isPlaying) ? (
+            ) : lyricsText && isReady ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
                 <div 
                   className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm" 
@@ -564,4 +562,3 @@ export const SyncedLyricsView: React.FC = () => {
     </div>
   );
 };
-
