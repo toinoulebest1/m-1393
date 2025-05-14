@@ -1,7 +1,23 @@
+
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export const isDropboxEnabled = (): boolean => {
   return localStorage.getItem('use_dropbox_storage') === 'true';
+};
+
+// Added getDropboxConfig function
+export const getDropboxConfig = () => {
+  return {
+    accessToken: localStorage.getItem('dropbox_access_token') || '',
+    isEnabled: localStorage.getItem('use_dropbox_storage') === 'true'
+  };
+};
+
+// Added saveDropboxConfig function
+export const saveDropboxConfig = (config: { accessToken: string, isEnabled: boolean }) => {
+  localStorage.setItem('dropbox_access_token', config.accessToken);
+  localStorage.setItem('use_dropbox_storage', config.isEnabled ? 'true' : 'false');
 };
 
 export const uploadFileToDropbox = async (file: File, path: string, folderPath?: string) => {
@@ -48,6 +64,38 @@ export const uploadFileToDropbox = async (file: File, path: string, folderPath?:
     console.error('Dropbox upload error:', error);
     toast.error(`Failed to upload ${file.name} to Dropbox. See console for details.`);
     throw error;
+  }
+};
+
+// Added checkFileExistsOnDropbox function
+export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
+  try {
+    console.log(`Checking if file exists on Dropbox: ${path}`);
+    
+    const accessToken = localStorage.getItem('dropbox_access_token');
+    if (!accessToken) {
+      console.warn('Dropbox access token not found.');
+      return false;
+    }
+
+    // Using Dropbox API to check if the file exists
+    const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: `/${path}`,
+        include_media_info: false
+      })
+    });
+
+    // If response is OK, the file exists
+    return response.ok;
+  } catch (error) {
+    console.error('Error checking if file exists on Dropbox:', error);
+    return false;
   }
 };
 
@@ -200,4 +248,89 @@ export const uploadLrcFile = async (songId: string, lrcContent: string): Promise
       toast.error(`Failed to upload LRC file for song ${songId} to Dropbox. See console for details.`);
       throw error;
     }
+};
+
+// Added migrateFilesToDropbox function
+export const migrateFilesToDropbox = async (
+  songs: Array<{ id: string, file_path?: string }>,
+  callbacks?: {
+    onProgress?: (processed: number, total: number) => void,
+    onSuccess?: (fileId: string) => void,
+    onError?: (fileId: string, error: string) => void
+  }
+): Promise<{ success: number, failed: number, failedFiles: Array<{ id: string, error: string }> }> => {
+  const results = {
+    success: 0,
+    failed: 0,
+    failedFiles: [] as Array<{ id: string, error: string }>
   };
+
+  // Check if Dropbox is enabled and configured
+  const accessToken = localStorage.getItem('dropbox_access_token');
+  if (!accessToken) {
+    toast.error('Dropbox access token not found. Please configure Dropbox first.');
+    throw new Error('Dropbox access token not found');
+  }
+
+  const totalSongs = songs.length;
+  
+  // Process each song
+  for (let i = 0; i < totalSongs; i++) {
+    const song = songs[i];
+    
+    // Update progress
+    if (callbacks?.onProgress) {
+      callbacks.onProgress(i + 1, totalSongs);
+    }
+    
+    try {
+      // Skip songs without file path
+      if (!song.file_path) {
+        throw new Error('No file path available');
+      }
+      
+      // Download the file from Supabase
+      console.log(`Downloading file from Supabase for song ID: ${song.id}`);
+      const { data: fileData, error: fileError } = await supabase.storage
+        .from('audio')
+        .download(song.file_path);
+        
+      if (fileError || !fileData) {
+        throw new Error(`Failed to download file from Supabase: ${fileError?.message || 'Unknown error'}`);
+      }
+      
+      // Create a File object from the blob
+      const file = new File([fileData], song.file_path.split('/').pop() || `${song.id}.mp3`, {
+        type: 'audio/mpeg'
+      });
+      
+      // Upload to Dropbox
+      console.log(`Uploading file to Dropbox: ${song.id}`);
+      const dropboxFolderPath = `songs/${song.id}`;
+      await uploadFileToDropbox(file, '', dropboxFolderPath);
+      
+      // Migration successful for this song
+      results.success++;
+      if (callbacks?.onSuccess) {
+        callbacks.onSuccess(song.id);
+      }
+      
+    } catch (error) {
+      // Migration failed for this song
+      console.error(`Migration failed for song ${song.id}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      results.failed++;
+      results.failedFiles.push({
+        id: song.id,
+        error: errorMessage
+      });
+      
+      if (callbacks?.onError) {
+        callbacks.onError(song.id, errorMessage);
+      }
+    }
+  }
+  
+  return results;
+};
