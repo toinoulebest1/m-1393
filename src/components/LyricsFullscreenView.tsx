@@ -199,7 +199,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
         if (data) {
-          // Use the isLrcFormat function to check the format, but don't call it as a function
+          // Correction : appeler la fonction isLrcFormat comme une fonction normale
           const lrcFormatDetected = isLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
           
@@ -456,29 +456,36 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     setScrollTimeout(timeout);
   }, [scrollTimeout]);
 
-  // Synchronisation des paroles avec la musique
+  // Améliorons la synchronisation des paroles avec la musique
   useEffect(() => {
-    if (!isPlaying || !parsedLyrics || !parsedLyrics.lines.length || userScrolling) return;
+    if (!isPlaying || !parsedLyrics || !parsedLyrics.lines.length) return;
+    
+    // Utilisateur en train de défiler manuellement - ne pas interférer
+    if (userScrolling) return;
     
     // Trouver la ligne actuelle basée sur le temps de lecture
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
       currentAudioTime,
-      parsedLyrics.offset
+      parsedLyrics.offset || 0
     );
     
+    // Mise à jour des états pour le rendu
     setCurrentLineIndex(current);
     setNextLines(next);
     
-    // Faire défiler automatiquement si une ligne est active et que l'utilisateur ne défile pas manuellement
-    if (current >= 0 && lyricsContainerRef.current && !userScrolling) {
+    // Faire défiler automatiquement vers la ligne active
+    if (current >= 0 && lyricsContainerRef.current) {
       const container = lyricsContainerRef.current;
       const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
       
       if (currentLineElement) {
-        currentLineElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
+        // Utiliser requestAnimationFrame pour une animation plus fluide
+        requestAnimationFrame(() => {
+          currentLineElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
         });
       }
     }

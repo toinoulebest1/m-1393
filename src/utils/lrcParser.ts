@@ -68,6 +68,9 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
     let lineText = line;
     const timings: number[] = [];
 
+    // Reset lastIndex pour assurer une nouvelle analyse à chaque ligne
+    timeRegex.lastIndex = 0;
+
     // Extraire tous les timestamps de la ligne
     while ((timeMatch = timeRegex.exec(line)) !== null) {
       const minutes = parseInt(timeMatch[1], 10);
@@ -127,7 +130,7 @@ export const lrcToPlainText = (parsedLrc: ParsedLrc): string => {
  * Trouve la ligne de paroles correspondant à la position actuelle de lecture
  * @param lines Tableau de lignes de paroles
  * @param currentTime Temps actuel de lecture en secondes
- * @param offset Décalage en millisecondes (optionnel)
+ * @param offset Décalage en millisecondes
  * @returns Index de la ligne actuelle et les 3 prochaines lignes
  */
 export const findCurrentLyricLine = (
@@ -135,27 +138,49 @@ export const findCurrentLyricLine = (
   currentTime: number,
   offset: number = 0
 ): { current: number; next: LrcLine[] } => {
-  // Appliquer l'offset (conversion de ms en secondes)
-  const adjustedTime = currentTime - (offset / 1000 || 0);
+  // Amélioration: Appliquer l'offset (conversion de ms en secondes)
+  // L'offset est généralement négatif dans les fichiers LRC, donc on soustrait
+  const adjustedTime = currentTime - (offset / 1000);
   
-  // Trouver la ligne actuelle
+  // Optimisation pour trouver la ligne actuelle avec une recherche plus efficace
   let currentIndex = -1;
   
-  for (let i = 0; i < lines.length; i++) {
+  // Si nous n'avons pas de lignes, retourner valeurs par défaut
+  if (lines.length === 0) {
+    return { current: -1, next: [] };
+  }
+  
+  // Cas spécial: avant la première ligne
+  if (adjustedTime < lines[0].time) {
+    return { current: -1, next: lines.slice(0, Math.min(3, lines.length)) };
+  }
+  
+  // Cas spécial: après la dernière ligne
+  if (adjustedTime >= lines[lines.length - 1].time) {
+    return { current: lines.length - 1, next: [] };
+  }
+  
+  // Recherche binaire pour trouver la ligne actuelle plus efficacement
+  let start = 0;
+  let end = lines.length - 1;
+  
+  while (start <= end) {
+    const mid = Math.floor((start + end) / 2);
+    
     // Si c'est la dernière ligne ou si le temps actuel est avant le temps de la prochaine ligne
-    if (i === lines.length - 1 || adjustedTime < lines[i + 1].time) {
+    if (mid === lines.length - 1 || adjustedTime < lines[mid + 1].time) {
       // Et si le temps actuel est après ou égal au temps de cette ligne
-      if (adjustedTime >= lines[i].time) {
-        currentIndex = i;
+      if (adjustedTime >= lines[mid].time) {
+        currentIndex = mid;
         break;
       }
     }
-  }
-  
-  // Si aucune ligne actuelle n'est trouvée, utiliser -1
-  if (currentIndex === -1 && lines.length > 0 && adjustedTime < lines[0].time) {
-    // Avant la première ligne
-    currentIndex = -1;
+    
+    if (adjustedTime < lines[mid].time) {
+      end = mid - 1;
+    } else {
+      start = mid + 1;
+    }
   }
   
   // Récupérer les 3 prochaines lignes
