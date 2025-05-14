@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,6 +62,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   
   // Utiliser useRef pour l'intervalle de synchronisation
   const syncIntervalRef = useRef<number | null>(null);
+  const audioPollingRef = useRef<number | null>(null);
 
   // Integrate Player context to control playback
   const { 
@@ -85,68 +85,104 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   // Obtenir une référence à l'élément audio dès que possible
   useEffect(() => {
     const findAudioElement = () => {
-      const audioElement = document.querySelector('audio');
-      if (audioElement) {
-        audioRef.current = audioElement;
-        setCurrentAudioTime(audioElement.currentTime);
-        console.log("Élément audio trouvé, temps initial:", audioElement.currentTime);
+      // Tentative de récupération plus ciblée
+      let audioElement = document.querySelector('audio');
+      
+      if (!audioElement) {
+        // Fallback: chercher dans les iframes (pour les lecteurs embarqués)
+        document.querySelectorAll('iframe').forEach(iframe => {
+          try {
+            const iframeAudio = iframe.contentDocument?.querySelector('audio');
+            if (iframeAudio) audioElement = iframeAudio;
+          } catch (e) {
+            // Ignorer les erreurs CORS
+          }
+        });
       }
+      
+      if (audioElement) {
+        console.log("Élément audio trouvé:", audioElement);
+        audioRef.current = audioElement;
+        setCurrentAudioTime(audioElement.currentTime || 0);
+        
+        // Ajouter un écouteur d'événement timeupdate pour une meilleure synchronisation
+        audioElement.addEventListener('timeupdate', () => {
+          setCurrentAudioTime(audioElement!.currentTime);
+        });
+        
+        return true;
+      }
+      
+      return false;
     };
 
-    // Essayer de trouver l'élément audio immédiatement et régulièrement
-    findAudioElement();
+    // Essayer de trouver l'élément audio immédiatement
+    const found = findAudioElement();
     
-    if (!audioRef.current) {
-      let attempts = 0;
-      const maxAttempts = 20; // 2 secondes max
+    if (!found) {
+      console.log("Audio non trouvé, mise en place d'un polling...");
+      // Polling plus fréquent pour trouver l'audio
+      if (audioPollingRef.current) {
+        window.clearInterval(audioPollingRef.current);
+      }
       
-      const interval = setInterval(() => {
-        findAudioElement();
+      let attempts = 0;
+      const maxAttempts = 50; // 5 secondes max
+      
+      audioPollingRef.current = window.setInterval(() => {
+        const foundInInterval = findAudioElement();
         attempts++;
         
-        if (audioRef.current || attempts >= maxAttempts) {
-          clearInterval(interval);
+        if (foundInInterval) {
+          console.log(`Élément audio trouvé après ${attempts} tentatives`);
+          if (audioPollingRef.current) {
+            window.clearInterval(audioPollingRef.current);
+            audioPollingRef.current = null;
+          }
+        } else if (attempts >= maxAttempts) {
+          console.warn(`Échec de détection de l'élément audio après ${maxAttempts} tentatives`);
+          if (audioPollingRef.current) {
+            window.clearInterval(audioPollingRef.current);
+            audioPollingRef.current = null;
+          }
         }
       }, 100);
-      
-      return () => clearInterval(interval);
     }
+    
+    return () => {
+      if (audioPollingRef.current) {
+        window.clearInterval(audioPollingRef.current);
+      }
+      
+      // Nettoyage de l'écouteur timeupdate
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', () => {});
+      }
+    };
   }, [song?.id]);
 
-  // Mise à jour régulière du temps de lecture pour une synchronisation précise
+  // Mise à jour plus précise du temps de lecture pour une synchronisation optimale
   useEffect(() => {
-    // Fonction pour mettre à jour le temps de lecture actuel
-    const updateCurrentTime = () => {
-      if (audioRef.current) {
-        const newTime = audioRef.current.currentTime;
-        setCurrentAudioTime(newTime);
-        return newTime;
-      } else {
-        const audioElement = document.querySelector('audio');
-        if (audioElement) {
-          audioRef.current = audioElement;
-          setCurrentAudioTime(audioElement.currentTime);
-          return audioElement.currentTime;
-        }
-      }
-      return null;
-    };
-
     // Nettoyage de l'intervalle précédent
     if (syncIntervalRef.current) {
       window.clearInterval(syncIntervalRef.current);
       syncIntervalRef.current = null;
     }
     
-    // Synchronisation plus fréquente pour une meilleure précision (60 fois par seconde)
+    // Mise à jour à haute fréquence pour une synchronisation optimale avec les paroles
     if (isPlaying && isLrcFormat && parsedLyrics) {
       syncIntervalRef.current = window.setInterval(() => {
-        updateCurrentTime();
-      }, 16.67); // ~60 fps pour une synchronisation parfaitement fluide
+        if (audioRef.current) {
+          const currentTime = audioRef.current.currentTime;
+          setCurrentAudioTime(currentTime);
+          
+          // Log moins fréquent pour éviter de surcharger la console
+          if (Math.floor(currentTime * 2) % 2 === 0) {
+            console.log(`LyricsFullscreenView: temps audio actuel = ${currentTime.toFixed(2)}s`);
+          }
+        }
+      }, 16.67); // ~60 fps pour une synchronisation fluide
     }
-    
-    // Faire une mise à jour initiale
-    updateCurrentTime();
     
     return () => {
       if (syncIntervalRef.current) {
@@ -232,25 +268,41 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     };
   }, [song?.imageUrl, extractDominantColor]);
 
-  // Détection du format LRC
+  // Détection du format LRC - Optimisée pour une meilleure détection
   const detectLrcFormat = (text: string): boolean => {
-    return checkIsLrcFormat(text);
+    if (!text) return false;
+    
+    // Format typique: [MM:SS] ou [MM:SS.xx]
+    const strongLrcRegex = /\[\d{1,2}:\d{2}([\.:]\d{2})?\]/;
+    const lines = text.split('\n').filter(line => line.trim().length > 0).slice(0, 10);
+    
+    // Compter les lignes qui correspondent exactement au format LRC
+    const matchCount = lines.filter(line => strongLrcRegex.test(line)).length;
+    console.log(`Détection LRC améliorée: ${matchCount} lignes sur ${lines.length} contiennent des timestamps valides`);
+    
+    // Si au moins 30% des 10 premières lignes ont un timestamp, c'est probablement un LRC
+    return matchCount >= Math.min(2, Math.ceil(lines.length * 0.3));
   };
 
-  // Query to fetch lyrics - optimized with caching
+  // Query to fetch lyrics - optimized with better parsing
   const { data: lyrics, isLoading, refetch } = useQuery({
     queryKey: ["lyrics", song?.id],
     queryFn: async () => {
       if (!song?.id) return null;
       
-      const { data, error } = await supabase
-        .from("lyrics")
-        .select("content")
-        .eq("song_id", song.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.content || null;
+      try {
+        const { data, error } = await supabase
+          .from("lyrics")
+          .select("content")
+          .eq("song_id", song.id)
+          .maybeSingle();
+  
+        if (error) throw error;
+        return data?.content || null;
+      } catch (err) {
+        console.error("Erreur lors de la récupération des paroles:", err);
+        return null;
+      }
     },
     enabled: !!song?.id,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
@@ -264,6 +316,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           
           if (lrcFormatDetected) {
             try {
+              console.log("Format LRC détecté, parsing...");
               const parsed = parseLrc(data);
               setParsedLyrics(parsed);
               console.log("Paroles LRC parsées avec succès:", parsed.lines.length, "lignes");
@@ -273,15 +326,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
               setParsedLyrics(null);
             }
           } else {
+            console.log("Format LRC non détecté, affichage normal");
             setParsedLyrics(null);
           }
         }
       },
-      onError: (error) => {
-        console.error("Error fetching lyrics:", error);
-        setIsLrcFormat(false);
-        setParsedLyrics(null);
-      }
     }
   });
 
@@ -501,11 +550,18 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     previousSong();
   }, [previousSong]);
 
-  // Nettoyage des timeouts au démontage
+  // Nettoyage des intervalles au démontage
   useEffect(() => {
     return () => {
       if (syncIntervalRef.current) {
         window.clearInterval(syncIntervalRef.current);
+      }
+      if (audioPollingRef.current) {
+        window.clearInterval(audioPollingRef.current);
+      }
+      // Nettoyage des écouteurs d'événements audio
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', () => {});
       }
     };
   }, []);
@@ -745,13 +801,22 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20">
                   {isLrcFormat && parsedLyrics ? (
                     <>
-                      <div className="mb-6 text-spotify-neutral/80 text-sm">
+                      {/* Afficher des informations de débogage de synchronisation */}
+                      <div className="mb-4 text-spotify-neutral/70 text-xs">
+                        <p>Temps actuel: {currentAudioTime.toFixed(2)}s</p>
+                        {parsedLyrics.offset && <p>Décalage: {parsedLyrics.offset}ms</p>}
+                        <p>Lignes: {parsedLyrics.lines.length}</p>
+                        <hr className="border-white/20 my-2" />
+                      </div>
+                      
+                      {/* Informations sur le fichier LRC */}
+                      <div className="mb-4 text-spotify-neutral/80 text-sm">
                         {parsedLyrics.artist && <p>Artiste: {parsedLyrics.artist}</p>}
                         {parsedLyrics.title && <p>Titre: {parsedLyrics.title}</p>}
                         {parsedLyrics.album && <p>Album: {parsedLyrics.album}</p>}
-                        {parsedLyrics.offset && <p>Décalage: {parsedLyrics.offset}ms</p>}
                       </div>
                       
+                      {/* Composant LRC Player amélioré */}
                       <LrcPlayer 
                         parsedLyrics={parsedLyrics}
                         currentTime={currentAudioTime}

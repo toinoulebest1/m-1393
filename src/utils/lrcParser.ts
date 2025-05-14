@@ -1,4 +1,3 @@
-
 /**
  * Utilitaire pour parser les fichiers LRC (Lyrics)
  * Format LRC: Support multiple formats including:
@@ -183,11 +182,12 @@ export const findCurrentLyricLine = (
     return { current: -1, next: [] };
   }
 
+  // Appliquer l'offset (positif = retard, négatif = avance)
   const adjustedTime = currentTime - offset / 1000;
   
-  // Optimisation: log moins fréquent pour réduire les performances
-  if (Math.floor(currentTime * 10) % 10 === 0) {
-    console.log(`Recherche de ligne pour le temps: ${currentTime}s, ajusté: ${adjustedTime}s`);
+  // Logs de diagnostic plus fréquents pour détecter les problèmes de synchronisation
+  if (Math.floor(currentTime * 4) % 4 === 0) {
+    console.log(`Recherche de ligne pour le temps: ${currentTime.toFixed(2)}s, ajusté: ${adjustedTime.toFixed(2)}s`);
   }
 
   // Cas spécial: avant la première ligne
@@ -200,8 +200,7 @@ export const findCurrentLyricLine = (
     return { current: lines.length - 1, next: [] };
   }
 
-  // Algorithme de recherche binaire pour trouver la ligne correspondante
-  // plus rapidement dans les fichiers LRC volumineux
+  // Algorithme de recherche binaire optimisé pour trouver la ligne correspondante
   let start = 0;
   let end = lines.length - 1;
   
@@ -225,9 +224,11 @@ export const findCurrentLyricLine = (
     }
   }
 
-  // Si nous arrivons ici, utiliser l'approche traditionnelle
+  // Si nous arrivons ici, utiliser une approche linéaire comme fallback
   for (let i = 0; i < lines.length - 1; i++) {
     if (adjustedTime >= lines[i].time && adjustedTime < lines[i + 1].time) {
+      // Log détaillé pour debug
+      console.log(`Ligne trouvée (linéaire): ${i}, temps: ${lines[i].time.toFixed(2)}s <= ${adjustedTime.toFixed(2)}s < ${lines[i + 1].time.toFixed(2)}s`);
       return { 
         current: i,
         next: lines.slice(i + 1, i + 4)
@@ -235,8 +236,24 @@ export const findCurrentLyricLine = (
     }
   }
 
-  // Si aucune correspondance n'est trouvée, utiliser la dernière ligne comme secours
-  return { current: lines.length - 1, next: [] };
+  // Fallback: trouver la ligne la plus proche
+  let closestIndex = 0;
+  let minDiff = Number.MAX_VALUE;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const diff = Math.abs(adjustedTime - lines[i].time);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestIndex = i;
+    }
+  }
+  
+  console.log(`Fallback: ligne la plus proche ${closestIndex}, diff: ${minDiff.toFixed(2)}s`);
+  
+  return { 
+    current: closestIndex, 
+    next: lines.slice(closestIndex + 1, closestIndex + 4).filter(l => l.time > adjustedTime)
+  };
 };
 
 /**

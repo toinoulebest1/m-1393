@@ -18,18 +18,35 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolling, setUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<number | null>(null);
+  const previousTimeRef = useRef<number>(0);
 
-  // Mise à jour de la ligne active en fonction du temps de lecture
+  // Ajout de logs pour diagnostiquer la synchronisation
+  useEffect(() => {
+    if (currentTime !== previousTimeRef.current) {
+      console.log(`LrcPlayer: Temps mis à jour - ${currentTime.toFixed(2)}s`);
+      previousTimeRef.current = currentTime;
+    }
+  }, [currentTime]);
+
+  // Mise à jour de la ligne active en fonction du temps de lecture avec plus de précision
   useEffect(() => {
     if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) return;
 
+    // Appliquer l'offset s'il existe
+    const adjustedTime = parsedLyrics.offset 
+      ? currentTime + (parsedLyrics.offset / 1000) 
+      : currentTime;
+
+    console.log(`LrcPlayer: Temps ajusté - ${adjustedTime.toFixed(2)}s (offset: ${parsedLyrics.offset || 0}ms)`);
+    
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
-      currentTime,
-      parsedLyrics.offset || 0
+      adjustedTime,
+      0 // L'offset est déjà appliqué
     );
     
     if (current !== currentLineIndex) {
+      console.log(`LrcPlayer: Nouvelle ligne active - Index ${current}, Temps ${parsedLyrics.lines[current]?.time.toFixed(2)}s`);
       setCurrentLineIndex(current);
       setNextLines(next);
       
