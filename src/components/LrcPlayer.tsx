@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Lrc } from 'react-lrc';
+import { Lrc, LyricLine } from 'react-lrc';
 
 interface LrcPlayerProps {
   lrcContent: string;
@@ -19,7 +19,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     <div className={`overflow-y-auto h-full ${className}`}>
       <Lrc
         lrc={lrcContent}
-        currentTime={currentTime}
+        // currentTime is passed as a custom prop and handled internally by the component
         lineRenderer={({ index, active, line }) => (
           <div
             key={index}
@@ -32,7 +32,8 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
             {line.content}
           </div>
         )}
-        onLineChange={(index) => setLineIndex(index)}
+        currentMillisecond={currentTime * 1000} // Convert seconds to milliseconds
+        onLineChange={(line) => setLineIndex(line.index)} // Fix the type mismatch
       />
     </div>
   );
