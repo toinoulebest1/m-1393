@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2 } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate } from "react-router-dom";
@@ -10,9 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { Slider } from "@/components/ui/slider";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -133,6 +134,64 @@ export const SyncedLyricsView: React.FC = () => {
     setTimeout(() => {
       navigate(-1);
     }, 150);
+  };
+
+  // Formatage du temps pour l'affichage
+  const formatTime = (progress: number) => {
+    if (!currentSong?.duration) return "0:00";
+    
+    try {
+      let totalSeconds = 0;
+      if (currentSong.duration.includes(':')) {
+        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+        if (!isNaN(minutes) && !isNaN(seconds)) {
+          totalSeconds = minutes * 60 + seconds;
+        }
+      } else {
+        const duration = parseFloat(currentSong.duration);
+        if (!isNaN(duration)) {
+          totalSeconds = duration;
+        }
+      }
+      
+      const currentTime = (progress / 100) * totalSeconds;
+      const currentMinutes = Math.floor(currentTime / 60);
+      const currentSeconds = Math.floor(currentTime % 60);
+      
+      return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+    } catch {
+      return "0:00";
+    }
+  };
+
+  // Formatage de la durée pour l'affichage
+  const formatDuration = (duration: string | undefined) => {
+    if (!duration) return "0:00";
+    
+    try {
+      if (duration.includes(':')) {
+        return duration;
+      }
+      
+      const durationInSeconds = parseFloat(duration);
+      if (isNaN(durationInSeconds)) return "0:00";
+      
+      const minutes = Math.floor(durationInSeconds / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } catch {
+      return "0:00";
+    }
+  };
+
+  // Fonction pour gérer la lecture/pause
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
   };
 
   const generateLyrics = async () => {
@@ -268,6 +327,60 @@ export const SyncedLyricsView: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg" />
             </div>
           )}
+          
+          {/* Player Controls - Added below image and above title/artist */}
+          <div className="w-full mb-4 transition-all duration-200">
+            {/* Progress display */}
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-spotify-neutral">{formatTime(progress)}</span>
+              <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="flex items-center">
+              <Slider
+                value={[progress]}
+                max={100}
+                step={1}
+                className="flex-grow"
+                onValueChange={(value) => setProgress(value[0])}
+              />
+            </div>
+            
+            {/* Playback controls */}
+            <div className="flex items-center justify-center space-x-4 mt-4">
+              <Button 
+                variant="ghost"
+                size="icon"
+                onClick={previousSong}
+                className="text-white hover:bg-white/10 rounded-full h-10 w-10"
+              >
+                <SkipBack className="h-5 w-5" />
+              </Button>
+              
+              <Button
+                variant="default"
+                size="icon"
+                onClick={handlePlayPause}
+                className="bg-white text-black hover:bg-white/90 rounded-full h-12 w-12 flex items-center justify-center"
+              >
+                {isPlaying ? (
+                  <Pause className="h-6 w-6" />
+                ) : (
+                  <Play className="h-6 w-6" />
+                )}
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={nextSong}
+                className="text-white hover:bg-white/10 rounded-full h-10 w-10"
+              >
+                <SkipForward className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
 
           <div className="text-center md:text-left w-full px-4 md:px-0">
             <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
