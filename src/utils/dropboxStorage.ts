@@ -409,3 +409,152 @@ export const migrateFilesToDropbox = async (
     failedFiles
   };
 };
+
+// Nouvelle fonction pour récupérer un fichier LRC associé à une chanson
+export const getLrcFile = async (songId: string, folderPath?: string): Promise<string | null> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    return null;
+  }
+  
+  try {
+    // Construire le chemin du fichier LRC
+    let lrcPath: string;
+    
+    if (folderPath) {
+      // Si un chemin de dossier est fourni, utiliser ce chemin
+      lrcPath = `/${folderPath}/${songId}.lrc`;
+    } else {
+      // Sinon, vérifier d'abord dans le dossier songs/songId
+      lrcPath = `/songs/${songId}/${songId}.lrc`;
+      
+      try {
+        // Vérifier si le fichier existe à cet emplacement
+        const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            path: lrcPath
+          })
+        });
+        
+        if (!response.ok) {
+          // Si le fichier n'existe pas dans le dossier songs, essayer le chemin audio/songId.lrc
+          console.log(`Fichier LRC non trouvé dans ${lrcPath}, tentative dans audio/`);
+          lrcPath = `/audio/${songId}.lrc`;
+        }
+      } catch (error) {
+        // Si une erreur se produit, essayer le chemin audio/songId.lrc
+        console.log(`Erreur en vérifiant ${lrcPath}, tentative dans audio/`);
+        lrcPath = `/audio/${songId}.lrc`;
+      }
+    }
+    
+    console.log(`Tentative de récupération du fichier LRC: ${lrcPath}`);
+    
+    // Vérifier si le fichier LRC existe
+    const metadataResponse = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: lrcPath
+      })
+    });
+    
+    if (!metadataResponse.ok) {
+      console.log(`Fichier LRC non trouvé: ${lrcPath}`);
+      return null;
+    }
+    
+    // Obtenir un lien de téléchargement pour le fichier LRC
+    const url = await getDropboxSharedLink(lrcPath.substring(1)); // Supprimer le premier '/'
+    
+    // Télécharger le contenu du fichier LRC
+    const fileResponse = await fetch(url);
+    if (!fileResponse.ok) {
+      console.error(`Erreur lors du téléchargement du fichier LRC: ${fileResponse.statusText}`);
+      return null;
+    }
+    
+    const lrcContent = await fileResponse.text();
+    console.log(`Fichier LRC récupéré avec succès (${lrcContent.length} caractères)`);
+    return lrcContent;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du fichier LRC:', error);
+    return null;
+  }
+};
+
+// Fonction pour télécharger un fichier LRC vers Dropbox
+export const uploadLrcFile = async (
+  content: string, 
+  songId: string, 
+  folderPath?: string
+): Promise<string | null> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    return null;
+  }
+  
+  try {
+    // Créer un objet File à partir du contenu
+    const file = new File([content], `${songId}.lrc`, { 
+      type: 'text/plain' 
+    });
+    
+    // Déterminer le chemin de destination
+    let fullPath: string;
+    if (folderPath) {
+      fullPath = `/${folderPath}/${songId}.lrc`;
+    } else {
+      // Par défaut, sauvegarder dans le dossier songs/songId
+      fullPath = `/songs/${songId}/${songId}.lrc`;
+    }
+    
+    console.log(`Téléchargement du fichier LRC vers: ${fullPath}`);
+    
+    // Utiliser l'API Dropbox pour télécharger le fichier
+    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          path: fullPath,
+          mode: 'overwrite',
+          autorename: true,
+          mute: false
+        })
+      },
+      body: file
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Dropbox upload error:', errorText);
+      toast.error("Erreur lors du téléchargement du fichier LRC");
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Fichier LRC téléchargé avec succès:', data);
+    toast.success("Fichier LRC téléchargé avec succès");
+    
+    return data.path_display || fullPath;
+  } catch (error) {
+    console.error('Erreur lors du téléchargement du fichier LRC:', error);
+    toast.error("Échec du téléchargement du fichier LRC");
+    return null;
+  }
+};

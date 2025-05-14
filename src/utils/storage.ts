@@ -75,14 +75,44 @@ export const getAudioFile = async (path: string) => {
 
   try {
     if (useDropbox) {
-      // Check if the path contains a folder structure
-      if (path.includes('/')) {
-        // If it already has a full path format, use it as-is
-        return await getDropboxSharedLink(path);
-      } else {
-        // Default to the old audio/ path if not using the new folder structure
-        return await getDropboxSharedLink(`audio/${path}`);
+      // Gestion améliorée des chemins pour les structures de dossiers
+      let dropboxPath = path;
+      
+      // Si le chemin ne contient pas de '/', ajouter le préfixe 'audio/'
+      if (!path.includes('/')) {
+        dropboxPath = `audio/${path}`;
       }
+      
+      // Vérifier si le chemin contient déjà un fichier ou s'il s'agit d'un dossier
+      // Si le chemin se termine par une extension de fichier audio (.mp3, .wav, etc.), c'est un fichier
+      const audioFileExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac'];
+      const isFilePath = audioFileExtensions.some(ext => path.toLowerCase().endsWith(ext));
+      
+      // Si c'est un chemin de dossier et non un fichier, chercher le fichier audio dans le dossier
+      if (!isFilePath && path.includes('/')) {
+        const folderPath = path;
+        // Essayer de récupérer le fichier audio du dossier (on suppose qu'il a le même nom que le dossier)
+        const folderId = folderPath.split('/').pop();
+        if (folderId) {
+          // Essayer plusieurs extensions courantes pour le fichier audio
+          for (const ext of audioFileExtensions) {
+            try {
+              const audioFilePath = `${folderPath}/${folderId}${ext}`;
+              console.log(`Tentative de récupération du fichier audio: ${audioFilePath}`);
+              return await getDropboxSharedLink(audioFilePath);
+            } catch (error) {
+              console.log(`Fichier ${ext} non trouvé, essai suivant...`);
+              // Continue to try the next extension
+            }
+          }
+        }
+        
+        // Si aucune extension ne fonctionne, on tente avec le chemin original
+        console.log("Aucun fichier audio trouvé avec les extensions courantes, tentative avec le chemin original");
+      }
+      
+      console.log(`Récupération du fichier depuis Dropbox: ${dropboxPath}`);
+      return await getDropboxSharedLink(dropboxPath);
     }
     
     // Original Supabase implementation

@@ -19,7 +19,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     <div className={`overflow-y-auto h-full ${className}`}>
       <Lrc
         lrc={lrcContent}
-        // currentTime is passed as a custom prop and handled internally by the component
         lineRenderer={({ index, active, line }) => (
           <div
             key={index}
@@ -33,7 +32,11 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
           </div>
         )}
         currentMillisecond={currentTime * 1000} // Convert seconds to milliseconds
-        onLineChange={(line) => setLineIndex(line.index)} // Fix the type mismatch
+        onLineChange={(line) => {
+          if (typeof line === 'object' && 'index' in line) {
+            setLineIndex(line.index);
+          }
+        }}
       />
     </div>
   );
