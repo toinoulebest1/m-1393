@@ -554,8 +554,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
 
   // Optimisation de la synchronisation des paroles avec la musique
   useEffect(() => {
-    if (!parsedLyrics || !parsedLyrics.lines.length) {
-      console.log("Pas de paroles à synchroniser");
+    if (!parsedLyrics || !parsedLyrics.lines.length || !isPlaying) {
+      console.log("Pas de synchronisation nécessaire");
       return;
     }
     
@@ -564,42 +564,54 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       console.log("Défilement manuel actif, pas de synchronisation automatique");
       return;
     }
-    
-    // Ne synchroniser que si le temps a changé significativement ou si la chanson est en cours de lecture
-    console.log(`Synchronisation des paroles - Temps: ${currentAudioTime}s, Offset: ${parsedLyrics.offset || 0}ms`);
-    
-    // Trouver la ligne actuelle basée sur le temps de lecture avec une marge de tolérance
-    const { current, next } = findCurrentLyricLine(
-      parsedLyrics.lines,
-      currentAudioTime,
-      parsedLyrics.offset || 0
-    );
-    
-    // Mise à jour des états uniquement si nécessaire pour éviter les re-rendus inutiles
-    if (current !== currentLineIndex) {
-      console.log(`Nouvelle ligne active: ${current}, texte: "${current >= 0 ? parsedLyrics.lines[current].text : 'avant le début'}"`)
-      setCurrentLineIndex(current);
-      setNextLines(next);
-      
-      // Faire défiler automatiquement vers la ligne active
-      if (current >= 0 && lyricsContainerRef.current && !userScrolling) {
-        const container = lyricsContainerRef.current;
-        const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
-        
-        if (currentLineElement) {
-          requestAnimationFrame(() => {
+
+    // Fonction de mise à jour
+    const updateLyrics = () => {
+      const audioElement = audioRef.current || document.querySelector('audio');
+      if (!audioElement) {
+        console.log("Élément audio non trouvé");
+        return;
+      }
+
+      const currentTime = audioElement.currentTime;
+      console.log(`Temps actuel: ${currentTime}s, Offset: ${parsedLyrics.offset || 0}ms`);
+
+      const { current, next } = findCurrentLyricLine(
+        parsedLyrics.lines,
+        currentTime,
+        parsedLyrics.offset || 0
+      );
+
+      if (current !== currentLineIndex) {
+        console.log(`Nouvelle ligne active: ${current}, texte: "${current >= 0 ? parsedLyrics.lines[current].text : 'avant le début'}"`)
+        setCurrentLineIndex(current);
+        setNextLines(next);
+
+        // Faire défiler vers la ligne active
+        if (current >= 0 && lyricsContainerRef.current && !userScrolling) {
+          const container = lyricsContainerRef.current;
+          const currentLineElement = container.querySelector(`[data-line-index="${current}"]`);
+
+          if (currentLineElement) {
             currentLineElement.scrollIntoView({
               behavior: 'smooth',
               block: 'center',
             });
-          });
+          }
         }
       }
-    } else if (JSON.stringify(next) !== JSON.stringify(nextLines)) {
-      // Mettre à jour uniquement les lignes suivantes si elles ont changé
-      setNextLines(next);
-    }
-  }, [currentAudioTime, parsedLyrics, userScrolling, currentLineIndex]);
+    };
+
+    // Mettre à jour immédiatement
+    updateLyrics();
+
+    // Mettre en place l'intervalle de mise à jour
+    const intervalId = setInterval(updateLyrics, 50); // 20 fps pour une mise à jour fluide
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [currentAudioTime, parsedLyrics, isPlaying, userScrolling, currentLineIndex]);
 
   // Nettoyage du timeout au démontage
   useEffect(() => {
