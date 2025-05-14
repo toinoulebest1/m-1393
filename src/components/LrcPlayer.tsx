@@ -19,6 +19,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const [userScrolling, setUserScrolling] = useState(false);
   const scrollTimeoutRef = useRef<number | null>(null);
   const previousTimeRef = useRef<number>(0);
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
 
   // Ajout de logs pour diagnostiquer la synchronisation
   useEffect(() => {
@@ -52,13 +53,22 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       
       // Auto-scroll vers la ligne active si l'utilisateur ne fait pas défiler manuellement
       if (current >= 0 && containerRef.current && !userScrolling) {
-        const lineElement = containerRef.current.querySelector(`[data-line-index="${current}"]`);
-        if (lineElement) {
-          lineElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
-        }
+        setTimeout(() => {
+          if (activeLineRef.current && containerRef.current) {
+            // Scroll the active line to the center of the container
+            const containerHeight = containerRef.current.clientHeight;
+            const lineTop = activeLineRef.current.offsetTop;
+            const lineHeight = activeLineRef.current.clientHeight;
+            
+            // Calculate position to center the line
+            const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+            
+            containerRef.current.scrollTo({
+              top: scrollPosition,
+              behavior: 'smooth'
+            });
+          }
+        }, 50); // Small delay to ensure the DOM is updated
       }
     }
   }, [currentTime, parsedLyrics, currentLineIndex, userScrolling]);
@@ -97,25 +107,29 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
 
   return (
     <div 
-      className={`overflow-y-auto h-full ${className}`}
+      className={`overflow-y-auto h-full relative ${className}`}
       ref={containerRef}
       onScroll={handleScroll}
     >
+      {/* Spacer at top to allow centering of first lines */}
+      <div className="h-[40vh]"></div>
+      
       <div className="py-8">
         {parsedLyrics.lines.map((line, index) => (
           <div 
             key={`${index}-${line.time}`}
             data-line-index={index}
             data-time={line.time}
+            ref={currentLineIndex === index ? activeLineRef : null}
             className={`
-              py-2 px-4 transition-all duration-300 text-lg
+              py-2 px-4 transition-all duration-300 text-center my-3
               ${currentLineIndex === index 
-                ? 'text-spotify-accent font-bold scale-110' 
+                ? 'text-spotify-accent font-bold text-2xl' 
                 : nextLines.some(nextLine => nextLine.time === line.time)
-                  ? 'text-white/90'
+                  ? 'text-white/90 text-xl'
                   : index < currentLineIndex 
-                    ? 'text-white/40'
-                    : 'text-white/70'
+                    ? 'text-white/30 text-lg'
+                    : 'text-white/60 text-lg'
               }
             `}
           >
@@ -123,6 +137,9 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
           </div>
         ))}
       </div>
+      
+      {/* Spacer at bottom to allow centering of last lines */}
+      <div className="h-[40vh]"></div>
     </div>
   );
 };
