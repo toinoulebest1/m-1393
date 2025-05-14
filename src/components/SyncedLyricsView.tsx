@@ -14,7 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, isReady } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -24,7 +24,6 @@ export const SyncedLyricsView: React.FC = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [accentColor, setAccentColor] = useState<[number, number, number] | null>(null);
   const [animationStage, setAnimationStage] = useState<"entry" | "exit">("entry");
-  const [showLoadingMessage, setShowLoadingMessage] = useState(false);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -32,19 +31,9 @@ export const SyncedLyricsView: React.FC = () => {
     accent: [75, 20, 95] as [number, number, number]
   };
 
-  // Monitorer l'état de chargement de l'audio et afficher un message d'attente si nécessaire
-  useEffect(() => {
-    // Si la chanson est définie mais pas encore prête, afficher un message de chargement
-    if (currentSong && !isReady) {
-      setShowLoadingMessage(true);
-    } else {
-      setShowLoadingMessage(false);
-    }
-  }, [currentSong, isReady]);
-
   // Calcul du temps actuel basé sur le pourcentage de progression
   useEffect(() => {
-    if (!currentSong || !currentSong.duration || !isReady) return;
+    if (!currentSong || !currentSong.duration) return;
     
     let duration: number;
     
@@ -60,7 +49,7 @@ export const SyncedLyricsView: React.FC = () => {
     const time = (progress / 100) * duration;
     setCurrentTime(time);
     
-  }, [currentSong, progress, isReady]);
+  }, [currentSong, progress]);
 
   // Animation effects setup
   useEffect(() => {
@@ -454,21 +443,12 @@ export const SyncedLyricsView: React.FC = () => {
         {/* Right side - Lyrics content */}
         <div className="flex-grow h-[70%] md:h-full md:max-h-full overflow-hidden md:w-2/3 md:pl-8 md:border-l border-white/10">
           <div className="h-full w-full flex flex-col">
-            {/* Afficher un message d'attente si l'audio est en cours de chargement */}
-            {showLoadingMessage ? (
-              <div className="flex-grow flex flex-col items-center justify-center text-center">
-                <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
-                <span className="text-lg text-spotify-neutral">Chargement de l'audio...</span>
-                <p className="text-sm text-spotify-neutral/70 mt-2">
-                  Les paroles synchronisées s'afficheront une fois l'audio chargé
-                </p>
-              </div>
-            ) : isGenerating ? (
+            {isGenerating ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Génération des paroles en cours...</span>
               </div>
-            ) : lyricsText && isReady ? (
+            ) : lyricsText ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
                 <div 
                   className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm" 
