@@ -212,12 +212,33 @@ const Index = () => {
       )
       .subscribe();
 
+    // Abonnement aux changements pour les fichiers Dropbox 
+    const dropboxFilesChannel = supabase
+      .channel('dropbox-files-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'dropbox_files',
+        },
+        (payload: any) => {
+          console.log("Dropbox file reference change detected:", payload);
+          // On peut rafraîchir si nécessaire
+          if (refreshCurrentSong && currentSong) {
+            refreshCurrentSong();
+          }
+        }
+      )
+      .subscribe();
+
     // Nettoyage des abonnements
     return () => {
       supabase.removeChannel(profileChannel);
       supabase.removeChannel(songsChannel);
+      supabase.removeChannel(dropboxFilesChannel);
     };
-  }, [userId, username, refreshCurrentSong]);
+  }, [userId, username, refreshCurrentSong, currentSong]);
 
   return (
     <div className="w-full h-full flex flex-col">

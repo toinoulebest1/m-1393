@@ -18,7 +18,7 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
     },
     global: {
-      fetch: (...args) => {
+      fetch: function(...args) {
         console.log("Supabase API call:", args[0]);
         return fetch(...args);
       }
