@@ -1,6 +1,7 @@
 
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Add a simple local storage helper for Dropbox configuration
 export const getDropboxConfig = (): DropboxConfig => {
@@ -34,6 +35,8 @@ export const uploadFileToDropbox = async (
   const config = getDropboxConfig();
   
   if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
     throw new Error('Dropbox access token not configured');
   }
   
@@ -49,7 +52,7 @@ export const uploadFileToDropbox = async (
         'Dropbox-API-Arg': JSON.stringify({
           path: `/${path}`,
           mode: 'overwrite',
-          autorename: false,
+          autorename: true,
           mute: false
         })
       },
@@ -57,15 +60,16 @@ export const uploadFileToDropbox = async (
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Dropbox upload error:', errorData);
+      const errorText = await response.text();
+      console.error('Dropbox upload error:', errorText);
+      toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
       throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     console.log('Dropbox upload successful:', data);
     
-    // Store the reference in a local object instead of directly using Supabase
+    // Store the reference in Supabase
     try {
       // Insert using a raw query instead of the typed client
       const { error } = await supabase
@@ -77,14 +81,17 @@ export const uploadFileToDropbox = async (
         
       if (error) {
         console.error('Error saving Dropbox reference:', error);
+        // Continue anyway since the upload succeeded
       }
     } catch (dbError) {
       console.error('Database error when saving reference:', dbError);
+      // Continue anyway since the upload succeeded
     }
     
     return data.path_display || `/${path}`;
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
+    toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
     throw error;
   }
 };
@@ -94,6 +101,8 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   const config = getDropboxConfig();
   
   if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
     throw new Error('Dropbox access token not configured');
   }
   
@@ -134,6 +143,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     
     // If link already exists, fetch it
     if (response.status === 409) {
+      console.log('Shared link already exists, fetching it');
       const listResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
         method: 'POST',
         headers: {
@@ -144,6 +154,13 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
           path: dropboxPath
         })
       });
+      
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error('Failed to list shared links:', errorText);
+        toast.error("Impossible de récupérer le lien de partage");
+        throw new Error('Failed to list shared links');
+      }
       
       const listData = await listResponse.json();
       
@@ -156,12 +173,14 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
         return url;
       }
       
+      toast.error("Aucun lien de partage trouvé");
       throw new Error('No shared links found');
     }
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Dropbox shared link error:', errorData);
+      const errorText = await response.text();
+      console.error('Dropbox shared link error:', errorText);
+      toast.error("Impossible de créer un lien de partage");
       throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
     }
     
@@ -175,6 +194,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     return url;
   } catch (error) {
     console.error('Error getting Dropbox shared link:', error);
+    toast.error("Impossible d'obtenir un lien de partage Dropbox");
     throw error;
   }
 };
