@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, AlertCircle, Transfer } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 
 export const DropboxSettings = () => {
@@ -291,7 +291,7 @@ export const DropboxSettings = () => {
               disabled={!accessToken || isSaving || isTesting} 
               className="w-full mt-2"
             >
-              <Transfer className="mr-2 h-4 w-4" />
+              <ArrowRight className="mr-2 h-4 w-4" />
               Démarrer la migration des fichiers
             </Button>
           )}
@@ -343,3 +343,4 @@ export const DropboxSettings = () => {
     </Card>
   );
 };
+
