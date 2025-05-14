@@ -137,12 +137,9 @@ export const findCurrentLyricLine = (
   currentTime: number,
   offset: number = 0
 ): { current: number; next: LrcLine[] } => {
-  // Amélioration: Appliquer l'offset (conversion de ms en secondes)
-  // L'offset est généralement négatif dans les fichiers LRC, donc on soustrait
+  // Amélioration: Appliquer l'offset de façon plus précise
+  // L'offset est généralement négatif dans les fichiers LRC pour avancer les paroles
   const adjustedTime = currentTime - (offset / 1000);
-  
-  // Optimisation pour trouver la ligne actuelle avec une recherche plus efficace
-  let currentIndex = -1;
   
   // Si nous n'avons pas de lignes, retourner valeurs par défaut
   if (lines.length === 0) {
@@ -159,27 +156,20 @@ export const findCurrentLyricLine = (
     return { current: lines.length - 1, next: [] };
   }
   
-  // Recherche binaire pour trouver la ligne actuelle plus efficacement
-  let start = 0;
-  let end = lines.length - 1;
+  // Trouver la ligne active avec une recherche linéaire plus précise
+  let currentIndex = -1;
   
-  while (start <= end) {
-    const mid = Math.floor((start + end) / 2);
-    
-    // Si c'est la dernière ligne ou si le temps actuel est avant le temps de la prochaine ligne
-    if (mid === lines.length - 1 || adjustedTime < lines[mid + 1].time) {
-      // Et si le temps actuel est après ou égal au temps de cette ligne
-      if (adjustedTime >= lines[mid].time) {
-        currentIndex = mid;
-        break;
-      }
+  // Parcourir chaque ligne pour trouver celle qui correspond au temps actuel
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (adjustedTime >= lines[i].time && adjustedTime < lines[i + 1].time) {
+      currentIndex = i;
+      break;
     }
-    
-    if (adjustedTime < lines[mid].time) {
-      end = mid - 1;
-    } else {
-      start = mid + 1;
-    }
+  }
+  
+  // Si on n'a pas trouvé et qu'on est après la dernière ligne
+  if (currentIndex === -1 && adjustedTime >= lines[lines.length - 1].time) {
+    currentIndex = lines.length - 1;
   }
   
   // Récupérer les 3 prochaines lignes
