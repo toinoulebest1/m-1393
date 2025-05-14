@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,7 +57,7 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark">
       <Router>
-        {/* Fixed provider order: PlayerProvider should wrap CastProvider */}
+        {/* Fixed provider order: PlayerProvider must wrap CastProvider */}
         <PlayerProvider>
           <CastProvider>
             <Routes>
