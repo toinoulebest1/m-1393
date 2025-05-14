@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 import type {
@@ -140,25 +139,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-interface ToastWithMethods {
-  (props: Toast): {
-    id: string
-    dismiss: () => void
-    update: (props: ToasterToast) => void
-  }
-  success: (props: Toast | string) => {
-    id: string
-    dismiss: () => void
-    update: (props: ToasterToast) => void
-  }
-  error: (props: Toast | string) => {
-    id: string
-    dismiss: () => void
-    update: (props: ToasterToast) => void
-  }
-}
-
-const toast = (function(props: Toast) {
+function toast({ ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -185,33 +166,7 @@ const toast = (function(props: Toast) {
     dismiss,
     update,
   }
-}) as ToastWithMethods
-
-// Add success and error methods
-toast.success = (props: Toast | string) => {
-  // If props is a string, convert it to a Toast object
-  const toastProps: Toast = typeof props === 'string' 
-    ? { description: props } 
-    : props;
-    
-  return toast({
-    ...toastProps,
-    variant: "default",
-    className: "bg-green-100 border-green-500 dark:bg-green-900/50 dark:border-green-800",
-  });
-};
-
-toast.error = (props: Toast | string) => {
-  // If props is a string, convert it to a Toast object
-  const toastProps: Toast = typeof props === 'string' 
-    ? { description: props } 
-    : props;
-    
-  return toast({
-    ...toastProps,
-    variant: "destructive",
-  });
-};
+}
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
