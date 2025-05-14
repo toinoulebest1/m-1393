@@ -26,6 +26,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const [firstLyricTime, setFirstLyricTime] = useState<number | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isWaitingForFirstLyric, setIsWaitingForFirstLyric] = useState(false);
+  const [remainingTime, setRemainingTime] = useState<string>("");
 
   // Ajout de logs pour diagnostiquer la synchronisation
   useEffect(() => {
@@ -55,12 +56,19 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     }
   }, [parsedLyrics, currentTime]);
 
-  // Update loading progress based on current time
+  // Update loading progress and remaining time based on current time
   useEffect(() => {
     if (isWaitingForFirstLyric && firstLyricTime && firstLyricTime > 0) {
       // Calculate progress as a percentage of time until first lyric
       const progress = Math.min(100, (currentTime / firstLyricTime) * 100);
       setLoadingProgress(progress);
+      
+      // Calculate remaining time in seconds
+      const timeRemaining = Math.max(0, firstLyricTime - currentTime);
+      const seconds = Math.floor(timeRemaining);
+      
+      // Format the remaining time
+      setRemainingTime(`${seconds} seconde${seconds > 1 ? 's' : ''}`);
       
       // If we've reached the first lyric, stop showing the loading bar
       if (currentTime >= firstLyricTime) {
@@ -151,7 +159,7 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       {isWaitingForFirstLyric && firstLyricTime && (
         <div className="w-full px-4 py-2 mb-4 animate-fade-in">
           <div className="text-center text-white/70 mb-2">
-            Préparation des paroles...
+            Début des paroles dans {remainingTime}
           </div>
           <Progress 
             value={loadingProgress} 
