@@ -60,7 +60,9 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const [scrollTimeout, setScrollTimeout] = useState<number | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
-  const [syncIntervalRef, setSyncIntervalRef] = useState<number | null>(null);
+  
+  // Correction: Utiliser useRef au lieu de useState pour l'intervalle
+  const syncIntervalRef = useRef<number | null>(null);
 
   // Integrate Player context to control playback
   const { 
