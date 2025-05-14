@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -8,6 +8,7 @@ import { isDropboxEnabled } from "@/utils/dropboxStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 
 interface Song {
   id: string;
@@ -27,6 +28,8 @@ export const MusicUploader = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
   const [storageProvider, setStorageProvider] = useState<string>("Supabase");
+  // Référence pour stocker temporairement les fichiers LRC trouvés
+  const lrcFilesRef = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     // Check which storage provider is active
@@ -61,6 +64,7 @@ export const MusicUploader = () => {
   };
 
   const parseFileName = (fileName: string) => {
+    // Supprimer l'extension de fichier
     const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
     const match = nameWithoutExt.match(/^(.*?)\s*-\s*(.*)$/);
     
@@ -110,6 +114,47 @@ export const MusicUploader = () => {
     } catch (error) {
       console.error("Erreur détaillée lors de l'extraction des métadonnées:", error);
       return null;
+    }
+  };
+
+  // Fonction pour traiter un fichier LRC
+  const processLrcFile = async (lrcFile: File, songId: string, title: string, artist: string): Promise<boolean> => {
+    try {
+      console.log(`Traitement du fichier LRC pour la chanson ${title}:`, lrcFile.name);
+      
+      // Lire le contenu du fichier LRC
+      const lrcContent = await lrcFile.text();
+      
+      // Parser le fichier LRC
+      const parsedLrc = parseLrc(lrcContent);
+      console.log("Fichier LRC parsé:", parsedLrc);
+      
+      if (parsedLrc.lines.length === 0) {
+        console.log("Le fichier LRC ne contient pas de paroles valides");
+        return false;
+      }
+      
+      // Convertir en texte brut pour stockage dans la base de données
+      const lyricsText = lrcToPlainText(parsedLrc);
+      
+      // Enregistrer les paroles dans la base de données
+      const { error } = await supabase
+        .from('lyrics')
+        .insert({
+          song_id: songId,
+          content: lyricsText
+        });
+      
+      if (error) {
+        console.error("Erreur lors de l'enregistrement des paroles:", error);
+        return false;
+      }
+      
+      console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors du traitement du fichier LRC:", error);
+      return false;
     }
   };
 
@@ -261,8 +306,27 @@ export const MusicUploader = () => {
         return null;
       }
       
-      // Récupération et stockage des paroles après l'enregistrement de la chanson
-      if (artist !== "Unknown Artist") {
+      // Vérifier si un fichier LRC correspondant a été trouvé
+      const baseFileName = file.name.replace(/\.[^/.]+$/, "");
+      const lrcFileName = `${baseFileName}.lrc`;
+      
+      console.log("Recherche d'un fichier LRC correspondant:", lrcFileName);
+      
+      let lyricsFound = false;
+      
+      // Vérifier si nous avons un fichier LRC correspondant dans notre cache temporaire
+      if (lrcFilesRef.current.has(lrcFileName)) {
+        console.log("Fichier LRC correspondant trouvé dans le cache:", lrcFileName);
+        const lrcFile = lrcFilesRef.current.get(lrcFileName)!;
+        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
+        
+        if (lyricsFound) {
+          toast.success(`Paroles importées depuis le fichier ${lrcFileName}`);
+        }
+      }
+      
+      // Si aucun fichier LRC n'a été trouvé, essayer de récupérer les paroles en ligne
+      if (!lyricsFound && artist !== "Unknown Artist") {
         // Toast de chargement des paroles
         const lyricsToastId = toast.loading(`Récupération des paroles pour "${title}"...`);
         
@@ -303,7 +367,24 @@ export const MusicUploader = () => {
   };
 
   const processFiles = async (files: FileList | File[]) => {
-    const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+    // Réinitialiser le cache des fichiers LRC
+    lrcFilesRef.current.clear();
+    
+    const allFiles = Array.from(files);
+    const audioFiles: File[] = [];
+    
+    // Première passe pour identifier les fichiers audio et LRC
+    allFiles.forEach(file => {
+      const fileName = file.name.toLowerCase();
+      
+      if (fileName.endsWith('.lrc')) {
+        // Stocker temporairement les fichiers LRC par nom
+        lrcFilesRef.current.set(file.name, file);
+        console.log("Fichier LRC détecté et mis en cache:", file.name);
+      } else if (file.type.startsWith('audio/')) {
+        audioFiles.push(file);
+      }
+    });
     
     if (audioFiles.length === 0) {
       toast.error("Aucun fichier audio trouvé");
@@ -311,6 +392,7 @@ export const MusicUploader = () => {
     }
 
     console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
+    console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
 
     const processedSongs = await Promise.all(
       audioFiles.map(processAudioFile)
@@ -322,6 +404,9 @@ export const MusicUploader = () => {
     if (validSongs.length > 0) {
       validSongs.forEach(song => addToQueue(song));
     }
+    
+    // Nettoyer le cache des fichiers LRC
+    lrcFilesRef.current.clear();
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -430,7 +515,7 @@ export const MusicUploader = () => {
           <span>{t('common.upload')}</span>
           <input
             type="file"
-            accept="audio/*"
+            accept="audio/*,.lrc"
             multiple
             webkitdirectory=""
             directory=""
