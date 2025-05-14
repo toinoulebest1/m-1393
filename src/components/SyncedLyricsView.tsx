@@ -24,6 +24,8 @@ export const SyncedLyricsView: React.FC = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [accentColor, setAccentColor] = useState<[number, number, number] | null>(null);
   const [animationStage, setAnimationStage] = useState<"entry" | "exit">("entry");
+  const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
+  const [currentSongId, setCurrentSongId] = useState<string | null>(null);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -31,13 +33,13 @@ export const SyncedLyricsView: React.FC = () => {
     accent: [75, 20, 95] as [number, number, number]
   };
 
-  // Calcul du temps actuel basé sur le pourcentage de progression
+  // Calculate current time based on progress percentage
   useEffect(() => {
     if (!currentSong || !currentSong.duration) return;
     
     let duration: number;
     
-    // Convertir la durée du format MM:SS au format secondes
+    // Convert duration from MM:SS format to seconds
     if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
       const [minutes, seconds] = currentSong.duration.split(':').map(Number);
       duration = minutes * 60 + seconds;
@@ -45,7 +47,7 @@ export const SyncedLyricsView: React.FC = () => {
       duration = parseFloat(String(currentSong.duration));
     }
     
-    // Calculer le temps actuel en secondes
+    // Calculate current time in seconds
     const time = (progress / 100) * duration;
     setCurrentTime(time);
     
@@ -107,48 +109,65 @@ export const SyncedLyricsView: React.FC = () => {
     extractColors();
   }, [currentSong?.imageUrl]);
 
-  // Effet pour récupérer les paroles depuis la base de données
+  // Effect for detecting song changes and fetching lyrics
   useEffect(() => {
-    const fetchLyrics = async () => {
-      if (!currentSong) {
-        setParsedLyrics(null);
-        setLyricsText(null);
+    // Reset lyrics state when song changes
+    if (currentSong && currentSong.id !== currentSongId) {
+      // Reset states when song changes
+      setParsedLyrics(null);
+      setLyricsText(null);
+      setError(null);
+      setIsLoadingLyrics(true);
+      
+      // Store the new song ID
+      setCurrentSongId(currentSong.id);
+      
+      // Fetch lyrics for the new song
+      fetchLyrics(currentSong.id);
+    }
+  }, [currentSong?.id]);
+
+  // Function to fetch lyrics
+  const fetchLyrics = async (songId: string) => {
+    if (!songId) {
+      setIsLoadingLyrics(false);
+      return;
+    }
+    
+    try {
+      console.log('SyncedLyricsView: Fetching lyrics for song ID:', songId);
+      
+      // Get lyrics from Supabase
+      const { data, error } = await supabase
+        .from('lyrics')
+        .select('content')
+        .eq('song_id', songId)
+        .single();
+        
+      if (error || !data) {
+        console.log('SyncedLyricsView: No lyrics found in database');
+        setIsLoadingLyrics(false);
         return;
       }
       
+      const lyrics = data.content;
+      setLyricsText(lyrics);
+      
+      // Parse LRC format lyrics
       try {
-        console.log('SyncedLyricsView: Récupération des paroles pour', currentSong.title);
-        
-        // Récupérer les paroles depuis Supabase
-        const { data, error } = await supabase
-          .from('lyrics')
-          .select('content')
-          .eq('song_id', currentSong.id)
-          .single();
-          
-        if (error || !data) {
-          console.log('SyncedLyricsView: Pas de paroles trouvées dans la base de données');
-          setParsedLyrics(null);
-          setLyricsText(null);
-          return;
-        }
-        
-        const lyrics = data.content;
-        setLyricsText(lyrics);
-        
-        // Parser les paroles au format LRC
         const parsed = parseLrc(lyrics);
+        console.log('SyncedLyricsView: Successfully parsed lyrics:', parsed);
         setParsedLyrics(parsed);
-        console.log('SyncedLyricsView: Paroles parsées', parsed);
-      } catch (error) {
-        console.error('SyncedLyricsView: Erreur lors du parsing des paroles', error);
-        setParsedLyrics(null);
-        setLyricsText(null);
+      } catch (parseError) {
+        console.error('SyncedLyricsView: Error parsing lyrics', parseError);
+        // Still show raw lyrics text even if parsing fails
       }
-    };
-    
-    fetchLyrics();
-  }, [currentSong]);
+    } catch (error) {
+      console.error('SyncedLyricsView: Error fetching lyrics', error);
+    } finally {
+      setIsLoadingLyrics(false);
+    }
+  };
 
   const handleClose = () => {
     setAnimationStage("exit");
@@ -157,7 +176,7 @@ export const SyncedLyricsView: React.FC = () => {
     }, 150);
   };
 
-  // Formatage du temps pour l'affichage
+  // Format time for display
   const formatTime = (progress: number) => {
     if (!currentSong?.duration) return "0:00";
     
@@ -185,7 +204,7 @@ export const SyncedLyricsView: React.FC = () => {
     }
   };
 
-  // Formatage de la durée pour l'affichage
+  // Format duration for display
   const formatDuration = (duration: string | undefined) => {
     if (!duration) return "0:00";
     
@@ -206,7 +225,7 @@ export const SyncedLyricsView: React.FC = () => {
     }
   };
 
-  // Fonction pour gérer la lecture/pause
+  // Function to handle play/pause
   const handlePlayPause = () => {
     if (isPlaying) {
       pause();
@@ -242,7 +261,7 @@ export const SyncedLyricsView: React.FC = () => {
 
       const lyricsContent = response.data.lyrics;
       
-      // Enregistrer les paroles dans la base de données
+      // Save lyrics to database
       const { error: insertError } = await supabase
         .from('lyrics')
         .upsert({
@@ -254,13 +273,13 @@ export const SyncedLyricsView: React.FC = () => {
         throw insertError;
       }
 
-      // Rafraîchir les paroles
+      // Refresh lyrics
       setLyricsText(lyricsContent);
       try {
         const parsed = parseLrc(lyricsContent);
         setParsedLyrics(parsed);
       } catch (e) {
-        console.log('Les paroles ne sont pas au format LRC');
+        console.log('Lyrics are not in LRC format');
       }
       
       toast.success("Les paroles ont été récupérées avec succès");
@@ -447,6 +466,11 @@ export const SyncedLyricsView: React.FC = () => {
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Génération des paroles en cours...</span>
+              </div>
+            ) : isLoadingLyrics ? (
+              <div className="flex-grow flex flex-col items-center justify-center text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
+                <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
               </div>
             ) : lyricsText ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
