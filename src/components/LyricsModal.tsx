@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTranslation } from "react-i18next";
-import { getLrcFile } from '@/utils/dropboxStorage';
 
 interface LyricsModalProps {
   isOpen: boolean;
@@ -38,43 +37,11 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
   const { t } = useTranslation();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lrcContent, setLrcContent] = useState<string | null>(null);
-
-  // Rechercher le fichier LRC lorsque la modal s'ouvre
-  useEffect(() => {
-    if (isOpen && songId) {
-      const checkForLrcFile = async () => {
-        try {
-          // Vérifier d'abord dans le dossier songs/songId
-          let content = await getLrcFile(songId);
-          
-          if (content) {
-            console.log("Fichier LRC trouvé dans Dropbox");
-            setLrcContent(content);
-          } else {
-            console.log("Aucun fichier LRC trouvé pour cette chanson");
-            setLrcContent(null);
-          }
-        } catch (error) {
-          console.error("Erreur lors de la recherche du fichier LRC:", error);
-          setLrcContent(null);
-        }
-      };
-      
-      checkForLrcFile();
-    }
-  }, [isOpen, songId]);
 
   const { data: lyrics, isLoading, refetch } = useQuery({
     queryKey: ['lyrics', songId],
     queryFn: async () => {
       console.log('Fetching lyrics for song:', songId);
-      
-      // Si nous avons déjà le contenu LRC, l'utiliser
-      if (lrcContent) {
-        return lrcContent;
-      }
-      
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
@@ -88,7 +55,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
 
       return data?.content || null;
     },
-    enabled: isOpen && !!songId && lrcContent === null,
+    enabled: isOpen && !!songId,
   });
 
   const generateLyrics = async () => {
@@ -149,9 +116,6 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
     }
   };
 
-  // Déterminer le contenu à afficher
-  const displayContent = lrcContent || lyrics;
-
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl">
@@ -159,7 +123,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
           <DialogTitle className="text-xl font-bold flex items-center justify-between">
             <span className="break-words">{songTitle || "Titre inconnu"}</span>
             <div className="flex space-x-2">
-              {displayContent && onEditRequest && (
+              {lyrics && onEditRequest && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -171,7 +135,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
                 </Button>
               )}
               
-              {!displayContent && !isLoading && (
+              {!lyrics && !isLoading && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -199,9 +163,9 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
               <Loader2 className="h-8 w-8 animate-spin text-spotify-accent" />
               <span className="ml-2">{t("common.loadingLyrics")}</span>
             </div>
-          ) : displayContent ? (
+          ) : lyrics ? (
             <div className="whitespace-pre-line text-spotify-neutral">
-              {displayContent}
+              {lyrics}
             </div>
           ) : error ? (
             <Alert variant="destructive" className="mb-4">
