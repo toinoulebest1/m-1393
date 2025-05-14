@@ -160,7 +160,7 @@ export const DataMigrationTool = () => {
       </CardHeader>
       <CardContent>
         {!dropboxReady && (
-          <Alert variant="warning" className="mb-4">
+          <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               Dropbox n'est pas configuré. Veuillez configurer Dropbox dans les paramètres pour activer la migration.
