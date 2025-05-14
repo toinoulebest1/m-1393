@@ -1,4 +1,3 @@
-
 /**
  * Utilitaire pour parser les fichiers LRC (Lyrics)
  * Format LRC: [MM:SS.xx]Paroles ou [MM.SS.xx]Paroles
@@ -32,11 +31,11 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
   // Expression régulière pour les tags de métadonnées
   const metadataRegex = /^\[([a-zA-Z]+):(.+)\]$/;
   
-  // Expression régulière améliorée pour mieux supporter les formats avec points
-  // Cette regex capture les minutes, les secondes (avec . ou :) et les centièmes optionnels
-  const timeRegex = /\[(\d{2})[:.]{1}(\d{2})(?:[:.]{1}(\d{2}))?\]/g;
+  // Expression régulière plus robuste pour capturer tous les formats LRC possibles
+  // Support pour [MM:SS.xx], [MM.SS.xx], [MM:SS:xx], et même [M:SS.xx]
+  const timeRegex = /\[(\d{1,2})[:.]{1}(\d{2})(?:[:.]{1}(\d{2}))?\]/g;
 
-  console.log("Début du parsing LRC avec support complet des formats [MM:SS.xx] et [MM.SS.xx]");
+  console.log("Début du parsing LRC avec support universel des formats");
 
   lines.forEach(line => {
     // Ignorer les lignes vides
@@ -148,12 +147,13 @@ export const findCurrentLyricLine = (
   currentTime: number,
   offset: number = 0
 ): { current: number; next: LrcLine[] } => {
-  const adjustedTime = currentTime - offset / 1000;
-  console.log(`Recherche de ligne pour le temps: ${currentTime}s, ajusté: ${adjustedTime}s`);
-
-  if (lines.length === 0) {
+  if (!lines || lines.length === 0) {
+    console.log("Aucune ligne de paroles trouvée");
     return { current: -1, next: [] };
   }
+
+  const adjustedTime = currentTime - offset / 1000;
+  console.log(`Recherche de ligne pour le temps: ${currentTime}s, ajusté: ${adjustedTime}s`);
 
   // Cas spécial: avant la première ligne
   if (adjustedTime < lines[0].time) {
@@ -167,45 +167,30 @@ export const findCurrentLyricLine = (
     return { current: lines.length - 1, next: [] };
   }
 
-  // Recherche binaire pour trouver la ligne correspondante
-  let left = 0;
-  let right = lines.length - 1;
+  // Recherche de la ligne active avec marge de tolérance (100ms)
+  const tolerance = 0.1;
   let currentIndex = -1;
-
-  while (left <= right) {
-    const mid = Math.floor((left + right) / 2);
+  
+  // Recherche optimisée de la ligne active
+  for (let i = 0; i < lines.length - 1; i++) {
+    const currentLineTime = lines[i].time;
+    const nextLineTime = lines[i + 1].time;
     
-    if (mid + 1 < lines.length && adjustedTime >= lines[mid].time && adjustedTime < lines[mid + 1].time) {
-      currentIndex = mid;
+    // Si le temps est entre la ligne actuelle et la suivante (avec tolérance)
+    if (adjustedTime >= currentLineTime && adjustedTime < nextLineTime) {
+      // Si on est très proche de la ligne suivante (moins de 100ms), l'utiliser
+      if (nextLineTime - adjustedTime <= tolerance) {
+        currentIndex = i + 1;
+      } else {
+        currentIndex = i;
+      }
       break;
-    } else if (adjustedTime < lines[mid].time) {
-      right = mid - 1;
-    } else {
-      left = mid + 1;
     }
   }
-
-  // Si pas trouvé par la recherche binaire, utiliser la méthode linéaire avec anticipation
-  if (currentIndex === -1) {
-    for (let i = 0; i < lines.length; i++) {
-      if (adjustedTime >= lines[i].time) {
-        // Regarder si nous sommes plus proches de la ligne suivante
-        if (i < lines.length - 1) {
-          const nextTime = lines[i + 1].time;
-          const currentDiff = adjustedTime - lines[i].time;
-          const nextDiff = nextTime - adjustedTime;
-
-          // Si nous sommes très proches de la ligne suivante, l'utiliser
-          if (nextDiff < 0.1 && nextDiff < currentDiff) {
-            currentIndex = i + 1;
-            continue;
-          }
-        }
-        currentIndex = i;
-      } else {
-        break;
-      }
-    }
+  
+  // Si on n'a pas trouvé de ligne (cas rare), utiliser la dernière ligne
+  if (currentIndex === -1 && lines.length > 0) {
+    currentIndex = lines.length - 1;
   }
 
   console.log(`Ligne trouvée: ${currentIndex}, texte: "${currentIndex >= 0 ? lines[currentIndex].text : 'aucune'}"`);
@@ -228,14 +213,17 @@ export const findCurrentLyricLine = (
 export const isLrcFormat = (lyricsText: string): boolean => {
   if (!lyricsText) return false;
   
-  // Expression régulière pour les timestamps LRC, supporte à la fois [MM:SS.xx] et [MM.SS.xx]
-  const timeRegex = /\[\d{2}[:.]\d{2}(?:[:.]\d{2})?\]/;
+  // Expression régulière pour les timestamps LRC avec support pour tous les formats
+  const timeRegex = /\[\d{1,2}[:.]\d{2}(?:[:.]\d{2})?\]/;
   
   // Vérifier les 5 premières lignes non vides
   const lines = lyricsText.split('\n').filter(line => line.trim().length > 0).slice(0, 5);
   
   // Si au moins 2 lignes contiennent un timestamp, considérer comme format LRC
-  return lines.filter(line => timeRegex.test(line)).length >= 2;
+  const matchCount = lines.filter(line => timeRegex.test(line)).length;
+  console.log(`Détection LRC: ${matchCount} lignes sur ${lines.length} contiennent des timestamps`);
+  
+  return matchCount >= 2;
 };
 
 /**
@@ -244,7 +232,10 @@ export const isLrcFormat = (lyricsText: string): boolean => {
  * @returns Objet ParsedLrc ou null si ce n'est pas au format LRC
  */
 export const convertTextToLrc = (lyricsText: string): ParsedLrc | null => {
-  if (!isLrcFormat(lyricsText)) return null;
+  const isLrc = isLrcFormat(lyricsText);
+  console.log(`Format LRC détecté: ${isLrc}`);
+  
+  if (!isLrc) return null;
   
   try {
     return parseLrc(lyricsText);
