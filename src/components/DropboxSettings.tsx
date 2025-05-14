@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { getDropboxConfig, saveDropboxConfig } from '@/utils/dropboxStorage';
-import { toast } from 'sonner';
+import { getDropboxConfig, saveDropboxConfig, migrateFilesToDropbox } from '@/utils/dropboxStorage';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Progress } from "@/components/ui/progress";
+import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -21,6 +23,17 @@ export const DropboxSettings = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const navigate = useNavigate();
+  
+  // Nouveaux états pour la migration
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [processedFiles, setProcessedFiles] = useState(0);
+  const [migrationResults, setMigrationResults] = useState<{
+    success: number;
+    failed: number;
+    failedFiles: Array<{ id: string; error: string }>;
+  }>({ success: 0, failed: 0, failedFiles: [] });
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -108,6 +121,104 @@ export const DropboxSettings = () => {
     }
   };
 
+  // Nouvelle fonction pour gérer la migration
+  const handleMigrateFiles = async () => {
+    if (!accessToken) {
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton Dropbox valide',
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsMigrating(true);
+    setMigrationProgress(0);
+    setProcessedFiles(0);
+    setMigrationResults({ success: 0, failed: 0, failedFiles: [] });
+
+    try {
+      // Ensure the audio bucket exists
+      const bucketExists = await ensureAudioBucketExists();
+      
+      if (!bucketExists) {
+        setIsMigrating(false);
+        return;
+      }
+
+      // Obtenir la liste des fichiers audio dans Supabase
+      const { data: songs, error: songsError } = await supabase
+        .from('songs')
+        .select('id, file_path')
+        .order('created_at', { ascending: false });
+
+      if (songsError) {
+        console.error('Erreur lors de la récupération des chansons:', songsError);
+        toast({
+          title: "Erreur",
+          description: 'Erreur lors de la récupération des chansons',
+          variant: "destructive"
+        });
+        setIsMigrating(false);
+        return;
+      }
+
+      if (!songs || songs.length === 0) {
+        toast({
+          title: "Information",
+          description: 'Aucun fichier audio à migrer'
+        });
+        setIsMigrating(false);
+        return;
+      }
+
+      setTotalFiles(songs.length);
+      toast({
+        title: "Information", 
+        description: `Démarrage de la migration de ${songs.length} fichiers...`
+      });
+      
+      // Lancer la migration avec des callbacks de progression
+      const results = await migrateFilesToDropbox(songs, {
+        onProgress: (processed, total) => {
+          setProcessedFiles(processed);
+          setMigrationProgress(Math.round((processed / total) * 100));
+        },
+        onSuccess: (fileId) => {
+          console.log(`Migration réussie pour le fichier: ${fileId}`);
+          setMigrationResults(prev => ({ 
+            ...prev, 
+            success: prev.success + 1 
+          }));
+        },
+        onError: (fileId, error) => {
+          console.error(`Échec de la migration pour le fichier: ${fileId}`, error);
+          setMigrationResults(prev => ({ 
+            ...prev, 
+            failed: prev.failed + 1,
+            failedFiles: [...prev.failedFiles, { id: fileId, error }]
+          }));
+        }
+      });
+
+      console.log('Résultats de la migration:', results);
+      toast({
+        title: "Succès",
+        description: `Migration terminée: ${results.success} fichiers migrés, ${results.failed} échecs`
+      });
+      
+    } catch (error) {
+      console.error('Erreur lors de la migration des fichiers:', error);
+      toast({
+        title: "Erreur",
+        description: 'Échec de la migration des fichiers',
+        variant: "destructive"
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -169,12 +280,65 @@ export const DropboxSettings = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Nouvelle section pour la migration */}
+        <div className="border-t border-border pt-4 mt-4">
+          <h3 className="text-lg font-semibold mb-2">Migration des fichiers</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Transférez tous les fichiers audio de Supabase vers Dropbox. Cette opération peut prendre du temps selon le nombre de fichiers.
+          </p>
+
+          {isMigrating ? (
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm">
+                <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
+                <span>{migrationProgress}%</span>
+              </div>
+              <Progress value={migrationProgress} className="h-2" />
+              
+              <div className="flex justify-between text-sm mt-2">
+                <span className="text-green-500">Succès: {migrationResults.success}</span>
+                <span className="text-red-500">Échecs: {migrationResults.failed}</span>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              onClick={handleMigrateFiles} 
+              disabled={!accessToken || isSaving || isTesting} 
+              className="w-full mt-2"
+            >
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Démarrer la migration des fichiers
+            </Button>
+          )}
+
+          {/* Afficher les erreurs de migration s'il y en a */}
+          {migrationResults.failedFiles.length > 0 && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <details>
+                  <summary className="cursor-pointer font-medium">
+                    {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
+                  </summary>
+                  <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                    {migrationResults.failedFiles.map((file, index) => (
+                      <li key={index} className="break-all">
+                        ID: {file.id} - <span className="text-red-400">{file.error}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
       </CardContent>
       <CardFooter className="flex space-x-2">
         <Button 
           variant="outline" 
           onClick={testDropboxToken} 
-          disabled={isTesting || !accessToken || isSaving}
+          disabled={isTesting || !accessToken || isSaving || isMigrating}
         >
           {isTesting ? (
             <>
@@ -185,7 +349,10 @@ export const DropboxSettings = () => {
             'Tester le jeton'
           )}
         </Button>
-        <Button onClick={handleSaveConfig} disabled={isSaving}>
+        <Button 
+          onClick={handleSaveConfig} 
+          disabled={isSaving || isMigrating}
+        >
           {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>
       </CardFooter>
