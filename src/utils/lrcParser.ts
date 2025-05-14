@@ -32,11 +32,11 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
   // Expression régulière pour les tags de métadonnées
   const metadataRegex = /^\[([a-zA-Z]+):(.+)\]$/;
   
-  // Expression régulière améliorée pour supporter à la fois [MM:SS.xx] et [MM.SS.xx]
+  // Expression régulière améliorée pour mieux supporter les formats avec points
   // Cette regex capture les minutes, les secondes (avec . ou :) et les centièmes optionnels
   const timeRegex = /\[(\d{2})[:.]{1}(\d{2})(?:[:.]{1}(\d{2}))?\]/g;
 
-  console.log("Début du parsing LRC avec support des formats [MM:SS.xx] et [MM.SS.xx]");
+  console.log("Début du parsing LRC avec support complet des formats [MM:SS.xx] et [MM.SS.xx]");
 
   lines.forEach(line => {
     // Ignorer les lignes vides
