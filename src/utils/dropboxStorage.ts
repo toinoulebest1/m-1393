@@ -41,6 +41,7 @@ export const uploadFileToDropbox = async (
   }
   
   console.log(`Uploading file to Dropbox: ${path}`, file);
+  console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
     // Using Dropbox API v2 with fetch
@@ -61,13 +62,29 @@ export const uploadFileToDropbox = async (
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Dropbox upload error:', errorText);
-      toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
-      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText}`);
+      console.error('Dropbox upload error status:', response.status, response.statusText);
+      console.error('Dropbox upload error details:', errorText);
+      
+      // More specific error messages based on status code
+      if (response.status === 400) {
+        toast.error("Erreur 400: Requête invalide. Vérifiez la taille du fichier et les permissions Dropbox.");
+        console.error("Possible causes: invalid file format, file too large, or incorrect parameters");
+      } else if (response.status === 401) {
+        toast.error("Erreur 401: Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
+      } else if (response.status === 403) {
+        toast.error("Erreur 403: Accès refusé. Vérifiez les permissions de votre app Dropbox.");
+      } else if (response.status === 429) {
+        toast.error("Erreur 429: Trop de requêtes. Veuillez réessayer plus tard.");
+      } else {
+        toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
+      }
+      
+      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     const data = await response.json();
     console.log('Dropbox upload successful:', data);
+    toast.success("Fichier téléchargé avec succès vers Dropbox");
     
     // Store the reference in Supabase
     try {
