@@ -35,7 +35,8 @@ interface PlayerContextType {
   favoriteStats: FavoriteStat[];
   playbackRate: number;
   history: Song[];
-  isChangingSong: boolean; // Nouvelle propriété pour indiquer une transition en cours
+  isChangingSong: boolean;
+  stopCurrentSong: () => void;
   setQueue: (songs: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
@@ -64,8 +65,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const fadingRef = useRef(false);
   const fadeIntervalRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-  const [isChangingSong, setIsChangingSong] = useState(false); // État pour suivre les transitions
-  const changeTimeoutRef = useRef<number | null>(null); // Pour suivre le timeout de changement
+  const [isChangingSong, setIsChangingSong] = useState(false);
+  const changeTimeoutRef = useRef<number | null>(null);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(() => {
     const savedSong = localStorage.getItem('currentSong');
@@ -155,7 +156,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentSong]);
 
-  // Fonction préchargement modifiée avec gestion d'erreurs améliorée
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -181,7 +181,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       nextAudioRef.current.load();
       nextAudioRef.current.volume = 0;
       
-      // Écouter l'événement canplaythrough pour confirmer le préchargement
       const canPlayHandler = () => {
         console.log("Préchargement réussi et audio prêt à jouer");
         setNextSongPreloaded(true);
@@ -190,7 +189,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       nextAudioRef.current.addEventListener('canplaythrough', canPlayHandler);
       
-      // Définir un délai maximum pour le préchargement
       setTimeout(() => {
         if (!nextSongPreloaded) {
           console.log("Timeout du préchargement, marquage comme prêt par sécurité");
@@ -205,7 +203,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction pour ajouter une chanson à l'historique
   const addToHistory = async (song: Song) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -250,7 +247,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction pour calculer la durée en secondes
   const calculateDurationInSeconds = (duration: string): number => {
     if (!duration) return 0;
     
@@ -266,7 +262,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction pour mettre à jour les statistiques d'écoute
   const updateListeningStats = async (song: Song, actualListeningTime: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -328,15 +323,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction play modifiée pour gérer correctement les transitions avec état d'attente
   const play = async (song?: Song) => {
-    // Si on est déjà en train de changer de chanson, éviter les appels multiples
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours, ignorer l'appel");
       return;
     }
     
-    // Nettoyer les transitions précédentes si en cours
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
@@ -347,30 +339,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       fadingRef.current = false;
     }
 
-    // Nettoyer tout timeout de changement de chanson précédent
     if (changeTimeoutRef.current) {
       clearTimeout(changeTimeoutRef.current);
       changeTimeoutRef.current = null;
     }
 
-    // Réinitialiser le volume des éléments audio
-    if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
-    }
-    if (nextAudioRef.current) {
-      nextAudioRef.current.pause();
-      nextAudioRef.current.volume = 0;
-    }
-    
     if (song && (!currentSong || song.id !== currentSong.id)) {
-      // Marquer que nous sommes en train de changer de chanson
       setIsChangingSong(true);
       
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
-
-      // Update MediaSession metadata here when song changes
+      
       if ('mediaSession' in navigator) {
         updateMediaSessionMetadata(song);
       }
@@ -404,7 +384,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
         
-        // Augmenter la priorité du chargement
         audioRef.current.preload = "auto";
         
         audioRef.current.load();
@@ -416,15 +395,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             audioRef.current.volume = volume / 100;
             console.log("Lecture démarrée avec succès:", song.title);
             
-            // Précharger la prochaine chanson une fois celle-ci démarrée
             setTimeout(() => preloadNextSong(), 1000);
             
-            // Désactiver l'état de changement après un court délai pour l'UX
             changeTimeoutRef.current = window.setTimeout(() => {
               setIsChangingSong(false);
               changeTimeoutRef.current = null;
-            }, 1200); // Délai court mais suffisant pour éviter les clics multiples
-            
+            }, 1200);
           }).catch(error => {
             console.error("Error starting playback:", error);
             setIsPlaying(false);
@@ -495,18 +471,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
   };
 
-  // Fonction nextSong() modifiée avec gestion de l'état de chargement
   const nextSong = async () => {
-    // Éviter les appels multiples pendant le changement de chanson
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours, ignorer nextSong()");
       return;
     }
     
-    // Indiquer que le changement est en cours
     setIsChangingSong(true);
     
-    // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
@@ -514,7 +486,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     fadingRef.current = false;
     
-    // Reset volumes
     if (nextAudioRef.current) {
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
@@ -549,41 +520,33 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log("Utilisation de l'audio préchargé pour une transition plus rapide");
         
         try {
-          // Échanger les références audio pour une transition instantanée
           const tempAudio = audioRef.current;
           audioRef.current = nextAudioRef.current;
           nextAudioRef.current = tempAudio;
           
-          // Réinitialiser l'ancien audio principal (maintenant nextAudioRef)
           nextAudioRef.current.pause();
           nextAudioRef.current.src = '';
           nextAudioRef.current.load();
           
-          // Mettre à jour l'état
           setCurrentSong(nextTrack);
           localStorage.setItem('currentSong', JSON.stringify(nextTrack));
           setNextSongPreloaded(false);
           
-          // Démarrer la lecture du nouvel audio
           const playPromise = audioRef.current.play();
           if (playPromise !== undefined) {
             playPromise.then(() => {
               setIsPlaying(true);
               
-              // Précharger la prochaine chanson
               setTimeout(() => preloadNextSong(), 1000);
               
-              // Mettre fin à l'état de chargement après un court délai
               setTimeout(() => {
                 setIsChangingSong(false);
               }, 1000);
-              
             }).catch(error => {
               console.error("Error playing next track:", error);
               setIsPlaying(false);
               setIsChangingSong(false);
               
-              // Tomber sur la méthode standard en cas d'échec
               play(nextTrack);
             });
           }
@@ -591,15 +554,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.error("Error during optimized track change:", error);
           setIsChangingSong(false);
           
-          // Utiliser la méthode standard en cas d'erreur
           play(nextTrack);
         }
       } else {
-        // Méthode standard si pas de préchargement
         play(nextTrack);
       }
       
-      // Ensure MediaSession is updated
       if ('mediaSession' in navigator && nextTrack) {
         updateMediaSessionMetadata(nextTrack);
       }
@@ -611,12 +571,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log(`Repeating playlist from beginning: ${firstTrack.title}`);
       toast.success(`Retour au début de la playlist : ${firstTrack.title}`);
       play(firstTrack);
-      // Ensure MediaSession is updated
       if ('mediaSession' in navigator && firstTrack) {
         updateMediaSessionMetadata(firstTrack);
       }
     } else {
-      // End of queue and no repeat
       console.log("End of queue reached with no repeat");
       toast.info("Fin de la liste de lecture");
       audioRef.current.pause();
@@ -626,18 +584,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonction previousSong() modifiée avec gestion de l'état de chargement
   const previousSong = async () => {
-    // Éviter les appels multiples pendant le changement de chanson
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours, ignorer previousSong()");
       return;
     }
     
-    // Indiquer que le changement est en cours
     setIsChangingSong(true);
     
-    // Clear any ongoing transitions
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
@@ -645,7 +599,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     fadingRef.current = false;
     
-    // Reset volumes
     if (nextAudioRef.current) {
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
@@ -671,12 +624,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
-    // If current song has played for more than 3 seconds, restart it
     if (audioRef.current.currentTime > 3) {
       console.log("Restarting current song from beginning");
       toast.info("Redémarrage de la chanson");
       audioRef.current.currentTime = 0;
-      // Make sure we're playing
       if (!isPlaying) {
         audioRef.current.play()
           .then(() => {
@@ -693,28 +644,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
-    // Go to previous track
     if (currentIndex > 0) {
       const prevTrack = queue[currentIndex - 1];
       console.log(`Playing previous track: ${prevTrack.title} by ${prevTrack.artist}`);
       toast.success(`Lecture de : ${prevTrack.title}`);
       play(prevTrack);
-      // Ensure MediaSession is updated
       if ('mediaSession' in navigator && prevTrack) {
         updateMediaSessionMetadata(prevTrack);
       }
     } else if (repeatMode === 'all' && queue.length > 0) {
-      // If we're at the first track and repeat is on, go to the last track
       const lastTrack = queue[queue.length - 1];
       console.log(`Looping to last track: ${lastTrack.title}`);
       toast.success(`Aller à la dernière piste : ${lastTrack.title}`);
       play(lastTrack);
-      // Update MediaSession
       if ('mediaSession' in navigator && lastTrack) {
         updateMediaSessionMetadata(lastTrack);
       }
     } else {
-      // Already at first track, just restart it
       console.log("Already at first track, restarting");
       toast.info("Première piste de la liste");
       audioRef.current.currentTime = 0;
@@ -852,6 +798,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setPlaybackRate(rate);
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
+    }
+  };
+
+  const stopCurrentSong = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+      }
+      
+      fadingRef.current = false;
+      
+      console.log("Current song stopped immediately");
     }
   };
 
@@ -1030,7 +992,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
-      // Vérifier si on approche de la fin et démarrer le crossfade
       if (timeLeft <= overlapTimeRef.current && timeLeft > 0 && !fadingRef.current) {
         console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${overlapTimeRef.current}s`);
         
@@ -1042,7 +1003,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         fadingRef.current = true;
         
-        // Afficher une alerte pour la prochaine chanson
         const alertElement = document.getElementById('next-song-alert');
         const titleElement = document.getElementById('next-song-title');
         const artistElement = document.getElementById('next-song-artist');
@@ -1059,7 +1019,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }, 3000);
         }
 
-        // S'assurer que la prochaine chanson est préchargée
         if (!nextAudioRef.current.src || !nextSongPreloaded) {
           console.log("La prochaine chanson n'est pas préchargée correctement, préchargement forcé");
           preloadNextSong().then(() => {
@@ -1074,7 +1033,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const startCrossfade = (timeLeft: number, nextSong: Song) => {
       console.log(`Début du fondu enchaîné pour ${nextSong.title}`);
       
-      // Démarrer la lecture de la prochaine chanson avec volume à 0
       nextAudioRef.current.volume = 0;
       const playPromise = nextAudioRef.current.play();
       
@@ -1082,9 +1040,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playPromise.then(() => {
           console.log("Lecture de la prochaine chanson démarrée avec succès");
           
-          // Calculer les paramètres du fondu
           const fadeDuration = Math.min(timeLeft * 1000, overlapTimeRef.current * 1000);
-          const steps = Math.max(50, fadeDuration / 20); // Au moins 50 étapes pour une transition fluide
+          const steps = Math.max(50, fadeDuration / 20);
           const intervalTime = fadeDuration / steps;
           const volumeStep = (volume / 100) / steps;
           
@@ -1094,12 +1051,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           let currentInVolume = 0;
           let stepCount = 0;
           
-          // Nettoyer tout intervalle précédent
           if (fadeIntervalRef.current) {
             clearInterval(fadeIntervalRef.current);
           }
           
-          // Créer le nouvel intervalle de fondu
           fadeIntervalRef.current = window.setInterval(() => {
             stepCount++;
             
@@ -1114,7 +1069,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 console.log(`Progression du fondu: out=${Math.round(currentOutVolume*100)}%, in=${Math.round(currentInVolume*100)}%, étape=${stepCount}`);
               }
             } else {
-              // Fondu terminé
               console.log("Fondu enchaîné terminé, passage à la chanson suivante");
               
               if (fadeIntervalRef.current) {
@@ -1127,24 +1081,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 audioRef.current.currentTime = 0;
               }
               
-              // Passer à la chanson suivante
               const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
               const nextTrack = queue[currentIndex + 1];
               if (nextTrack) {
-                // Échange des références audio
                 const tempAudio = audioRef.current;
                 audioRef.current = nextAudioRef.current;
                 nextAudioRef.current = tempAudio;
-                nextAudioRef.current.src = '';  // Réinitialiser l'audio de préchargement
-                
+                nextAudioRef.current.src = '';
                 setCurrentSong(nextTrack);
                 localStorage.setItem('currentSong', JSON.stringify(nextTrack));
-                
-                setProgress(0);
                 setNextSongPreloaded(false);
                 fadingRef.current = false;
                 
-                // Précharger la prochaine chanson
                 setTimeout(() => preloadNextSong(), 1000);
               }
             }
@@ -1157,7 +1105,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    // Gestion de la fin de la chanson (sans crossfade)
     const handleEnded = () => {
       console.log("Chanson terminée, fondu en cours:", fadingRef.current);
       
@@ -1192,8 +1139,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
         setProgress(percentage);
         
-        // Dans le cas où le temps restant est très court (moins de 0.5s)
-        // et que le crossfade n'a pas été déclenché, le forcer ici
         if (preferences.crossfadeEnabled && !fadingRef.current && currentSong) {
           const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
           if (timeLeft <= 0.5 && overlapTimeRef.current > 0) {
@@ -1221,7 +1166,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
 
-  // Mise à jour forcée des valeurs de préférences lorsqu'elles changent
   useEffect(() => {
     console.log(`Préférences crossfade mises à jour: activé=${preferences.crossfadeEnabled}, durée=${preferences.crossfadeDuration}`);
     overlapTimeRef.current = preferences.crossfadeDuration || 3;
@@ -1280,7 +1224,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong]);
 
-  // Fonction pour rafraîchir les métadonnées de la chanson actuelle
   const refreshCurrentSong = () => {
     if (currentSong) {
       const fetchUpdatedSong = async () => {
@@ -1322,6 +1265,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       playbackRate,
       history,
       isChangingSong,
+      stopCurrentSong,
+      setQueue,
       setHistory,
       play,
       pause,
