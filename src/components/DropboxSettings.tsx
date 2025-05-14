@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
+import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -133,20 +133,10 @@ export const DropboxSettings = () => {
     setMigrationResults({ success: 0, failed: 0, failedFiles: [] });
 
     try {
-      // Vérifier d'abord si le bucket audio existe dans Supabase
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      // Ensure the audio bucket exists
+      const bucketExists = await ensureAudioBucketExists();
       
-      if (bucketsError) {
-        console.error('Erreur lors de la vérification des buckets:', bucketsError);
-        toast.error('Erreur lors de la vérification des buckets Supabase');
-        setIsMigrating(false);
-        return;
-      }
-
-      const audioBucketExists = buckets?.some(bucket => bucket.name === 'audio');
-      if (!audioBucketExists) {
-        console.error('Le bucket audio n\'existe pas dans Supabase');
-        toast.error('Le bucket audio n\'existe pas dans Supabase');
+      if (!bucketExists) {
         setIsMigrating(false);
         return;
       }
@@ -171,6 +161,7 @@ export const DropboxSettings = () => {
       }
 
       setTotalFiles(songs.length);
+      toast.info(`Démarrage de la migration de ${songs.length} fichiers...`);
       
       // Lancer la migration avec des callbacks de progression
       const results = await migrateFilesToDropbox(songs, {
@@ -179,12 +170,14 @@ export const DropboxSettings = () => {
           setMigrationProgress(Math.round((processed / total) * 100));
         },
         onSuccess: (fileId) => {
+          console.log(`Migration réussie pour le fichier: ${fileId}`);
           setMigrationResults(prev => ({ 
             ...prev, 
             success: prev.success + 1 
           }));
         },
         onError: (fileId, error) => {
+          console.error(`Échec de la migration pour le fichier: ${fileId}`, error);
           setMigrationResults(prev => ({ 
             ...prev, 
             failed: prev.failed + 1,
@@ -193,6 +186,7 @@ export const DropboxSettings = () => {
         }
       });
 
+      console.log('Résultats de la migration:', results);
       toast.success(`Migration terminée: ${results.success} fichiers migrés, ${results.failed} échecs`);
       
     } catch (error) {
@@ -343,4 +337,3 @@ export const DropboxSettings = () => {
     </Card>
   );
 };
-

@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -216,7 +215,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   }
 };
 
-// Nouvelle fonction pour migrer les fichiers audio de Supabase vers Dropbox
+// Fonction améliorée pour migrer les fichiers audio de Supabase vers Dropbox
 export const migrateFilesToDropbox = async (
   files: Array<{ id: string; file_path: string }>,
   callbacks?: {
