@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Slider } from "@/components/ui/slider";
 import ColorThief from "colorthief";
-import { parseLrc, findCurrentLyricLine, isLrcFormat, convertTextToLrc, ParsedLrc, LrcLine } from "@/utils/lrcParser";
+import { parseLrc, findCurrentLyricLine, isLrcFormat as checkIsLrcFormat, convertTextToLrc, ParsedLrc, LrcLine } from "@/utils/lrcParser";
 
 // Define the Song interface since we can't import it from PlayerContext
 interface Song {
@@ -199,8 +199,8 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
         if (data) {
-          // Fixed: Call isLrcFormat as a function and pass data as an argument
-          const lrcFormatDetected = isLrcFormat(data);
+          // Properly call the function with the right name to avoid any confusion
+          const lrcFormatDetected = checkIsLrcFormat(data);
           setIsLrcFormat(lrcFormatDetected);
           
           if (lrcFormatDetected) {
