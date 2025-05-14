@@ -1,6 +1,6 @@
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 // Add a simple local storage helper for Dropbox configuration
 export const getDropboxConfig = (): DropboxConfig => {
@@ -312,15 +312,26 @@ export const migrateFilesToDropbox = async (
         type: fileData.type || 'audio/mpeg' 
       });
       
+      console.log(`Successfully downloaded file from Supabase: ${file.id}, size: ${audioFile.size} bytes`);
+      
       // Uploader vers Dropbox
-      const dropboxPath = await uploadFileToDropbox(audioFile, `audio/${file.id}`);
-      console.log(`Successfully uploaded ${file.id} to Dropbox: ${dropboxPath}`);
-      
-      successCount++;
-      if (callbacks?.onSuccess) {
-        callbacks.onSuccess(file.id);
+      if (audioFile.size > 0) {
+        const dropboxPath = await uploadFileToDropbox(audioFile, `audio/${file.id}`);
+        console.log(`Successfully uploaded ${file.id} to Dropbox: ${dropboxPath}`);
+        
+        successCount++;
+        if (callbacks?.onSuccess) {
+          callbacks.onSuccess(file.id);
+        }
+      } else {
+        console.error(`File ${file.id} has zero size, skipping upload`);
+        failedCount++;
+        failedFiles.push({ id: file.id, error: "Fichier de taille nulle" });
+        
+        if (callbacks?.onError) {
+          callbacks.onError(file.id, "Fichier de taille nulle");
+        }
       }
-      
     } catch (error) {
       console.error(`Error migrating file ${file.id}:`, error);
       failedCount++;

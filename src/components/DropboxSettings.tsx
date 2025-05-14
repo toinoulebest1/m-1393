@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDropboxConfig, saveDropboxConfig, migrateFilesToDropbox } from '@/utils/dropboxStorage';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -123,7 +124,11 @@ export const DropboxSettings = () => {
   // Nouvelle fonction pour gérer la migration
   const handleMigrateFiles = async () => {
     if (!accessToken) {
-      toast.error('Veuillez configurer un jeton Dropbox valide');
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton Dropbox valide',
+        variant: "destructive"
+      });
       return;
     }
 
@@ -149,19 +154,29 @@ export const DropboxSettings = () => {
 
       if (songsError) {
         console.error('Erreur lors de la récupération des chansons:', songsError);
-        toast.error('Erreur lors de la récupération des chansons');
+        toast({
+          title: "Erreur",
+          description: 'Erreur lors de la récupération des chansons',
+          variant: "destructive"
+        });
         setIsMigrating(false);
         return;
       }
 
       if (!songs || songs.length === 0) {
-        toast.info('Aucun fichier audio à migrer');
+        toast({
+          title: "Information",
+          description: 'Aucun fichier audio à migrer'
+        });
         setIsMigrating(false);
         return;
       }
 
       setTotalFiles(songs.length);
-      toast.info(`Démarrage de la migration de ${songs.length} fichiers...`);
+      toast({
+        title: "Information", 
+        description: `Démarrage de la migration de ${songs.length} fichiers...`
+      });
       
       // Lancer la migration avec des callbacks de progression
       const results = await migrateFilesToDropbox(songs, {
@@ -187,11 +202,18 @@ export const DropboxSettings = () => {
       });
 
       console.log('Résultats de la migration:', results);
-      toast.success(`Migration terminée: ${results.success} fichiers migrés, ${results.failed} échecs`);
+      toast({
+        title: "Succès",
+        description: `Migration terminée: ${results.success} fichiers migrés, ${results.failed} échecs`
+      });
       
     } catch (error) {
       console.error('Erreur lors de la migration des fichiers:', error);
-      toast.error('Échec de la migration des fichiers');
+      toast({
+        title: "Erreur",
+        description: 'Échec de la migration des fichiers',
+        variant: "destructive"
+      });
     } finally {
       setIsMigrating(false);
     }

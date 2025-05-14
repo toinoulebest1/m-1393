@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 export const ensureAudioBucketExists = async (): Promise<boolean> => {
   try {
@@ -27,13 +27,20 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
         throw createBucketError;
       }
       console.log("Audio bucket created successfully");
-      toast.success("Bucket audio créé avec succès");
+      toast({
+        title: "Succès",
+        description: "Bucket audio créé avec succès"
+      });
     }
     
     return true;
   } catch (error) {
     console.error("Error ensuring audio bucket exists:", error);
-    toast.error("Impossible de créer ou vérifier le bucket audio");
+    toast({
+      title: "Erreur",
+      description: "Impossible de créer ou vérifier le bucket audio",
+      variant: "destructive"
+    });
     return false;
   }
 };
