@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      dropbox_files: {
+        Row: {
+          created_at: string
+          dropbox_path: string
+          id: string
+          local_id: string
+        }
+        Insert: {
+          created_at?: string
+          dropbox_path: string
+          id?: string
+          local_id: string
+        }
+        Update: {
+          created_at?: string
+          dropbox_path?: string
+          id?: string
+          local_id?: string
+        }
+        Relationships: []
+      }
       favorite_stats: {
         Row: {
           count: number | null

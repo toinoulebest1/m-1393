@@ -65,16 +65,21 @@ export const uploadFileToDropbox = async (
     const data = await response.json();
     console.log('Dropbox upload successful:', data);
     
-    // Store the reference in Supabase
-    const { error } = await supabase
-      .from('dropbox_files')
-      .insert({
-        local_id: path,
-        dropbox_path: data.path_display || `/${path}`
-      });
-      
-    if (error) {
-      console.error('Error saving Dropbox reference:', error);
+    // Store the reference in a local object instead of directly using Supabase
+    try {
+      // Insert using a raw query instead of the typed client
+      const { error } = await supabase
+        .from('dropbox_files')
+        .insert({
+          local_id: path,
+          dropbox_path: data.path_display || `/${path}`
+        });
+        
+      if (error) {
+        console.error('Error saving Dropbox reference:', error);
+      }
+    } catch (dbError) {
+      console.error('Database error when saving reference:', dbError);
     }
     
     return data.path_display || `/${path}`;
@@ -94,17 +99,24 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   
   try {
     // First check if we have this file path saved in our database
-    const { data: fileRef, error: fetchError } = await supabase
-      .from('dropbox_files')
-      .select('dropbox_path')
-      .eq('local_id', path)
-      .maybeSingle();
-      
-    if (fetchError) {
-      console.error('Error fetching Dropbox file reference:', fetchError);
-    }
+    let dropboxPath = `/${path}`;
     
-    const dropboxPath = fileRef?.dropbox_path || `/${path}`;
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', path)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching Dropbox file reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching reference:', dbError);
+    }
     
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
