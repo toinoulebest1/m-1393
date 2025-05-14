@@ -122,3 +122,81 @@ export const lrcToPlainText = (parsedLrc: ParsedLrc): string => {
   
   return result;
 };
+
+/**
+ * Trouve la ligne de paroles correspondant à la position actuelle de lecture
+ * @param lines Tableau de lignes de paroles
+ * @param currentTime Temps actuel de lecture en secondes
+ * @param offset Décalage en millisecondes (optionnel)
+ * @returns Index de la ligne actuelle et les 3 prochaines lignes
+ */
+export const findCurrentLyricLine = (
+  lines: LrcLine[],
+  currentTime: number,
+  offset: number = 0
+): { current: number; next: LrcLine[] } => {
+  // Appliquer l'offset (conversion de ms en secondes)
+  const adjustedTime = currentTime - (offset / 1000 || 0);
+  
+  // Trouver la ligne actuelle
+  let currentIndex = -1;
+  
+  for (let i = 0; i < lines.length; i++) {
+    // Si c'est la dernière ligne ou si le temps actuel est avant le temps de la prochaine ligne
+    if (i === lines.length - 1 || adjustedTime < lines[i + 1].time) {
+      // Et si le temps actuel est après ou égal au temps de cette ligne
+      if (adjustedTime >= lines[i].time) {
+        currentIndex = i;
+        break;
+      }
+    }
+  }
+  
+  // Si aucune ligne actuelle n'est trouvée, utiliser -1
+  if (currentIndex === -1 && lines.length > 0 && adjustedTime < lines[0].time) {
+    // Avant la première ligne
+    currentIndex = -1;
+  }
+  
+  // Récupérer les 3 prochaines lignes
+  const nextLines: LrcLine[] = [];
+  for (let i = currentIndex + 1; i < Math.min(currentIndex + 4, lines.length); i++) {
+    nextLines.push(lines[i]);
+  }
+  
+  return { current: currentIndex, next: nextLines };
+};
+
+/**
+ * Parse les paroles brutes pour détecter si elles sont au format LRC
+ * @param lyricsText Texte des paroles à analyser
+ * @returns True si le texte semble être au format LRC
+ */
+export const isLrcFormat = (lyricsText: string): boolean => {
+  if (!lyricsText) return false;
+  
+  // Expression régulière pour les timestamps LRC [mm:ss.xx]
+  const timeRegex = /\[\d{2}:\d{2}\.\d{2}\]/;
+  
+  // Vérifier les 5 premières lignes non vides
+  const lines = lyricsText.split('\n').filter(line => line.trim().length > 0).slice(0, 5);
+  
+  // Si au moins 2 lignes contiennent un timestamp, considérer comme format LRC
+  return lines.filter(line => timeRegex.test(line)).length >= 2;
+};
+
+/**
+ * Convertit des paroles brutes en objet ParsedLrc si elles semblent être au format LRC
+ * @param lyricsText Texte des paroles à analyser
+ * @returns Objet ParsedLrc ou null si ce n'est pas au format LRC
+ */
+export const convertTextToLrc = (lyricsText: string): ParsedLrc | null => {
+  if (!isLrcFormat(lyricsText)) return null;
+  
+  try {
+    return parseLrc(lyricsText);
+  } catch (error) {
+    console.error("Erreur lors de la conversion du texte en LRC:", error);
+    return null;
+  }
+};
