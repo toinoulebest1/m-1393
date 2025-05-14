@@ -75,10 +75,12 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   }
 };
 
-// Function to upload a file to Dropbox
+// Updated function to upload a file to Dropbox
+// Now supports better folder organization with optional folderPath parameter
 export const uploadFileToDropbox = async (
   file: File,
-  path: string
+  path: string,
+  folderPath?: string
 ): Promise<string> => {
   const config = getDropboxConfig();
   
@@ -88,7 +90,10 @@ export const uploadFileToDropbox = async (
     throw new Error('Dropbox access token not configured');
   }
   
-  console.log(`Uploading file to Dropbox: ${path}`, file);
+  // Construct full path based on folderPath parameter
+  const fullPath = folderPath ? `/${folderPath}/${path}` : `/${path}`;
+  
+  console.log(`Uploading file to Dropbox: ${fullPath}`, file);
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
@@ -99,7 +104,7 @@ export const uploadFileToDropbox = async (
         'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': JSON.stringify({
-          path: `/${path}`,
+          path: fullPath,
           mode: 'overwrite',
           autorename: true,
           mute: false
@@ -136,12 +141,15 @@ export const uploadFileToDropbox = async (
     
     // Store the reference in Supabase
     try {
+      // Store the path without the leading slash to be consistent
+      const pathToStore = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
+      
       // Insert using a raw query instead of the typed client
       const { error } = await supabase
         .from('dropbox_files')
         .insert({
           local_id: path,
-          dropbox_path: data.path_display || `/${path}`
+          dropbox_path: data.path_display || fullPath
         });
         
       if (error) {
@@ -153,7 +161,7 @@ export const uploadFileToDropbox = async (
       // Continue anyway since the upload succeeded
     }
     
-    return data.path_display || `/${path}`;
+    return data.path_display || fullPath;
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
     toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");

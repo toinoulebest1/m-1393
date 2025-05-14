@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
-import { isDropboxEnabled } from "@/utils/dropboxStorage";
+import { isDropboxEnabled, uploadFileToDropbox } from "@/utils/dropboxStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -142,12 +142,35 @@ export const MusicUploader = () => {
         .from('lyrics')
         .insert({
           song_id: songId,
-          content: lyricsText
+          content: lrcContent // Store the raw LRC content to preserve timestamps
         });
       
       if (error) {
         console.error("Erreur lors de l'enregistrement des paroles:", error);
         return false;
+      }
+      
+      // If Dropbox storage is enabled, save the LRC file to Dropbox as well
+      if (isDropboxEnabled()) {
+        try {
+          // Create a clean file name for the LRC file
+          const lrcFileName = `${songId}.lrc`;
+          
+          // Create a folder structure: songs/songId/
+          const folderPath = `songs/${songId}`;
+          
+          // Create a new File instance to upload
+          const lrcFileToUpload = new File([lrcContent], lrcFileName, {
+            type: 'text/plain'
+          });
+          
+          // Upload the LRC file to Dropbox in the song's folder
+          await uploadFileToDropbox(lrcFileToUpload, lrcFileName, folderPath);
+          console.log("Fichier LRC téléchargé vers Dropbox dans le dossier:", folderPath);
+        } catch (dropboxError) {
+          console.error("Erreur lors de l'upload du fichier LRC vers Dropbox:", dropboxError);
+          // Continue anyway as we've stored the lyrics in the database
+        }
       }
       
       console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
@@ -248,7 +271,14 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      await storeAudioFile(fileId, file);
+      // If Dropbox is enabled, use the folder structure
+      if (isDropboxEnabled()) {
+        // Create a folder structure: songs/songId/
+        const folderPath = `songs/${fileId}`;
+        await storeAudioFile(fileId, file, folderPath);
+      } else {
+        await storeAudioFile(fileId, file);
+      }
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();

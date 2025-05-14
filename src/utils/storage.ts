@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 
-export const storeAudioFile = async (id: string, file: File | string) => {
+export const storeAudioFile = async (id: string, file: File | string, folderPath?: string) => {
   console.log("Stockage du fichier audio:", id);
   
   // Check if we should use Dropbox instead of Supabase
@@ -29,8 +29,14 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   try {
     if (useDropbox) {
       console.log("Uploading file to Dropbox storage:", id);
-      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
-      return `audio/${id}`;
+      // Use folder structure if provided
+      if (folderPath) {
+        await uploadFileToDropbox(fileToUpload, id, folderPath);
+        return `${folderPath}/${id}`;
+      } else {
+        await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+        return `audio/${id}`;
+      }
     } else {
       console.log("Uploading file to Supabase storage:", id);
       const { data, error } = await supabase.storage
@@ -69,7 +75,14 @@ export const getAudioFile = async (path: string) => {
 
   try {
     if (useDropbox) {
-      return await getDropboxSharedLink(`audio/${path}`);
+      // Check if the path contains a folder structure
+      if (path.includes('/')) {
+        // If it already has a full path format, use it as-is
+        return await getDropboxSharedLink(path);
+      } else {
+        // Default to the old audio/ path if not using the new folder structure
+        return await getDropboxSharedLink(`audio/${path}`);
+      }
     }
     
     // Original Supabase implementation
