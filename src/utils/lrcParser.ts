@@ -1,6 +1,7 @@
+
 /**
  * Utilitaire pour parser les fichiers LRC (Lyrics)
- * Format LRC: [MM:SS.xx]Paroles
+ * Format LRC: [MM:SS.xx]Paroles ou [MM.SS.xx]Paroles
  */
 
 export interface LrcLine {
@@ -28,9 +29,14 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
     lines: []
   };
 
-  // Expression régulière pour les tags de métadonnées et les lignes de paroles
+  // Expression régulière pour les tags de métadonnées
   const metadataRegex = /^\[([a-zA-Z]+):(.+)\]$/;
-  const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2}))?\]/g;
+  
+  // Expression régulière améliorée pour supporter à la fois [MM:SS.xx] et [MM.SS.xx]
+  // Cette regex capture les minutes, les secondes (avec . ou :) et les centièmes optionnels
+  const timeRegex = /\[(\d{2})[:.]{1}(\d{2})(?:[:.]{1}(\d{2}))?\]/g;
+
+  console.log("Début du parsing LRC avec support des formats [MM:SS.xx] et [MM.SS.xx]");
 
   lines.forEach(line => {
     // Ignorer les lignes vides
@@ -78,6 +84,8 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
       
       // Convertir en secondes avec plus de précision
       const timeInSeconds = minutes * 60 + seconds + hundredths / 100;
+      
+      console.log(`Timestamp trouvé: [${timeMatch[0]}] => ${timeInSeconds}s`);
       timings.push(timeInSeconds);
       
       // Supprimer le timestamp du texte
@@ -95,6 +103,8 @@ export const parseLrc = (lrcContent: string): ParsedLrc => {
 
   // Trier les lignes par ordre chronologique
   result.lines.sort((a, b) => a.time - b.time);
+  
+  console.log(`Parsing LRC terminé: ${result.lines.length} lignes trouvées`);
   
   return result;
 };
@@ -127,6 +137,7 @@ export const lrcToPlainText = (parsedLrc: ParsedLrc): string => {
 
 /**
  * Trouve la ligne de paroles correspondant à la position actuelle de lecture
+ * Utilise une recherche binaire pour des performances optimales
  * @param lines Tableau de lignes de paroles
  * @param currentTime Temps actuel de lecture en secondes
  * @param offset Décalage en millisecondes (positif = retard, négatif = avance)
@@ -138,6 +149,7 @@ export const findCurrentLyricLine = (
   offset: number = 0
 ): { current: number; next: LrcLine[] } => {
   const adjustedTime = currentTime - offset / 1000;
+  console.log(`Recherche de ligne pour le temps: ${currentTime}s, ajusté: ${adjustedTime}s`);
 
   if (lines.length === 0) {
     return { current: -1, next: [] };
@@ -145,36 +157,58 @@ export const findCurrentLyricLine = (
 
   // Cas spécial: avant la première ligne
   if (adjustedTime < lines[0].time) {
+    console.log("Avant la première ligne");
     return { current: -1, next: lines.slice(0, Math.min(3, lines.length)) };
   }
 
   // Cas spécial: après la dernière ligne
   if (adjustedTime >= lines[lines.length - 1].time) {
+    console.log(`Après la dernière ligne (${lines.length - 1})`);
     return { current: lines.length - 1, next: [] };
   }
 
+  // Recherche binaire pour trouver la ligne correspondante
+  let left = 0;
+  let right = lines.length - 1;
   let currentIndex = -1;
 
-  // Trouver la ligne actuelle
-  for (let i = 0; i < lines.length; i++) {
-    if (adjustedTime >= lines[i].time) {
-      // Regarder si nous sommes plus proches de la ligne suivante
-      if (i < lines.length - 1) {
-        const nextTime = lines[i + 1].time;
-        const currentDiff = adjustedTime - lines[i].time;
-        const nextDiff = nextTime - adjustedTime;
-
-        // Si nous sommes très proches de la ligne suivante, l'utiliser
-        if (nextDiff < 0.1 && nextDiff < currentDiff) {
-          currentIndex = i + 1;
-          continue;
-        }
-      }
-      currentIndex = i;
-    } else {
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    
+    if (mid + 1 < lines.length && adjustedTime >= lines[mid].time && adjustedTime < lines[mid + 1].time) {
+      currentIndex = mid;
       break;
+    } else if (adjustedTime < lines[mid].time) {
+      right = mid - 1;
+    } else {
+      left = mid + 1;
     }
   }
+
+  // Si pas trouvé par la recherche binaire, utiliser la méthode linéaire avec anticipation
+  if (currentIndex === -1) {
+    for (let i = 0; i < lines.length; i++) {
+      if (adjustedTime >= lines[i].time) {
+        // Regarder si nous sommes plus proches de la ligne suivante
+        if (i < lines.length - 1) {
+          const nextTime = lines[i + 1].time;
+          const currentDiff = adjustedTime - lines[i].time;
+          const nextDiff = nextTime - adjustedTime;
+
+          // Si nous sommes très proches de la ligne suivante, l'utiliser
+          if (nextDiff < 0.1 && nextDiff < currentDiff) {
+            currentIndex = i + 1;
+            continue;
+          }
+        }
+        currentIndex = i;
+      } else {
+        break;
+      }
+    }
+  }
+
+  console.log(`Ligne trouvée: ${currentIndex}, texte: "${currentIndex >= 0 ? lines[currentIndex].text : 'aucune'}"`);
 
   // Récupérer les 3 prochaines lignes
   const nextLines: LrcLine[] = [];
@@ -187,14 +221,15 @@ export const findCurrentLyricLine = (
 
 /**
  * Parse les paroles brutes pour détecter si elles sont au format LRC
+ * Supporte à la fois les formats [MM:SS.xx] et [MM.SS.xx]
  * @param lyricsText Texte des paroles à analyser
  * @returns True si le texte semble être au format LRC
  */
 export const isLrcFormat = (lyricsText: string): boolean => {
   if (!lyricsText) return false;
   
-  // Expression régulière pour les timestamps LRC [mm:ss.xx]
-  const timeRegex = /\[\d{2}:\d{2}\.\d{2}\]/;
+  // Expression régulière pour les timestamps LRC, supporte à la fois [MM:SS.xx] et [MM.SS.xx]
+  const timeRegex = /\[\d{2}[:.]\d{2}(?:[:.]\d{2})?\]/;
   
   // Vérifier les 5 premières lignes non vides
   const lines = lyricsText.split('\n').filter(line => line.trim().length > 0).slice(0, 5);
