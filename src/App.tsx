@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +20,7 @@ import './App.css';
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
+import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -193,6 +193,20 @@ function App() {
                   session ? (
                     <Layout>
                       <DropboxSettings />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
+              {/* New synced lyrics route */}
+              <Route 
+                path="/synced-lyrics" 
+                element={
+                  session ? (
+                    <Layout hideNavbar>
+                      <SyncedLyricsView />
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />

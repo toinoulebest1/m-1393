@@ -10,11 +10,13 @@ import { useEffect, useRef, useState } from "react";
 import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 import { Button } from "./ui/button";
 import { LyricsFullscreenView } from "./LyricsFullscreenView";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export const Player = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
+  const navigate = useNavigate();
+  
   const { 
     currentSong, 
     isPlaying, 
@@ -37,6 +39,7 @@ export const Player = () => {
   
   // Check if the current page is the blind test page
   const isBlindTest = location.pathname === '/blind-test';
+  const isSyncedLyricsPage = location.pathname === '/synced-lyrics';
   
   const positionUpdateIntervalRef = useRef<number | null>(null);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -127,6 +130,11 @@ export const Player = () => {
 
   const toggleLyrics = () => {
     setShowLyrics(!showLyrics);
+  };
+  
+  // Fonction pour naviguer vers la page des paroles synchronisées
+  const navigateToSyncedLyrics = () => {
+    navigate('/synced-lyrics');
   };
   
   // Function to get displayed song info for blind test mode
@@ -224,7 +232,7 @@ export const Player = () => {
   const songInfo = getDisplayedSongInfo();
   const blurImage = shouldBlurImage();
 
-  // Determine if the lyrics button should be shown (hide during blind test)
+  // Determine if the lyrics buttons should be shown (hide during blind test)
   const shouldShowLyricsButton = !isBlindTest;
 
   return (
@@ -346,18 +354,51 @@ export const Player = () => {
 
               <div className="flex items-center space-x-4">
                 {currentSong && shouldShowLyricsButton && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "text-spotify-neutral hover:text-white transition-all",
-                      showLyrics && "text-spotify-accent"
-                    )}
-                    onClick={toggleLyrics}
-                    title="Afficher les paroles"
-                  >
-                    <Mic className="w-5 h-5" />
-                  </Button>
+                  <>
+                    {/* Bouton pour les paroles standard (modal) */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "text-spotify-neutral hover:text-white transition-all",
+                        showLyrics && "text-spotify-accent"
+                      )}
+                      onClick={toggleLyrics}
+                      title="Afficher les paroles"
+                    >
+                      <Mic className="w-5 h-5" />
+                    </Button>
+                    
+                    {/* Nouveau bouton pour les paroles synchronisées (page dédiée) */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "text-spotify-neutral hover:text-white transition-all",
+                        isSyncedLyricsPage && "text-spotify-accent"
+                      )}
+                      onClick={navigateToSyncedLyrics}
+                      title="Paroles synchronisées"
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="20" 
+                        height="20" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                        <path d="M9 8h6" />
+                        <path d="M9 12h3" />
+                        <path d="m14 12 6 6" />
+                        <path d="m20 12-6 6" />
+                      </svg>
+                    </Button>
+                  </>
                 )}
                 <CastButton />
                 <div className="flex items-center space-x-2">
@@ -421,19 +462,48 @@ export const Player = () => {
                         )}
                       />
                     </button>
-                    {currentSong && shouldShowLyricsButton && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                          showLyrics && "text-spotify-accent"
-                        )}
-                        onClick={toggleLyrics}
+                    
+                    {/* Bouton pour les paroles standard (modal) sur mobile */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "p-1.5 text-spotify-neutral hover:text-white transition-all",
+                        showLyrics && "text-spotify-accent"
+                      )}
+                      onClick={toggleLyrics}
+                    >
+                      <Mic className="w-4 h-4" />
+                    </Button>
+                    
+                    {/* Nouveau bouton pour les paroles synchronisées (page dédiée) sur mobile */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "p-1.5 text-spotify-neutral hover:text-white transition-all",
+                        isSyncedLyricsPage && "text-spotify-accent"
+                      )}
+                      onClick={navigateToSyncedLyrics}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
                       >
-                        <Mic className="w-4 h-4" />
-                      </Button>
-                    )}
+                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                        <path d="M9 8h6" />
+                        <path d="M9 12h3" />
+                        <path d="m14 12 6 6" />
+                        <path d="m20 12-6 6" />
+                      </svg>
+                    </Button>
                     <CastButton />
                   </div>
                 </div>
