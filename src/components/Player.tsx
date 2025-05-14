@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -36,7 +35,8 @@ export const Player = () => {
     toggleShuffle,
     toggleRepeat,
     toggleFavorite,
-    isChangingSong
+    isChangingSong,
+    stopCurrentSong
   } = usePlayer();
   
   // Check if the current page is the blind test page
@@ -204,6 +204,9 @@ export const Player = () => {
       return;
     }
     
+    // Stop the current song immediately before loading the next one
+    stopCurrentSong();
+    
     // Call the nextSong function from PlayerContext
     nextSong();
   };
@@ -218,6 +221,9 @@ export const Player = () => {
       toast.info("Changement de piste en cours...");
       return;
     }
+    
+    // Stop the current song immediately before loading the previous one
+    stopCurrentSong();
     
     // Call the previousSong function from PlayerContext
     previousSong();
@@ -535,11 +541,7 @@ export const Player = () => {
                         strokeLinecap="round" 
                         strokeLinejoin="round"
                       >
-                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                        <path d="M9 8h6" />
-                        <path d="M9 12h3" />
-                        <path d="m14 12 6 6" />
-                        <path d="m20 12-6 6" />
+                        <path d="M21 15V5a2 2 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     </Button>
                     <CastButton />
