@@ -526,6 +526,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const refreshCurrentSong = async () => {
+    if (!currentSong) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('id', currentSong.id)
+        .single();
+      
+      if (error) {
+        console.error("Error refreshing current song data:", error);
+        return;
+      }
+      
+      if (data) {
+        // Update the current song with the fresh data
+        const updatedSong: Song = {
+          ...currentSong,
+          title: data.title || currentSong.title,
+          artist: data.artist || currentSong.artist,
+          imageUrl: data.image_url || currentSong.imageUrl,
+          bitrate: data.bitrate || currentSong.bitrate,
+          genre: data.genre || currentSong.genre
+        };
+        
+        setCurrentSong(updatedSong);
+        localStorage.setItem('currentSong', JSON.stringify(updatedSong));
+        
+        // Update media session metadata
+        if ('mediaSession' in navigator) {
+          updateMediaSessionMetadata(updatedSong);
+        }
+        
+        console.log("Current song metadata refreshed:", updatedSong.title);
+      }
+    } catch (error) {
+      console.error("Error in refreshCurrentSong:", error);
+    }
+  };
+
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -720,6 +761,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
+
+  const getNextSong = (): Song | null => {
+    if (!currentSong || queue.length === 0) return null;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    if (currentIndex === -1 || currentIndex + 1 >= queue.length) return null;
+    
+    return queue[currentIndex + 1];
+  };
 
   return (
     <PlayerContext.Provider value={{
