@@ -29,26 +29,12 @@ export const SyncedLyricsView: React.FC = () => {
   const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
     dark: [48, 12, 61] as [number, number, number],
     accent: [75, 20, 95] as [number, number, number]
   };
-
-  // Récupérer l'élément audio au chargement et le stocker dans la référence
-  useEffect(() => {
-    const audioElement = getCurrentAudioElement();
-    audioElementRef.current = audioElement;
-    console.log("SyncedLyricsView: Élément audio récupéré", audioElement);
-    
-    // Récupération initiale du temps
-    if (audioElement) {
-      setCurrentTime(audioElement.currentTime);
-      console.log("SyncedLyricsView: Temps initial =", audioElement.currentTime);
-    }
-  }, [getCurrentAudioElement]);
 
   // Utiliser un useEffect pour mettre à jour le temps actuel périodiquement
   useEffect(() => {
@@ -61,9 +47,7 @@ export const SyncedLyricsView: React.FC = () => {
     // Créer un nouvel intervalle uniquement si la lecture est en cours
     if (isPlaying) {
       syncIntervalRef.current = window.setInterval(() => {
-        // Récupérer directement l'élément audio à chaque tick pour s'assurer d'avoir la référence la plus récente
         const audioElement = getCurrentAudioElement();
-        audioElementRef.current = audioElement;
         
         if (audioElement) {
           const audioCurrentTime = audioElement.currentTime;
@@ -89,7 +73,6 @@ export const SyncedLyricsView: React.FC = () => {
             
             const calculatedTime = (progress / 100) * duration;
             setCurrentTime(calculatedTime);
-            console.log(`SyncedLyricsView: Temps calculé (fallback) = ${calculatedTime.toFixed(2)}s`);
           }
         }
       }, 50); // Intervalle court pour une meilleure fluidité
@@ -119,17 +102,8 @@ export const SyncedLyricsView: React.FC = () => {
       // Calculate current time in seconds
       const time = (progress / 100) * duration;
       setCurrentTime(time);
-      console.log(`SyncedLyricsView: Temps initial basé sur la progression = ${time.toFixed(2)}s`);
     }
   }, [currentSong, progress, isPlaying]);
-
-  // Log supplémentaire pour déboguer le rendu des paroles
-  useEffect(() => {
-    console.log(`SyncedLyricsView: Render avec currentTime = ${currentTime.toFixed(2)}s, isPlaying = ${isPlaying}`);
-    if (parsedLyrics) {
-      console.log(`SyncedLyricsView: Nombre de lignes de paroles = ${parsedLyrics.lines?.length || 0}`);
-    }
-  }, [currentTime, isPlaying, parsedLyrics]);
 
   // Animation effects setup
   useEffect(() => {
@@ -148,7 +122,7 @@ export const SyncedLyricsView: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
-
+  
   // Extract colors from the album art
   useEffect(() => {
     const extractColors = async () => {
@@ -219,7 +193,7 @@ export const SyncedLyricsView: React.FC = () => {
 
     // Fonction pour attacher les handlers sur la nouvelle balise audio
     const setupAudioHandlers = () => {
-      audio = getCurrentAudioElement();
+      audio = document.querySelector('audio');
       if (!audio) return;
 
       // Toujours mettre isAudioLoading à true au début
@@ -232,10 +206,8 @@ export const SyncedLyricsView: React.FC = () => {
         setIsAudioLoading(false); // Charger se termine quand la lecture démarre vraiment
       };
 
-      if (audio) {
-        audio.addEventListener('waiting', waitingHandler);
-        audio.addEventListener('playing', playingHandler);
-      }
+      audio.addEventListener('waiting', waitingHandler);
+      audio.addEventListener('playing', playingHandler);
     };
 
     // On attend un court moment pour laisser le DOM mettre le nouvel <audio>
@@ -250,7 +222,7 @@ export const SyncedLyricsView: React.FC = () => {
         if (playingHandler) audio.removeEventListener('playing', playingHandler);
       }
     };
-  }, [currentSong?.id, getCurrentAudioElement]);
+  }, [currentSong?.id]);
 
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
@@ -696,11 +668,6 @@ export const SyncedLyricsView: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Debug info - Afficher le temps actuel pour faciliter le débogage */}
-      <div className="fixed bottom-1 right-1 text-xs text-white/40 bg-black/50 px-2 py-1 rounded-md">
-        Temps: {currentTime.toFixed(2)}s
       </div>
 
       {/* Styles fixes */}
