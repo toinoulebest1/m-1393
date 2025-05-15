@@ -57,7 +57,8 @@ export const Player = () => {
 
   const [showLyrics, setShowLyrics] = useState(false);
 
-  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture
+  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture,
+  // et rafraîchit audioRef.current à chaque tick pour prendre la vraie source utilisée.
   useEffect(() => {
     // Clear any existing interval
     if (positionUpdateIntervalRef.current) {
@@ -67,7 +68,11 @@ export const Player = () => {
 
     if ('mediaSession' in navigator && currentSong && isPlaying) {
       positionUpdateIntervalRef.current = window.setInterval(() => {
-        // Lecture de la vraie durée et position
+        // Toujours forcer l'audioRef à pointer vers le vrai player global
+        if (typeof window !== "undefined" && "Audio" in window) {
+          // @ts-ignore
+          audioRef.current = window.globalAudio || document.querySelector('audio');
+        }
         let duration = 0;
         let position = 0;
         let playbackRateVal = playbackRate ?? 1;
@@ -75,9 +80,10 @@ export const Player = () => {
         if (audioRef.current && !isNaN(audioRef.current.duration)) {
           duration = audioRef.current.duration;
           position = audioRef.current.currentTime;
+          playbackRateVal = audioRef.current.playbackRate || playbackRateVal;
         } else {
           duration = durationToSeconds(currentSong.duration);
-          // Utilisation fallback : estimation via progress si pas mieux
+          // Utilisation fallback
           position = (progress / 100) * duration;
         }
 
@@ -90,7 +96,7 @@ export const Player = () => {
         window.clearInterval(positionUpdateIntervalRef.current);
       }
     };
-  }, [currentSong, isPlaying, playbackRate]); // Note : on supprime progress des dépendances
+  }, [currentSong, isPlaying, playbackRate]); // On ne remet pas progress
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
