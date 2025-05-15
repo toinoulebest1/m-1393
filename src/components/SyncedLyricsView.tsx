@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
@@ -636,13 +635,6 @@ export const SyncedLyricsView: React.FC = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour
           </Button>
-          
-          {/* Debug panel - afficher les informations de synchronisation */}
-          <div className="mt-4 p-2 bg-black/40 rounded-md text-xs text-spotify-neutral/70 w-full">
-            <div>Temps actuel: {formatTime(currentTime)}</div>
-            <div>Affichage: {formatTime(getCurrentAudioTime())} / {formatDuration(currentSong?.duration)}</div>
-            <div>Progression: {displayedProgress.toFixed(1)}%</div>
-          </div>
         </div>
 
         {/* Right side - Lyrics content */}
@@ -752,4 +744,3 @@ export const SyncedLyricsView: React.FC = () => {
     </div>
   );
 };
-
