@@ -13,6 +13,9 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
+  // Refs pour timers et handlers de secours
+  const audioForceLoadingTimeout = React.useRef<number | null>(null);
+
   const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
@@ -110,10 +113,11 @@ export const SyncedLyricsView: React.FC = () => {
     extractColors();
   }, [currentSong?.imageUrl]);
 
-  // Detect song change and show loading overlay if applicable
+  // On force le chargement à true sur changement de chanson
   useEffect(() => {
     if (currentSong && currentSong.id !== currentSongId) {
-      setIsChangingSong(true); // Début du changement de chanson
+      setIsAudioLoading(true); // Force à true AU CHANGEMENT DE CHANSON
+      setIsChangingSong(true);
       setParsedLyrics(null);
       setLyricsText(null);
       setError(null);
@@ -134,41 +138,59 @@ export const SyncedLyricsView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoadingLyrics]);
 
-  // Gérer l'état de chargement audio
+  // Gestion propre du chargement audio
   useEffect(() => {
     let audio: HTMLAudioElement | null = null;
-    let waitingHandler: (() => void) | null = null;
     let playingHandler: (() => void) | null = null;
+    let waitingHandler: (() => void) | null = null;
 
-    // Fonction pour attacher les handlers sur la nouvelle balise audio
+    // Sécurité : reset le timeout chaque fois
+    if (audioForceLoadingTimeout.current) {
+      clearTimeout(audioForceLoadingTimeout.current);
+      audioForceLoadingTimeout.current = null;
+    }
+
     const setupAudioHandlers = () => {
       audio = document.querySelector('audio');
       if (!audio) return;
 
-      // Toujours mettre isAudioLoading à true au début
+      // Toujours état "chargement" tant que playing pas lancé
       setIsAudioLoading(true);
 
+      playingHandler = () => {
+        setIsAudioLoading(false);
+        // Sécurité : on vide le timeout de secours si lecture commence
+        if (audioForceLoadingTimeout.current) {
+          clearTimeout(audioForceLoadingTimeout.current);
+          audioForceLoadingTimeout.current = null;
+        }
+      };
       waitingHandler = () => {
         setIsAudioLoading(true);
       };
-      playingHandler = () => {
-        setIsAudioLoading(false); // Charger se termine quand la lecture démarre vraiment
-      };
 
-      audio.addEventListener('waiting', waitingHandler);
       audio.addEventListener('playing', playingHandler);
+      audio.addEventListener('waiting', waitingHandler);
+
+      // Ajout d'un timeout de secours au cas où "playing" n'arrive jamais (ex : problème stream)
+      audioForceLoadingTimeout.current = window.setTimeout(() => {
+        setIsAudioLoading(false);
+      }, 12000); // 12 secondes au max
     };
 
-    // On attend un court moment pour laisser le DOM mettre le nouvel <audio>
-    const timeout = setTimeout(() => {
-      setupAudioHandlers();
-    }, 120);
+    // Petit délai pour laisser le DOM préparer le nouvel audio
+    const timeout = setTimeout(setupAudioHandlers, 120);
 
     return () => {
       clearTimeout(timeout);
       if (audio) {
-        if (waitingHandler) audio.removeEventListener('waiting', waitingHandler);
         if (playingHandler) audio.removeEventListener('playing', playingHandler);
+        if (waitingHandler) audio.removeEventListener('waiting', waitingHandler);
+      }
+      // Nettoie le timeout de secours si changement
+      if (audioForceLoadingTimeout.current) {
+        clearTimeout(audioForceLoadingTimeout.current);
+        audioForceLoadingTimeout.current = null;
       }
     };
   }, [currentSong?.id]);
@@ -375,14 +397,24 @@ export const SyncedLyricsView: React.FC = () => {
             <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
             <span className="text-lg font-semibold text-white">
               {isAudioLoading
-                ? "Chargement de la musique en cours..."
-                : "Changement de chanson..."}
+                ? "Chargement de la musique en cours…"
+                : "Changement de chanson…"}
             </span>
             <span className="text-sm text-muted-foreground">
               {isAudioLoading
                 ? "Veuillez patienter, la lecture démarre bientôt"
                 : "Veuillez patienter pendant le chargement des nouvelles paroles."}
             </span>
+            {/* Bouton de secours si ça ne démarre pas */}
+            {isAudioLoading && (
+              <Button
+                className="mt-3"
+                variant="outline"
+                onClick={() => setIsAudioLoading(false)}
+              >
+                Forcer le départ
+              </Button>
+            )}
           </div>
         </div>
       )}
