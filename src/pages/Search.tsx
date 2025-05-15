@@ -134,8 +134,9 @@ const Search = () => {
       return;
     }
 
-    setQueue([song]);
-    
+    // Remplacer le queue pour inclure toute la liste des résultats
+    setQueue(results);
+
     play(song);
   };
 
