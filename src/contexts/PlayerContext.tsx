@@ -73,7 +73,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return savedSong ? JSON.parse(savedSong) : null;
   });
 
-  const [queue, setQueue] = useState<Song[]>(() => {
+  const [queue, setQueueRaw] = useState<Song[]>(() => {
+    const savedQueue = localStorage.getItem('queue');
+    if (savedQueue) {
+      try {
+        return JSON.parse(savedQueue);
+      } catch (err) {
+        return [];
+      }
+    }
     const savedSong = localStorage.getItem('currentSong');
     return savedSong ? [JSON.parse(savedSong)] : [];
   });
@@ -156,6 +164,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentSong]);
 
+  useEffect(() => {
+    localStorage.setItem('queue', JSON.stringify(queue));
+  }, [queue]);
+
+  const setQueue = (songs: Song[]) => {
+    setQueueRaw(songs);
+    localStorage.setItem('queue', JSON.stringify(songs));
+  };
+
   const preloadNextSong = async () => {
     if (!currentSong || queue.length === 0) return;
     
@@ -174,10 +191,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       nextAudioRef.current.src = audioUrl;
-      
-      // Augmenter la priorité du préchargement
       nextAudioRef.current.preload = "auto";
-      
       nextAudioRef.current.load();
       nextAudioRef.current.volume = 0;
       
