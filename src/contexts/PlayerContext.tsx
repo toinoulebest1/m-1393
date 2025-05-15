@@ -139,9 +139,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (savedProgress) {
             audioRef.current.currentTime = parseFloat(savedProgress);
           }
-          
+
           setCurrentSong(song);
-          setQueue(prevQueue => {
+          // FIX: Only setQueueRaw can accept a function, not setQueue.
+          setQueueRaw(prevQueue => {
             if (!prevQueue.some(s => s.id === song.id)) {
               return [song, ...prevQueue];
             }
