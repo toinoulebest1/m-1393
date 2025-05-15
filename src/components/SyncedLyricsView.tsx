@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,7 @@ export const SyncedLyricsView: React.FC = () => {
   const [animationStage, setAnimationStage] = useState<"entry" | "exit">("entry");
   const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
+  const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -109,23 +109,29 @@ export const SyncedLyricsView: React.FC = () => {
     extractColors();
   }, [currentSong?.imageUrl]);
 
-  // Effect for detecting song changes and fetching lyrics
+  // Detect song change and show loading overlay if applicable
   useEffect(() => {
-    // Reset lyrics state when song changes
     if (currentSong && currentSong.id !== currentSongId) {
-      // Reset states when song changes
+      setIsChangingSong(true); // Début du changement de chanson
       setParsedLyrics(null);
       setLyricsText(null);
       setError(null);
       setIsLoadingLyrics(true);
-      
-      // Store the new song ID
       setCurrentSongId(currentSong.id);
-      
-      // Fetch lyrics for the new song
       fetchLyrics(currentSong.id);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id]);
+
+  // Lorsque les paroles (lyrics) sont chargées, enlever l'overlay de chargement
+  useEffect(() => {
+    // Retirer l'overlay si on arrête de loader ET qu'on a song et ses paroles (ou message d'erreur)
+    if (isChangingSong && !isLoadingLyrics) {
+      // Petite latence visuelle si besoin
+      setTimeout(() => setIsChangingSong(false), 350);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingLyrics]);
 
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
@@ -307,6 +313,21 @@ export const SyncedLyricsView: React.FC = () => {
       </div>
     );
   }
+
+  // Chargement/changement de chanson
+  {isChangingSong && (
+    <div className="absolute z-50 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all animate-fade-in">
+      <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-background/80 shadow-lg border border-white/10">
+        <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
+        <span className="text-lg font-semibold text-white">
+          Changement de chanson...
+        </span>
+        <span className="text-sm text-muted-foreground">
+          Veuillez patienter pendant le chargement des nouvelles paroles.
+        </span>
+      </div>
+    </div>
+  )}
 
   // Background style based on extracted colors
   const bgStyle = dominantColor ? {
