@@ -44,34 +44,53 @@ export const Player = () => {
   const isSyncedLyricsPage = location.pathname === '/synced-lyrics';
   
   const positionUpdateIntervalRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Synchroniser audioRef avec l'Audio global du PlayerContext si possible
+  useEffect(() => {
+    // Récupère le joueur global (fixe pour l'app)
+    if (typeof window !== "undefined" && "Audio" in window) {
+      // @ts-ignore: accès au singleton "globalAudio" utilisé partout
+      audioRef.current = window.globalAudio || document.querySelector('audio');
+    }
+  }, []);
+
   const [showLyrics, setShowLyrics] = useState(false);
 
-  // Set up interval to update position state for MediaSession API
+  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture
   useEffect(() => {
     // Clear any existing interval
     if (positionUpdateIntervalRef.current) {
       window.clearInterval(positionUpdateIntervalRef.current);
       positionUpdateIntervalRef.current = null;
     }
-    
+
     if ('mediaSession' in navigator && currentSong && isPlaying) {
       positionUpdateIntervalRef.current = window.setInterval(() => {
-        const duration = durationToSeconds(currentSong.duration);
+        // Lecture de la vraie durée et position
+        let duration = 0;
+        let position = 0;
+        let playbackRateVal = playbackRate ?? 1;
 
-        // Correction : calculer la bonne position courante (en secondes)
-        const position = (progress / 100) * duration;
+        if (audioRef.current && !isNaN(audioRef.current.duration)) {
+          duration = audioRef.current.duration;
+          position = audioRef.current.currentTime;
+        } else {
+          duration = durationToSeconds(currentSong.duration);
+          // Utilisation fallback : estimation via progress si pas mieux
+          position = (progress / 100) * duration;
+        }
 
-        // !! Use la vraie position pour MediaSession !!
-        updatePositionState(duration, position, playbackRate);
+        updatePositionState(duration, position, playbackRateVal);
       }, 1000);
     }
-    
+
     return () => {
       if (positionUpdateIntervalRef.current) {
         window.clearInterval(positionUpdateIntervalRef.current);
       }
     };
-  }, [currentSong, isPlaying, progress, playbackRate]);
+  }, [currentSong, isPlaying, playbackRate]); // Note : on supprime progress des dépendances
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
@@ -485,7 +504,7 @@ export const Player = () => {
                         {songInfo.title || '••••••'}
                       </h3>
                       <p className="text-xs text-spotify-neutral truncate">
-                        {songInfo.artist || '••••••'}
+                        {songInfo.artist || '••••���•'}
                       </p>
                     </div>
                   </div>
