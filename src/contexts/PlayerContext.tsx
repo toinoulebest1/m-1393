@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
-import { webAudioPlayer, PlayerType } from '@/utils/webAudioPlayer';
 
 interface Song {
   id: string;
@@ -37,8 +36,6 @@ interface PlayerContextType {
   playbackRate: number;
   history: Song[];
   isChangingSong: boolean;
-  playerType: PlayerType;
-  togglePlayerType: () => void;
   stopCurrentSong: () => void;
   setQueue: (songs: Song[]) => void;
   setHistory: (history: Song[]) => void;
@@ -70,10 +67,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [isChangingSong, setIsChangingSong] = useState(false);
   const changeTimeoutRef = useRef<number | null>(null);
-  const [playerType, setPlayerType] = useState<PlayerType>(() => {
-    const saved = localStorage.getItem('playerType');
-    return saved ? (saved as PlayerType) : PlayerType.NATIVE;
-  });
 
   const [currentSong, setCurrentSong] = useState<Song | null>(() => {
     const savedSong = localStorage.getItem('currentSong');
@@ -404,41 +397,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           throw new Error('Fichier audio non trouvé');
         }
 
-        // Use the appropriate player based on the current setting
-        if (playerType === PlayerType.NATIVE) {
-          // Native HTML5 Audio
-          audioRef.current.src = audioUrl;
-          audioRef.current.currentTime = 0;
-          audioRef.current.preload = "auto";
-          audioRef.current.load();
-          
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              setIsPlaying(true);
-              audioRef.current.volume = volume / 100;
-              console.log("Lecture démarrée avec succès:", song.title);
-              
-              setTimeout(() => preloadNextSong(), 1000);
-              
-              changeTimeoutRef.current = window.setTimeout(() => {
-                setIsChangingSong(false);
-                changeTimeoutRef.current = null;
-              }, 1200);
-            }).catch(error => {
-              console.error("Error starting playback:", error);
-              setIsPlaying(false);
-              setIsChangingSong(false);
-            });
-          }
-        } else {
-          // Web Audio API
-          await webAudioPlayer.loadAudio(audioUrl);
-          webAudioPlayer.volume = volume / 100;
-          
-          try {
-            await webAudioPlayer.play();
+        audioRef.current.src = audioUrl;
+        audioRef.current.currentTime = 0;
+        
+        audioRef.current.preload = "auto";
+        
+        audioRef.current.load();
+        
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
             setIsPlaying(true);
+            audioRef.current.volume = volume / 100;
             console.log("Lecture démarrée avec succès:", song.title);
             
             setTimeout(() => preloadNextSong(), 1000);
@@ -447,11 +417,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               setIsChangingSong(false);
               changeTimeoutRef.current = null;
             }, 1200);
-          } catch (error) {
-            console.error("Error starting playback with Web Audio API:", error);
+          }).catch(error => {
+            console.error("Error starting playback:", error);
             setIsPlaying(false);
             setIsChangingSong(false);
-          }
+          });
         }
       } catch (error) {
         console.error("Error playing audio:", error);
@@ -461,23 +431,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsPlaying(false);
         setIsChangingSong(false);
       }
-    } else if (audioRef.current || webAudioPlayer) {
+    } else if (audioRef.current) {
       try {
-        if (playerType === PlayerType.NATIVE) {
-          audioRef.current.volume = volume / 100;
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              setIsPlaying(true);
-            }).catch(error => {
-              console.error("Error resuming native playback:", error);
-              setIsPlaying(false);
-            });
-          }
-        } else {
-          webAudioPlayer.volume = volume / 100;
-          await webAudioPlayer.play();
-          setIsPlaying(true);
+        audioRef.current.volume = volume / 100;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.error("Error resuming playback:", error);
+            setIsPlaying(false);
+          });
         }
       } catch (error) {
         console.error("Error resuming audio:", error);
@@ -487,38 +451,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const pause = () => {
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    } else {
-      webAudioPlayer.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
     }
     setIsPlaying(false);
   };
 
   const updateVolume = (newVolume: number) => {
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.volume = newVolume / 100;
-      }
-    } else {
-      webAudioPlayer.volume = newVolume / 100;
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100;
     }
     setVolume(newVolume);
   };
 
   const updateProgress = (newProgress: number) => {
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current && !isNaN(audioRef.current.duration)) {
-        const time = (newProgress / 100) * audioRef.current.duration;
-        audioRef.current.currentTime = time;
-      }
-    } else {
-      if (!isNaN(webAudioPlayer.duration)) {
-        const time = (newProgress / 100) * webAudioPlayer.duration;
-        webAudioPlayer.currentTime = time;
-      }
+    if (audioRef.current) {
+      const time = (newProgress / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = time;
     }
     setProgress(newProgress);
   };
@@ -557,12 +506,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
     }
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.volume = volume / 100;
-      }
-    } else {
-      webAudioPlayer.volume = volume / 100;
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
     }
     
     console.log("Executing nextSong function");
@@ -674,12 +619,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       nextAudioRef.current.pause();
       nextAudioRef.current.volume = 0;
     }
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.volume = volume / 100;
-      }
-    } else {
-      webAudioPlayer.volume = volume / 100;
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
     }
     
     console.log("Executing previousSong function");
@@ -871,32 +812,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updatePlaybackRate = (rate: number) => {
     setPlaybackRate(rate);
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.playbackRate = rate;
-      }
-    } else {
-      webAudioPlayer.playbackRate = rate;
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
     }
   };
 
   const stopCurrentSong = () => {
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
       }
-    } else {
-      webAudioPlayer.reset();
+      
+      fadingRef.current = false;
+      
+      console.log("Current song stopped immediately");
     }
-    
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    
-    fadingRef.current = false;
-    console.log("Current song stopped immediately");
   };
 
   useEffect(() => {
@@ -1306,88 +1240,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong]);
 
-  const parseTimeToSeconds = (timeStr: string | undefined): number => {
-    if (!timeStr) return 0;
-    
-    try {
-      if (timeStr.includes(':')) {
-        const [minutes, seconds] = timeStr.split(':').map(Number);
-        return (minutes * 60) + seconds;
-      }
-      return parseInt(timeStr);
-    } catch (error) {
-      console.error("Error parsing time:", error);
-      return 0;
-    }
-  };
-
-  const togglePlayerType = () => {
-    const newType = playerType === PlayerType.NATIVE ? PlayerType.WEB_AUDIO : PlayerType.NATIVE;
-    setPlayerType(newType);
-    localStorage.setItem('playerType', newType);
-    
-    // Si une chanson est en cours de lecture, adapter la transition
-    if (currentSong) {
-      const wasPlaying = isPlaying;
-      
-      // Pause the current player
-      if (isPlaying) {
-        if (playerType === PlayerType.NATIVE) {
-          audioRef.current.pause();
-        } else {
-          webAudioPlayer.pause();
-        }
-        setIsPlaying(false);
-      }
-      
-      // Save current position
-      const currentPosition = playerType === PlayerType.NATIVE 
-        ? audioRef.current.currentTime 
-        : webAudioPlayer.currentTime;
-      
-      const percentProgress = currentSong && currentPosition > 0 
-        ? (currentPosition / parseTimeToSeconds(currentSong.duration)) * 100 
-        : progress;
-      
-      // Notify user
-      toast.success(`Passage au lecteur ${newType === PlayerType.NATIVE ? 'natif' : 'Web Audio'}`, {
-        duration: 2000,
-      });
-      
-      // If it was playing, resume on the new player after a small delay
-      if (wasPlaying) {
-        setTimeout(async () => {
-          try {
-            if (newType === PlayerType.NATIVE) {
-              // Make sure audio is loaded in the native player
-              if (!audioRef.current.src) {
-                const audioUrl = await getAudioFile(currentSong.url);
-                if (audioUrl) {
-                  audioRef.current.src = audioUrl;
-                  audioRef.current.load();
-                }
-              }
-              audioRef.current.currentTime = currentPosition;
-              audioRef.current.play().catch(err => console.error("Error resuming native player:", err));
-            } else {
-              // Load and play with Web Audio
-              const audioUrl = await getAudioFile(currentSong.url);
-              if (audioUrl) {
-                await webAudioPlayer.loadAudio(audioUrl);
-                webAudioPlayer.currentTime = currentPosition;
-                await webAudioPlayer.play();
-              }
-            }
-            setIsPlaying(true);
-          } catch (error) {
-            console.error("Error switching player types:", error);
-            toast.error("Erreur lors du changement de lecteur");
-          }
-        }, 300);
-      }
-    }
-  };
-
   const refreshCurrentSong = () => {
     if (currentSong) {
       const fetchUpdatedSong = async () => {
@@ -1429,8 +1281,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       playbackRate,
       history,
       isChangingSong,
-      playerType,
-      togglePlayerType,
       stopCurrentSong,
       setQueue,
       setHistory,

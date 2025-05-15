@@ -11,8 +11,6 @@ import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 import { Button } from "./ui/button";
 import { LyricsFullscreenView } from "./LyricsFullscreenView";
 import { useLocation, useNavigate } from "react-router-dom";
-import { PlayerType } from "@/utils/webAudioPlayer";
-import { Switch } from "./ui/switch";
 
 export const Player = () => {
   const isMobile = useIsMobile();
@@ -38,9 +36,7 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite,
     isChangingSong,
-    stopCurrentSong,
-    playerType,
-    togglePlayerType
+    stopCurrentSong
   } = usePlayer();
   
   // Check if the current page is the blind test page
@@ -81,29 +77,14 @@ export const Player = () => {
         let position = 0;
         let playbackRateVal = playbackRate ?? 1;
 
-        if (playerType === PlayerType.NATIVE) {
-          if (audioRef.current && !isNaN(audioRef.current.duration)) {
-            duration = audioRef.current.duration;
-            position = audioRef.current.currentTime;
-            playbackRateVal = audioRef.current.playbackRate || playbackRateVal;
-          } else {
-            duration = durationToSeconds(currentSong.duration);
-            // Utilisation fallback
-            position = (progress / 100) * duration;
-          }
+        if (audioRef.current && !isNaN(audioRef.current.duration)) {
+          duration = audioRef.current.duration;
+          position = audioRef.current.currentTime;
+          playbackRateVal = audioRef.current.playbackRate || playbackRateVal;
         } else {
-          // Web Audio player has its own time tracking
-          if (window.webAudioPlayer) {
-            // @ts-ignore
-            duration = window.webAudioPlayer.duration;
-            // @ts-ignore
-            position = window.webAudioPlayer.currentTime;
-            // @ts-ignore
-            playbackRateVal = window.webAudioPlayer.playbackRate || playbackRateVal;
-          } else {
-            duration = durationToSeconds(currentSong.duration);
-            position = (progress / 100) * duration;
-          }
+          duration = durationToSeconds(currentSong.duration);
+          // Utilisation fallback
+          position = (progress / 100) * duration;
         }
 
         updatePositionState(duration, position, playbackRateVal);
@@ -115,7 +96,7 @@ export const Player = () => {
         window.clearInterval(positionUpdateIntervalRef.current);
       }
     };
-  }, [currentSong, isPlaying, playbackRate, playerType, progress]); // On a ajouté playerType
+  }, [currentSong, isPlaying, playbackRate]); // On ne remet pas progress
 
   const formatTime = (progress: number) => {
     if (!currentSong) return "0:00";
@@ -184,11 +165,6 @@ export const Player = () => {
   // Fonction pour naviguer vers la page des paroles synchronisées
   const navigateToSyncedLyrics = () => {
     navigate('/synced-lyrics');
-  };
-  
-  // Function to handle player type toggle
-  const handlePlayerTypeToggle = () => {
-    togglePlayerType();
   };
   
   // Function to get displayed song info for blind test mode
@@ -352,18 +328,6 @@ export const Player = () => {
                         )}
                       />
                     </button>
-                    
-                    {/* Player Type Toggle */}
-                    <div className="ml-4 flex items-center">
-                      <span className="text-xs text-spotify-neutral mr-2">
-                        {playerType === PlayerType.NATIVE ? "Web" : "WebAudio"}
-                      </span>
-                      <Switch
-                        checked={playerType === PlayerType.WEB_AUDIO}
-                        onCheckedChange={handlePlayerTypeToggle}
-                        className="mr-2 data-[state=checked]:bg-spotify-accent"
-                      />
-                    </div>
                   </>
                 )}
               </div>
