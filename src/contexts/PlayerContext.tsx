@@ -543,13 +543,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       if (data) {
         // Update the current song with the fresh data
+        // Only use properties that exist in both the database and our Song type
         const updatedSong: Song = {
           ...currentSong,
           title: data.title || currentSong.title,
           artist: data.artist || currentSong.artist,
           imageUrl: data.image_url || currentSong.imageUrl,
-          bitrate: data.bitrate || currentSong.bitrate,
-          genre: data.genre || currentSong.genre
+          genre: data.genre || currentSong.genre,
+          // Don't use bitrate from database as it doesn't exist in the type
         };
         
         setCurrentSong(updatedSong);
