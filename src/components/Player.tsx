@@ -20,7 +20,7 @@ export const Player = () => {
   const { 
     currentSong, 
     isPlaying, 
-    progress, 
+    progress,
     volume,
     shuffleMode,
     repeatMode,
@@ -36,7 +36,8 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite,
     isChangingSong,
-    stopCurrentSong
+    stopCurrentSong,
+    getCurrentAudioElement
   } = usePlayer();
   
   // Check if the current page is the blind test page
@@ -44,22 +45,23 @@ export const Player = () => {
   const isSyncedLyricsPage = location.pathname === '/synced-lyrics';
   
   const positionUpdateIntervalRef = useRef<number | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentPosition, setCurrentPosition] = useState(0);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  // Synchroniser audioRef avec l'Audio global du PlayerContext si possible
+  // Nouvelle logique pour accéder à l'élément audio global
   useEffect(() => {
-    // Récupère le joueur global (fixe pour l'app)
-    if (typeof window !== "undefined" && "Audio" in window) {
-      // @ts-ignore: accès au singleton "globalAudio" utilisé partout
-      audioRef.current = window.globalAudio || document.querySelector('audio');
+    const audio = getCurrentAudioElement();
+    if (audio) {
+      setAudioElement(audio);
+      console.log("Audio element accessed successfully in Player component");
+    } else {
+      console.error("Failed to access audio element");
     }
-  }, []);
+  }, [getCurrentAudioElement, currentSong]);
 
   const [showLyrics, setShowLyrics] = useState(false);
 
-  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture,
-  // et rafraîchit audioRef.current à chaque tick pour prendre la vraie source utilisée.
+  // Intervalle de mise à jour de la position
   useEffect(() => {
     // Clear any existing interval
     if (positionUpdateIntervalRef.current) {
@@ -67,19 +69,13 @@ export const Player = () => {
       positionUpdateIntervalRef.current = null;
     }
 
-    if (isPlaying) {
+    if (isPlaying && audioElement) {
       // Créer un intervalle qui s'exécute plus fréquemment pour une mise à jour fluide
       positionUpdateIntervalRef.current = window.setInterval(() => {
-        // Toujours forcer l'audioRef à pointer vers le vrai player global
-        if (typeof window !== "undefined" && "Audio" in window) {
-          // @ts-ignore
-          audioRef.current = window.globalAudio || document.querySelector('audio');
-        }
-        
-        // Si on a accès à l'élément audio, récupérer sa position actuelle
-        if (audioRef.current && !isNaN(audioRef.current.duration)) {
-          const currentTime = audioRef.current.currentTime;
-          const duration = audioRef.current.duration;
+        const audio = getCurrentAudioElement();
+        if (audio && !isNaN(audio.duration) && audio.duration > 0) {
+          const currentTime = audio.currentTime;
+          const duration = audio.duration;
           
           // Calculer la progression en pourcentage
           const newProgress = (currentTime / duration) * 100;
@@ -89,7 +85,7 @@ export const Player = () => {
           
           // Mettre à jour le MediaSession API
           if ('mediaSession' in navigator) {
-            updatePositionState(duration, currentTime, audioRef.current.playbackRate || 1);
+            updatePositionState(duration, currentTime, audio.playbackRate || 1);
           }
         }
       }, 250); // Mise à jour 4 fois par seconde pour plus de fluidité
@@ -100,7 +96,7 @@ export const Player = () => {
         window.clearInterval(positionUpdateIntervalRef.current);
       }
     };
-  }, [isPlaying, currentSong]); 
+  }, [isPlaying, currentSong, audioElement, getCurrentAudioElement]); 
 
   const formatTime = (position: number) => {
     if (!currentSong) return "0:00";
@@ -282,8 +278,14 @@ export const Player = () => {
     }
   };
   
-  const songInfo = getDisplayedSongInfo();
-  const blurImage = shouldBlurImage();
+  const handleProgressChange = (value: number) => {
+    setProgress(value);
+    // Force local position update for immediate UI feedback
+    setCurrentPosition(value);
+  };
+  
+  const songInfo = getDisplayedSongInfo ? getDisplayedSongInfo() : { title: currentSong?.title, artist: currentSong?.artist };
+  const blurImage = shouldBlurImage ? shouldBlurImage() : false;
 
   // Determine if the lyrics buttons should be shown (hide during blind test)
   const shouldShowLyricsButton = !isBlindTest;
@@ -425,7 +427,7 @@ export const Player = () => {
                     max={100}
                     step={1}
                     className="w-full"
-                    onValueChange={(value) => setProgress(value[0])}
+                    onValueChange={(value) => handleProgressChange(value[0])}
                     disabled={isChangingSong}
                   />
                   <span className="text-xs text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
@@ -611,7 +613,7 @@ export const Player = () => {
                   if (isChangingSong) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const percent = ((e.clientX - rect.left) / rect.width) * 100;
-                  setProgress(Math.max(0, Math.min(100, percent)));
+                  handleProgressChange(Math.max(0, Math.min(100, percent)));
                 }}
               />
 
