@@ -168,6 +168,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem('queue', JSON.stringify(queue));
   }, [queue]);
 
+  // "setQueue" doit recevoir un tableau, pas une fonction
   const setQueue = (songs: Song[]) => {
     setQueueRaw(songs);
     localStorage.setItem('queue', JSON.stringify(songs));
@@ -695,7 +696,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const addToQueue = (song: Song) => {
-    setQueue(prevQueue => {
+    setQueueRaw(prevQueue => {
       if (prevQueue.length === 0 && !currentSong) {
         play(song);
       }
