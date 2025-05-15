@@ -314,6 +314,15 @@ export const SyncedLyricsView: React.FC = () => {
     );
   }
 
+  // Ajout de la définition de bgStyle juste avant le return
+  const bgStyle = dominantColor ? {
+    background: `radial-gradient(circle at center, 
+      rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
+      rgba(0, 0, 0, 0.95) 100%)`,
+    willChange: 'transform',
+    transform: 'translateZ(0)',
+  } : {};
+
   return (
     <div className={cn(
       "fixed inset-0 z-[100] flex flex-col",
