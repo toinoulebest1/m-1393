@@ -314,35 +314,26 @@ export const SyncedLyricsView: React.FC = () => {
     );
   }
 
-  // Chargement/changement de chanson
-  {isChangingSong && (
-    <div className="absolute z-50 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all animate-fade-in">
-      <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-background/80 shadow-lg border border-white/10">
-        <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
-        <span className="text-lg font-semibold text-white">
-          Changement de chanson...
-        </span>
-        <span className="text-sm text-muted-foreground">
-          Veuillez patienter pendant le chargement des nouvelles paroles.
-        </span>
-      </div>
-    </div>
-  )}
-
-  // Background style based on extracted colors
-  const bgStyle = dominantColor ? {
-    background: `radial-gradient(circle at center, 
-      rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
-      rgba(0, 0, 0, 0.95) 100%)`,
-    willChange: 'transform',
-    transform: 'translateZ(0)',
-  } : {};
-
   return (
     <div className={cn(
       "fixed inset-0 z-[100] flex flex-col",
       animationStage === "entry" ? "animate-fade-in" : "opacity-0 transition-opacity duration-200"
     )}>
+      {/* === Overlay de chargement du changement de chanson === */}
+      {isChangingSong && (
+        <div className="absolute z-50 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all animate-fade-in">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-background/80 shadow-lg border border-white/10">
+            <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
+            <span className="text-lg font-semibold text-white">
+              Changement de chanson...
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Veuillez patienter pendant le chargement des nouvelles paroles.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Background with album art color */}
       <div 
         className="absolute inset-0 z-0"
