@@ -15,7 +15,7 @@ export const usePlayerQueue = ({
   setIsChangingSong
 }: UsePlayerQueueProps) => {
   // État de la file d'attente
-  const [queue, setQueueRaw] = useState<Song[]>(() => {
+  const [queue, setQueueInternal] = useState<Song[]>(() => {
     const savedQueue = localStorage.getItem('queue');
     if (savedQueue) {
       try {
@@ -31,13 +31,22 @@ export const usePlayerQueue = ({
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
 
-  const setQueue = useCallback((songs: Song[]) => {
-    setQueueRaw(songs);
-    localStorage.setItem('queue', JSON.stringify(songs));
+  // Create a properly typed setQueue function that accepts both arrays and callback functions
+  const setQueue = useCallback((value: Song[] | ((prevQueue: Song[]) => Song[])) => {
+    if (typeof value === 'function') {
+      setQueueInternal(prevQueue => {
+        const newQueue = value(prevQueue);
+        localStorage.setItem('queue', JSON.stringify(newQueue));
+        return newQueue;
+      });
+    } else {
+      setQueueInternal(value);
+      localStorage.setItem('queue', JSON.stringify(value));
+    }
   }, []);
 
   const addToQueue = useCallback((song: Song) => {
-    setQueueRaw(prevQueue => {
+    setQueueInternal(prevQueue => {
       const newQueue = [...prevQueue, song];
       localStorage.setItem('queue', JSON.stringify(newQueue));
       return newQueue;

@@ -117,12 +117,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           setCurrentSong(song);
-          setQueue(prevQueue => {
-            if (!prevQueue.some(s => s.id === song.id)) {
-              return [song, ...prevQueue];
-            }
-            return prevQueue;
-          });
+          // Fix the type error by properly updating the queue with a correctly typed new array
+          const updatedQueue = [...queue];
+          if (!updatedQueue.some(s => s.id === song.id)) {
+            updatedQueue.unshift(song);
+          }
+          setQueue(updatedQueue);
         } catch (error) {
           console.error("Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');

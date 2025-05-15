@@ -32,7 +32,7 @@ export interface PlayerContextType {
   history: Song[];
   isChangingSong: boolean;
   stopCurrentSong: () => void;
-  setQueue: (songs: Song[]) => void;
+  setQueue: (songs: Song[] | ((prevSongs: Song[]) => Song[])) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
   pause: () => void;
