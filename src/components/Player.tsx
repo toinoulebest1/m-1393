@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -102,9 +103,9 @@ export const Player = () => {
     if (!currentSong) return "0:00";
     
     try {
-      if (audioRef.current && !isNaN(audioRef.current.duration)) {
+      if (audioElement && !isNaN(audioElement.duration)) {
         // Utiliser directement la position de l'audio en cours de lecture
-        const currentTime = (position / 100) * audioRef.current.duration;
+        const currentTime = (position / 100) * audioElement.duration;
         const currentMinutes = Math.floor(currentTime / 60);
         const currentSeconds = Math.floor(currentTime % 60);
         

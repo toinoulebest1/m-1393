@@ -1,9 +1,12 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { usePlayerState } from '@/hooks/usePlayerState';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
+import { getAudioFile } from '@/utils/storage';
+import { toast } from 'sonner';
 
 // Types
 import { Song, FavoriteStat, PlayerContextType } from '@/types/player';
@@ -114,7 +117,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           setCurrentSong(song);
-          setQueueRaw(prevQueue => {
+          setQueue(prevQueue => {
             if (!prevQueue.some(s => s.id === song.id)) {
               return [song, ...prevQueue];
             }
