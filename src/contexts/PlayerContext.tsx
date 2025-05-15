@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { getAudioFile } from '@/utils/storage';
 import { supabase } from '@/integrations/supabase/client';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
+import { preloadAudio, isInCache, getFromCache, addToCache } from '@/utils/audioCache';
 
 interface Song {
   id: string;
@@ -141,7 +142,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           setCurrentSong(song);
-          // FIX: Only setQueueRaw can accept a function, not setQueue.
           setQueueRaw(prevQueue => {
             if (!prevQueue.some(s => s.id === song.id)) {
               return [song, ...prevQueue];
@@ -169,173 +169,38 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem('queue', JSON.stringify(queue));
   }, [queue]);
 
-  // "setQueue" doit recevoir un tableau, pas une fonction
   const setQueue = (songs: Song[]) => {
     setQueueRaw(songs);
     localStorage.setItem('queue', JSON.stringify(songs));
   };
 
-  const preloadNextSong = async () => {
+  const preloadNextTracks = async () => {
     if (!currentSong || queue.length === 0) return;
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1 || currentIndex >= queue.length - 1) return;
+    if (currentIndex === -1) return;
     
-    const nextSong = queue[currentIndex + 1];
-    if (!nextSong) return;
-
-    console.log("Préchargement de la prochaine chanson:", nextSong.title);
+    const tracksToPreload = queue.slice(currentIndex + 1, currentIndex + 3);
     
-    try {
-      const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) {
-        throw new Error("URL audio non disponible");
-      }
-
-      nextAudioRef.current.src = audioUrl;
-      nextAudioRef.current.preload = "auto";
-      nextAudioRef.current.load();
-      nextAudioRef.current.volume = 0;
-      
-      const canPlayHandler = () => {
-        console.log("Préchargement réussi et audio prêt à jouer");
-        setNextSongPreloaded(true);
-        nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
-      };
-      
-      nextAudioRef.current.addEventListener('canplaythrough', canPlayHandler);
-      
-      setTimeout(() => {
-        if (!nextSongPreloaded) {
-          console.log("Timeout du préchargement, marquage comme prêt par sécurité");
+    for (const track of tracksToPreload) {
+      if (await isInCache(track.url)) {
+        console.log(`Utilisation du fichier audio en cache: ${track.title}`);
+        const cachedUrl = await getFromCache(track.url);
+        if (cachedUrl) {
+          const audioElement = new Audio(cachedUrl);
+          audioElement.load();
+          nextAudioRef.current = audioElement;
           setNextSongPreloaded(true);
-          nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
         }
-      }, 3000);
-      
-    } catch (error) {
-      console.error("Erreur lors du préchargement:", error);
-      setNextSongPreloaded(false);
-    }
-  };
-
-  const addToHistory = async (song: Song) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { error: songError } = await supabase
-        .from('songs')
-        .upsert({
-          id: song.id,
-          title: song.title,
-          artist: song.artist,
-          file_path: song.url,
-          duration: song.duration,
-          image_url: song.imageUrl
-        });
-
-      if (songError) {
-        console.error("Erreur lors de l'insertion de la chanson:", songError);
-        return;
-      }
-
-      const { error: historyError } = await supabase
-        .from('play_history')
-        .insert({
-          user_id: session.user.id,
-          song_id: song.id,
-          played_at: new Date().toISOString()
-        });
-
-      if (historyError) {
-        console.error("Erreur lors de l'ajout à l'historique:", historyError);
-        return;
-      }
-
-      setHistory(prev => [{
-        ...song,
-        playedAt: new Date().toISOString()
-      }, ...prev.filter(s => s.id !== song.id)]);
-
-    } catch (error) {
-      console.error("Erreur lors de l'ajout à l'historique:", error);
-    }
-  };
-
-  const calculateDurationInSeconds = (duration: string): number => {
-    if (!duration) return 0;
-    
-    try {
-      if (duration.includes(':')) {
-        const [minutes, seconds] = duration.split(':').map(Number);
-        return (minutes * 60) + seconds;
-      }
-      return parseInt(duration);
-    } catch (error) {
-      console.error("Erreur lors du calcul de la durée:", error);
-      return 0;
-    }
-  };
-
-  const updateListeningStats = async (song: Song, actualListeningTime: number) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: existingStats, error: statsError } = await supabase
-        .from('listening_stats')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (statsError) {
-        console.error("Erreur lors de la récupération des statistiques:", statsError);
-        return;
-      }
-
-      const currentHour = new Date().getHours();
-      const currentPeriod = `${currentHour}:00-${currentHour + 1}:00`;
-      
-      let peakHours = existingStats?.peak_hours || {};
-      peakHours[currentPeriod] = (peakHours[currentPeriod] || 0) + 1;
-
-      const favoritePeriods = Object.entries(peakHours)
-        .sort(([, a], [, b]) => (b as number) - (a as number))
-        .slice(0, 5)
-        .map(([period, count]) => ({
-          period,
-          count
-        }));
-
-      const previousTotalTime = existingStats?.total_listening_time || 0;
-      const newTotalTime = previousTotalTime + actualListeningTime;
-
-      if (!existingStats) {
-        await supabase
-          .from('listening_stats')
-          .insert({
-            user_id: session.user.id,
-            total_listening_time: actualListeningTime,
-            tracks_played: 1,
-            peak_hours: peakHours,
-            favorite_periods: favoritePeriods
-          });
       } else {
-        await supabase
-          .from('listening_stats')
-          .update({
-            total_listening_time: newTotalTime,
-            tracks_played: existingStats.tracks_played + 1,
-            peak_hours: peakHours,
-            favorite_periods: favoritePeriods
-          })
-          .eq('user_id', session.user.id);
+        console.log(`Préchargement de la piste: ${track.title}`);
+        const audioUrl = await getAudioFile(track.url);
+        if (!audioUrl) continue;
+        
+        const audioElement = new Audio(audioUrl);
+        audioElement.load();
+        await addToCache(track.url, await fetch(audioUrl).then(res => res.blob()));
       }
-
-      console.log(`Temps d'écoute mis à jour: ${actualListeningTime} secondes, Total: ${newTotalTime} secondes`);
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des statistiques:", error);
     }
   };
 
@@ -345,21 +210,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    
-    if (fadingRef.current) {
-      console.log("Annulation de la transition en cours");
-      fadingRef.current = false;
-    }
-
-    if (changeTimeoutRef.current) {
-      clearTimeout(changeTimeoutRef.current);
-      changeTimeoutRef.current = null;
-    }
-
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setIsChangingSong(true);
       
@@ -372,26 +222,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { error: songError } = await supabase
-            .from('songs')
-            .upsert({
-              id: song.id,
-              title: song.title,
-              artist: song.artist,
-              file_path: song.url,
-              duration: song.duration,
-              image_url: song.imageUrl
-            });
-
-          if (songError) {
-            console.error("Erreur lors de l'enregistrement de la chanson:", songError);
-          }
-
-          await addToHistory(song);
-        }
-
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');
@@ -399,9 +229,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
-        
         audioRef.current.preload = "auto";
-        
         audioRef.current.load();
         
         const playPromise = audioRef.current.play();
@@ -411,7 +239,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             audioRef.current.volume = volume / 100;
             console.log("Lecture démarrée avec succès:", song.title);
             
-            setTimeout(() => preloadNextSong(), 1000);
+            setTimeout(() => preloadNextTracks(), 1000);
             
             changeTimeoutRef.current = window.setTimeout(() => {
               setIsChangingSong(false);
@@ -472,21 +300,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setProgress(newProgress);
   };
 
-  const getNextSong = () => {
-    if (!currentSong) return null;
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1) return null;
-    
-    if (shuffleMode) {
-      const remainingSongs = queue.slice(currentIndex + 1);
-      if (remainingSongs.length === 0) return null;
-      const randomIndex = Math.floor(Math.random() * remainingSongs.length);
-      return remainingSongs[randomIndex];
-    }
-    
-    return currentIndex < queue.length - 1 ? queue[currentIndex + 1] : null;
-  };
-
   const nextSong = async () => {
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours, ignorer nextSong()");
@@ -495,23 +308,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     setIsChangingSong(true);
     
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    
-    fadingRef.current = false;
-    
-    if (nextAudioRef.current) {
-      nextAudioRef.current.pause();
-      nextAudioRef.current.volume = 0;
-    }
-    if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
-    }
-    
-    console.log("Executing nextSong function");
-    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
       setIsChangingSong(false);
@@ -519,8 +315,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    console.log(`Current song index: ${currentIndex}, Queue length: ${queue.length}`);
-    
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
       setIsChangingSong(false);
@@ -532,67 +326,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const nextTrack = queue[nextIndex];
       console.log(`Playing next track: ${nextTrack.title} by ${nextTrack.artist}`);
       
-      if (nextSongPreloaded && nextAudioRef.current.src) {
+      const preloadedAudio = nextAudioRef.current;
+      if (preloadedAudio) {
         console.log("Utilisation de l'audio préchargé pour une transition plus rapide");
-        
-        try {
-          const tempAudio = audioRef.current;
-          audioRef.current = nextAudioRef.current;
-          nextAudioRef.current = tempAudio;
-          
-          nextAudioRef.current.pause();
-          nextAudioRef.current.src = '';
-          nextAudioRef.current.load();
-          
-          setCurrentSong(nextTrack);
-          localStorage.setItem('currentSong', JSON.stringify(nextTrack));
-          setNextSongPreloaded(false);
-          
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              setIsPlaying(true);
-              
-              setTimeout(() => preloadNextSong(), 1000);
-              
-              setTimeout(() => {
-                setIsChangingSong(false);
-              }, 1000);
-            }).catch(error => {
-              console.error("Error playing next track:", error);
-              setIsPlaying(false);
-              setIsChangingSong(false);
-              
-              play(nextTrack);
-            });
-          }
-        } catch (error) {
-          console.error("Error during optimized track change:", error);
-          setIsChangingSong(false);
-          
-          play(nextTrack);
-        }
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = preloadedAudio;
+        audioRef.current.play();
       } else {
         play(nextTrack);
       }
-      
-      if ('mediaSession' in navigator && nextTrack) {
-        updateMediaSessionMetadata(nextTrack);
-      }
-      
-      toast.success(`Lecture de : ${nextTrack.title}`);
-      
-    } else if (repeatMode === 'all' && queue.length > 0) {
-      const firstTrack = queue[0];
-      console.log(`Repeating playlist from beginning: ${firstTrack.title}`);
-      toast.success(`Retour au début de la playlist : ${firstTrack.title}`);
-      play(firstTrack);
-      if ('mediaSession' in navigator && firstTrack) {
-        updateMediaSessionMetadata(firstTrack);
-      }
     } else {
       console.log("End of queue reached with no repeat");
-      toast.info("Fin de la liste de lecture");
       audioRef.current.pause();
       setIsPlaying(false);
       setProgress(0);
@@ -608,23 +353,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     setIsChangingSong(true);
     
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    
-    fadingRef.current = false;
-    
-    if (nextAudioRef.current) {
-      nextAudioRef.current.pause();
-      nextAudioRef.current.volume = 0;
-    }
-    if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
-    }
-    
-    console.log("Executing previousSong function");
-    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
       setIsChangingSong(false);
@@ -632,53 +360,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    console.log(`Current song index: ${currentIndex}, Total songs in queue: ${queue.length}`);
-    
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
       setIsChangingSong(false);
       return;
     }
     
-    if (audioRef.current.currentTime > 3) {
-      console.log("Restarting current song from beginning");
-      toast.info("Redémarrage de la chanson");
-      audioRef.current.currentTime = 0;
-      if (!isPlaying) {
-        audioRef.current.play()
-          .then(() => {
-            setIsPlaying(true);
-            setIsChangingSong(false);
-          })
-          .catch(err => {
-            console.error("Error playing audio:", err);
-            setIsChangingSong(false);
-          });
-      } else {
-        setIsChangingSong(false);
-      }
-      return;
-    }
-    
     if (currentIndex > 0) {
       const prevTrack = queue[currentIndex - 1];
       console.log(`Playing previous track: ${prevTrack.title} by ${prevTrack.artist}`);
-      toast.success(`Lecture de : ${prevTrack.title}`);
       play(prevTrack);
-      if ('mediaSession' in navigator && prevTrack) {
-        updateMediaSessionMetadata(prevTrack);
-      }
-    } else if (repeatMode === 'all' && queue.length > 0) {
-      const lastTrack = queue[queue.length - 1];
-      console.log(`Looping to last track: ${lastTrack.title}`);
-      toast.success(`Aller à la dernière piste : ${lastTrack.title}`);
-      play(lastTrack);
-      if ('mediaSession' in navigator && lastTrack) {
-        updateMediaSessionMetadata(lastTrack);
-      }
     } else {
       console.log("Already at first track, restarting");
-      toast.info("Première piste de la liste");
       audioRef.current.currentTime = 0;
       if (!isPlaying) {
         audioRef.current.play()
@@ -859,143 +552,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     loadPreferences();
-    
-    const preferenceChannel = supabase
-      .channel('music_preferences_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'music_preferences'
-        },
-        (payload) => {
-          const newData = payload.new as any;
-          if (newData.crossfade_duration !== undefined) {
-            overlapTimeRef.current = newData.crossfade_duration || 3;
-            setPreferences(prev => ({
-              ...prev,
-              crossfadeDuration: newData.crossfade_duration,
-              crossfadeEnabled: newData.crossfade_enabled
-            }));
-            console.log('Durée du fondu mise à jour (temps réel):', newData.crossfade_duration);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      preferenceChannel.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        console.log("Chargement initial des favoris");
-
-        const { data: favStats, error: favError } = await supabase
-          .from('favorite_stats')
-          .select('song_id')
-          .eq('user_id', session.user.id);
-
-        if (favError) throw favError;
-
-        if (favStats && favStats.length > 0) {
-          const { data: favoriteSongs, error: songsError } = await supabase
-            .from('songs')
-            .select('*')
-            .in('id', favStats.map(row => row.song_id));
-
-          if (songsError) throw songsError;
-
-          if (favoriteSongs) {
-            console.log("Favoris chargés:", favoriteSongs);
-            const mappedSongs: Song[] = favoriteSongs.map(song => ({
-              id: song.id,
-              title: song.title,
-              artist: song.artist || '',
-              duration: song.duration || '0:00',
-              url: song.file_path,
-              imageUrl: song.image_url,
-              bitrate: '320 kbps'
-            }));
-            setFavorites(mappedSongs);
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des favoris:", error);
-      }
-    };
-
-    loadFavorites();
-  }, []);
-
-  useEffect(() => {
-    const setupRealtimeFavorites = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        console.log("Mise en place de l'écoute des favoris en temps réel");
-
-        const channel = supabase
-          .channel('favorite_changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'favorite_stats',
-              filter: `user_id=eq.${session.user.id}`
-            },
-            async (payload) => {
-              console.log("Changement détecté dans les favoris:", payload);
-
-              const { data: favStats } = await supabase
-                .from('favorite_stats')
-                .select('song_id')
-                .eq('user_id', session.user.id);
-
-              if (favStats && favStats.length > 0) {
-                const { data: favoriteSongs } = await supabase
-                  .from('songs')
-                  .select('*')
-                  .in('id', favStats.map(row => row.song_id));
-
-                if (favoriteSongs) {
-                  console.log("Mise à jour des favoris:", favoriteSongs);
-                  const mappedSongs: Song[] = favoriteSongs.map(song => ({
-                    id: song.id,
-                    title: song.title,
-                    artist: song.artist || '',
-                    duration: song.duration || '0:00',
-                    url: song.file_path,
-                    imageUrl: song.image_url,
-                    bitrate: '320 kbps'
-                  }));
-                  setFavorites(mappedSongs);
-                }
-              } else {
-                setFavorites([]);
-              }
-            }
-          )
-          .subscribe();
-
-        return () => {
-          console.log("Nettoyage de l'écoute des favoris");
-          supabase.removeChannel(channel);
-        };
-      } catch (error) {
-        console.error("Erreur lors de la configuration de l'écoute en temps réel:", error);
-      }
-    };
-
-    setupRealtimeFavorites();
   }, []);
 
   useEffect(() => {
@@ -1037,7 +593,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (!nextAudioRef.current.src || !nextSongPreloaded) {
           console.log("La prochaine chanson n'est pas préchargée correctement, préchargement forcé");
-          preloadNextSong().then(() => {
+          preloadNextTracks().then(() => {
             startCrossfade(timeLeft, nextSong);
           });
         } else {
@@ -1109,7 +665,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setNextSongPreloaded(false);
                 fadingRef.current = false;
                 
-                setTimeout(() => preloadNextSong(), 1000);
+                setTimeout(() => preloadNextTracks(), 1000);
               }
             }
           }, intervalTime);
@@ -1150,29 +706,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    const handleTimeUpdateProgress = () => {
-      if (audioRef.current && !isNaN(audioRef.current.duration)) {
-        const percentage = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-        setProgress(percentage);
-        
-        if (preferences.crossfadeEnabled && !fadingRef.current && currentSong) {
-          const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
-          if (timeLeft <= 0.5 && overlapTimeRef.current > 0) {
-            console.log(`Forçage du crossfade car temps restant très court: ${timeLeft.toFixed(2)}s`);
-            handleTimeUpdate();
-          }
-        }
-      }
-    };
-
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdateProgress);
     audioRef.current.addEventListener('ended', handleEnded);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdateProgress);
         audioRef.current.removeEventListener('ended', handleEnded);
       }
       
@@ -1181,90 +720,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
-
-  useEffect(() => {
-    console.log(`Préférences crossfade mises à jour: activé=${preferences.crossfadeEnabled}, durée=${preferences.crossfadeDuration}`);
-    overlapTimeRef.current = preferences.crossfadeDuration || 3;
-  }, [preferences.crossfadeEnabled, preferences.crossfadeDuration]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    let startTime: number | null = null;
-    let accumulatedTime = 0;
-
-    const handleTimeUpdate = () => {
-      if (!currentSong) return;
-
-      if (startTime === null && !audioRef.current.paused) {
-        startTime = Date.now();
-      }
-    };
-
-    const handlePause = () => {
-      if (startTime !== null) {
-        accumulatedTime += (Date.now() - startTime) / 1000;
-        startTime = null;
-      }
-    };
-
-    const handleEnded = async () => {
-      if (startTime !== null) {
-        accumulatedTime += (Date.now() - startTime) / 1000;
-      }
-      if (currentSong && accumulatedTime > 0) {
-        await updateListeningStats(currentSong, Math.round(accumulatedTime));
-      }
-      accumulatedTime = 0;
-      startTime = null;
-    };
-
-    const handleSeeked = () => {
-      if (!audioRef.current.paused) {
-        startTime = Date.now();
-      }
-    };
-
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('pause', handlePause);
-    audioRef.current.addEventListener('ended', handleEnded);
-    audioRef.current.addEventListener('seeked', handleSeeked);
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('pause', handlePause);
-        audioRef.current.removeEventListener('ended', handleEnded);
-        audioRef.current.removeEventListener('seeked', handleSeeked);
-      }
-    };
-  }, [currentSong]);
-
-  const refreshCurrentSong = () => {
-    if (currentSong) {
-      const fetchUpdatedSong = async () => {
-        console.log("Rafraîchissement des métadonnées de la chanson:", currentSong.id);
-        const { data, error } = await supabase
-          .from('songs')
-          .select('*')
-          .eq('id', currentSong.id)
-          .single();
-
-        if (data && !error) {
-          setCurrentSong({
-            ...currentSong,
-            title: data.title,
-            artist: data.artist,
-            imageUrl: data.image_url,
-            genre: data.genre,
-            duration: data.duration
-          });
-        }
-      };
-
-      fetchUpdatedSong();
-    }
-  };
 
   return (
     <PlayerContext.Provider value={{
@@ -1300,14 +755,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       refreshCurrentSong,
     }}>
       {children}
-      <div 
-        id="next-song-alert"
-        className="fixed bottom-28 right-4 bg-spotify-dark/90 text-white p-3 rounded-lg shadow-lg transition-all duration-300 transform opacity-0 translate-y-2 z-50"
-      >
-        <p className="text-xs text-spotify-neutral">À suivre :</p>
-        <p id="next-song-title" className="font-medium"></p>
-        <p id="next-song-artist" className="text-sm text-spotify-neutral"></p>
-      </div>
     </PlayerContext.Provider>
   );
 };

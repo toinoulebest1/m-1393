@@ -8,6 +8,7 @@ import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { updateMediaSessionMetadata } from "@/utils/mediaSession";
+import { AudioCacheManager } from "@/components/AudioCacheManager";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -15,6 +16,7 @@ const Index = () => {
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
   const isMobile = useIsMobile();
   const positionUpdateIntervalRef = useRef<number | null>(null);
+  const [showCacheManager, setShowCacheManager] = useState(false);
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -183,12 +185,26 @@ const Index = () => {
               {username}
             </span>
           )}
+          <button 
+            onClick={() => setShowCacheManager(!showCacheManager)}
+            className="text-spotify-neutral hover:text-white transition-colors text-sm px-2 py-1 rounded-md bg-spotify-dark/50 hover:bg-spotify-dark"
+          >
+            Cache Audio
+          </button>
           <AccountSettingsDialog />
         </div>
       )}
+      
       {/* Pass forceUpdate to force re-render when metadata changes */}
       <div className="flex-1 w-full">
         <NowPlaying key={`now-playing-${forceUpdate}`} />
+        
+        {/* Gestionnaire de cache audio */}
+        {showCacheManager && (
+          <div className="absolute right-4 top-14 z-50 w-80">
+            <AudioCacheManager />
+          </div>
+        )}
       </div>
       <Player />
       <Toaster />
