@@ -138,27 +138,25 @@ export const SyncedLyricsView: React.FC = () => {
   useEffect(() => {
     let audio: HTMLAudioElement | null = null;
     let waitingHandler: (() => void) | null = null;
-    let canPlayHandler: (() => void) | null = null;
+    let playingHandler: (() => void) | null = null;
 
     // Fonction pour attacher les handlers sur la nouvelle balise audio
     const setupAudioHandlers = () => {
       audio = document.querySelector('audio');
       if (!audio) return;
 
-      // Définir l'état initial
-      setIsAudioLoading(audio.readyState < 3); // readyState < 3 => ne peut pas jouer encore
+      // Toujours mettre isAudioLoading à true au début
+      setIsAudioLoading(true);
 
       waitingHandler = () => {
         setIsAudioLoading(true);
       };
-      canPlayHandler = () => {
-        setIsAudioLoading(false);
+      playingHandler = () => {
+        setIsAudioLoading(false); // Charger se termine quand la lecture démarre vraiment
       };
-      // Quand audio attend du buffering, il passe par 'waiting'
+
       audio.addEventListener('waiting', waitingHandler);
-      // Quand audio peut jouer, on lève l'indicateur de chargement
-      audio.addEventListener('canplaythrough', canPlayHandler);
-      audio.addEventListener('canplay', canPlayHandler);
+      audio.addEventListener('playing', playingHandler);
     };
 
     // On attend un court moment pour laisser le DOM mettre le nouvel <audio>
@@ -170,10 +168,7 @@ export const SyncedLyricsView: React.FC = () => {
       clearTimeout(timeout);
       if (audio) {
         if (waitingHandler) audio.removeEventListener('waiting', waitingHandler);
-        if (canPlayHandler) {
-          audio.removeEventListener('canplaythrough', canPlayHandler);
-          audio.removeEventListener('canplay', canPlayHandler);
-        }
+        if (playingHandler) audio.removeEventListener('playing', playingHandler);
       }
     };
   }, [currentSong?.id]);
