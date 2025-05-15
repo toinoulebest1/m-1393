@@ -8,9 +8,6 @@ import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 
-// Types
-import { Song, FavoriteStat, PlayerContextType } from '@/types/player';
-
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
 const globalAudio = new Audio();
@@ -64,7 +61,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateProgress, 
     updatePlaybackRate, 
     stopCurrentSong,
-    refreshCurrentSong
+    refreshCurrentSong,
+    getCurrentAudioElement
   } = useAudioControl({ 
     audioRef,
     nextAudioRef,
@@ -79,11 +77,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNextSongPreloaded,
     preloadNextTracks
   });
-
-  // Fonction pour obtenir l'élément audio actuel
-  const getCurrentAudioElement = useCallback(() => {
-    return audioRef.current;
-  }, [audioRef]);
 
   // Sauvegarde de la progression avant fermeture de page
   useEffect(() => {
@@ -330,7 +323,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playbackRate,
     history,
     isChangingSong,
-    stopCurrentSong: audioControls.stopCurrentSong,
+    stopCurrentSong,
     setQueue,
     setHistory,
     play,
@@ -345,8 +338,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleFavorite,
     removeFavorite,
     setSearchQuery,
-    setPlaybackRate: audioControls.updatePlaybackRate,
-    refreshCurrentSong: audioControls.refreshCurrentSong,
+    setPlaybackRate: updatePlaybackRate,
+    refreshCurrentSong,
     getCurrentAudioElement
   };
 
