@@ -26,6 +26,7 @@ export const SyncedLyricsView: React.FC = () => {
   const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
   const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -132,6 +133,50 @@ export const SyncedLyricsView: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoadingLyrics]);
+
+  // Gérer l'état de chargement audio
+  useEffect(() => {
+    let audio: HTMLAudioElement | null = null;
+    let waitingHandler: (() => void) | null = null;
+    let canPlayHandler: (() => void) | null = null;
+
+    // Fonction pour attacher les handlers sur la nouvelle balise audio
+    const setupAudioHandlers = () => {
+      audio = document.querySelector('audio');
+      if (!audio) return;
+
+      // Définir l'état initial
+      setIsAudioLoading(audio.readyState < 3); // readyState < 3 => ne peut pas jouer encore
+
+      waitingHandler = () => {
+        setIsAudioLoading(true);
+      };
+      canPlayHandler = () => {
+        setIsAudioLoading(false);
+      };
+      // Quand audio attend du buffering, il passe par 'waiting'
+      audio.addEventListener('waiting', waitingHandler);
+      // Quand audio peut jouer, on lève l'indicateur de chargement
+      audio.addEventListener('canplaythrough', canPlayHandler);
+      audio.addEventListener('canplay', canPlayHandler);
+    };
+
+    // On attend un court moment pour laisser le DOM mettre le nouvel <audio>
+    const timeout = setTimeout(() => {
+      setupAudioHandlers();
+    }, 120);
+
+    return () => {
+      clearTimeout(timeout);
+      if (audio) {
+        if (waitingHandler) audio.removeEventListener('waiting', waitingHandler);
+        if (canPlayHandler) {
+          audio.removeEventListener('canplaythrough', canPlayHandler);
+          audio.removeEventListener('canplay', canPlayHandler);
+        }
+      }
+    };
+  }, [currentSong?.id]);
 
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
@@ -314,7 +359,7 @@ export const SyncedLyricsView: React.FC = () => {
     );
   }
 
-  // Ajout de la définition de bgStyle juste avant le return
+  // Ajout de la définition de bgStyle
   const bgStyle = dominantColor ? {
     background: `radial-gradient(circle at center, 
       rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
@@ -328,16 +373,20 @@ export const SyncedLyricsView: React.FC = () => {
       "fixed inset-0 z-[100] flex flex-col",
       animationStage === "entry" ? "animate-fade-in" : "opacity-0 transition-opacity duration-200"
     )}>
-      {/* === Overlay de chargement du changement de chanson === */}
-      {isChangingSong && (
+      {/* === Overlay de chargement de la chanson (flux audio) === */}
+      {(isChangingSong || isAudioLoading) && (
         <div className="absolute z-50 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all animate-fade-in">
           <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-background/80 shadow-lg border border-white/10">
             <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
             <span className="text-lg font-semibold text-white">
-              Changement de chanson...
+              {isAudioLoading
+                ? "Chargement de la musique en cours..."
+                : "Changement de chanson..."}
             </span>
             <span className="text-sm text-muted-foreground">
-              Veuillez patienter pendant le chargement des nouvelles paroles.
+              {isAudioLoading
+                ? "Veuillez patienter, la lecture démarre bientôt"
+                : "Veuillez patienter pendant le chargement des nouvelles paroles."}
             </span>
           </div>
         </div>
