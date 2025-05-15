@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
@@ -15,7 +16,6 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
   const isMobile = useIsMobile();
-  const positionUpdateIntervalRef = useRef<number | null>(null);
   const [showCacheManager, setShowCacheManager] = useState(false);
 
   // Force re-render when currentSong changes

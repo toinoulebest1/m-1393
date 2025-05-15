@@ -45,6 +45,7 @@ export const Player = () => {
   
   const positionUpdateIntervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [currentPosition, setCurrentPosition] = useState(0);
 
   // Synchroniser audioRef avec l'Audio global du PlayerContext si possible
   useEffect(() => {
@@ -57,7 +58,7 @@ export const Player = () => {
 
   const [showLyrics, setShowLyrics] = useState(false);
 
-  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture,
+  // Nouvelle logique : intervalle qui se base sur la vraie position de lecture,
   // et rafraîchit audioRef.current à chaque tick pour prendre la vraie source utilisée.
   useEffect(() => {
     // Clear any existing interval
@@ -66,29 +67,32 @@ export const Player = () => {
       positionUpdateIntervalRef.current = null;
     }
 
-    if ('mediaSession' in navigator && currentSong && isPlaying) {
+    if (isPlaying) {
+      // Créer un intervalle qui s'exécute plus fréquemment pour une mise à jour fluide
       positionUpdateIntervalRef.current = window.setInterval(() => {
         // Toujours forcer l'audioRef à pointer vers le vrai player global
         if (typeof window !== "undefined" && "Audio" in window) {
           // @ts-ignore
           audioRef.current = window.globalAudio || document.querySelector('audio');
         }
-        let duration = 0;
-        let position = 0;
-        let playbackRateVal = playbackRate ?? 1;
-
+        
+        // Si on a accès à l'élément audio, récupérer sa position actuelle
         if (audioRef.current && !isNaN(audioRef.current.duration)) {
-          duration = audioRef.current.duration;
-          position = audioRef.current.currentTime;
-          playbackRateVal = audioRef.current.playbackRate || playbackRateVal;
-        } else {
-          duration = durationToSeconds(currentSong.duration);
-          // Utilisation fallback
-          position = (progress / 100) * duration;
+          const currentTime = audioRef.current.currentTime;
+          const duration = audioRef.current.duration;
+          
+          // Calculer la progression en pourcentage
+          const newProgress = (currentTime / duration) * 100;
+          
+          // Mettre à jour l'état local pour l'affichage
+          setCurrentPosition(newProgress);
+          
+          // Mettre à jour le MediaSession API
+          if ('mediaSession' in navigator) {
+            updatePositionState(duration, currentTime, audioRef.current.playbackRate || 1);
+          }
         }
-
-        updatePositionState(duration, position, playbackRateVal);
-      }, 1000);
+      }, 250); // Mise à jour 4 fois par seconde pour plus de fluidité
     }
 
     return () => {
@@ -96,18 +100,27 @@ export const Player = () => {
         window.clearInterval(positionUpdateIntervalRef.current);
       }
     };
-  }, [currentSong, isPlaying, playbackRate]); // On ne remet pas progress
+  }, [isPlaying, currentSong]); 
 
-  const formatTime = (progress: number) => {
+  const formatTime = (position: number) => {
     if (!currentSong) return "0:00";
     
     try {
+      if (audioRef.current && !isNaN(audioRef.current.duration)) {
+        // Utiliser directement la position de l'audio en cours de lecture
+        const currentTime = (position / 100) * audioRef.current.duration;
+        const currentMinutes = Math.floor(currentTime / 60);
+        const currentSeconds = Math.floor(currentTime % 60);
+        
+        return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+      }
+      
       if (currentSong.duration && currentSong.duration.includes(':')) {
         const [minutes, seconds] = currentSong.duration.split(':').map(Number);
         if (isNaN(minutes) || isNaN(seconds)) return "0:00";
         
         const totalSeconds = minutes * 60 + seconds;
-        const currentTime = (progress / 100) * totalSeconds;
+        const currentTime = (position / 100) * totalSeconds;
         const currentMinutes = Math.floor(currentTime / 60);
         const currentSeconds = Math.floor(currentTime % 60);
         
@@ -117,7 +130,7 @@ export const Player = () => {
       const duration = parseFloat(currentSong.duration);
       if (isNaN(duration)) return "0:00";
       
-      const currentTime = (progress / 100) * duration;
+      const currentTime = (position / 100) * duration;
       const currentMinutes = Math.floor(currentTime / 60);
       const currentSeconds = Math.floor(currentTime % 60);
       
@@ -275,6 +288,9 @@ export const Player = () => {
   // Determine if the lyrics buttons should be shown (hide during blind test)
   const shouldShowLyricsButton = !isBlindTest;
 
+  // Utiliser currentPosition pour l'affichage mais garder progress pour les contrôles
+  const displayPosition = currentPosition > 0 ? currentPosition : progress;
+
   return (
     <>
       {/* La bannière "En cours de lecture" a été supprimée */}
@@ -403,9 +419,9 @@ export const Player = () => {
                   </button>
                 </div>
                 <div className="w-full flex items-center space-x-2">
-                  <span className="text-xs text-spotify-neutral">{formatTime(progress)}</span>
+                  <span className="text-xs text-spotify-neutral">{formatTime(displayPosition)}</span>
                   <Slider
-                    value={[progress]}
+                    value={[displayPosition]}
                     max={100}
                     step={1}
                     className="w-full"
@@ -510,7 +526,7 @@ export const Player = () => {
                         {songInfo.title || '••••••'}
                       </h3>
                       <p className="text-xs text-spotify-neutral truncate">
-                        {songInfo.artist || '••••���•'}
+                        {songInfo.artist || '•••••'}
                       </p>
                     </div>
                   </div>
@@ -569,7 +585,11 @@ export const Player = () => {
                         strokeLinecap="round" 
                         strokeLinejoin="round"
                       >
-                        <path d="M21 15V5a2 2 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                        <path d="M9 8h6" />
+                        <path d="M9 12h3" />
+                        <path d="m14 12 6 6" />
+                        <path d="m20 12-6 6" />
                       </svg>
                     </Button>
                     <CastButton />
@@ -579,13 +599,13 @@ export const Player = () => {
 
               {/* Durée affichée pour les mobiles */}
               <div className="flex items-center justify-between text-xs px-1 mb-0.5">
-                <span className="text-spotify-neutral">{formatTime(progress)}</span>
+                <span className="text-spotify-neutral">{formatTime(displayPosition)}</span>
                 <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
               </div>
 
               {/* Barre de progression pour mobiles */}
               <Progress 
-                value={progress} 
+                value={displayPosition} 
                 className="h-1.5 w-full bg-secondary/30" 
                 onClick={(e) => {
                   if (isChangingSong) return;
