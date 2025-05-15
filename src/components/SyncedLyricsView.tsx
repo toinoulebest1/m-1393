@@ -18,6 +18,7 @@ export const SyncedLyricsView: React.FC = () => {
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [displayedProgress, setDisplayedProgress] = useState<number>(0);
   const [lyricsText, setLyricsText] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export const SyncedLyricsView: React.FC = () => {
   const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
+  const progressUpdateIntervalRef = useRef<number | null>(null);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -85,6 +87,51 @@ export const SyncedLyricsView: React.FC = () => {
       }
     };
   }, [isPlaying, currentSong, progress, getCurrentAudioElement]);
+
+  // Nouveau useEffect pour mettre à jour l'affichage du progress en temps réel
+  useEffect(() => {
+    // Nettoyer l'intervalle précédent si existant
+    if (progressUpdateIntervalRef.current) {
+      window.clearInterval(progressUpdateIntervalRef.current);
+      progressUpdateIntervalRef.current = null;
+    }
+
+    if (isPlaying) {
+      progressUpdateIntervalRef.current = window.setInterval(() => {
+        const audioElement = getCurrentAudioElement();
+        
+        if (audioElement && currentSong && currentSong.duration) {
+          let durationInSeconds: number;
+          
+          // Convertir la durée en secondes
+          if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
+            const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+            durationInSeconds = minutes * 60 + seconds;
+          } else {
+            durationInSeconds = parseFloat(String(currentSong.duration));
+          }
+          
+          // Calculer le pourcentage de progression
+          if (durationInSeconds > 0) {
+            const calculatedProgress = (audioElement.currentTime / durationInSeconds) * 100;
+            setDisplayedProgress(Math.min(100, calculatedProgress));
+            
+            // Log moins fréquent
+            if (Math.floor(audioElement.currentTime) % 5 === 0) {
+              console.log(`SyncedLyricsView: Progression mise à jour = ${calculatedProgress.toFixed(2)}%, temps = ${audioElement.currentTime.toFixed(2)}s, durée = ${durationInSeconds}s`);
+            }
+          }
+        }
+      }, 200); // Intervalle pour mettre à jour la progression
+    }
+
+    return () => {
+      if (progressUpdateIntervalRef.current) {
+        window.clearInterval(progressUpdateIntervalRef.current);
+        progressUpdateIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying, currentSong, getCurrentAudioElement]);
 
   // Fallback pour le calcul du temps basé sur la progression - utile pour l'initialisation
   useEffect(() => {
@@ -274,31 +321,13 @@ export const SyncedLyricsView: React.FC = () => {
   };
 
   // Format time for display
-  const formatTime = (progress: number) => {
-    if (!currentSong?.duration) return "0:00";
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return "0:00";
     
-    try {
-      let totalSeconds = 0;
-      if (currentSong.duration.includes(':')) {
-        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
-        if (!isNaN(minutes) && !isNaN(seconds)) {
-          totalSeconds = minutes * 60 + seconds;
-        }
-      } else {
-        const duration = parseFloat(currentSong.duration);
-        if (!isNaN(duration)) {
-          totalSeconds = duration;
-        }
-      }
-      
-      const currentTime = (progress / 100) * totalSeconds;
-      const currentMinutes = Math.floor(currentTime / 60);
-      const currentSeconds = Math.floor(currentTime % 60);
-      
-      return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
-    } catch {
-      return "0:00";
-    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   // Format duration for display
@@ -414,6 +443,28 @@ export const SyncedLyricsView: React.FC = () => {
     transform: 'translateZ(0)',
   } : {};
 
+  // Calculer la durée en secondes pour le formatage
+  const getDurationInSeconds = () => {
+    if (!currentSong?.duration) return 0;
+    
+    try {
+      if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
+        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+        return minutes * 60 + seconds;
+      } else {
+        return parseFloat(String(currentSong.duration));
+      }
+    } catch {
+      return 0;
+    }
+  };
+  
+  // Obtenir le temps actuel de l'audio
+  const getCurrentAudioTime = () => {
+    const audio = getCurrentAudioElement();
+    return audio ? audio.currentTime : 0;
+  };
+
   return (
     <div className={cn(
       "fixed inset-0 z-[100] flex flex-col",
@@ -488,18 +539,30 @@ export const SyncedLyricsView: React.FC = () => {
           <div className="w-full mb-4 transition-all duration-200">
             {/* Progress display */}
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-spotify-neutral">{formatTime(progress)}</span>
-              <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
+              <span className="text-spotify-neutral">
+                {formatTime(getCurrentAudioTime())}
+              </span>
+              <span className="text-spotify-neutral">
+                {formatDuration(currentSong?.duration)}
+              </span>
             </div>
             
             {/* Progress bar */}
             <div className="flex items-center">
               <Slider
-                value={[progress]}
+                value={[displayedProgress]}
                 max={100}
-                step={1}
+                step={0.1}
                 className="flex-grow"
-                onValueChange={(value) => setProgress(value[0])}
+                onValueChange={(value) => {
+                  const audio = getCurrentAudioElement();
+                  if (audio && currentSong?.duration) {
+                    const durationInSeconds = getDurationInSeconds();
+                    const newTime = (value[0] / 100) * durationInSeconds;
+                    audio.currentTime = newTime;
+                    setDisplayedProgress(value[0]);
+                  }
+                }}
               />
             </div>
             
@@ -573,6 +636,13 @@ export const SyncedLyricsView: React.FC = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour
           </Button>
+          
+          {/* Debug panel - afficher les informations de synchronisation */}
+          <div className="mt-4 p-2 bg-black/40 rounded-md text-xs text-spotify-neutral/70 w-full">
+            <div>Temps actuel: {formatTime(currentTime)}</div>
+            <div>Affichage: {formatTime(getCurrentAudioTime())} / {formatDuration(currentSong?.duration)}</div>
+            <div>Progression: {displayedProgress.toFixed(1)}%</div>
+          </div>
         </div>
 
         {/* Right side - Lyrics content */}
@@ -682,3 +752,4 @@ export const SyncedLyricsView: React.FC = () => {
     </div>
   );
 };
+
