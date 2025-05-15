@@ -1306,94 +1306,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong]);
 
-  const preloadNextSong = async () => {
-    if (!currentSong || queue.length === 0) return;
-    
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1 || currentIndex >= queue.length - 1) return;
-    
-    const nextSong = queue[currentIndex + 1];
-    if (!nextSong) return;
-
-    console.log("Préchargement de la prochaine chanson:", nextSong.title);
-    
-    try {
-      const audioUrl = await getAudioFile(nextSong.url);
-      if (!audioUrl) {
-        throw new Error("URL audio non disponible");
-      }
-
-      nextAudioRef.current.src = audioUrl;
-      nextAudioRef.current.preload = "auto";
-      nextAudioRef.current.load();
-      nextAudioRef.current.volume = 0;
-      
-      const canPlayHandler = () => {
-        console.log("Préchargement réussi et audio prêt à jouer");
-        setNextSongPreloaded(true);
-        nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
-      };
-      
-      nextAudioRef.current.addEventListener('canplaythrough', canPlayHandler);
-      
-      setTimeout(() => {
-        if (!nextSongPreloaded) {
-          console.log("Timeout du préchargement, marquage comme prêt par sécurité");
-          setNextSongPreloaded(true);
-          nextAudioRef.current.removeEventListener('canplaythrough', canPlayHandler);
-        }
-      }, 3000);
-      
-    } catch (error) {
-      console.error("Erreur lors du préchargement:", error);
-      setNextSongPreloaded(false);
-    }
-  };
-
-  const addToHistory = async (song: Song) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { error: songError } = await supabase
-        .from('songs')
-        .upsert({
-          id: song.id,
-          title: song.title,
-          artist: song.artist,
-          file_path: song.url,
-          duration: song.duration,
-          image_url: song.imageUrl
-        });
-
-      if (songError) {
-        console.error("Erreur lors de l'insertion de la chanson:", songError);
-        return;
-      }
-
-      const { error: historyError } = await supabase
-        .from('play_history')
-        .insert({
-          user_id: session.user.id,
-          song_id: song.id,
-          played_at: new Date().toISOString()
-        });
-
-      if (historyError) {
-        console.error("Erreur lors de l'ajout à l'historique:", historyError);
-        return;
-      }
-
-      setHistory(prev => [{
-        ...song,
-        playedAt: new Date().toISOString()
-      }, ...prev.filter(s => s.id !== song.id)]);
-
-    } catch (error) {
-      console.error("Erreur lors de l'ajout à l'historique:", error);
-    }
-  };
-
   const parseTimeToSeconds = (timeStr: string | undefined): number => {
     if (!timeStr) return 0;
     
@@ -1406,17 +1318,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.error("Error parsing time:", error);
       return 0;
-    }
-  };
-
-  const updatePlaybackRate = (rate: number) => {
-    setPlaybackRate(rate);
-    if (playerType === PlayerType.NATIVE) {
-      if (audioRef.current) {
-        audioRef.current.playbackRate = rate;
-      }
-    } else {
-      webAudioPlayer.playbackRate = rate;
     }
   };
 

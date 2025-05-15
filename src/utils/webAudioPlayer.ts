@@ -246,7 +246,16 @@ class WebAudioPlayer {
 export const webAudioPlayer = new WebAudioPlayer();
 
 // Pour la compatibilité dans certaines parties du code
-(window as any).webAudioPlayer = webAudioPlayer;
+// Ajout du type pour l'objet window
+declare global {
+  interface Window {
+    webAudioPlayer: WebAudioPlayer;
+    globalAudio: HTMLAudioElement;
+  }
+}
+
+// Exposer webAudioPlayer à l'objet window
+window.webAudioPlayer = webAudioPlayer;
 
 // Interface pour le changement de type de lecteur
 export enum PlayerType {
