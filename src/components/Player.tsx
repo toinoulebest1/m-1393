@@ -57,8 +57,11 @@ export const Player = () => {
     if ('mediaSession' in navigator && currentSong && isPlaying) {
       positionUpdateIntervalRef.current = window.setInterval(() => {
         const duration = durationToSeconds(currentSong.duration);
+
+        // Correction : calculer la bonne position courante (en secondes)
         const position = (progress / 100) * duration;
-        
+
+        // !! Use la vraie position pour MediaSession !!
         updatePositionState(duration, position, playbackRate);
       }, 1000);
     }
