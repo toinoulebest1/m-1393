@@ -1,9 +1,9 @@
-
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
-import { useAudioControl } from '@/hooks/useAudioControl';
-import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
+import { usePlayerQueue } from '@/hooks/usePlayerQueue';
+import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -80,8 +80,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  // Fonction pour accéder à l'élément audio actuel (exposée pour le composant Player)
-  const getCurrentAudioElement = () => audioRef.current;
+  // Fonction pour obtenir l'élément audio actuel
+  const getCurrentAudioElement = useCallback(() => {
+    return audioRef.current;
+  }, [audioRef]);
 
   // Sauvegarde de la progression avant fermeture de page
   useEffect(() => {
@@ -313,40 +315,43 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
 
+  // L'objet context complet
+  const playerContext: PlayerContextType = {
+    currentSong,
+    isPlaying,
+    progress,
+    volume,
+    queue,
+    shuffleMode,
+    repeatMode,
+    favorites,
+    searchQuery,
+    favoriteStats,
+    playbackRate,
+    history,
+    isChangingSong,
+    stopCurrentSong: audioControls.stopCurrentSong,
+    setQueue,
+    setHistory,
+    play,
+    pause,
+    setVolume,
+    setProgress,
+    nextSong,
+    previousSong,
+    addToQueue,
+    toggleShuffle,
+    toggleRepeat,
+    toggleFavorite,
+    removeFavorite,
+    setSearchQuery,
+    setPlaybackRate: audioControls.updatePlaybackRate,
+    refreshCurrentSong: audioControls.refreshCurrentSong,
+    getCurrentAudioElement
+  };
+
   return (
-    <PlayerContext.Provider value={{
-      currentSong,
-      isPlaying,
-      progress,
-      volume,
-      queue,
-      shuffleMode,
-      repeatMode,
-      favorites,
-      searchQuery,
-      favoriteStats,
-      playbackRate,
-      history,
-      isChangingSong,
-      stopCurrentSong,
-      setQueue,
-      setHistory,
-      play,
-      pause,
-      setVolume: updateVolume,
-      setProgress: updateProgress,
-      nextSong,
-      previousSong,
-      addToQueue,
-      toggleShuffle,
-      toggleRepeat,
-      toggleFavorite,
-      removeFavorite,
-      setSearchQuery,
-      setPlaybackRate: updatePlaybackRate,
-      refreshCurrentSong,
-      getCurrentAudioElement,
-    }}>
+    <PlayerContext.Provider value={playerContext}>
       {children}
     </PlayerContext.Provider>
   );

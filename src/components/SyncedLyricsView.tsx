@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
@@ -13,7 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -27,6 +28,7 @@ export const SyncedLyricsView: React.FC = () => {
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
   const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const syncIntervalRef = useRef<number | null>(null);
 
   // Default colors for songs without image or during loading
   const DEFAULT_COLORS = {
@@ -34,25 +36,74 @@ export const SyncedLyricsView: React.FC = () => {
     accent: [75, 20, 95] as [number, number, number]
   };
 
-  // Calculate current time based on progress percentage
+  // Utiliser un useEffect pour mettre à jour le temps actuel périodiquement
   useEffect(() => {
-    if (!currentSong || !currentSong.duration) return;
-    
-    let duration: number;
-    
-    // Convert duration from MM:SS format to seconds
-    if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
-      const [minutes, seconds] = currentSong.duration.split(':').map(Number);
-      duration = minutes * 60 + seconds;
-    } else {
-      duration = parseFloat(String(currentSong.duration));
+    // Nettoyer l'intervalle précédent si existant
+    if (syncIntervalRef.current) {
+      window.clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
     }
-    
-    // Calculate current time in seconds
-    const time = (progress / 100) * duration;
-    setCurrentTime(time);
-    
-  }, [currentSong, progress]);
+
+    // Créer un nouvel intervalle uniquement si la lecture est en cours
+    if (isPlaying) {
+      syncIntervalRef.current = window.setInterval(() => {
+        const audioElement = getCurrentAudioElement();
+        
+        if (audioElement) {
+          const audioCurrentTime = audioElement.currentTime;
+          setCurrentTime(audioCurrentTime);
+          
+          // Log moins fréquent pour éviter de surcharger la console
+          if (Math.floor(audioCurrentTime * 2) % 2 === 0) {
+            console.log(`SyncedLyricsView: Temps audio réel = ${audioCurrentTime.toFixed(2)}s`);
+          }
+        } else {
+          console.log("SyncedLyricsView: Aucun élément audio trouvé");
+          
+          // Fallback sur le calcul basé sur la progression
+          if (currentSong && currentSong.duration) {
+            let duration: number;
+            
+            if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
+              const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+              duration = minutes * 60 + seconds;
+            } else {
+              duration = parseFloat(String(currentSong.duration));
+            }
+            
+            const calculatedTime = (progress / 100) * duration;
+            setCurrentTime(calculatedTime);
+          }
+        }
+      }, 50); // Intervalle court pour une meilleure fluidité
+    }
+
+    return () => {
+      if (syncIntervalRef.current) {
+        window.clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying, currentSong, progress, getCurrentAudioElement]);
+
+  // Fallback pour le calcul du temps basé sur la progression - utile pour l'initialisation
+  useEffect(() => {
+    if (!isPlaying && currentSong && currentSong.duration) {
+      let duration: number;
+      
+      // Convert duration from MM:SS format to seconds
+      if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
+        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
+        duration = minutes * 60 + seconds;
+      } else {
+        duration = parseFloat(String(currentSong.duration));
+      }
+      
+      // Calculate current time in seconds
+      const time = (progress / 100) * duration;
+      setCurrentTime(time);
+    }
+  }, [currentSong, progress, isPlaying]);
 
   // Animation effects setup
   useEffect(() => {

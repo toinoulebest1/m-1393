@@ -29,12 +29,13 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isWaitingForFirstLyric, setIsWaitingForFirstLyric] = useState(false);
   const [remainingTime, setRemainingTime] = useState<string>("");
+  const lastCurrentTimeRef = useRef<number>(0);
 
   // Log for debugging time synchronization
   useEffect(() => {
-    if (currentTime !== previousTimeRef.current) {
-      console.log(`LrcPlayer: Temps mis à jour - ${currentTime.toFixed(2)}s`);
-      previousTimeRef.current = currentTime;
+    if (Math.abs(currentTime - lastCurrentTimeRef.current) > 0.2) {
+      console.log(`LrcPlayer: Temps mis à jour - ${currentTime.toFixed(2)}s (différence: ${(currentTime - lastCurrentTimeRef.current).toFixed(2)}s)`);
+      lastCurrentTimeRef.current = currentTime;
     }
   }, [currentTime]);
 
@@ -66,7 +67,11 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       // Calculate progress as a percentage of time until first lyric
       const progress = Math.min(100, (currentTime / firstLyricTime) * 100);
       setLoadingProgress(progress);
-      console.log(`LrcPlayer: Progression du chargement: ${progress.toFixed(1)}%, temps actuel: ${currentTime.toFixed(1)}s, premier lyric à: ${firstLyricTime.toFixed(1)}s`);
+      
+      if (progress % 5 < 0.2) {
+        // Log moins fréquemment pour éviter la surcharge
+        console.log(`LrcPlayer: Progression du chargement: ${progress.toFixed(1)}%, temps actuel: ${currentTime.toFixed(1)}s, premier lyric à: ${firstLyricTime.toFixed(1)}s`);
+      }
       
       // Calculate remaining time in seconds
       const timeRemaining = Math.max(0, firstLyricTime - currentTime);
@@ -92,7 +97,11 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       ? currentTime + (parsedLyrics.offset / 1000) 
       : currentTime;
 
-    console.log(`LrcPlayer: Temps ajusté - ${adjustedTime.toFixed(2)}s (offset: ${parsedLyrics.offset || 0}ms)`);
+    // Log moins fréquemment
+    if (Math.abs(adjustedTime - previousTimeRef.current) > 0.5) {
+      console.log(`LrcPlayer: Temps ajusté - ${adjustedTime.toFixed(2)}s (offset: ${parsedLyrics.offset || 0}ms)`);
+      previousTimeRef.current = adjustedTime;
+    }
     
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,

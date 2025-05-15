@@ -189,6 +189,11 @@ export const useAudioControl = ({
     }
   }, [currentSong, setCurrentSong]);
 
+  // Nouvelle fonction pour accéder directement à l'élément audio
+  const getCurrentAudioElement = useCallback(() => {
+    return audioRef.current;
+  }, [audioRef]);
+
   return {
     play,
     pause,
@@ -196,6 +201,7 @@ export const useAudioControl = ({
     updateProgress,
     updatePlaybackRate,
     stopCurrentSong,
-    refreshCurrentSong
+    refreshCurrentSong,
+    getCurrentAudioElement
   };
 };
