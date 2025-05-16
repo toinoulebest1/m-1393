@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,7 @@ import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-r
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropboxOAuthButton } from './DropboxOAuthButton';
 
 export const DropboxSettings = () => {
   // États de base
@@ -334,6 +334,14 @@ export const DropboxSettings = () => {
             onCheckedChange={setIsEnabled}
           />
           <Label htmlFor="enable-dropbox">Utiliser Dropbox pour le stockage de fichiers</Label>
+        </div>
+
+        {/* Ajouter le bouton d'authentification OAuth avant les tests */}
+        <div className="border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground mb-4">
+            Connectez votre compte Dropbox pour activer le stockage des fichiers sans avoir besoin d'une clé API manuelle.
+          </p>
+          <DropboxOAuthButton />
         </div>
 
         {testResult === 'success' && (
