@@ -59,6 +59,7 @@ export const refreshDropboxToken = async (): Promise<boolean> => {
   }
 };
 
+// Fonction améliorée pour vérifier si Dropbox est activé
 export const isDropboxEnabled = async (): Promise<boolean> => {
   try {
     console.log("Vérification si Dropbox est activé...");
@@ -95,6 +96,8 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
         return data.isEnabled;
       }
       
+      // Si le serveur ne donne pas d'information claire, utiliser la config locale
+      console.log("Utilisation de la configuration locale:", localConfig.isEnabled);
       return localConfig.isEnabled === true;
     } catch (serverError) {
       console.error("Exception lors de la vérification du serveur:", serverError);
@@ -192,32 +195,18 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
       return false;
     }
 
-    // First check if we have this file path saved in our database
+    // Assurer que le chemin est correctement formaté pour l'API Dropbox
     let dropboxPath = path.startsWith('/') ? path : `/${path}`;
+    const formattedPath = dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath;
     
-    try {
-      const { data: fileRef, error } = await supabase
-        .from('dropbox_files')
-        .select('dropbox_path')
-        .eq('local_id', path)
-        .maybeSingle();
-        
-      if (error) {
-        console.error('Error fetching Dropbox file reference:', error);
-      } else if (fileRef) {
-        dropboxPath = fileRef.dropbox_path;
-        console.log('Found stored Dropbox path:', dropboxPath);
-      }
-    } catch (dbError) {
-      console.error('Database error when fetching reference:', dbError);
-    }
+    console.log(`Vérification de l'existence du fichier sur Dropbox: ${formattedPath}`);
     
     // Utiliser l'edge function pour vérifier si le fichier existe
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'POST',
       body: {
         action: 'check',
-        path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
+        path: formattedPath
       }
     });
     
@@ -226,6 +215,7 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
       return false;
     }
     
+    console.log(`Résultat de la vérification Dropbox pour ${formattedPath}:`, data?.exists ? "Existe" : "N'existe pas");
     return data?.exists || false;
   } catch (error) {
     console.error('Error checking if file exists on Dropbox:', error);

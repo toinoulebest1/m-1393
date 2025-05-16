@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
+import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
@@ -102,6 +103,9 @@ export const getAudioFile = async (path: string) => {
       }
     }
 
+    // Vérifier d'abord si Dropbox est activé
+    const dropboxActive = await isDropboxEnabled();
+    
     // If file is not in cache, proceed with retrieval from storage providers
     let audioUrl;
     let retrievalAttempts = 0;
@@ -112,9 +116,69 @@ export const getAudioFile = async (path: string) => {
       try {
         console.log(`Tentative ${retrievalAttempts}/${maxRetrievalAttempts} pour récupérer l'audio`);
         
-        // First try with our getAudioFileUrl function that handles both Dropbox and Supabase
-        const { getAudioFileUrl } = await import('./getAudioFile');
-        audioUrl = await getAudioFileUrl(path);
+        if (dropboxActive) {
+          // Vérifier si nous avons une entrée dans la table dropbox_files
+          const { data: fileRef } = await supabase
+            .from('dropbox_files')
+            .select('storage_provider, dropbox_path')
+            .eq('local_id', path)
+            .maybeSingle();
+            
+          if (fileRef && (fileRef.storage_provider === 'dropbox' || !fileRef.storage_provider)) {
+            console.log(`Utilisation de Dropbox pour: ${path} → ${fileRef.dropbox_path}`);
+            
+            // Vérifier que le fichier existe réellement sur Dropbox
+            const fileExists = await checkFileExistsOnDropbox(fileRef.dropbox_path);
+            
+            if (fileExists) {
+              // Récupérer l'URL Dropbox
+              const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+                method: 'POST',
+                body: {
+                  action: 'get',
+                  path: fileRef.dropbox_path
+                }
+              });
+              
+              if (!error && data?.url) {
+                audioUrl = data.url;
+                break;
+              } else {
+                console.warn("Échec de la récupération depuis Dropbox via référence:", error);
+              }
+            } else {
+              console.warn(`Fichier non trouvé sur Dropbox: ${fileRef.dropbox_path}`);
+            }
+          } else {
+            // Essayer de récupérer directement avec le chemin formaté pour Dropbox
+            const audioPath = `audio/${path}`;
+            console.log(`Tentative avec chemin direct Dropbox: ${audioPath}`);
+            
+            const fileExists = await checkFileExistsOnDropbox(audioPath);
+            
+            if (fileExists) {
+              const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+                method: 'POST',
+                body: {
+                  action: 'get',
+                  path: audioPath
+                }
+              });
+              
+              if (!error && data?.url) {
+                audioUrl = data.url;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!audioUrl) {
+          console.log("Utilisation du stockage Supabase pour:", path);
+          // Fallback to Supabase Storage
+          const { getAudioFileUrl } = await import('./getAudioFile');
+          audioUrl = await getAudioFileUrl(path);
+        }
         
         if (!audioUrl) {
           throw new Error("URL audio non générée");
