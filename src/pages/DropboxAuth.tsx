@@ -18,21 +18,35 @@ export const DropboxAuth = () => {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
 
+      console.log('Dropbox callback parameters:', { code: code?.substring(0, 10) + '...', state });
+
       if (!code || !state) {
+        console.error('Code d\'autorisation ou state manquant');
         setStatus('error');
         setMessage('Code d\'autorisation ou state manquant');
         return;
       }
 
       try {
+        console.log('Échange du code d\'autorisation...');
         const { data, error } = await supabase.functions.invoke('dropbox-oauth', {
-          method: 'GET',
+          method: 'POST',
           body: { action: 'exchange-code', code, state }
         });
 
-        if (error || !data?.success) {
+        console.log('Résultat de l\'échange:', { data, error });
+
+        if (error) {
+          console.error('Erreur lors de l\'échange du code:', error);
           setStatus('error');
-          setMessage(error?.message || data?.error || 'Erreur lors de l\'authentification');
+          setMessage(`Erreur lors de l'authentification: ${error.message || 'Une erreur est survenue'}`);
+          return;
+        }
+
+        if (!data?.success) {
+          console.error('Échec de l\'authentification:', data?.error || 'Raison inconnue');
+          setStatus('error');
+          setMessage(data?.error || 'Erreur lors de l\'authentification');
           return;
         }
 
@@ -46,7 +60,7 @@ export const DropboxAuth = () => {
       } catch (error) {
         console.error('Erreur lors de l\'échange du code:', error);
         setStatus('error');
-        setMessage('Une erreur est survenue lors de l\'authentification');
+        setMessage(`Une erreur est survenue lors de l'authentification: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
       }
     };
 

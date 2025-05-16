@@ -20,6 +20,9 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
+  // Log de la requête pour le débogage
+  console.log(`Requête reçue: ${req.method} ${req.url}`);
+  
   // Gérer les requêtes OPTIONS (CORS preflight)
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,6 +49,7 @@ serve(async (req: Request) => {
     }
     
     if (!isAdmin) {
+      console.log("Accès refusé: l'utilisateur n'est pas administrateur");
       return new Response(JSON.stringify({ error: 'Accès non autorisé' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -57,7 +61,9 @@ serve(async (req: Request) => {
     if (req.method === 'POST') {
       try {
         requestData = await req.json();
+        console.log('Données POST reçues:', requestData);
       } catch (e) {
+        console.error('Erreur lors du parsing des données JSON:', e);
         requestData = {};
       }
     } else if (req.method === 'GET') {
@@ -67,12 +73,22 @@ serve(async (req: Request) => {
       const state = url.searchParams.get('state');
       
       requestData = { action, code, state };
+      console.log('Données GET reçues:', requestData);
     }
     
     const action = requestData?.action || '';
+    console.log(`Action demandée: ${action}`);
 
     // Générer l'URL d'authentification Dropbox
     if (action === 'get-auth-url') {
+      // Vérifier que les variables d'environnement sont définies
+      if (!dropboxAppKey) {
+        console.error("DROPBOX_APP_KEY non configurée");
+      }
+      if (!redirectUri) {
+        console.error("DROPBOX_REDIRECT_URI non configurée");
+      }
+      
       if (!dropboxAppKey || !redirectUri) {
         return new Response(JSON.stringify({ 
           error: 'Configuration Dropbox incomplète. Veuillez configurer DROPBOX_APP_KEY et DROPBOX_REDIRECT_URI.' 
@@ -100,6 +116,8 @@ serve(async (req: Request) => {
       authUrl.searchParams.append('response_type', 'code');
       authUrl.searchParams.append('redirect_uri', redirectUri);
       authUrl.searchParams.append('state', stateValue);
+      
+      console.log(`URL d'authentification générée: ${authUrl.toString()}`);
 
       return new Response(JSON.stringify({ authUrl: authUrl.toString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -112,6 +130,7 @@ serve(async (req: Request) => {
       const state = requestData?.state;
 
       if (!code || !state) {
+        console.error(`Code ou state manquant. Code: ${code}, State: ${state}`);
         return new Response(JSON.stringify({ error: 'Code ou state manquant' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -127,13 +146,27 @@ serve(async (req: Request) => {
         .single();
 
       if (stateError || !stateData) {
+        console.error('État OAuth invalide ou expiré:', stateError || 'Aucune donnée trouvée');
         return new Response(JSON.stringify({ error: 'State invalide ou expiré' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
+      // Vérifier que les variables d'environnement sont définies
+      if (!dropboxAppKey || !dropboxAppSecret || !redirectUri) {
+        console.error('Configuration Dropbox incomplète pour l\'échange de jetons');
+        return new Response(JSON.stringify({ 
+          error: 'Configuration Dropbox incomplète pour l\'échange de jetons.' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // Échanger le code contre un token d'accès
+      console.log('Début de l\'échange du code contre un token...');
+      
       const tokenResponse = await fetch('https://api.dropboxapi.com/oauth2/token', {
         method: 'POST',
         headers: {
@@ -150,6 +183,7 @@ serve(async (req: Request) => {
 
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
+        console.error(`Erreur lors de l'échange du code: ${tokenResponse.status} - ${errorText}`);
         return new Response(JSON.stringify({ 
           error: `Erreur lors de l'échange du code: ${tokenResponse.status} - ${errorText}` 
         }), {
@@ -160,6 +194,7 @@ serve(async (req: Request) => {
 
       // Extraire le token d'accès
       const tokenData = await tokenResponse.json();
+      console.log('Token obtenu avec succès');
       
       // Enregistrer le token dans la base de données
       const { error: updateError } = await supabase
@@ -178,6 +213,7 @@ serve(async (req: Request) => {
         });
       
       if (updateError) {
+        console.error(`Erreur lors de l'enregistrement du token:`, updateError);
         return new Response(JSON.stringify({ 
           error: `Erreur lors de l'enregistrement du token: ${updateError.message}` 
         }), {
@@ -194,13 +230,15 @@ serve(async (req: Request) => {
       });
     }
     
+    console.error(`Action non supportée: ${action}`);
     return new Response(JSON.stringify({ error: 'Action non supportée' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
-    return new Response(JSON.stringify({ error: `Erreur serveur: ${error.message}` }), {
+    console.error(`Erreur serveur:`, error);
+    return new Response(JSON.stringify({ error: `Erreur serveur: ${error.message || 'Erreur inconnue'}` }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
