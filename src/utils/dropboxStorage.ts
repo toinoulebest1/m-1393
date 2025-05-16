@@ -99,7 +99,7 @@ export const checkAndUpdateDropboxStatus = async (): Promise<boolean> => {
     
     if (error) {
       console.error("Erreur lors de la vérification du serveur:", error);
-      return getDropboxConfig().isEnabled;
+      return false;
     }
     
     if (data && typeof data.isEnabled === 'boolean') {
@@ -114,10 +114,10 @@ export const checkAndUpdateDropboxStatus = async (): Promise<boolean> => {
       return data.isEnabled;
     }
     
-    return getDropboxConfig().isEnabled;
+    return false;
   } catch (serverError) {
     console.error("Exception lors de la vérification du serveur:", serverError);
-    return getDropboxConfig().isEnabled;
+    return false;
   }
 };
 

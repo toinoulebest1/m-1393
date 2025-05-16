@@ -21,21 +21,25 @@ export const DropboxOAuthButton = () => {
       try {
         console.log("Vérification de la connexion Dropbox...");
         
-        // Vérifier d'abord la configuration locale pour une réponse rapide
-        const localConfig = getDropboxConfig();
-        if (localConfig.isEnabled) {
-          setIsConnected(true);
-        }
+        // Ne pas utiliser la configuration locale pour la vérification initiale
+        // car elle pourrait être obsolète ou incorrecte
         
-        // Ensuite, vérifier avec le serveur pour mettre à jour le statut
+        // Vérifier directement avec le serveur pour obtenir le statut réel
         const serverStatus = await checkAndUpdateDropboxStatus();
         setIsConnected(serverStatus);
         
         console.log("Dropbox est", serverStatus ? "activé" : "désactivé");
+        
+        // Mettre à jour la configuration locale après vérification avec le serveur
+        saveDropboxConfig({
+          accessToken: '',
+          isEnabled: serverStatus
+        });
       } catch (error) {
         console.error('Exception lors de la vérification de la connexion Dropbox:', error);
         toast.error("Erreur lors de la vérification de la connexion Dropbox");
         setCheckFailed(true);
+        setIsConnected(false);
       } finally {
         setIsChecking(false);
       }
@@ -144,6 +148,45 @@ export const DropboxOAuthButton = () => {
       });
   };
 
+  // Déconnexion de Dropbox
+  const disconnectDropbox = async () => {
+    setIsLoading(true);
+    setErrorDetails(null);
+    
+    try {
+      console.log('Déconnexion de Dropbox...');
+      
+      const { error } = await supabase.functions.invoke('dropbox-config', {
+        method: 'POST',
+        body: { isEnabled: false }
+      });
+      
+      if (error) {
+        console.error('Erreur lors de la déconnexion de Dropbox:', error);
+        toast.error(`Impossible de déconnecter Dropbox: ${error.message || 'Une erreur est survenue'}`);
+        setErrorDetails(JSON.stringify(error, null, 2));
+        return;
+      }
+      
+      // Mettre à jour la configuration locale
+      saveDropboxConfig({
+        accessToken: '',
+        isEnabled: false
+      });
+      
+      setIsConnected(false);
+      toast.success('Dropbox a été déconnecté avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion de Dropbox:', error);
+      toast.error(`Erreur lors de la déconnexion: ${error instanceof Error ? error.message : 'Une erreur inconnue est survenue'}`);
+      setErrorDetails(error instanceof Error ? 
+        `${error.message}\n${error.stack || ''}` : 
+        JSON.stringify(error, null, 2));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {isChecking ? (
@@ -166,9 +209,26 @@ export const DropboxOAuthButton = () => {
           </Button>
         </div>
       ) : isConnected ? (
-        <div className="flex items-center space-x-2 text-green-500">
-          <CheckCircle className="h-5 w-5" />
-          <span>Dropbox est connecté pour tous les utilisateurs</span>
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2 text-green-500">
+            <CheckCircle className="h-5 w-5" />
+            <span>Dropbox est connecté pour tous les utilisateurs</span>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={disconnectDropbox}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Déconnexion...
+              </>
+            ) : (
+              "Déconnecter Dropbox"
+            )}
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -223,3 +283,4 @@ export const DropboxOAuthButton = () => {
     </div>
   );
 };
+
