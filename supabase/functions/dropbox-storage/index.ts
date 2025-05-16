@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
@@ -227,6 +226,22 @@ serve(async (req: Request) => {
           headers: { 'Content-Type': 'application/json' }
         });
       }
+    }
+    
+    // Check if file exists
+    if (action === 'check' && req.method === 'GET') {
+      const path = url.searchParams.get('path');
+      if (!path) {
+        return new Response(JSON.stringify({ error: 'Chemin non spécifié' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      const exists = await checkFileExists(path);
+      return new Response(JSON.stringify({ exists }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     
     return new Response(JSON.stringify({ error: 'Action ou méthode non supportée' }), {
