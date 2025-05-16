@@ -21,7 +21,6 @@ import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
-import DropboxAuth from './pages/DropboxAuth';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -213,12 +212,6 @@ function App() {
                     <Navigate to="/auth" />
                   )
                 } 
-              />
-              
-              {/* New Dropbox auth route */}
-              <Route 
-                path="/dropbox-auth" 
-                element={<DropboxAuth />} 
               />
             </Routes>
           </CastProvider>

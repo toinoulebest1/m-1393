@@ -1,13 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
+import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
   // Check if we should use Dropbox instead of Supabase
-  const useDropbox = await isDropboxEnabled();
+  const useDropbox = isDropboxEnabled();
   console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
   
   let fileToUpload: File;
@@ -31,35 +30,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   try {
     if (useDropbox) {
       console.log("Uploading file to Dropbox storage:", id);
-      // Upload direct vers Dropbox, quelle que soit la taille du fichier
-      const dropboxPath = await uploadFileToDropbox(fileToUpload, `audio/${id}`);
-      
-      if (!dropboxPath) {
-        console.error("Upload vers Dropbox a échoué: chemin manquant");
-        throw new Error("Échec de l'upload vers Dropbox");
-      }
-      
-      // Ensure we add an entry in dropbox_files table to link local ID to Dropbox path
-      try {
-        const { error: refError } = await supabase
-          .from('dropbox_files')
-          .upsert({
-            local_id: `audio/${id}`,
-            dropbox_path: dropboxPath,
-            storage_provider: 'dropbox'
-          });
-          
-        if (refError) {
-          console.error("Erreur lors de l'enregistrement de la référence Dropbox:", refError);
-          // Continue even if this fails - the upload succeeded
-        } else {
-          console.log(`Référence Dropbox enregistrée: audio/${id} -> ${dropboxPath}`);
-        }
-      } catch (refError) {
-        console.error("Exception lors de l'enregistrement de la référence:", refError);
-        // Continue even if this fails - the upload succeeded
-      }
-      
+      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
       return `audio/${id}`;
     } else {
       console.log("Uploading file to Supabase storage:", id);
@@ -94,7 +65,7 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // Check first if the file is cached for quick retrieval
+    // Vérifie d'abord si le fichier est en cache pour une récupération rapide
     if (await isInCache(path)) {
       console.log(`Fichier audio trouvé dans le cache: ${path}`);
       const cachedUrl = await getFromCache(path);
@@ -103,126 +74,49 @@ export const getAudioFile = async (path: string) => {
       }
     }
 
-    // Vérifier d'abord si Dropbox est activé
-    const dropboxActive = await isDropboxEnabled();
+    // Si le fichier n'est pas en cache, procède normalement
+    const useDropbox = isDropboxEnabled();
+    console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
+
+    let audioUrl: string;
     
-    // If file is not in cache, proceed with retrieval from storage providers
-    let audioUrl;
-    let retrievalAttempts = 0;
-    const maxRetrievalAttempts = 3;
-    
-    while (!audioUrl && retrievalAttempts < maxRetrievalAttempts) {
-      retrievalAttempts++;
-      try {
-        console.log(`Tentative ${retrievalAttempts}/${maxRetrievalAttempts} pour récupérer l'audio`);
-        
-        if (dropboxActive) {
-          // Vérifier si nous avons une entrée dans la table dropbox_files
-          const { data: fileRef } = await supabase
-            .from('dropbox_files')
-            .select('storage_provider, dropbox_path')
-            .eq('local_id', path)
-            .maybeSingle();
-            
-          if (fileRef && (fileRef.storage_provider === 'dropbox' || !fileRef.storage_provider)) {
-            console.log(`Utilisation de Dropbox pour: ${path} → ${fileRef.dropbox_path}`);
-            
-            // Vérifier que le fichier existe réellement sur Dropbox
-            const fileExists = await checkFileExistsOnDropbox(fileRef.dropbox_path);
-            
-            if (fileExists) {
-              // Récupérer l'URL Dropbox
-              const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-                method: 'POST',
-                body: {
-                  action: 'get',
-                  path: fileRef.dropbox_path
-                }
-              });
-              
-              if (!error && data?.url) {
-                audioUrl = data.url;
-                break;
-              } else {
-                console.warn("Échec de la récupération depuis Dropbox via référence:", error);
-              }
-            } else {
-              console.warn(`Fichier non trouvé sur Dropbox: ${fileRef.dropbox_path}`);
-            }
-          } else {
-            // Essayer de récupérer directement avec le chemin formaté pour Dropbox
-            const audioPath = `audio/${path}`;
-            console.log(`Tentative avec chemin direct Dropbox: ${audioPath}`);
-            
-            const fileExists = await checkFileExistsOnDropbox(audioPath);
-            
-            if (fileExists) {
-              const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-                method: 'POST',
-                body: {
-                  action: 'get',
-                  path: audioPath
-                }
-              });
-              
-              if (!error && data?.url) {
-                audioUrl = data.url;
-                break;
-              }
-            }
-          }
-        }
-        
-        if (!audioUrl) {
-          console.log("Utilisation du stockage Supabase pour:", path);
-          // Fallback to Supabase Storage
-          const { getAudioFileUrl } = await import('./getAudioFile');
-          audioUrl = await getAudioFileUrl(path);
-        }
-        
-        if (!audioUrl) {
-          throw new Error("URL audio non générée");
-        }
-      } catch (retrievalError) {
-        console.error(`Erreur lors de la tentative ${retrievalAttempts}:`, retrievalError);
-        
-        if (retrievalAttempts === maxRetrievalAttempts) {
-          throw retrievalError;
-        }
-        
-        // Wait a short delay before retrying
-        await new Promise(resolve => setTimeout(resolve, 500));
+    if (useDropbox) {
+      audioUrl = await getDropboxSharedLink(`audio/${path}`);
+    } else {
+      // Vérifie si le fichier existe
+      const { data: fileExists } = await supabase.storage
+        .from('audio')
+        .list('', { search: path });
+
+      if (!fileExists || fileExists.length === 0) {
+        console.error("Fichier non trouvé dans le stockage:", path);
+        throw new Error("Fichier audio non trouvé");
       }
-    }
-    
-    if (!audioUrl) {
-      throw new Error("URL audio non disponible après plusieurs tentatives");
-    }
-    
-    // Check if URL is accessible
-    try {
-      const response = await fetch(audioUrl, { method: 'HEAD' });
-      if (!response.ok) {
-        console.warn(`L'URL audio n'est pas accessible (code ${response.status}), tentative de lecture tout de même`);
+
+      const { data, error } = await supabase.storage
+        .from('audio')
+        .createSignedUrl(path, 3600);
+
+      if (error) {
+        console.error("Erreur lors de la récupération du fichier:", error);
+        throw error;
       }
-    } catch (validationError) {
-      // Just log the validation error but still try to use the URL
-      console.warn("Impossible de vérifier l'URL, tentative de lecture tout de même:", validationError);
+
+      if (!data?.signedUrl) {
+        throw new Error("URL signée non générée");
+      }
+
+      audioUrl = data.signedUrl;
     }
-    
-    // Cache for future retrievals
+
+    // Mise en cache pour les futures récupérations
     try {
       const response = await fetch(audioUrl);
       const blob = await response.blob();
-      if (blob.size > 0) {
-        await addToCache(path, blob);
-        console.log(`Mise en cache réussie pour ${path} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
-      } else {
-        console.warn("Blob vide - pas de mise en cache");
-      }
+      await addToCache(path, blob);
     } catch (cacheError) {
       console.warn("Impossible de mettre en cache le fichier:", cacheError);
-      // Continue even if caching fails
+      // Continue même en cas d'échec de mise en cache
     }
 
     return audioUrl;

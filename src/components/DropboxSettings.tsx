@@ -1,10 +1,16 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { saveDropboxConfig, migrateFilesToDropbox, migrateLyricsToDropbox } from '@/utils/dropboxStorage';
+import { 
+  getDropboxConfig, 
+  saveDropboxConfig, 
+  migrateFilesToDropbox,
+  migrateLyricsToDropbox
+} from '@/utils/dropboxStorage';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -13,10 +19,9 @@ import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-r
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropboxOAuthButton } from './DropboxOAuthButton';
 
 export const DropboxSettings = () => {
-  // États de base
+  const [accessToken, setAccessToken] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -36,7 +41,7 @@ export const DropboxSettings = () => {
     failedFiles: Array<{ id: string; error: string }>;
   }>({ success: 0, failed: 0, failedFiles: [] });
   
-  // États pour la migration des paroles
+  // Nouveaux états pour la migration des paroles
   const [isMigratingLyrics, setIsMigratingLyrics] = useState(false);
   const [lyricsProgress, setLyricsProgress] = useState(0);
   const [totalLyrics, setTotalLyrics] = useState(0);
@@ -71,13 +76,9 @@ export const DropboxSettings = () => {
         toast.error('Accès non autorisé');
       } else {
         // Load config only if admin
-        const { data, error } = await supabase.functions.invoke('dropbox-config', {
-          method: 'GET',
-        });
-        
-        if (!error && data) {
-          setIsEnabled(data.isEnabled || false);
-        }
+        const config = getDropboxConfig();
+        setAccessToken(config.accessToken || '');
+        setIsEnabled(config.isEnabled || false);
       }
       
       setIsLoading(false);
@@ -89,19 +90,12 @@ export const DropboxSettings = () => {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      await supabase.functions.invoke('dropbox-config', {
-        method: 'POST',
-        body: { isEnabled }
-      });
-      
-      // Save locally for immediate UI updates
       saveDropboxConfig({
-        accessToken: '',  // No token stored locally anymore
+        accessToken,
         isEnabled
       });
-      
       toast.success('Configuration Dropbox enregistrée');
-      setTestResult(null);
+      setTestResult(null); // Reset test result when saving new token
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration Dropbox:', error);
       toast.error('Échec de l\'enregistrement de la configuration Dropbox');
@@ -115,23 +109,30 @@ export const DropboxSettings = () => {
     setTestResult(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('dropbox-config', {
+      // Use Dropbox API to test the token by getting account information
+      const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
         method: 'POST',
-        body: { action: 'test' }
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(null)
       });
       
-      if (error || !data?.success) {
-        console.error('Erreur lors du test de connexion Dropbox:', error || data?.error);
-        setTestResult('error');
-        toast.error('La connexion Dropbox a échoué');
-      } else {
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Dropbox account info:', data);
         setTestResult('success');
-        toast.success('Connexion Dropbox établie avec succès');
+        toast.success('Jeton Dropbox valide');
+      } else {
+        console.error('Erreur lors du test du jeton Dropbox:', response.status, response.statusText);
+        setTestResult('error');
+        toast.error('Jeton Dropbox invalide');
       }
     } catch (error) {
       console.error('Erreur lors du test du jeton Dropbox:', error);
       setTestResult('error');
-      toast.error('Erreur lors du test de la connexion Dropbox');
+      toast.error('Erreur lors du test du jeton Dropbox');
     } finally {
       setIsTesting(false);
     }
@@ -139,6 +140,15 @@ export const DropboxSettings = () => {
 
   // Fonction pour la migration des fichiers audio
   const handleMigrateFiles = async () => {
+    if (!accessToken) {
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton Dropbox valide',
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsMigrating(true);
     setMigrationProgress(0);
     setProcessedFiles(0);
@@ -226,8 +236,17 @@ export const DropboxSettings = () => {
     }
   };
   
-  // Fonction pour la migration des paroles
+  // Nouvelle fonction pour la migration des paroles
   const handleMigrateLyrics = async () => {
+    if (!accessToken) {
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton Dropbox valide',
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsMigratingLyrics(true);
     setLyricsProgress(0);
     setProcessedLyrics(0);
@@ -327,6 +346,20 @@ export const DropboxSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="dropbox-token">Jeton d'accès Dropbox</Label>
+          <Input
+            id="dropbox-token"
+            type="password"
+            placeholder="Entrez votre jeton d'accès Dropbox"
+            value={accessToken}
+            onChange={(e) => setAccessToken(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Générez un jeton d'accès depuis la <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="underline">Console d'applications Dropbox</a>.
+          </p>
+        </div>
+        
         <div className="flex items-center space-x-2">
           <Switch
             id="enable-dropbox"
@@ -336,19 +369,11 @@ export const DropboxSettings = () => {
           <Label htmlFor="enable-dropbox">Utiliser Dropbox pour le stockage de fichiers</Label>
         </div>
 
-        {/* Ajouter le bouton d'authentification OAuth avant les tests */}
-        <div className="border-t border-border pt-4">
-          <p className="text-sm text-muted-foreground mb-4">
-            Connectez votre compte Dropbox pour activer le stockage des fichiers sans avoir besoin d'une clé API manuelle.
-          </p>
-          <DropboxOAuthButton />
-        </div>
-
         {testResult === 'success' && (
           <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
             <AlertDescription className="text-green-800 dark:text-green-400">
-              La connexion Dropbox est valide et fonctionne correctement.
+              Le jeton Dropbox est valide et fonctionne correctement.
             </AlertDescription>
           </Alert>
         )}
@@ -357,7 +382,7 @@ export const DropboxSettings = () => {
           <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
             <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             <AlertDescription className="text-red-800 dark:text-red-400">
-              La connexion Dropbox est invalide. Veuillez vérifier la clé API dans les paramètres Supabase.
+              Le jeton Dropbox est invalide ou n'a pas les permissions requises.
             </AlertDescription>
           </Alert>
         )}
@@ -393,7 +418,7 @@ export const DropboxSettings = () => {
               ) : (
                 <Button 
                   onClick={handleMigrateFiles} 
-                  disabled={!isEnabled || isSaving || isTesting || isMigratingLyrics} 
+                  disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
                   className="w-full mt-2"
                 >
                   <ArrowRight className="mr-2 h-4 w-4" />
@@ -446,7 +471,7 @@ export const DropboxSettings = () => {
               ) : (
                 <Button 
                   onClick={handleMigrateLyrics} 
-                  disabled={!isEnabled || isSaving || isTesting || isMigrating} 
+                  disabled={!accessToken || isSaving || isTesting || isMigrating} 
                   className="w-full mt-2"
                 >
                   <ArrowRight className="mr-2 h-4 w-4" />
@@ -482,7 +507,7 @@ export const DropboxSettings = () => {
         <Button 
           variant="outline" 
           onClick={testDropboxToken} 
-          disabled={isTesting || isSaving || isMigrating || isMigratingLyrics}
+          disabled={isTesting || !accessToken || isSaving || isMigrating || isMigratingLyrics}
         >
           {isTesting ? (
             <>
@@ -490,7 +515,7 @@ export const DropboxSettings = () => {
               Test en cours...
             </>
           ) : (
-            'Tester la connexion'
+            'Tester le jeton'
           )}
         </Button>
         <Button 

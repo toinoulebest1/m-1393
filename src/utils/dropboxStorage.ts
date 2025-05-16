@@ -1,4 +1,5 @@
-import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
+
+import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -21,221 +22,23 @@ export const saveDropboxConfig = (config: DropboxConfig): void => {
   localStorage.setItem('dropbox_config', JSON.stringify(config));
 };
 
-// Nouvelle fonction pour gérer l'actualisation automatique du token d'accès
-export const refreshDropboxToken = async (): Promise<boolean> => {
-  try {
-    console.log("Tentative de rafraîchissement du token Dropbox...");
-    
-    // Récupération de la configuration Dropbox depuis le serveur
-    const { data, error } = await supabase.functions.invoke('dropbox-refresh-token', {
-      method: 'POST',
-    });
-    
-    console.log("Réponse du refresh token:", { data, error });
-    
-    if (error) {
-      console.error("Erreur lors du rafraîchissement du token:", error);
-      return false;
-    }
-    
-    if (data?.success) {
-      console.log("Token rafraîchi avec succès:", data);
-      
-      // Mise à jour de la configuration locale
-      const localConfig = getDropboxConfig();
-      saveDropboxConfig({
-        ...localConfig,
-        isEnabled: true,
-        // Pas d'accessToken stocké localement pour des raisons de sécurité
-      });
-      
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error("Exception lors du rafraîchissement du token:", error);
-    return false;
-  }
-};
-
-// Fonction améliorée pour vérifier si Dropbox est activé
-export const isDropboxEnabled = async (): Promise<boolean> => {
-  try {
-    console.log("Vérification si Dropbox est activé...");
-    
-    // Vérifier d'abord la configuration locale
-    const localConfig = getDropboxConfig();
-    console.log("Configuration locale Dropbox:", localConfig);
-    
-    // Toujours vérifier avec le serveur pour avoir l'état le plus à jour
-    try {
-      const { data, error } = await supabase.functions.invoke('dropbox-config', {
-        method: 'GET',
-      });
-      
-      console.log("Réponse du serveur dropbox-config:", { data, error });
-      
-      if (error) {
-        console.error("Erreur lors de la vérification du serveur:", error);
-        // En cas d'erreur avec l'edge function, se rabattre sur la configuration locale
-        return localConfig.isEnabled === true;
-      }
-      
-      if (data && typeof data.isEnabled === 'boolean') {
-        console.log("Statut Dropbox selon le serveur:", data.isEnabled);
-        
-        // Mettre à jour la configuration locale si elle diffère
-        if (localConfig.isEnabled !== data.isEnabled) {
-          saveDropboxConfig({
-            ...localConfig,
-            isEnabled: data.isEnabled
-          });
-        }
-        
-        return data.isEnabled;
-      }
-      
-      // Si le serveur ne donne pas d'information claire, utiliser la config locale
-      console.log("Utilisation de la configuration locale:", localConfig.isEnabled);
-      return localConfig.isEnabled === true;
-    } catch (serverError) {
-      console.error("Exception lors de la vérification du serveur:", serverError);
-      // En cas d'erreur, se rabattre sur la configuration locale
-      return localConfig.isEnabled === true;
-    }
-  } catch (error) {
-    console.error("Erreur lors de la vérification du statut Dropbox:", error);
-    return false;
-  }
-};
-
-// Nouvelle fonction pour vérifier et mettre à jour le statut Dropbox
-export const checkAndUpdateDropboxStatus = async (): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.functions.invoke('dropbox-config', {
-      method: 'GET',
-    });
-    
-    console.log("Réponse du serveur dropbox-config:", { data, error });
-    
-    if (error) {
-      console.error("Erreur lors de la vérification du serveur:", error);
-      return false;
-    }
-    
-    if (data && typeof data.isEnabled === 'boolean') {
-      console.log("Statut Dropbox selon le serveur:", data.isEnabled);
-      
-      // Mettre à jour la configuration locale
-      saveDropboxConfig({
-        accessToken: '',
-        isEnabled: data.isEnabled
-      });
-      
-      return data.isEnabled;
-    }
-    
-    return false;
-  } catch (serverError) {
-    console.error("Exception lors de la vérification du serveur:", serverError);
-    return false;
-  }
-};
-
-// Vérifier si un token Dropbox est expiré et le rafraîchir si nécessaire
-export const ensureValidDropboxToken = async (): Promise<boolean> => {
-  try {
-    // Vérifier d'abord si Dropbox est activé
-    const isEnabled = await isDropboxEnabled();
-    if (!isEnabled) {
-      return false;
-    }
-    
-    // Vérifier l'état du token avec le serveur
-    const { data, error } = await supabase.functions.invoke('dropbox-config', {
-      method: 'POST',
-      body: { action: 'check-token' }
-    });
-    
-    console.log("Vérification du token Dropbox:", { data, error });
-    
-    if (error) {
-      console.error("Erreur lors de la vérification du token:", error);
-      return false;
-    }
-    
-    // Si le token est valide, tout est bon
-    if (data?.isValid) {
-      return true;
-    }
-    
-    // Si le token est expiré, essayer de le rafraîchir
-    if (data?.isExpired) {
-      console.log("Token expiré, tentative de rafraîchissement...");
-      return await refreshDropboxToken();
-    }
-    
-    // Si aucune information claire, on suppose que le token n'est pas valide
-    return false;
-  } catch (error) {
-    console.error("Erreur lors de la vérification du token Dropbox:", error);
-    return false;
-  }
+export const isDropboxEnabled = (): boolean => {
+  const config = getDropboxConfig();
+  return config.isEnabled && !!config.accessToken;
 };
 
 // Function to check if a file exists on Dropbox
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
-  try {
-    // D'abord vérifier si Dropbox est activé et le token est valide
-    const tokenValid = await ensureValidDropboxToken();
-    console.log(`Token Dropbox valide: ${tokenValid} pour le chemin: ${path}`);
-    
-    if (!tokenValid) {
-      return false;
-    }
-
-    // Assurer que le chemin est correctement formaté pour l'API Dropbox
-    let dropboxPath = path.startsWith('/') ? path : `/${path}`;
-    const formattedPath = dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath;
-    
-    console.log(`Vérification de l'existence du fichier sur Dropbox: ${formattedPath}`);
-    
-    // Utiliser l'edge function pour vérifier si le fichier existe
-    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'POST',
-      body: {
-        action: 'check',
-        path: formattedPath
-      }
-    });
-    
-    if (error) {
-      console.error('Error checking file existence:', error);
-      return false;
-    }
-    
-    console.log(`Résultat de la vérification Dropbox pour ${formattedPath}:`, data?.exists ? "Existe" : "N'existe pas");
-    return data?.exists || false;
-  } catch (error) {
-    console.error('Error checking if file exists on Dropbox:', error);
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
     return false;
   }
-};
-
-// Function to get a shared link for a file on Dropbox
-export const getDropboxSharedLink = async (path: string): Promise<string> => {
+  
   try {
-    // Vérifier si Dropbox est activé et le token est valide
-    const tokenValid = await ensureValidDropboxToken();
-    console.log(`Token Dropbox valide: ${tokenValid} pour le chemin: ${path}`);
-    
-    if (!tokenValid) {
-      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
-    }
-
     // First check if we have this file path saved in our database
-    let dropboxPath = path;
+    let dropboxPath = `/${path}`;
     
     try {
       const { data: fileRef, error } = await supabase
@@ -254,52 +57,207 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
       console.error('Database error when fetching reference:', dbError);
     }
     
-    console.log(`Demande de l'URL pour le chemin: ${dropboxPath}`);
-    
-    // Ensure the path is properly formatted
-    const formattedPath = dropboxPath.startsWith('/') 
-      ? dropboxPath.substring(1) 
-      : dropboxPath;
-    
-    console.log(`Chemin formaté pour la requête: ${formattedPath}`);
-    
-    // Vérifier d'abord si le fichier existe
-    const { data: existCheck, error: existError } = await supabase.functions.invoke('dropbox-storage', {
+    // Check if the file exists on Dropbox using the get_metadata API
+    const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
-      body: {
-        action: 'check',
-        path: formattedPath
-      }
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: dropboxPath
+      })
     });
     
-    if (existError || !existCheck?.exists) {
-      console.error(`Fichier non trouvé: ${formattedPath}`, existError);
-      throw new Error(`Le fichier ${formattedPath} n'existe pas sur Dropbox`);
-    }
-    
-    // Utiliser l'edge function pour récupérer l'URL
-    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+    return response.ok;
+  } catch (error) {
+    console.error('Error checking if file exists on Dropbox:', error);
+    return false;
+  }
+};
+
+// Function to upload a file to Dropbox
+export const uploadFileToDropbox = async (
+  file: File,
+  path: string
+): Promise<string> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log(`Uploading file to Dropbox: ${path}`, file);
+  console.log(`File size: ${file.size} bytes, type: ${file.type}`);
+  
+  try {
+    // Using Dropbox API v2 with fetch
+    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
-      body: {
-        action: 'get',
-        path: formattedPath
-      }
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          path: `/${path}`,
+          mode: 'overwrite',
+          autorename: true,
+          mute: false
+        })
+      },
+      body: file
     });
     
-    console.log("Réponse de dropbox-storage:", { data, error });
-    
-    if (error) {
-      console.error("Erreur avec dropbox-storage:", error);
-      throw new Error(`Erreur lors de la récupération du lien: ${error.message || JSON.stringify(error)}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Dropbox upload error status:', response.status, response.statusText);
+      console.error('Dropbox upload error details:', errorText);
+      
+      // More specific error messages based on status code
+      if (response.status === 400) {
+        toast.error("Erreur 400: Requête invalide. Vérifiez la taille du fichier et les permissions Dropbox.");
+        console.error("Possible causes: invalid file format, file too large, or incorrect parameters");
+      } else if (response.status === 401) {
+        toast.error("Erreur 401: Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
+      } else if (response.status === 403) {
+        toast.error("Erreur 403: Accès refusé. Vérifiez les permissions de votre app Dropbox.");
+      } else if (response.status === 429) {
+        toast.error("Erreur 429: Trop de requêtes. Veuillez réessayer plus tard.");
+      } else {
+        toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
+      }
+      
+      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
-    if (!data?.url) {
-      console.error("Pas d'URL dans la réponse");
-      throw new Error('URL manquante dans la réponse');
+    const data = await response.json();
+    console.log('Dropbox upload successful:', data);
+    toast.success("Fichier téléchargé avec succès vers Dropbox");
+    
+    // Store the reference in Supabase
+    try {
+      // Insert using a raw query instead of the typed client
+      const { error } = await supabase
+        .from('dropbox_files')
+        .insert({
+          local_id: path,
+          dropbox_path: data.path_display || `/${path}`
+        });
+        
+      if (error) {
+        console.error('Error saving Dropbox reference:', error);
+        // Continue anyway since the upload succeeded
+      }
+    } catch (dbError) {
+      console.error('Database error when saving reference:', dbError);
+      // Continue anyway since the upload succeeded
     }
     
-    console.log(`URL partagée obtenue: ${data.url}`);
-    return data.url;
+    return data.path_display || `/${path}`;
+  } catch (error) {
+    console.error('Error uploading to Dropbox:', error);
+    toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
+    throw error;
+  }
+};
+
+// Function to get a shared link for a file on Dropbox
+export const getDropboxSharedLink = async (path: string): Promise<string> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  try {
+    // First check if we have this file path saved in our database
+    let dropboxPath = `/${path}`;
+    
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', path)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching Dropbox file reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching reference:', dbError);
+    }
+    
+    const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: dropboxPath,
+        settings: {
+          requested_visibility: "public"
+        }
+      })
+    });
+    
+    // If link already exists, fetch it
+    if (response.status === 409) {
+      console.log('Shared link already exists, fetching it');
+      const listResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          path: dropboxPath
+        })
+      });
+      
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error('Failed to list shared links:', errorText);
+        toast.error("Impossible de récupérer le lien de partage");
+        throw new Error('Failed to list shared links');
+      }
+      
+      const listData = await listResponse.json();
+      
+      if (listData.links && listData.links.length > 0) {
+        // Convert the shared link to a direct download link
+        let url = listData.links[0].url;
+        url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+        url = url.replace('?dl=0', '');
+        
+        return url;
+      }
+      
+      toast.error("Aucun lien de partage trouvé");
+      throw new Error('No shared links found');
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Dropbox shared link error:', errorText);
+      toast.error("Impossible de créer un lien de partage");
+      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Convert the shared link to a direct download link
+    let url = data.url;
+    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    url = url.replace('?dl=0', '');
+    
+    return url;
   } catch (error) {
     console.error('Error getting Dropbox shared link:', error);
     toast.error("Impossible d'obtenir un lien de partage Dropbox");
@@ -307,155 +265,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   }
 };
 
-// Fonction pour récupérer les paroles depuis Dropbox
-export const getLyricsFromDropbox = async (songId: string): Promise<string | null> => {
-  try {
-    // Vérifier si Dropbox est activé et le token est valide
-    const tokenValid = await ensureValidDropboxToken();
-    if (!tokenValid) {
-      return null;
-    }
-    
-    // Utiliser l'edge function pour récupérer les paroles
-    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'GET',
-      body: {
-        action: 'get-lyrics',
-        songId
-      }
-    });
-    
-    if (error || !data?.lyrics) {
-      console.error('Error fetching lyrics:', error || 'No lyrics data');
-      return null;
-    }
-    
-    return data.lyrics;
-  } catch (error) {
-    console.error('Error retrieving lyrics from Dropbox:', error);
-    return null;
-  }
-};
-
-// Fonction améliorée pour uploader les fichiers de n'importe quelle taille directement sur Dropbox
-export const uploadFileToDropbox = async (
-  file: File,
-  path: string
-): Promise<string> => {
-  try {
-    // Check if Dropbox is enabled and token is valid
-    const tokenValid = await ensureValidDropboxToken();
-    if (!tokenValid) {
-      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
-    }
-    
-    console.log(`Uploading file to Dropbox: ${path}`, file);
-    
-    // Pour tous les fichiers volumineux (plus de 10 Mo), utiliser l'endpoint direct pour éviter les problèmes de sérialisation
-    if (file.size > 10 * 1024 * 1024) {
-      console.log(`Fichier volumineux détecté: ${file.size} octets, utilisation de la méthode directe`);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('path', path);
-      
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || '';
-      
-      // Appel direct à l'edge function de Dropbox
-      const response = await fetch(`https://pwknncursthenghqgevl.functions.supabase.co/dropbox-storage`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erreur lors de l'upload: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log(`Fichier téléchargé avec succès vers: ${data.path}`);
-      return data.path;
-    }
-    
-    // Pour les fichiers plus petits, continuer avec la méthode existante
-    // Convert the file to an array of bytes for better transfer performance
-    const fileBuffer = await file.arrayBuffer();
-    const fileBytes = new Uint8Array(fileBuffer);
-    
-    console.log(`Taille du fichier: ${fileBytes.length} octets`);
-    
-    // Utilisation standard de l'edge function pour les fichiers plus petits
-    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'POST',
-      body: {
-        action: 'upload',
-        path: path,
-        fileContent: Array.from(fileBytes), // Convert to array for JSON serialization
-        contentType: file.type
-      }
-    });
-    
-    if (error) {
-      console.error("Erreur lors de l'upload vers Dropbox:", error);
-      throw error;
-    }
-    
-    if (!data?.path) {
-      throw new Error('Chemin du fichier manquant dans la réponse');
-    }
-    
-    console.log(`Fichier téléchargé avec succès vers: ${data.path}`);
-    return data.path;
-  } catch (error) {
-    console.error('Error during file upload to Dropbox:', error);
-    toast.error("Échec de l'upload vers Dropbox");
-    throw error;
-  }
-};
-
-// Fonction pour télécharger des paroles sur Dropbox
-export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
-  try {
-    // Vérifier si Dropbox est activé et le token est valide
-    const tokenValid = await ensureValidDropboxToken();
-    if (!tokenValid) {
-      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
-    }
-    
-    // Utiliser l'edge function pour upload les paroles
-    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'POST',
-      body: {
-        action: 'upload',
-        path: `lyrics/${songId}`,
-        fileContent: lyricsContent,
-        contentType: 'text/plain'
-      }
-    });
-    
-    if (error) {
-      console.error("Erreur lors de l'upload des paroles vers Dropbox:", error);
-      throw error;
-    }
-    
-    if (!data?.path) {
-      throw new Error('Chemin du fichier de paroles manquant dans la réponse');
-    }
-    
-    return data.path;
-  } catch (error) {
-    console.error('Error uploading lyrics to Dropbox:', error);
-    toast.error("Échec de l'upload des paroles vers Dropbox");
-    throw error;
-  }
-};
-
-// Fonction pour migrer les fichiers audio de Supabase vers Dropbox
+// Fonction améliorée pour migrer les fichiers audio de Supabase vers Dropbox
 export const migrateFilesToDropbox = async (
   files: Array<{ id: string; file_path: string }>,
   callbacks?: {
@@ -464,58 +274,246 @@ export const migrateFilesToDropbox = async (
     onError?: (fileId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> => {
-  try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log(`Starting migration of ${files.length} files from Supabase to Dropbox`);
+  
+  let successCount = 0;
+  let failedCount = 0;
+  const failedFiles: Array<{ id: string; error: string }> = [];
+
+  // Vérifier si le fichier existe déjà dans Dropbox
+  const checkFileExistsInDropbox = async (path: string): Promise<boolean> => {
+    try {
+      const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          path: `/${path}`
+        })
+      });
+      
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  };
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const processedCount = i + 1;
+    
+    // Appeler la callback de progression si elle existe
+    if (callbacks?.onProgress) {
+      callbacks.onProgress(processedCount, files.length);
     }
     
-    const { data: migrationData, error: migrationError } = await supabase.functions.invoke('dropbox-migration', {
-      method: 'POST',
-      body: {
-        files,
-        type: 'audio'
+    try {
+      console.log(`Processing file ${processedCount}/${files.length}: ${file.id}`);
+      
+      // Vérifier si le fichier existe déjà dans Dropbox
+      const fileExists = await checkFileExistsInDropbox(`audio/${file.id}`);
+      
+      if (fileExists) {
+        console.log(`File already exists in Dropbox: ${file.id}`);
+        
+        // Enregistrer la référence dans la base de données
+        await supabase
+          .from('dropbox_files')
+          .upsert({
+            local_id: `audio/${file.id}`,
+            dropbox_path: `/audio/${file.id}`
+          });
+        
+        successCount++;
+        if (callbacks?.onSuccess) {
+          callbacks.onSuccess(file.id);
+        }
+        continue;
       }
-    });
+      
+      // Télécharger le fichier depuis Supabase
+      const { data: fileData, error: fileError } = await supabase.storage
+        .from('audio')
+        .download(file.file_path || file.id);
+      
+      if (fileError || !fileData) {
+        console.error(`Error downloading file ${file.id} from Supabase:`, fileError);
+        failedCount++;
+        const errorMessage = fileError ? fileError.message : "Fichier introuvable dans Supabase";
+        failedFiles.push({ id: file.id, error: errorMessage });
+        
+        if (callbacks?.onError) {
+          callbacks.onError(file.id, errorMessage);
+        }
+        continue;
+      }
+      
+      // Créer un objet File à partir du Blob
+      const audioFile = new File([fileData], file.id, { 
+        type: fileData.type || 'audio/mpeg' 
+      });
+      
+      console.log(`Successfully downloaded file from Supabase: ${file.id}, size: ${audioFile.size} bytes`);
+      
+      // Uploader vers Dropbox
+      if (audioFile.size > 0) {
+        const dropboxPath = await uploadFileToDropbox(audioFile, `audio/${file.id}`);
+        console.log(`Successfully uploaded ${file.id} to Dropbox: ${dropboxPath}`);
+        
+        successCount++;
+        if (callbacks?.onSuccess) {
+          callbacks.onSuccess(file.id);
+        }
+      } else {
+        console.error(`File ${file.id} has zero size, skipping upload`);
+        failedCount++;
+        failedFiles.push({ id: file.id, error: "Fichier de taille nulle" });
+        
+        if (callbacks?.onError) {
+          callbacks.onError(file.id, "Fichier de taille nulle");
+        }
+      }
+    } catch (error) {
+      console.error(`Error migrating file ${file.id}:`, error);
+      failedCount++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      failedFiles.push({ id: file.id, error: errorMessage });
+      
+      if (callbacks?.onError) {
+        callbacks.onError(file.id, errorMessage);
+      }
+    }
+  }
+  
+  console.log(`Migration completed: ${successCount} successful, ${failedCount} failed`);
+  
+  return {
+    success: successCount,
+    failed: failedCount,
+    failedFiles
+  };
+};
+
+// Nouvelles fonctions pour gérer les paroles dans Dropbox
+
+/**
+ * Télécharge les paroles d'une chanson vers Dropbox
+ * @param songId ID de la chanson
+ * @param lyricsContent Contenu des paroles
+ * @returns Chemin Dropbox des paroles
+ */
+export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log(`Uploading lyrics for song ${songId} to Dropbox`);
+  
+  try {
+    // Convertir le contenu des paroles en fichier
+    const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
+    const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
     
-    if (migrationError || !migrationData) {
-      console.error('Error during migration:', migrationError);
-      throw new Error('Erreur lors de la migration des fichiers');
+    // Chemin Dropbox pour les paroles
+    const path = `lyrics/${songId}`;
+    
+    // Utiliser la fonction existante pour télécharger le fichier
+    const dropboxPath = await uploadFileToDropbox(lyricsFile, path);
+    
+    // Enregistrer la référence dans la base de données
+    try {
+      const { error } = await supabase
+        .from('dropbox_files')
+        .upsert({
+          local_id: `lyrics/${songId}`,
+          dropbox_path: dropboxPath
+        });
+        
+      if (error) {
+        console.error('Error saving lyrics reference:', error);
+      }
+    } catch (dbError) {
+      console.error('Database error when saving lyrics reference:', dbError);
     }
     
-    // Simuler les callbacks pour la progression
-    if (callbacks) {
-      const progressIntervals = 10;
-      let processedCount = 0;
-      
-      // Simuler la progression avec des intervalles
-      const updateProgress = setInterval(() => {
-        processedCount += Math.ceil(files.length / progressIntervals);
-        const completed = Math.min(processedCount, files.length);
-        
-        if (callbacks.onProgress) {
-          callbacks.onProgress(completed, files.length);
-        }
-        
-        // Arrêter quand la migration est terminée
-        if (completed >= files.length) {
-          clearInterval(updateProgress);
-        }
-      }, 1000);
-      
-      // Attendre un peu avant de renvoyer le résultat pour permettre les animations
-      await new Promise(resolve => setTimeout(resolve, files.length * 100));
-    }
-    
-    return migrationData;
+    return dropboxPath;
   } catch (error) {
-    console.error('Error during migration:', error);
+    console.error('Error uploading lyrics to Dropbox:', error);
+    toast.error("Échec de l'upload des paroles vers Dropbox");
     throw error;
   }
 };
 
-// Fonction pour migrer les paroles de Supabase vers Dropbox
+/**
+ * Récupère les paroles d'une chanson depuis Dropbox
+ * @param songId ID de la chanson
+ * @returns Contenu des paroles
+ */
+export const getLyricsFromDropbox = async (songId: string): Promise<string | null> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    return null;
+  }
+  
+  try {
+    // Vérifier d'abord si nous avons déjà une référence dans la base de données
+    let dropboxPath = `/lyrics/${songId}`;
+    
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', `lyrics/${songId}`)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching lyrics reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox lyrics path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching lyrics reference:', dbError);
+    }
+    
+    // Obtenir un lien partagé pour télécharger les paroles
+    const url = await getDropboxSharedLink(dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath);
+    
+    // Télécharger le contenu des paroles
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('Error downloading lyrics from Dropbox:', response.status, response.statusText);
+      return null;
+    }
+    
+    const lyrics = await response.text();
+    return lyrics;
+  } catch (error) {
+    console.error('Error retrieving lyrics from Dropbox:', error);
+    return null;
+  }
+};
+
+/**
+ * Migre les paroles de Supabase vers Dropbox
+ * @param callbacks Callbacks pour suivre la progression
+ * @returns Résultats de la migration
+ */
 export const migrateLyricsToDropbox = async (
   callbacks?: {
     onProgress?: (processed: number, total: number) => void;
@@ -523,53 +521,100 @@ export const migrateLyricsToDropbox = async (
     onError?: (songId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> => {
+  const config = getDropboxConfig();
+  
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    throw new Error('Dropbox access token not configured');
+  }
+  
+  console.log('Starting migration of lyrics from Supabase to Dropbox');
+  
   try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
+    // Récupérer toutes les paroles stockées dans Supabase
+    const { data: lyrics, error } = await supabase
+      .from('lyrics')
+      .select('song_id, content');
+    
+    if (error) {
+      console.error('Error fetching lyrics from Supabase:', error);
+      throw error;
     }
     
-    const { data: migrationData, error: migrationError } = await supabase.functions.invoke('dropbox-migration', {
-      method: 'POST',
-      body: {
-        type: 'lyrics'
+    if (!lyrics || lyrics.length === 0) {
+      console.log('No lyrics found in Supabase');
+      return { success: 0, failed: 0, failedItems: [] };
+    }
+    
+    console.log(`Found ${lyrics.length} lyrics to migrate`);
+    
+    let successCount = 0;
+    let failedCount = 0;
+    const failedItems: Array<{ id: string; error: string }> = [];
+    
+    for (let i = 0; i < lyrics.length; i++) {
+      const lyric = lyrics[i];
+      const processedCount = i + 1;
+      
+      // Appeler la callback de progression si elle existe
+      if (callbacks?.onProgress) {
+        callbacks.onProgress(processedCount, lyrics.length);
       }
-    });
-    
-    if (migrationError || !migrationData) {
-      console.error('Error during lyrics migration:', migrationError);
-      throw new Error('Erreur lors de la migration des paroles');
-    }
-    
-    // Simuler les callbacks pour la progression
-    if (callbacks && migrationData.totalCount) {
-      const progressIntervals = 10;
-      let processedCount = 0;
-      const totalCount = migrationData.totalCount;
       
-      // Simuler la progression avec des intervalles
-      const updateProgress = setInterval(() => {
-        processedCount += Math.ceil(totalCount / progressIntervals);
-        const completed = Math.min(processedCount, totalCount);
+      try {
+        console.log(`Processing lyrics ${processedCount}/${lyrics.length}: ${lyric.song_id}`);
         
-        if (callbacks.onProgress) {
-          callbacks.onProgress(completed, totalCount);
+        // Vérifier si les paroles existent déjà dans Dropbox
+        const fileExists = await checkFileExistsOnDropbox(`lyrics/${lyric.song_id}`);
+        
+        if (fileExists) {
+          console.log(`Lyrics already exist in Dropbox: ${lyric.song_id}`);
+          successCount++;
+          if (callbacks?.onSuccess) {
+            callbacks.onSuccess(lyric.song_id);
+          }
+          continue;
         }
         
-        // Arrêter quand la migration est terminée
-        if (completed >= totalCount) {
-          clearInterval(updateProgress);
+        // Télécharger les paroles vers Dropbox
+        if (lyric.content) {
+          await uploadLyricsToDropbox(lyric.song_id, lyric.content);
+          console.log(`Successfully uploaded lyrics for ${lyric.song_id} to Dropbox`);
+          
+          successCount++;
+          if (callbacks?.onSuccess) {
+            callbacks.onSuccess(lyric.song_id);
+          }
+        } else {
+          console.error(`Lyrics for ${lyric.song_id} are empty, skipping upload`);
+          failedCount++;
+          failedItems.push({ id: lyric.song_id, error: "Paroles vides" });
+          
+          if (callbacks?.onError) {
+            callbacks.onError(lyric.song_id, "Paroles vides");
+          }
         }
-      }, 1000);
-      
-      // Attendre un peu avant de renvoyer le résultat pour permettre les animations
-      await new Promise(resolve => setTimeout(resolve, totalCount * 100));
+      } catch (error) {
+        console.error(`Error migrating lyrics for ${lyric.song_id}:`, error);
+        failedCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        failedItems.push({ id: lyric.song_id, error: errorMessage });
+        
+        if (callbacks?.onError) {
+          callbacks.onError(lyric.song_id, errorMessage);
+        }
+      }
     }
     
-    return migrationData;
+    console.log(`Lyrics migration completed: ${successCount} successful, ${failedCount} failed`);
+    
+    return {
+      success: successCount,
+      failed: failedCount,
+      failedItems
+    };
   } catch (error) {
-    console.error('Error during lyrics migration:', error);
+    console.error('Error migrating lyrics to Dropbox:', error);
     throw error;
   }
 };
