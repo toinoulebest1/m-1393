@@ -98,6 +98,10 @@ serve(async (req: Request) => {
         });
       }
 
+      // Nettoyer la clé de l'application pour supprimer les espaces et tabulations
+      const cleanAppKey = dropboxAppKey.trim();
+      console.log(`Clé d'application nettoyée: ${cleanAppKey}`);
+
       // Générer une chaîne aléatoire pour le state (sécurité CSRF)
       const stateValue = crypto.randomUUID();
       
@@ -112,7 +116,7 @@ serve(async (req: Request) => {
 
       // Construire l'URL d'authentification Dropbox
       const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
-      authUrl.searchParams.append('client_id', dropboxAppKey);
+      authUrl.searchParams.append('client_id', cleanAppKey);
       authUrl.searchParams.append('response_type', 'code');
       authUrl.searchParams.append('redirect_uri', redirectUri);
       authUrl.searchParams.append('state', stateValue);
@@ -154,7 +158,11 @@ serve(async (req: Request) => {
       }
 
       // Vérifier que les variables d'environnement sont définies
-      if (!dropboxAppKey || !dropboxAppSecret || !redirectUri) {
+      // Nettoyer les clés pour supprimer les espaces et tabulations
+      const cleanAppKey = dropboxAppKey.trim();
+      const cleanAppSecret = dropboxAppSecret.trim();
+
+      if (!cleanAppKey || !cleanAppSecret || !redirectUri) {
         console.error('Configuration Dropbox incomplète pour l\'échange de jetons');
         return new Response(JSON.stringify({ 
           error: 'Configuration Dropbox incomplète pour l\'échange de jetons.' 
@@ -175,8 +183,8 @@ serve(async (req: Request) => {
         body: new URLSearchParams({
           code,
           grant_type: 'authorization_code',
-          client_id: dropboxAppKey,
-          client_secret: dropboxAppSecret,
+          client_id: cleanAppKey,
+          client_secret: cleanAppSecret,
           redirect_uri: redirectUri,
         }),
       });
