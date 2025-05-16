@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -250,7 +249,7 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
   }
 };
 
-// Optimized function to upload file to Dropbox
+// Fonction améliorée pour uploader les fichiers de n'importe quelle taille directement sur Dropbox
 export const uploadFileToDropbox = async (
   file: File,
   path: string
@@ -264,18 +263,20 @@ export const uploadFileToDropbox = async (
     
     console.log(`Uploading file to Dropbox: ${path}`, file);
     
-    // Pour les fichiers volumineux (plus de 5 Mo), utiliser un flux de chargement optimisé
-    if (file.size > 5 * 1024 * 1024) {
-      console.log(`Fichier volumineux détecté: ${file.size} octets, utilisation de méthode optimisée`);
+    // Pour tous les fichiers volumineux (plus de 10 Mo), utiliser l'endpoint direct pour éviter les problèmes de sérialisation
+    if (file.size > 10 * 1024 * 1024) {
+      console.log(`Fichier volumineux détecté: ${file.size} octets, utilisation de la méthode directe`);
       
       const formData = new FormData();
       formData.append('file', file);
       formData.append('path', path);
       
-      // Utiliser l'API de téléchargement direct du projet au lieu de l'edge function
-      // Cette approche évite la sérialisation JSON et les limites de mémoire
-      const response = await fetch(`/api/upload-to-dropbox?path=${encodeURIComponent(path)}`, {
+      // Appel direct à l'edge function de Dropbox
+      const response = await fetch(`https://pwknncursthenghqgevl.functions.supabase.co/dropbox-storage`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+        },
         body: formData
       });
       

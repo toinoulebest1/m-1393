@@ -140,7 +140,8 @@ async function migrateLyricsFile(lyrics: { song_id: string; content: string }) {
         .from('dropbox_files')
         .upsert({
           local_id: `lyrics/${lyrics.song_id}`,
-          dropbox_path: `/lyrics/${lyrics.song_id}`
+          dropbox_path: `/lyrics/${lyrics.song_id}`,
+          storage_provider: 'dropbox'
         });
       
       return {
@@ -161,7 +162,8 @@ async function migrateLyricsFile(lyrics: { song_id: string; content: string }) {
       .from('dropbox_files')
       .upsert({
         local_id: `lyrics/${lyrics.song_id}`,
-        dropbox_path: dropboxPath
+        dropbox_path: dropboxPath,
+        storage_provider: 'dropbox'
       });
     
     return {

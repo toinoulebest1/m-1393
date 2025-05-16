@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -31,32 +30,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   try {
     if (useDropbox) {
       console.log("Uploading file to Dropbox storage:", id);
-      
-      // Déterminer si le fichier est volumineux (plus de 10 Mo)
-      const isLargeFile = fileToUpload.size > 10 * 1024 * 1024;
-      console.log(`Taille du fichier: ${fileToUpload.size} octets (${isLargeFile ? 'volumineux' : 'standard'})`);
-      
-      // Pour les fichiers volumineux, utiliser le stockage Supabase comme fallback
-      if (isLargeFile) {
-        console.log("Fichier volumineux détecté, utilisation de Supabase comme fallback");
-        const { data, error } = await supabase.storage
-          .from('audio')
-          .upload(id, fileToUpload, {
-            cacheControl: '3600',
-            upsert: true,
-            contentType: fileToUpload.type || 'audio/mpeg'
-          });
-
-        if (error) {
-          console.error("Erreur lors du stockage du fichier sur Supabase:", error);
-          throw error;
-        }
-
-        console.log("Fichier volumineux uploadé avec succès sur Supabase:", data);
-        return data.path;
-      }
-      
-      // Pour les fichiers standards, continuer avec Dropbox
+      // Upload direct vers Dropbox, quelle que soit la taille du fichier
       const dropboxPath = await uploadFileToDropbox(fileToUpload, `audio/${id}`);
       
       if (!dropboxPath) {
@@ -70,7 +44,8 @@ export const storeAudioFile = async (id: string, file: File | string) => {
           .from('dropbox_files')
           .upsert({
             local_id: `audio/${id}`,
-            dropbox_path: dropboxPath
+            dropbox_path: dropboxPath,
+            storage_provider: 'dropbox'
           });
           
         if (refError) {

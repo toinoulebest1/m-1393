@@ -288,7 +288,8 @@ async function uploadLargeFile(dropboxApiKey, path, contentData) {
           .from('dropbox_files')
           .upsert({
             local_id: localId,
-            dropbox_path: result.path_display
+            dropbox_path: result.path_display,
+            storage_provider: 'dropbox'
           });
         
         return result.path_display;
@@ -376,7 +377,8 @@ async function uploadToDropbox(content, path, contentType = 'application/octet-s
         .from('dropbox_files')
         .upsert({
           local_id: localId,
-          dropbox_path: data.path_display
+          dropbox_path: data.path_display,
+          storage_provider: 'dropbox'
         });
       
       return data.path_display;

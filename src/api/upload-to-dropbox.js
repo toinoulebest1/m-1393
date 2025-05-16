@@ -42,43 +42,35 @@ export async function onRequest(context) {
       });
     }
     
-    // Utiliser Supabase Storage comme alternative fiable
-    // Nous stockons temporairement le fichier dans Supabase puis nous le référençons comme s'il était sur Dropbox
-    const fileName = path.split('/').pop();
-    const { data, error } = await supabase.storage
-      .from('audio')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type || 'audio/mpeg'
-      });
-      
-    if (error) {
-      console.error("Erreur lors du stockage du fichier:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    // Redirection vers l'edge function Dropbox Storage pour les fichiers volumineux
+    const newFormData = new FormData();
+    newFormData.append('action', 'upload');
+    newFormData.append('path', path);
+    newFormData.append('fileContent', file);
+    newFormData.append('contentType', file.type || 'application/octet-stream');
+    
+    // Appel à l'edge function Dropbox Storage
+    const dropboxResponse = await fetch('https://pwknncursthenghqgevl.functions.supabase.co/dropbox-storage', {
+      method: 'POST',
+      body: newFormData,
+      headers: {
+        // Transférer l'autorisation si disponible
+        ...(context.request.headers.get('Authorization') ? {
+          'Authorization': context.request.headers.get('Authorization')
+        } : {})
+      }
+    });
+    
+    if (!dropboxResponse.ok) {
+      const error = await dropboxResponse.text();
+      throw new Error(`Upload error: ${dropboxResponse.status} - ${error}`);
     }
     
-    // Ajouter une référence dans la table dropbox_files pour simuler un stockage Dropbox
-    const { error: refError } = await supabase
-      .from('dropbox_files')
-      .upsert({
-        local_id: path,
-        dropbox_path: `/supabase_fallback/${fileName}`,
-        storage_provider: 'supabase'  // Indique que le fichier est en réalité sur Supabase
-      });
-      
-    if (refError) {
-      console.error("Erreur lors de l'enregistrement de la référence:", refError);
-    }
+    const data = await dropboxResponse.json();
     
     return new Response(JSON.stringify({ 
       success: true,
-      path: `/supabase_fallback/${fileName}`
+      path: data.path || data.path_display
     }), {
       status: 200,
       headers: {

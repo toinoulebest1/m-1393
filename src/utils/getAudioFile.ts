@@ -8,7 +8,7 @@ export async function getAudioFileUrl(path: string): Promise<string> {
   }
 
   try {
-    // Vérifier d'abord si c'est un fichier fallback stocké sur Supabase
+    // Vérifier d'abord si c'est un fichier stocké sur Dropbox
     const { data: fileRef } = await supabase
       .from('dropbox_files')
       .select('storage_provider, dropbox_path')
@@ -23,6 +23,24 @@ export async function getAudioFileUrl(path: string): Promise<string> {
         .getPublicUrl(fileName);
         
       return data.publicUrl;
+    }
+    
+    // Si c'est un fichier stocké sur Dropbox
+    if (fileRef?.storage_provider === 'dropbox' || fileRef?.dropbox_path) {
+      // Utiliser l'edge function pour récupérer le lien partagé
+      const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+        method: 'POST',
+        body: {
+          action: 'get',
+          path: fileRef.dropbox_path || path
+        }
+      });
+      
+      if (error || !data?.url) {
+        throw error || new Error("URL Dropbox non disponible");
+      }
+      
+      return data.url;
     }
     
     // Sinon, utiliser la méthode standard pour récupérer le fichier
