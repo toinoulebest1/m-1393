@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
@@ -107,12 +106,13 @@ serve(async (req: Request) => {
           });
         }
 
-        // Construire l'URL d'authentification Dropbox
+        // Construire l'URL d'authentification Dropbox en demandant spécifiquement un refresh token
         const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
         authUrl.searchParams.append('client_id', cleanAppKey);
         authUrl.searchParams.append('response_type', 'code');
         authUrl.searchParams.append('redirect_uri', redirectUri.trim());
         authUrl.searchParams.append('state', stateValue);
+        authUrl.searchParams.append('token_access_type', 'offline');
         
         console.log(`URL d'authentification générée: ${authUrl.toString()}`);
 
@@ -273,7 +273,7 @@ serve(async (req: Request) => {
               value: { 
                 isEnabled: true,
                 accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
+                refreshToken: tokenData.refresh_token, // Stocker le refresh token
                 expiresAt: tokenData.expires_in ? 
                   new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : 
                   null,

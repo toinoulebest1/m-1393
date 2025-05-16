@@ -1,5 +1,4 @@
-
-import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
+import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -20,6 +19,44 @@ export const getDropboxConfig = (): DropboxConfig => {
 
 export const saveDropboxConfig = (config: DropboxConfig): void => {
   localStorage.setItem('dropbox_config', JSON.stringify(config));
+};
+
+// Nouvelle fonction pour gérer l'actualisation automatique du token d'accès
+export const refreshDropboxToken = async (): Promise<boolean> => {
+  try {
+    console.log("Tentative de rafraîchissement du token Dropbox...");
+    
+    // Récupération de la configuration Dropbox depuis le serveur
+    const { data, error } = await supabase.functions.invoke('dropbox-refresh-token', {
+      method: 'POST',
+    });
+    
+    console.log("Réponse du refresh token:", { data, error });
+    
+    if (error) {
+      console.error("Erreur lors du rafraîchissement du token:", error);
+      return false;
+    }
+    
+    if (data?.success) {
+      console.log("Token rafraîchi avec succès:", data);
+      
+      // Mise à jour de la configuration locale
+      const localConfig = getDropboxConfig();
+      saveDropboxConfig({
+        ...localConfig,
+        isEnabled: true,
+        // Pas d'accessToken stocké localement pour des raisons de sécurité
+      });
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Exception lors du rafraîchissement du token:", error);
+    return false;
+  }
 };
 
 export const isDropboxEnabled = async (): Promise<boolean> => {
@@ -84,14 +121,55 @@ export const checkAndUpdateDropboxStatus = async (): Promise<boolean> => {
   }
 };
 
+// Vérifier si un token Dropbox est expiré et le rafraîchir si nécessaire
+export const ensureValidDropboxToken = async (): Promise<boolean> => {
+  try {
+    // Vérifier d'abord si Dropbox est activé
+    const isEnabled = await isDropboxEnabled();
+    if (!isEnabled) {
+      return false;
+    }
+    
+    // Vérifier l'état du token avec le serveur
+    const { data, error } = await supabase.functions.invoke('dropbox-config', {
+      method: 'POST',
+      body: { action: 'check-token' }
+    });
+    
+    console.log("Vérification du token Dropbox:", { data, error });
+    
+    if (error) {
+      console.error("Erreur lors de la vérification du token:", error);
+      return false;
+    }
+    
+    // Si le token est valide, tout est bon
+    if (data?.isValid) {
+      return true;
+    }
+    
+    // Si le token est expiré, essayer de le rafraîchir
+    if (data?.isExpired) {
+      console.log("Token expiré, tentative de rafraîchissement...");
+      return await refreshDropboxToken();
+    }
+    
+    // Si aucune information claire, on suppose que le token n'est pas valide
+    return false;
+  } catch (error) {
+    console.error("Erreur lors de la vérification du token Dropbox:", error);
+    return false;
+  }
+};
+
 // Function to check if a file exists on Dropbox
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
   try {
-    // D'abord vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    console.log(`Dropbox activé: ${dropboxEnabled} pour le chemin: ${path}`);
+    // D'abord vérifier si Dropbox est activé et le token est valide
+    const tokenValid = await ensureValidDropboxToken();
+    console.log(`Token Dropbox valide: ${tokenValid} pour le chemin: ${path}`);
     
-    if (!dropboxEnabled) {
+    if (!tokenValid) {
       return false;
     }
 
@@ -139,12 +217,12 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
 // Function to get a shared link for a file on Dropbox
 export const getDropboxSharedLink = async (path: string): Promise<string> => {
   try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    console.log(`Dropbox activé: ${dropboxEnabled} pour le chemin: ${path}`);
+    // Vérifier si Dropbox est activé et le token est valide
+    const tokenValid = await ensureValidDropboxToken();
+    console.log(`Token Dropbox valide: ${tokenValid} pour le chemin: ${path}`);
     
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
+    if (!tokenValid) {
+      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
     }
 
     // First check if we have this file path saved in our database
@@ -223,9 +301,9 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
 // Fonction pour récupérer les paroles depuis Dropbox
 export const getLyricsFromDropbox = async (songId: string): Promise<string | null> => {
   try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
+    // Vérifier si Dropbox est activé et le token est valide
+    const tokenValid = await ensureValidDropboxToken();
+    if (!tokenValid) {
       return null;
     }
     
@@ -256,10 +334,10 @@ export const uploadFileToDropbox = async (
   path: string
 ): Promise<string> => {
   try {
-    // Check if Dropbox is enabled
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
+    // Check if Dropbox is enabled and token is valid
+    const tokenValid = await ensureValidDropboxToken();
+    if (!tokenValid) {
+      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
     }
     
     console.log(`Uploading file to Dropbox: ${path}`, file);
@@ -334,10 +412,10 @@ export const uploadFileToDropbox = async (
 // Fonction pour télécharger des paroles sur Dropbox
 export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
   try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
+    // Vérifier si Dropbox est activé et le token est valide
+    const tokenValid = await ensureValidDropboxToken();
+    if (!tokenValid) {
+      throw new Error('Dropbox n\'est pas activé ou le token est invalide');
     }
     
     // Utiliser l'edge function pour upload les paroles
