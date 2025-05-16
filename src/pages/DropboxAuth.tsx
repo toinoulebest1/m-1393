@@ -14,6 +14,7 @@ export const DropboxAuth = () => {
   const [message, setMessage] = useState('Authentification en cours...');
   const [details, setDetails] = useState<string | null>(null);
   const [fullResponse, setFullResponse] = useState<any | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const exchangeCode = async () => {
@@ -72,11 +73,28 @@ export const DropboxAuth = () => {
           setStatus('error');
           setMessage(data?.error || 'Erreur lors de l\'authentification');
           setDetails(JSON.stringify(data, null, 2));
+          
+          // Si c'est la première tentative et qu'il y a une erreur potentiellement liée au serveur, réessayer une fois
+          if (retryCount === 0) {
+            setRetryCount(prev => prev + 1);
+            setMessage('Nouvelle tentative d\'authentification en cours...');
+            
+            // Attendre 2 secondes avant de réessayer
+            setTimeout(() => exchangeCode(), 2000);
+            return;
+          }
+          
           return;
         }
 
         setStatus('success');
         setMessage('Authentification réussie! Dropbox est maintenant connecté pour tous les utilisateurs. Redirection...');
+        
+        // Mettre à jour le localStorage pour synchroniser l'état
+        localStorage.setItem('dropbox_config', JSON.stringify({
+          accessToken: '',
+          isEnabled: true
+        }));
         
         // Rediriger vers la page de paramètres Dropbox après un court délai
         setTimeout(() => {
@@ -87,11 +105,20 @@ export const DropboxAuth = () => {
         setStatus('error');
         setMessage(`Une erreur est survenue lors de l'authentification: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
         setDetails(error instanceof Error ? error.stack : null);
+        
+        // Si c'est la première tentative, réessayer une fois
+        if (retryCount === 0) {
+          setRetryCount(prev => prev + 1);
+          setMessage('Nouvelle tentative d\'authentification en cours...');
+          
+          // Attendre 2 secondes avant de réessayer
+          setTimeout(() => exchangeCode(), 2000);
+        }
       }
     };
 
     exchangeCode();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, retryCount]);
 
   return (
     <div className="container max-w-lg my-8">
@@ -134,9 +161,14 @@ export const DropboxAuth = () => {
                   </details>
                 </div>
               )}
-              <Button onClick={() => navigate('/dropbox-settings')}>
-                Retour aux paramètres
-              </Button>
+              <div className="flex flex-col gap-2 w-full mt-4">
+                <Button onClick={() => navigate('/dropbox-settings')} variant="secondary">
+                  Retour aux paramètres
+                </Button>
+                <Button onClick={() => window.location.reload()} variant="default">
+                  Réessayer
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

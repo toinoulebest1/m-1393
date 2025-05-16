@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Loader2, ExternalLink, CheckCircle } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -10,11 +10,13 @@ export const DropboxOAuthButton = () => {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [checkFailed, setCheckFailed] = useState(false);
 
   // Vérifier si Dropbox est déjà connecté
   useEffect(() => {
     const checkDropboxConnection = async () => {
       setIsChecking(true);
+      setCheckFailed(false);
       try {
         console.log("Vérification de la connexion Dropbox...");
         const { data, error } = await supabase.functions.invoke('dropbox-config', {
@@ -26,6 +28,7 @@ export const DropboxOAuthButton = () => {
         if (error) {
           console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
           toast.error("Impossible de vérifier le statut de connexion Dropbox");
+          setCheckFailed(true);
           return;
         }
         
@@ -40,10 +43,16 @@ export const DropboxOAuthButton = () => {
         } else {
           console.log("Dropbox n'est pas activé");
           setIsConnected(false);
+          // Mettre à jour le localStorage pour synchroniser l'état
+          localStorage.setItem('dropbox_config', JSON.stringify({
+            accessToken: '',
+            isEnabled: false
+          }));
         }
       } catch (error) {
         console.error('Exception lors de la vérification de la connexion Dropbox:', error);
         toast.error("Erreur lors de la vérification de la connexion Dropbox");
+        setCheckFailed(true);
       } finally {
         setIsChecking(false);
       }
@@ -99,12 +108,76 @@ export const DropboxOAuthButton = () => {
     }
   };
 
+  const retryCheck = () => {
+    setIsChecking(true);
+    setCheckFailed(false);
+    setErrorDetails(null);
+    
+    // Attendre un peu avant de réessayer
+    setTimeout(async () => {
+      try {
+        console.log("Nouvelle tentative de vérification de la connexion Dropbox...");
+        const { data, error } = await supabase.functions.invoke('dropbox-config', {
+          method: 'GET'
+        });
+        
+        console.log("Résultat de la vérification:", { data, error });
+        
+        if (error) {
+          console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
+          toast.error("Impossible de vérifier le statut de connexion Dropbox");
+          setCheckFailed(true);
+          return;
+        }
+        
+        if (data && data.isEnabled) {
+          console.log("Dropbox est activé!");
+          setIsConnected(true);
+          toast.success("Connexion Dropbox vérifiée avec succès");
+          // Mettre à jour le localStorage
+          localStorage.setItem('dropbox_config', JSON.stringify({
+            accessToken: '',
+            isEnabled: true
+          }));
+        } else {
+          console.log("Dropbox n'est pas activé");
+          setIsConnected(false);
+          // Mettre à jour le localStorage
+          localStorage.setItem('dropbox_config', JSON.stringify({
+            accessToken: '',
+            isEnabled: false
+          }));
+        }
+      } catch (error) {
+        console.error('Exception lors de la vérification de la connexion Dropbox:', error);
+        toast.error("Erreur lors de la vérification de la connexion Dropbox");
+        setCheckFailed(true);
+      } finally {
+        setIsChecking(false);
+      }
+    }, 1000);
+  };
+
   return (
     <div className="space-y-4">
       {isChecking ? (
         <div className="flex items-center space-x-2">
           <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
           <span>Vérification du statut de connexion Dropbox...</span>
+        </div>
+      ) : checkFailed ? (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2 text-amber-500">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Impossible de vérifier la connexion Dropbox</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={retryCheck}
+          >
+            Réessayer
+          </Button>
         </div>
       ) : isConnected ? (
         <div className="flex items-center space-x-2 text-green-500">

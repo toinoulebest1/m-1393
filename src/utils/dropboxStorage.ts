@@ -25,27 +25,40 @@ export const saveDropboxConfig = (config: DropboxConfig): void => {
 export const isDropboxEnabled = async (): Promise<boolean> => {
   try {
     console.log("Vérification si Dropbox est activé...");
+    
+    let serverEnabled = false;
+    let localEnabled = false;
+    
     // Demander d'abord au serveur si Dropbox est activé
-    const { data, error } = await supabase.functions.invoke('dropbox-config', {
-      method: 'GET',
-    });
-    
-    console.log("Réponse du serveur dropbox-config:", { data, error });
-    
-    if (!error && data && data.isEnabled) {
-      console.log("Dropbox est activé selon le serveur");
-      // Synchroniser avec le localStorage pour l'état UI
-      saveDropboxConfig({
-        accessToken: '',
-        isEnabled: true
+    try {
+      const { data, error } = await supabase.functions.invoke('dropbox-config', {
+        method: 'GET',
       });
-      return true;
+      
+      console.log("Réponse du serveur dropbox-config:", { data, error });
+      
+      if (!error && data && data.isEnabled) {
+        console.log("Dropbox est activé selon le serveur");
+        serverEnabled = true;
+        
+        // Synchroniser avec le localStorage pour l'état UI
+        saveDropboxConfig({
+          accessToken: '',
+          isEnabled: true
+        });
+      }
+    } catch (serverError) {
+      console.error("Erreur lors de la vérification du serveur:", serverError);
+      // Continuer pour vérifier le stockage local
     }
     
-    // En cas d'erreur ou si le serveur dit non, vérifier les données locales
+    // Vérifier également les données locales
     const config = getDropboxConfig();
     console.log("Configuration locale Dropbox:", config);
-    return config.isEnabled;
+    localEnabled = config.isEnabled;
+    
+    // Actif si l'un des deux est actif (serveur ou local)
+    return serverEnabled || localEnabled;
   } catch (error) {
     console.error("Erreur lors de la vérification du statut Dropbox:", error);
     // Fallback sur les données locales

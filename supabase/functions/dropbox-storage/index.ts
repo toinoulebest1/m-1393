@@ -5,7 +5,6 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 // Les clés sont récupérées depuis les secrets Supabase
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const dropboxApiKey = Deno.env.get('DROPBOX_API_KEY') || '';
 
 // Création du client Supabase
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -17,26 +16,61 @@ const corsHeaders = {
 };
 
 // Vérification de la configuration Dropbox
-async function isDropboxEnabled() {
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'dropbox_config')
-    .single();
-  
-  if (error || !data) {
-    console.log("Erreur ou données manquantes pour la config Dropbox:", error);
-    return false;
+async function getDropboxApiKey() {
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'dropbox_config')
+      .single();
+    
+    if (error || !data) {
+      console.log("Erreur ou données manquantes pour la config Dropbox:", error);
+      return null;
+    }
+    
+    console.log("Configuration Dropbox trouvée:", data.value);
+    return data.value?.accessToken || Deno.env.get('DROPBOX_API_KEY') || null;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la clé API Dropbox:", error);
+    return Deno.env.get('DROPBOX_API_KEY') || null;
   }
-  
-  console.log("Configuration Dropbox trouvée:", data.value);
-  return data.value?.isEnabled && dropboxApiKey;
+}
+
+async function isDropboxEnabled() {
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'dropbox_config')
+      .single();
+    
+    if (error || !data) {
+      console.log("Erreur ou données manquantes pour la config Dropbox:", error);
+      // Vérifier le secret comme fallback
+      return !!Deno.env.get('DROPBOX_API_KEY');
+    }
+    
+    console.log("Configuration Dropbox trouvée:", data.value);
+    return (data.value?.isEnabled && (data.value?.accessToken || Deno.env.get('DROPBOX_API_KEY'))) || false;
+  } catch (error) {
+    console.error("Erreur lors de la vérification du statut Dropbox:", error);
+    // Vérifier le secret comme fallback
+    return !!Deno.env.get('DROPBOX_API_KEY');
+  }
 }
 
 // Fonction pour vérifier si un fichier existe sur Dropbox
 async function checkFileExists(path: string) {
-  console.log(`Vérification si le fichier existe sur Dropbox: ${path}`);
   try {
+    console.log(`Vérification si le fichier existe sur Dropbox: ${path}`);
+    
+    const dropboxApiKey = await getDropboxApiKey();
+    if (!dropboxApiKey) {
+      console.error('Clé API Dropbox non disponible');
+      return false;
+    }
+    
     // Check if the file exists on Dropbox using the get_metadata API
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
@@ -62,6 +96,11 @@ async function checkFileExists(path: string) {
 async function getSharedLink(path: string) {
   console.log(`Création du lien partagé pour: ${path}`);
   try {
+    const dropboxApiKey = await getDropboxApiKey();
+    if (!dropboxApiKey) {
+      throw new Error('Clé API Dropbox non disponible');
+    }
+    
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
@@ -140,10 +179,12 @@ serve(async (req: Request) => {
     
     // Vérifier que Dropbox est activé
     const enabled = await isDropboxEnabled();
-    if (!enabled || !dropboxApiKey) {
-      console.log("Dropbox n'est pas activé ou la clé API n'est pas configurée");
+    console.log(`Statut Dropbox: ${enabled ? 'Activé' : 'Désactivé'}`);
+    
+    if (!enabled) {
+      console.log("Dropbox n'est pas activé");
       return new Response(JSON.stringify({ 
-        error: 'Dropbox n\'est pas activé ou la clé API n\'est pas configurée' 
+        error: 'Dropbox n\'est pas activé' 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
