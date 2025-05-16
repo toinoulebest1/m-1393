@@ -43,11 +43,17 @@ async function isDropboxEnabled() {
       .from('app_settings')
       .select('value')
       .eq('key', 'dropbox_config')
-      .single();
+      .maybeSingle();  // Changed from single to maybeSingle to avoid errors when no record exists
     
-    if (error || !data) {
-      console.log("Erreur ou données manquantes pour la config Dropbox:", error);
+    if (error) {
+      console.log("Erreur lors de la récupération de la config Dropbox:", error);
       // Vérifier le secret comme fallback
+      return !!Deno.env.get('DROPBOX_API_KEY');
+    }
+    
+    // Si aucune donnée n'est trouvée, vérifier le secret comme fallback
+    if (!data) {
+      console.log("Aucune configuration Dropbox trouvée, vérification du secret...");
       return !!Deno.env.get('DROPBOX_API_KEY');
     }
     
@@ -79,7 +85,7 @@ async function checkFileExists(path: string) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        path: `/${path}`
+        path: path.startsWith('/') ? path : `/${path}`
       })
     });
     
@@ -101,6 +107,10 @@ async function getSharedLink(path: string) {
       throw new Error('Clé API Dropbox non disponible');
     }
     
+    // Assurons-nous que le chemin est formaté correctement
+    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    console.log(`Chemin formatté: ${formattedPath}`);
+    
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
@@ -108,7 +118,7 @@ async function getSharedLink(path: string) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        path: `/${path}`,
+        path: formattedPath,
         settings: {
           requested_visibility: "public"
         }
@@ -125,12 +135,14 @@ async function getSharedLink(path: string) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          path: `/${path}`
+          path: formattedPath
         })
       });
       
       if (!listResponse.ok) {
-        throw new Error('Failed to list shared links');
+        const errorResponse = await listResponse.json().catch(() => ({}));
+        console.error('Failed to list shared links:', errorResponse);
+        throw new Error(`Failed to list shared links: ${listResponse.status}`);
       }
       
       const listData = await listResponse.json();
@@ -148,6 +160,8 @@ async function getSharedLink(path: string) {
     }
     
     if (!response.ok) {
+      const errorResponse = await response.json().catch(() => ({}));
+      console.error('Failed to create shared link:', errorResponse);
       throw new Error(`Failed to create shared link: ${response.status}`);
     }
     
@@ -240,7 +254,7 @@ serve(async (req: Request) => {
         .from('dropbox_files')
         .select('dropbox_path')
         .eq('local_id', path)
-        .maybeSingle();
+        .maybeSingle();  // Changed from single to maybeSingle
       
       const dropboxPath = fileRef?.dropbox_path || path;
       console.log(`Chemin Dropbox résolu: ${dropboxPath}`);
@@ -277,7 +291,7 @@ serve(async (req: Request) => {
         .from('dropbox_files')
         .select('dropbox_path')
         .eq('local_id', `lyrics/${songId}`)
-        .maybeSingle();
+        .maybeSingle();  // Changed from single to maybeSingle
       
       const dropboxPath = fileRef?.dropbox_path || `lyrics/${songId}`;
       
@@ -286,7 +300,7 @@ serve(async (req: Request) => {
       if (!exists) {
         return new Response(JSON.stringify({ error: 'Paroles non trouvées' }), {
           status: 404,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
       
@@ -301,12 +315,12 @@ serve(async (req: Request) => {
         
         const lyrics = await response.text();
         return new Response(JSON.stringify({ lyrics }), {
-          headers: { 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } catch (error) {
         return new Response(JSON.stringify({ error: `Erreur lors de la récupération des paroles: ${error.message}` }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }

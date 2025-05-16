@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -34,7 +33,9 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     // pour une réponse immédiate, tout en vérifiant avec le serveur en arrière-plan
     if (localConfig.isEnabled) {
       // Toujours vérifier avec le serveur en arrière-plan pour rester synchronisé
-      checkAndUpdateDropboxStatus();
+      checkAndUpdateDropboxStatus().catch(err => 
+        console.error("Erreur lors de la vérification en arrière-plan:", err)
+      );
       return true;
     }
     
@@ -94,7 +95,7 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
     }
 
     // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
+    let dropboxPath = path.startsWith('/') ? path : `/${path}`;
     
     try {
       const { data: fileRef, error } = await supabase
@@ -146,7 +147,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     }
 
     // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
+    let dropboxPath = path;
     
     try {
       const { data: fileRef, error } = await supabase
@@ -167,20 +168,32 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     
     console.log(`Demande de l'URL pour le chemin: ${dropboxPath}`);
     
+    // Ensure the path is properly formatted
+    const formattedPath = dropboxPath.startsWith('/') 
+      ? dropboxPath.substring(1) 
+      : dropboxPath;
+    
+    console.log(`Chemin formaté pour la requête: ${formattedPath}`);
+    
     // Utiliser l'edge function pour récupérer l'URL
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'POST',
       body: {
         action: 'get',
-        path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
+        path: formattedPath
       }
     });
     
     console.log("Réponse de dropbox-storage:", { data, error });
     
-    if (error || !data?.url) {
-      console.error("Erreur avec dropbox-storage:", error || "pas d'URL dans la réponse");
-      throw new Error('Erreur lors de la récupération du lien');
+    if (error) {
+      console.error("Erreur avec dropbox-storage:", error);
+      throw new Error(`Erreur lors de la récupération du lien: ${error.message || JSON.stringify(error)}`);
+    }
+    
+    if (!data?.url) {
+      console.error("Pas d'URL dans la réponse");
+      throw new Error('URL manquante dans la réponse');
     }
     
     console.log(`URL partagée obtenue: ${data.url}`);
