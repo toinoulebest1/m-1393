@@ -18,11 +18,16 @@ export const DropboxOAuthButton = () => {
           method: 'GET'
         });
         
-        if (!error && data && data.isEnabled) {
+        if (error) {
+          console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
+          return;
+        }
+        
+        if (data && data.isEnabled) {
           setIsConnected(true);
         }
       } catch (error) {
-        console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
+        console.error('Exception lors de la vérification de la connexion Dropbox:', error);
       }
     };
     
@@ -34,14 +39,14 @@ export const DropboxOAuthButton = () => {
     setErrorDetails(null);
     
     try {
-      console.log('Initiating Dropbox OAuth...');
+      console.log('Initiation de l\'OAuth Dropbox...');
       
       const response = await supabase.functions.invoke('dropbox-oauth', {
         method: 'POST',
         body: { action: 'get-auth-url' }
       });
       
-      console.log('Dropbox OAuth response:', response);
+      console.log('Réponse OAuth Dropbox:', response);
       
       const { data, error } = response;
       
@@ -49,7 +54,6 @@ export const DropboxOAuthButton = () => {
         console.error('Erreur lors de la génération du lien d\'authentification:', error);
         toast.error(`Impossible de générer le lien d'authentification Dropbox: ${error.message || 'Une erreur est survenue'}`);
         setErrorDetails(JSON.stringify(error, null, 2));
-        setIsLoading(false);
         return;
       }
       
@@ -57,7 +61,6 @@ export const DropboxOAuthButton = () => {
         console.error('URL d\'authentification Dropbox manquante dans la réponse');
         toast.error('URL d\'authentification manquante dans la réponse du serveur');
         setErrorDetails(JSON.stringify(data, null, 2));
-        setIsLoading(false);
         return;
       }
       
