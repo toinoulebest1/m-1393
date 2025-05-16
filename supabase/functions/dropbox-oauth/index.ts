@@ -52,8 +52,24 @@ serve(async (req: Request) => {
       });
     }
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action') || '';
+    // Extraire les données de la requête
+    let requestData;
+    if (req.method === 'POST') {
+      try {
+        requestData = await req.json();
+      } catch (e) {
+        requestData = {};
+      }
+    } else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      const action = url.searchParams.get('action');
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      
+      requestData = { action, code, state };
+    }
+    
+    const action = requestData?.action || '';
 
     // Générer l'URL d'authentification Dropbox
     if (action === 'get-auth-url') {
@@ -92,8 +108,8 @@ serve(async (req: Request) => {
 
     // Échanger le code d'autorisation contre un token d'accès
     if (action === 'exchange-code') {
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
+      const code = requestData?.code;
+      const state = requestData?.state;
 
       if (!code || !state) {
         return new Response(JSON.stringify({ error: 'Code ou state manquant' }), {
@@ -169,10 +185,6 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-
-      // Enregistrer le token dans le secret Supabase
-      // Note: dans un environnement réel, nous devrions utiliser un API admin pour cela,
-      // mais nous allons simuler cette partie pour le moment
 
       return new Response(JSON.stringify({ 
         success: true, 

@@ -12,8 +12,9 @@ export const DropboxOAuthButton = () => {
     setIsLoading(true);
     
     try {
+      // Correction: utiliser POST au lieu de GET pour envoyer un body
       const { data, error } = await supabase.functions.invoke('dropbox-oauth', {
-        method: 'GET',
+        method: 'POST',
         body: { action: 'get-auth-url' }
       });
       
