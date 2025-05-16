@@ -153,8 +153,8 @@ const Index = () => {
         (payload: any) => {
           console.log("Song change detected:", payload);
           // Actualiser la chanson courante si ses métadonnées ont été mises à jour
-          if (refreshCurrentSong) {
-            console.log("Refreshing current song from Index.tsx");
+          if (refreshCurrentSong && payload.eventType === 'UPDATE' && payload.new) {
+            console.log("Refreshing current song from Index.tsx after metadata update");
             refreshCurrentSong();
             // Force re-render after metadata update
             setTimeout(() => {
