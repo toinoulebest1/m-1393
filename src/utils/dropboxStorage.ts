@@ -188,7 +188,7 @@ export const migrateFilesToDropbox = async (
     onSuccess?: (fileId: string) => void;
     onError?: (fileId: string, error: string) => void;
   }
-): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> {
+): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> => {
   try {
     // Vérifier si Dropbox est activé
     const dropboxEnabled = await isDropboxEnabled();
@@ -247,7 +247,7 @@ export const migrateLyricsToDropbox = async (
     onSuccess?: (songId: string) => void;
     onError?: (songId: string, error: string) => void;
   }
-): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> {
+): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> => {
   try {
     // Vérifier si Dropbox est activé
     const dropboxEnabled = await isDropboxEnabled();
