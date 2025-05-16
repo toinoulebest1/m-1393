@@ -102,55 +102,37 @@ export const getAudioFile = async (path: string) => {
       }
     }
 
-    // If file is not in cache, proceed normally
+    // If file is not in cache, proceed with retrieval from storage providers
     let audioUrl;
+    let retrievalAttempts = 0;
+    const maxRetrievalAttempts = 3;
     
-    try {
-      // First try with our getAudioFileUrl function that handles both Dropbox and Supabase
-      const { getAudioFileUrl } = await import('./getAudioFile');
-      audioUrl = await getAudioFileUrl(path);
-      
-      if (!audioUrl) {
-        throw new Error("URL audio non générée");
-      }
-    } catch (primaryError) {
-      console.error("Erreur avec getAudioFileUrl, essai méthode alternative:", primaryError);
-      
-      // Fallback - try directly with Supabase Storage
+    while (!audioUrl && retrievalAttempts < maxRetrievalAttempts) {
+      retrievalAttempts++;
       try {
-        // Try first with public URL (works better for most browsers)
-        const fileName = path.includes('/') ? path.split('/').pop() : path;
-        const { data: { publicUrl } } = supabase.storage
-          .from('audio')
-          .getPublicUrl(fileName || path);
-          
-        console.log("Fallback: URL publique générée:", publicUrl.substring(0, 50) + "...");
-        audioUrl = publicUrl;
-      } catch (fallbackError) {
-        console.error("Fallback également échoué:", fallbackError);
+        console.log(`Tentative ${retrievalAttempts}/${maxRetrievalAttempts} pour récupérer l'audio`);
         
-        // Last resort - try with signed URL
-        try {
-          const { data: { signedUrl } } = await supabase.storage
-            .from('audio')
-            .createSignedUrl(path, 3600);
-            
-          if (!signedUrl) {
-            throw new Error("URL signée non générée");
-          }
-          
-          console.log("Dernier recours: URL signée générée");
-          audioUrl = signedUrl;
-        } catch (lastError) {
-          console.error("Toutes les méthodes ont échoué:", lastError);
-          throw new Error("Impossible de récupérer le fichier audio après plusieurs tentatives");
+        // First try with our getAudioFileUrl function that handles both Dropbox and Supabase
+        const { getAudioFileUrl } = await import('./getAudioFile');
+        audioUrl = await getAudioFileUrl(path);
+        
+        if (!audioUrl) {
+          throw new Error("URL audio non générée");
         }
+      } catch (retrievalError) {
+        console.error(`Erreur lors de la tentative ${retrievalAttempts}:`, retrievalError);
+        
+        if (retrievalAttempts === maxRetrievalAttempts) {
+          throw retrievalError;
+        }
+        
+        // Wait a short delay before retrying
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
-    // Validate the URL before returning
     if (!audioUrl) {
-      throw new Error("URL audio non disponible après toutes les tentatives");
+      throw new Error("URL audio non disponible après plusieurs tentatives");
     }
     
     // Check if URL is accessible

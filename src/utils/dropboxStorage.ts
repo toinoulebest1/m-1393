@@ -67,24 +67,43 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     const localConfig = getDropboxConfig();
     console.log("Configuration locale Dropbox:", localConfig);
     
-    // Si la configuration locale indique que Dropbox est activé, on peut utiliser cette information
-    // pour une réponse immédiate, tout en vérifiant avec le serveur en arrière-plan
-    if (localConfig.isEnabled) {
-      // Toujours vérifier avec le serveur en arrière-plan pour rester synchronisé
-      checkAndUpdateDropboxStatus().catch(err => 
-        console.error("Erreur lors de la vérification en arrière-plan:", err)
-      );
-      return true;
+    // Toujours vérifier avec le serveur pour avoir l'état le plus à jour
+    try {
+      const { data, error } = await supabase.functions.invoke('dropbox-config', {
+        method: 'GET',
+      });
+      
+      console.log("Réponse du serveur dropbox-config:", { data, error });
+      
+      if (error) {
+        console.error("Erreur lors de la vérification du serveur:", error);
+        // En cas d'erreur avec l'edge function, se rabattre sur la configuration locale
+        return localConfig.isEnabled === true;
+      }
+      
+      if (data && typeof data.isEnabled === 'boolean') {
+        console.log("Statut Dropbox selon le serveur:", data.isEnabled);
+        
+        // Mettre à jour la configuration locale si elle diffère
+        if (localConfig.isEnabled !== data.isEnabled) {
+          saveDropboxConfig({
+            ...localConfig,
+            isEnabled: data.isEnabled
+          });
+        }
+        
+        return data.isEnabled;
+      }
+      
+      return localConfig.isEnabled === true;
+    } catch (serverError) {
+      console.error("Exception lors de la vérification du serveur:", serverError);
+      // En cas d'erreur, se rabattre sur la configuration locale
+      return localConfig.isEnabled === true;
     }
-    
-    // Si la configuration locale indique que Dropbox n'est pas activé,
-    // on vérifie avec le serveur pour être sûr
-    const status = await checkAndUpdateDropboxStatus();
-    return status;
   } catch (error) {
     console.error("Erreur lors de la vérification du statut Dropbox:", error);
-    // En cas d'erreur, se rabattre sur la configuration locale
-    return getDropboxConfig().isEnabled;
+    return false;
   }
 };
 

@@ -17,49 +17,75 @@ export async function getAudioFileUrl(path: string): Promise<string> {
       .eq('local_id', path)
       .maybeSingle();
       
-    // If it's a file stored in Supabase but referenced as Dropbox
-    if (fileRef?.storage_provider === 'supabase') {
-      const fileName = fileRef.dropbox_path.split('/').pop();
-      console.log(`Fichier référencé comme Dropbox mais stocké sur Supabase: ${fileName}`);
+    // Si nous avons une référence avec storage_provider explicitement défini
+    if (fileRef) {
+      console.log(`Référence de fichier trouvée. Provider: ${fileRef.storage_provider}, Path: ${fileRef.dropbox_path}`);
       
-      const { data } = supabase.storage
-        .from('audio')
-        .getPublicUrl(fileName || path);
+      // Si c'est un fichier stocké dans Supabase mais référencé comme Dropbox
+      if (fileRef.storage_provider === 'supabase') {
+        const fileName = fileRef.dropbox_path.split('/').pop();
+        console.log(`Fichier référencé comme Dropbox mais stocké sur Supabase: ${fileName}`);
         
-      console.log(`URL publique générée: ${data.publicUrl.substring(0, 50)}...`);
-      return data.publicUrl;
-    }
-    
-    // If it's a file stored on Dropbox
-    if (fileRef?.storage_provider === 'dropbox' || fileRef?.dropbox_path) {
-      try {
-        console.log(`Tentative de récupération depuis Dropbox: ${fileRef?.dropbox_path || path}`);
-        
-        // Try to get a direct download link from Dropbox using our edge function
-        const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-          method: 'POST',
-          body: {
-            action: 'get',
-            path: fileRef?.dropbox_path || path
-          }
-        });
-        
-        if (error) {
-          console.error("Erreur avec l'edge function Dropbox:", error);
-          throw error;
-        }
-        
-        if (!data?.url) {
-          console.error("URL Dropbox non disponible dans la réponse");
-          throw new Error("URL Dropbox non disponible");
-        }
-        
-        console.log(`URL Dropbox récupérée: ${data.url.substring(0, 50)}...`);
-        return data.url;
-      } catch (dropboxError) {
-        console.warn("Échec de la récupération depuis Dropbox, tentative avec Supabase:", dropboxError);
-        // Fall through to try Supabase instead
+        const { data } = supabase.storage
+          .from('audio')
+          .getPublicUrl(fileName || path);
+          
+        console.log(`URL publique générée: ${data.publicUrl.substring(0, 50)}...`);
+        return data.publicUrl;
       }
+      
+      // Si c'est un fichier stocké sur Dropbox
+      if (fileRef.storage_provider === 'dropbox' || fileRef.dropbox_path) {
+        try {
+          console.log(`Tentative de récupération depuis Dropbox: ${fileRef.dropbox_path}`);
+          
+          // Vérifier d'abord si le fichier existe réellement sur Dropbox
+          const { data: checkData, error: checkError } = await supabase.functions.invoke('dropbox-storage', {
+            method: 'POST',
+            body: {
+              action: 'check',
+              path: fileRef.dropbox_path
+            }
+          });
+          
+          if (checkError) {
+            console.error("Erreur lors de la vérification Dropbox:", checkError);
+            throw checkError;
+          }
+          
+          if (!checkData?.exists) {
+            console.warn(`Le fichier n'existe pas sur Dropbox: ${fileRef.dropbox_path}, retour à Supabase`);
+            throw new Error("Fichier non trouvé sur Dropbox");
+          }
+          
+          // Try to get a direct download link from Dropbox using our edge function
+          const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+            method: 'POST',
+            body: {
+              action: 'get',
+              path: fileRef.dropbox_path
+            }
+          });
+          
+          if (error) {
+            console.error("Erreur avec l'edge function Dropbox:", error);
+            throw error;
+          }
+          
+          if (!data?.url) {
+            console.error("URL Dropbox non disponible dans la réponse");
+            throw new Error("URL Dropbox non disponible");
+          }
+          
+          console.log(`URL Dropbox récupérée: ${data.url.substring(0, 50)}...`);
+          return data.url;
+        } catch (dropboxError) {
+          console.warn("Échec de la récupération depuis Dropbox, tentative avec Supabase:", dropboxError);
+          // Fall through to try Supabase instead
+        }
+      }
+    } else {
+      console.log("Aucune référence Dropbox trouvée pour ce chemin, utilisation de Supabase Storage.");
     }
     
     // Direct Supabase Storage approach
