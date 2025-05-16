@@ -1,8 +1,49 @@
 
 project_id = "pwknncursthenghqgevl"
 
-[functions.send-weekly-reports]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+uri = "http://localhost:54321"
+
+[realtime]
+enabled = true
+
+[analytics]
+enabled = true
+port = 54327
+
+[experimental]
+enable_realtime_replication = true
+
+# Configuration pour permettre à l'edge function d'être appelée sans JWT
+[functions.dropbox-oauth]
 verify_jwt = false
 
-[functions.dropbox-oauth]
+[functions.dropbox-config]
+verify_jwt = false
+
+[functions.dropbox-storage]
+verify_jwt = false
+
+[functions.dropbox-migration]
 verify_jwt = false

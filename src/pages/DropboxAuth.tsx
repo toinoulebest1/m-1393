@@ -76,7 +76,7 @@ export const DropboxAuth = () => {
         }
 
         setStatus('success');
-        setMessage('Authentification réussie! Redirection...');
+        setMessage('Authentification réussie! Dropbox est maintenant connecté pour tous les utilisateurs. Redirection...');
         
         // Rediriger vers la page de paramètres Dropbox après un court délai
         setTimeout(() => {
@@ -98,7 +98,7 @@ export const DropboxAuth = () => {
       <Card>
         <CardHeader>
           <CardTitle>Authentification Dropbox</CardTitle>
-          <CardDescription>Finalisation de la connexion à votre compte Dropbox</CardDescription>
+          <CardDescription>Configuration de la connexion Dropbox pour tous les utilisateurs</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4 py-6">
           {status === 'loading' && (

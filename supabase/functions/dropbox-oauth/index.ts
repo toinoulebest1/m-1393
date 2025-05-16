@@ -29,33 +29,6 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Vérifier l'authentification
-    const authHeader = req.headers.get('Authorization');
-    let isAdmin = false;
-    
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      if (!error && user) {
-        // Vérifier si l'utilisateur est admin
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-          
-        isAdmin = roleData?.role === 'admin';
-      }
-    }
-    
-    if (!isAdmin) {
-      console.log("Accès refusé: l'utilisateur n'est pas administrateur");
-      return new Response(JSON.stringify({ error: 'Accès non autorisé' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     // Extraire les données de la requête
     let requestData;
     if (req.method === 'POST') {
@@ -249,7 +222,7 @@ serve(async (req: Request) => {
         console.log(`Access Token: ${tokenData.access_token ? 'Présent' : 'Manquant'}`);
         console.log(`Refresh Token: ${tokenData.refresh_token ? 'Présent' : 'Manquant'}`);
         
-        // Enregistrer le token dans la base de données
+        // Enregistrer le token dans la base de données globalement
         const { error: updateError } = await supabase
           .from('app_settings')
           .upsert({ 
@@ -260,7 +233,8 @@ serve(async (req: Request) => {
               refreshToken: tokenData.refresh_token,
               expiresAt: tokenData.expires_in ? 
                 new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : 
-                null
+                null,
+              isGlobalAccess: true // Marquer comme accès global pour tous les utilisateurs
             },
             updated_at: new Date().toISOString()
           });
