@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTranslation } from "react-i18next";
-import { isDropboxEnabled, getLyricsFromDropbox, uploadLyricsToDropbox } from '@/utils/dropboxStorage';
+import { isDropboxEnabled, getLyricsFromDropbox } from '@/utils/dropboxStorage';
 
 interface LyricsModalProps {
   isOpen: boolean;
@@ -42,7 +42,12 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
 
   // Vérifier si Dropbox est activé
   useEffect(() => {
-    setUseDropbox(isDropboxEnabled());
+    const checkDropbox = async () => {
+      const enabled = await isDropboxEnabled();
+      setUseDropbox(enabled);
+    };
+    
+    checkDropbox();
   }, []);
 
   const { data: lyrics, isLoading, refetch } = useQuery({
@@ -128,10 +133,17 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         throw insertError;
       }
       
-      // Si Dropbox est activé, également enregistrer les paroles dans Dropbox
+      // Si Dropbox est activé, également enregistrer les paroles dans Dropbox via l'edge function
       if (useDropbox) {
         try {
-          await uploadLyricsToDropbox(songId, lyricsContent);
+          await supabase.functions.invoke('dropbox-storage', {
+            method: 'POST',
+            body: {
+              action: 'upload-lyrics',
+              songId,
+              content: lyricsContent
+            }
+          });
           console.log('Lyrics uploaded to Dropbox successfully');
         } catch (dropboxError) {
           console.error('Failed to upload lyrics to Dropbox:', dropboxError);
