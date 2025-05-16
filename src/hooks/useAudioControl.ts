@@ -54,7 +54,15 @@ export const useAudioControl = ({
       }
 
       try {
-        const audioUrl = await getAudioFile(song.url);
+        let audioUrl;
+        try {
+          audioUrl = await getAudioFile(song.url);
+        } catch (firstError) {
+          console.warn("Première tentative échouée, nouvel essai avec le stockage direct:", firstError);
+          const { data } = supabase.storage.from('audio').getPublicUrl(song.url);
+          audioUrl = data.publicUrl;
+        }
+        
         if (!audioUrl) {
           throw new Error('Fichier audio non trouvé');
         }

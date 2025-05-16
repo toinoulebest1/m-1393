@@ -103,69 +103,40 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Si le fichier n'est pas en cache, procède normalement
-    const useDropbox = await isDropboxEnabled();
-    console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
-
-    let audioUrl: string;
-    
-    if (useDropbox) {
-      // Pour Dropbox, nous devons nous assurer que le format du chemin est correct
-      const dropboxPath = path.includes('/') ? path : `audio/${path}`;
-      console.log(`Chemin formaté pour Dropbox: ${dropboxPath}`);
+    try {
+      // Essayer d'abord avec notre fonction getAudioFileUrl qui gère Dropbox et Supabase
+      const { getAudioFileUrl } = await import('./getAudioFile');
+      const audioUrl = await getAudioFileUrl(path);
       
-      // Vérifiez d'abord si le fichier existe sur Dropbox
-      const { data: existCheck, error: existError } = await supabase.functions.invoke('dropbox-storage', {
-        method: 'POST',
-        body: {
-          action: 'check',
-          path: dropboxPath
-        }
-      });
-      
-      if (existError || !existCheck?.exists) {
-        console.error("Fichier non trouvé sur Dropbox:", existError || "Le fichier n'existe pas");
-        throw new Error("Fichier audio non trouvé sur Dropbox");
+      if (!audioUrl) {
+        throw new Error("URL audio non générée");
       }
       
-      audioUrl = await getDropboxSharedLink(dropboxPath);
-    } else {
-      // Vérifie si le fichier existe
-      const { data: fileExists } = await supabase.storage
-        .from('audio')
-        .list('', { search: path });
-
-      if (!fileExists || fileExists.length === 0) {
-        console.error("Fichier non trouvé dans le stockage:", path);
-        throw new Error("Fichier audio non trouvé");
+      // Mise en cache pour les futures récupérations
+      try {
+        const response = await fetch(audioUrl);
+        const blob = await response.blob();
+        await addToCache(path, blob);
+      } catch (cacheError) {
+        console.warn("Impossible de mettre en cache le fichier:", cacheError);
+        // Continue même en cas d'échec de mise en cache
       }
 
-      const { data, error } = await supabase.storage
+      return audioUrl;
+    } catch (storageError) {
+      console.error("Erreur avec getAudioFileUrl, essai méthode classique:", storageError);
+      
+      // Fallback - essayer directement avec Supabase Storage
+      const { data: { signedUrl } } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
-
-      if (error) {
-        console.error("Erreur lors de la récupération du fichier:", error);
-        throw error;
-      }
-
-      if (!data?.signedUrl) {
+        
+      if (!signedUrl) {
         throw new Error("URL signée non générée");
       }
-
-      audioUrl = data.signedUrl;
+      
+      return signedUrl;
     }
-
-    // Mise en cache pour les futures récupérations
-    try {
-      const response = await fetch(audioUrl);
-      const blob = await response.blob();
-      await addToCache(path, blob);
-    } catch (cacheError) {
-      console.warn("Impossible de mettre en cache le fichier:", cacheError);
-      // Continue même en cas d'échec de mise en cache
-    }
-
-    return audioUrl;
   } catch (error) {
     console.error("Erreur lors de la récupération du fichier:", error);
     throw error;
