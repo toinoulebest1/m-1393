@@ -42,7 +42,7 @@ serve(async (req: Request) => {
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
           
         isAdmin = roleData?.role === 'admin';
       }
@@ -84,16 +84,19 @@ serve(async (req: Request) => {
       // Vérifier que les variables d'environnement sont définies
       if (!dropboxAppKey) {
         console.error("DROPBOX_APP_KEY non configurée");
+        return new Response(JSON.stringify({ 
+          error: 'DROPBOX_APP_KEY non configurée' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
       if (!redirectUri) {
         console.error("DROPBOX_REDIRECT_URI non configurée");
-      }
-      
-      if (!dropboxAppKey || !redirectUri) {
         return new Response(JSON.stringify({ 
-          error: 'Configuration Dropbox incomplète. Veuillez configurer DROPBOX_APP_KEY et DROPBOX_REDIRECT_URI.' 
+          error: 'DROPBOX_REDIRECT_URI non configurée' 
         }), {
-          status: 400,
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -101,24 +104,35 @@ serve(async (req: Request) => {
       // Nettoyer la clé de l'application pour supprimer les espaces et tabulations
       const cleanAppKey = dropboxAppKey.trim();
       console.log(`Clé d'application nettoyée: ${cleanAppKey}`);
+      console.log(`Redirect URI: ${redirectUri}`);
 
       // Générer une chaîne aléatoire pour le state (sécurité CSRF)
       const stateValue = crypto.randomUUID();
       
       // Stocker le state dans la base de données pour validation ultérieure
-      await supabase
+      const { error: insertError } = await supabase
         .from('oauth_states')
         .insert({
           state: stateValue,
           created_at: new Date().toISOString(),
           provider: 'dropbox'
         });
+        
+      if (insertError) {
+        console.error('Erreur lors de l\'enregistrement du state:', insertError);
+        return new Response(JSON.stringify({ 
+          error: `Erreur lors de l'enregistrement du state: ${insertError.message}` 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
       // Construire l'URL d'authentification Dropbox
       const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
       authUrl.searchParams.append('client_id', cleanAppKey);
       authUrl.searchParams.append('response_type', 'code');
-      authUrl.searchParams.append('redirect_uri', redirectUri);
+      authUrl.searchParams.append('redirect_uri', redirectUri.trim());
       authUrl.searchParams.append('state', stateValue);
       
       console.log(`URL d'authentification générée: ${authUrl.toString()}`);
@@ -147,7 +161,7 @@ serve(async (req: Request) => {
         .select('*')
         .eq('state', state)
         .eq('provider', 'dropbox')
-        .single();
+        .maybeSingle();
 
       if (stateError || !stateData) {
         console.error('État OAuth invalide ou expiré:', stateError || 'Aucune donnée trouvée');
@@ -217,7 +231,20 @@ serve(async (req: Request) => {
         }
 
         // Parser la réponse JSON
-        const tokenData = JSON.parse(responseText);
+        let tokenData;
+        try {
+          tokenData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Erreur lors du parsing de la réponse de token:', parseError);
+          return new Response(JSON.stringify({ 
+            error: `Erreur lors du parsing de la réponse: ${parseError instanceof Error ? parseError.message : 'Erreur inconnue'}`,
+            responseText
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
         console.log('Token obtenu avec succès');
         console.log(`Access Token: ${tokenData.access_token ? 'Présent' : 'Manquant'}`);
         console.log(`Refresh Token: ${tokenData.refresh_token ? 'Présent' : 'Manquant'}`);
@@ -248,6 +275,12 @@ serve(async (req: Request) => {
           });
         }
 
+        // Supprimer le state utilisé pour la sécurité CSRF
+        await supabase
+          .from('oauth_states')
+          .delete()
+          .eq('state', state);
+
         return new Response(JSON.stringify({ 
           success: true, 
           message: 'Authentification Dropbox réussie'
@@ -257,7 +290,7 @@ serve(async (req: Request) => {
       } catch (error) {
         console.error(`Exception lors de l'échange du token:`, error);
         return new Response(JSON.stringify({ 
-          error: `Exception lors de l'échange du token: ${error.message || 'Erreur inconnue'}` 
+          error: `Exception lors de l'échange du token: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -273,7 +306,10 @@ serve(async (req: Request) => {
     
   } catch (error) {
     console.error(`Erreur serveur:`, error);
-    return new Response(JSON.stringify({ error: `Erreur serveur: ${error.message || 'Erreur inconnue'}` }), {
+    return new Response(JSON.stringify({ 
+      error: `Erreur serveur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+      stack: error instanceof Error ? error.stack : undefined
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

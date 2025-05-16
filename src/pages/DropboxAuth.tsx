@@ -13,16 +13,30 @@ export const DropboxAuth = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Authentification en cours...');
   const [details, setDetails] = useState<string | null>(null);
+  const [fullResponse, setFullResponse] = useState<any | null>(null);
 
   useEffect(() => {
     const exchangeCode = async () => {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
 
       console.log('Dropbox callback parameters:', { 
         code: code ? `${code.substring(0, 10)}...` : 'manquant',
-        state: state || 'manquant'
+        state: state || 'manquant',
+        error: error || 'aucun',
+        errorDescription: errorDescription || 'aucun'
       });
+
+      // Check if there's an error in the URL parameters
+      if (error) {
+        console.error(`Erreur Dropbox: ${error} - ${errorDescription}`);
+        setStatus('error');
+        setMessage(`Erreur retournée par Dropbox: ${error}`);
+        setDetails(errorDescription || 'Aucun détail fourni');
+        return;
+      }
 
       if (!code || !state) {
         console.error('Code d\'autorisation ou state manquant');
@@ -33,10 +47,15 @@ export const DropboxAuth = () => {
 
       try {
         console.log('Échange du code d\'autorisation...');
-        const { data, error } = await supabase.functions.invoke('dropbox-oauth', {
+        const response = await supabase.functions.invoke('dropbox-oauth', {
           method: 'POST',
           body: { action: 'exchange-code', code, state }
         });
+
+        // Store the full response for debugging
+        setFullResponse(response);
+        
+        const { data, error } = response;
 
         console.log('Résultat de l\'échange:', { data, error });
 
@@ -103,6 +122,16 @@ export const DropboxAuth = () => {
               {details && (
                 <div className="w-full mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md overflow-auto">
                   <pre className="text-xs">{details}</pre>
+                </div>
+              )}
+              {fullResponse && (
+                <div className="w-full mt-4">
+                  <details>
+                    <summary className="cursor-pointer font-medium mb-2">Réponse complète (pour débogage)</summary>
+                    <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-md overflow-auto">
+                      <pre className="text-xs">{JSON.stringify(fullResponse, null, 2)}</pre>
+                    </div>
+                  </details>
                 </div>
               )}
               <Button onClick={() => navigate('/dropbox-settings')}>
