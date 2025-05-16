@@ -26,44 +26,59 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
   try {
     console.log("Vérification si Dropbox est activé...");
     
-    let serverEnabled = false;
-    let localEnabled = false;
+    // Vérifier d'abord la configuration locale
+    const localConfig = getDropboxConfig();
+    console.log("Configuration locale Dropbox:", localConfig);
     
-    // Demander d'abord au serveur si Dropbox est activé
-    try {
-      const { data, error } = await supabase.functions.invoke('dropbox-config', {
-        method: 'GET',
-      });
-      
-      console.log("Réponse du serveur dropbox-config:", { data, error });
-      
-      if (!error && data && data.isEnabled) {
-        console.log("Dropbox est activé selon le serveur");
-        serverEnabled = true;
-        
-        // Synchroniser avec le localStorage pour l'état UI
-        saveDropboxConfig({
-          accessToken: '',
-          isEnabled: true
-        });
-      }
-    } catch (serverError) {
-      console.error("Erreur lors de la vérification du serveur:", serverError);
-      // Continuer pour vérifier le stockage local
+    // Si la configuration locale indique que Dropbox est activé, on peut utiliser cette information
+    // pour une réponse immédiate, tout en vérifiant avec le serveur en arrière-plan
+    if (localConfig.isEnabled) {
+      // Toujours vérifier avec le serveur en arrière-plan pour rester synchronisé
+      checkAndUpdateDropboxStatus();
+      return true;
     }
     
-    // Vérifier également les données locales
-    const config = getDropboxConfig();
-    console.log("Configuration locale Dropbox:", config);
-    localEnabled = config.isEnabled;
-    
-    // Actif si l'un des deux est actif (serveur ou local)
-    return serverEnabled || localEnabled;
+    // Si la configuration locale indique que Dropbox n'est pas activé,
+    // on vérifie avec le serveur pour être sûr
+    const status = await checkAndUpdateDropboxStatus();
+    return status;
   } catch (error) {
     console.error("Erreur lors de la vérification du statut Dropbox:", error);
-    // Fallback sur les données locales
-    const config = getDropboxConfig();
-    return config.isEnabled;
+    // En cas d'erreur, se rabattre sur la configuration locale
+    return getDropboxConfig().isEnabled;
+  }
+};
+
+// Nouvelle fonction pour vérifier et mettre à jour le statut Dropbox
+export const checkAndUpdateDropboxStatus = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('dropbox-config', {
+      method: 'GET',
+    });
+    
+    console.log("Réponse du serveur dropbox-config:", { data, error });
+    
+    if (error) {
+      console.error("Erreur lors de la vérification du serveur:", error);
+      return getDropboxConfig().isEnabled;
+    }
+    
+    if (data && typeof data.isEnabled === 'boolean') {
+      console.log("Statut Dropbox selon le serveur:", data.isEnabled);
+      
+      // Mettre à jour la configuration locale
+      saveDropboxConfig({
+        accessToken: '',
+        isEnabled: data.isEnabled
+      });
+      
+      return data.isEnabled;
+    }
+    
+    return getDropboxConfig().isEnabled;
+  } catch (serverError) {
+    console.error("Exception lors de la vérification du serveur:", serverError);
+    return getDropboxConfig().isEnabled;
   }
 };
 

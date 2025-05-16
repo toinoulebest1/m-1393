@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { saveDropboxConfig, checkAndUpdateDropboxStatus } from '@/utils/dropboxStorage';
 
 export const DropboxAuth = () => {
   const [searchParams] = useSearchParams();
@@ -88,13 +89,16 @@ export const DropboxAuth = () => {
         }
 
         setStatus('success');
-        setMessage('Authentification réussie! Dropbox est maintenant connecté pour tous les utilisateurs. Redirection...');
+        setMessage('Authentification réussie! Dropbox est maintenant connecté pour tous les utilisateurs.');
         
         // Mettre à jour le localStorage pour synchroniser l'état
-        localStorage.setItem('dropbox_config', JSON.stringify({
+        saveDropboxConfig({
           accessToken: '',
           isEnabled: true
-        }));
+        });
+        
+        // Vérifier immédiatement le statut avec le serveur pour s'assurer que tout est synchronisé
+        await checkAndUpdateDropboxStatus();
         
         // Rediriger vers la page de paramètres Dropbox après un court délai
         setTimeout(() => {

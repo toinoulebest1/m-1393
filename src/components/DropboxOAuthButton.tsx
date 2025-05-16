@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ExternalLink, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { checkAndUpdateDropboxStatus, getDropboxConfig, saveDropboxConfig } from '@/utils/dropboxStorage';
 
 export const DropboxOAuthButton = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,36 +20,18 @@ export const DropboxOAuthButton = () => {
       setCheckFailed(false);
       try {
         console.log("Vérification de la connexion Dropbox...");
-        const { data, error } = await supabase.functions.invoke('dropbox-config', {
-          method: 'GET'
-        });
         
-        console.log("Résultat de la vérification:", { data, error });
-        
-        if (error) {
-          console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
-          toast.error("Impossible de vérifier le statut de connexion Dropbox");
-          setCheckFailed(true);
-          return;
-        }
-        
-        if (data && data.isEnabled) {
-          console.log("Dropbox est activé!");
+        // Vérifier d'abord la configuration locale pour une réponse rapide
+        const localConfig = getDropboxConfig();
+        if (localConfig.isEnabled) {
           setIsConnected(true);
-          // Mettre à jour le localStorage pour synchroniser l'état
-          localStorage.setItem('dropbox_config', JSON.stringify({
-            accessToken: '',
-            isEnabled: true
-          }));
-        } else {
-          console.log("Dropbox n'est pas activé");
-          setIsConnected(false);
-          // Mettre à jour le localStorage pour synchroniser l'état
-          localStorage.setItem('dropbox_config', JSON.stringify({
-            accessToken: '',
-            isEnabled: false
-          }));
         }
+        
+        // Ensuite, vérifier avec le serveur pour mettre à jour le statut
+        const serverStatus = await checkAndUpdateDropboxStatus();
+        setIsConnected(serverStatus);
+        
+        console.log("Dropbox est", serverStatus ? "activé" : "désactivé");
       } catch (error) {
         console.error('Exception lors de la vérification de la connexion Dropbox:', error);
         toast.error("Erreur lors de la vérification de la connexion Dropbox");
@@ -59,6 +42,17 @@ export const DropboxOAuthButton = () => {
     };
     
     checkDropboxConnection();
+    
+    // Configurer une vérification périodique du statut de Dropbox 
+    // (par exemple, toutes les 5 minutes)
+    const intervalId = setInterval(() => {
+      checkAndUpdateDropboxStatus().then((status) => {
+        setIsConnected(status);
+      });
+    }, 5 * 60 * 1000);
+    
+    // Nettoyer l'intervalle lors du démontage du composant
+    return () => clearInterval(intervalId);
   }, []);
 
   const initiateOAuth = async () => {
@@ -94,6 +88,14 @@ export const DropboxOAuthButton = () => {
       // Afficher l'URL pour le débogage
       console.log('Redirection vers:', data.authUrl);
       
+      // Marquer temporairement comme "en cours de connexion" en local
+      // Cela permet aux utilisateurs de garder une indication visuelle pendant l'authentification
+      saveDropboxConfig({
+        accessToken: '',
+        isEnabled: false,
+        authenticating: true
+      });
+      
       // Ouvrir la page d'authentification Dropbox dans une nouvelle fenêtre
       window.open(data.authUrl, '_blank');
       toast.success('Veuillez compléter l\'authentification dans la fenêtre ouverte');
@@ -113,49 +115,24 @@ export const DropboxOAuthButton = () => {
     setCheckFailed(false);
     setErrorDetails(null);
     
-    // Attendre un peu avant de réessayer
-    setTimeout(async () => {
-      try {
-        console.log("Nouvelle tentative de vérification de la connexion Dropbox...");
-        const { data, error } = await supabase.functions.invoke('dropbox-config', {
-          method: 'GET'
-        });
-        
-        console.log("Résultat de la vérification:", { data, error });
-        
-        if (error) {
-          console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
-          toast.error("Impossible de vérifier le statut de connexion Dropbox");
-          setCheckFailed(true);
-          return;
-        }
-        
-        if (data && data.isEnabled) {
-          console.log("Dropbox est activé!");
-          setIsConnected(true);
+    // Lancer une vérification immédiate
+    checkAndUpdateDropboxStatus()
+      .then(status => {
+        setIsConnected(status);
+        if (status) {
           toast.success("Connexion Dropbox vérifiée avec succès");
-          // Mettre à jour le localStorage
-          localStorage.setItem('dropbox_config', JSON.stringify({
-            accessToken: '',
-            isEnabled: true
-          }));
         } else {
-          console.log("Dropbox n'est pas activé");
-          setIsConnected(false);
-          // Mettre à jour le localStorage
-          localStorage.setItem('dropbox_config', JSON.stringify({
-            accessToken: '',
-            isEnabled: false
-          }));
+          toast.info("Dropbox n'est pas connecté");
         }
-      } catch (error) {
+      })
+      .catch(error => {
         console.error('Exception lors de la vérification de la connexion Dropbox:', error);
         toast.error("Erreur lors de la vérification de la connexion Dropbox");
         setCheckFailed(true);
-      } finally {
+      })
+      .finally(() => {
         setIsChecking(false);
-      }
-    }, 1000);
+      });
   };
 
   return (
