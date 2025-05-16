@@ -205,6 +205,30 @@ export type Database = {
           },
         ]
       }
+      oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          provider: string
+          state: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider: string
+          state: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider?: string
+          state?: string
+        }
+        Relationships: []
+      }
       offline_songs: {
         Row: {
           downloaded_at: string | null
