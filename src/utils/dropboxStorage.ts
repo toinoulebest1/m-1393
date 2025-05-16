@@ -1,3 +1,4 @@
+
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -263,13 +264,39 @@ export const uploadFileToDropbox = async (
     
     console.log(`Uploading file to Dropbox: ${path}`, file);
     
+    // Pour les fichiers volumineux (plus de 5 Mo), utiliser un flux de chargement optimisé
+    if (file.size > 5 * 1024 * 1024) {
+      console.log(`Fichier volumineux détecté: ${file.size} octets, utilisation de méthode optimisée`);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('path', path);
+      
+      // Utiliser l'API de téléchargement direct du projet au lieu de l'edge function
+      // Cette approche évite la sérialisation JSON et les limites de mémoire
+      const response = await fetch(`/api/upload-to-dropbox?path=${encodeURIComponent(path)}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erreur lors de l'upload: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Fichier téléchargé avec succès vers: ${data.path}`);
+      return data.path;
+    }
+    
+    // Pour les fichiers plus petits, continuer avec la méthode existante
     // Convert the file to an array of bytes for better transfer performance
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(fileBuffer);
     
     console.log(`Taille du fichier: ${fileBytes.length} octets`);
     
-    // Large file handling is now done in the edge function
+    // Utilisation standard de l'edge function pour les fichiers plus petits
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'POST',
       body: {
