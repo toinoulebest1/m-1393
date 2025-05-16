@@ -24,12 +24,16 @@ export const saveDropboxConfig = (config: DropboxConfig): void => {
 
 export const isDropboxEnabled = async (): Promise<boolean> => {
   try {
+    console.log("Vérification si Dropbox est activé...");
     // Demander d'abord au serveur si Dropbox est activé
     const { data, error } = await supabase.functions.invoke('dropbox-config', {
       method: 'GET',
     });
     
+    console.log("Réponse du serveur dropbox-config:", { data, error });
+    
     if (!error && data && data.isEnabled) {
+      console.log("Dropbox est activé selon le serveur");
       // Synchroniser avec le localStorage pour l'état UI
       saveDropboxConfig({
         accessToken: '',
@@ -40,6 +44,7 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     
     // En cas d'erreur ou si le serveur dit non, vérifier les données locales
     const config = getDropboxConfig();
+    console.log("Configuration locale Dropbox:", config);
     return config.isEnabled;
   } catch (error) {
     console.error("Erreur lors de la vérification du statut Dropbox:", error);
@@ -54,6 +59,8 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   try {
     // D'abord vérifier si Dropbox est activé
     const dropboxEnabled = await isDropboxEnabled();
+    console.log(`Dropbox activé: ${dropboxEnabled} pour le chemin: ${path}`);
+    
     if (!dropboxEnabled) {
       return false;
     }
@@ -80,7 +87,7 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
     
     // Utiliser l'edge function pour vérifier si le fichier existe
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'GET',
+      method: 'POST',
       body: {
         action: 'check',
         path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
@@ -104,6 +111,8 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   try {
     // Vérifier si Dropbox est activé
     const dropboxEnabled = await isDropboxEnabled();
+    console.log(`Dropbox activé: ${dropboxEnabled} pour le chemin: ${path}`);
+    
     if (!dropboxEnabled) {
       throw new Error('Dropbox n\'est pas activé');
     }
@@ -128,19 +137,25 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
       console.error('Database error when fetching reference:', dbError);
     }
     
+    console.log(`Demande de l'URL pour le chemin: ${dropboxPath}`);
+    
     // Utiliser l'edge function pour récupérer l'URL
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
-      method: 'GET',
+      method: 'POST',
       body: {
         action: 'get',
         path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
       }
     });
     
+    console.log("Réponse de dropbox-storage:", { data, error });
+    
     if (error || !data?.url) {
+      console.error("Erreur avec dropbox-storage:", error || "pas d'URL dans la réponse");
       throw new Error('Erreur lors de la récupération du lien');
     }
     
+    console.log(`URL partagée obtenue: ${data.url}`);
     return data.url;
   } catch (error) {
     console.error('Error getting Dropbox shared link:', error);

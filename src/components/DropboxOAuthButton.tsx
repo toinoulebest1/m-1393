@@ -9,25 +9,43 @@ export const DropboxOAuthButton = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   // Vérifier si Dropbox est déjà connecté
   useEffect(() => {
     const checkDropboxConnection = async () => {
+      setIsChecking(true);
       try {
+        console.log("Vérification de la connexion Dropbox...");
         const { data, error } = await supabase.functions.invoke('dropbox-config', {
           method: 'GET'
         });
         
+        console.log("Résultat de la vérification:", { data, error });
+        
         if (error) {
           console.error('Erreur lors de la vérification de la connexion Dropbox:', error);
+          toast.error("Impossible de vérifier le statut de connexion Dropbox");
           return;
         }
         
         if (data && data.isEnabled) {
+          console.log("Dropbox est activé!");
           setIsConnected(true);
+          // Mettre à jour le localStorage pour synchroniser l'état
+          localStorage.setItem('dropbox_config', JSON.stringify({
+            accessToken: '',
+            isEnabled: true
+          }));
+        } else {
+          console.log("Dropbox n'est pas activé");
+          setIsConnected(false);
         }
       } catch (error) {
         console.error('Exception lors de la vérification de la connexion Dropbox:', error);
+        toast.error("Erreur lors de la vérification de la connexion Dropbox");
+      } finally {
+        setIsChecking(false);
       }
     };
     
@@ -83,10 +101,15 @@ export const DropboxOAuthButton = () => {
 
   return (
     <div className="space-y-4">
-      {isConnected ? (
+      {isChecking ? (
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+          <span>Vérification du statut de connexion Dropbox...</span>
+        </div>
+      ) : isConnected ? (
         <div className="flex items-center space-x-2 text-green-500">
           <CheckCircle className="h-5 w-5" />
-          <span>Dropbox est déjà connecté pour tous les utilisateurs</span>
+          <span>Dropbox est connecté pour tous les utilisateurs</span>
         </div>
       ) : (
         <Button 
