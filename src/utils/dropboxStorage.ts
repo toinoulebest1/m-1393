@@ -1,5 +1,4 @@
-
-import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
+import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -27,13 +26,142 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
-// Function to check if a file exists on Dropbox
+// Nouvelle fonction pour vérifier si le token d'accès est expiré
+export const isAccessTokenExpired = (): boolean => {
+  const config = getDropboxConfig();
+  if (!config.expiresAt) return true;
+  
+  // Ajouter une marge de 5 minutes avant l'expiration réelle
+  const safetyMarginMs = 5 * 60 * 1000;
+  return Date.now() >= (config.expiresAt - safetyMarginMs);
+};
+
+// Nouvelle fonction pour rafraîchir le token d'accès si nécessaire
+export const refreshAccessTokenIfNeeded = async (): Promise<boolean> => {
+  const config = getDropboxConfig();
+  
+  // Si pas de refresh token ou pas d'identifiants client, impossible de rafraîchir
+  if (!config.refreshToken || !config.clientId || !config.clientSecret) {
+    return false;
+  }
+  
+  // Si le token n'est pas expiré, pas besoin de rafraîchir
+  if (config.expiresAt && Date.now() < config.expiresAt) {
+    return true;
+  }
+  
+  try {
+    console.log('Rafraîchissement du token Dropbox...');
+    
+    const formData = new URLSearchParams();
+    formData.append('grant_type', 'refresh_token');
+    formData.append('refresh_token', config.refreshToken);
+    formData.append('client_id', config.clientId);
+    formData.append('client_secret', config.clientSecret);
+    
+    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Échec du rafraîchissement du token:', response.status, errorText);
+      return false;
+    }
+    
+    const data = await response.json() as DropboxTokenResponse;
+    
+    // Mettre à jour le token et sa date d'expiration
+    const updatedConfig: DropboxConfig = {
+      ...config,
+      accessToken: data.access_token,
+      // Le nouveau token est valide pour data.expires_in secondes
+      expiresAt: Date.now() + ((data.expires_in || 14400) * 1000) // 4h par défaut
+    };
+    
+    saveDropboxConfig(updatedConfig);
+    console.log('Token Dropbox rafraîchi avec succès');
+    return true;
+  } catch (error) {
+    console.error('Erreur lors du rafraîchissement du token Dropbox:', error);
+    return false;
+  }
+};
+
+// Fonction pour échanger un code d'autorisation contre des tokens
+export const exchangeCodeForTokens = async (
+  code: string,
+  clientId: string,
+  clientSecret: string,
+  redirectUri: string
+): Promise<DropboxTokenResponse | null> => {
+  try {
+    const formData = new URLSearchParams();
+    formData.append('code', code);
+    formData.append('grant_type', 'authorization_code');
+    formData.append('client_id', clientId);
+    formData.append('client_secret', clientSecret);
+    formData.append('redirect_uri', redirectUri);
+    
+    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Échec de l\'échange de code:', response.status, errorText);
+      return null;
+    }
+    
+    return await response.json() as DropboxTokenResponse;
+  } catch (error) {
+    console.error('Erreur lors de l\'échange de code:', error);
+    return null;
+  }
+};
+
+// Fonction pour générer l'URL d'autorisation
+export const getAuthorizationUrl = (clientId: string, redirectUri: string): string => {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    token_access_type: 'offline',
+    redirect_uri: redirectUri
+  });
+  
+  return `https://www.dropbox.com/oauth2/authorize?${params.toString()}`;
+};
+
+// Version modifiée de la fonction existante pour vérifier/rafraîchir le token avant utilisation
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
   const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
     return false;
+  }
+  
+  // Rafraîchir le token si nécessaire
+  if (isAccessTokenExpired()) {
+    const refreshed = await refreshAccessTokenIfNeeded();
+    if (!refreshed) {
+      console.error("Failed to refresh access token");
+      return false;
+    }
+    // Récupérer la config mise à jour
+    const updatedConfig = getDropboxConfig();
+    if (!updatedConfig.accessToken) {
+      console.error("No access token available after refresh");
+      return false;
+    }
   }
   
   try {
@@ -61,7 +189,7 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
+        'Authorization': `Bearer ${getDropboxConfig().accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -76,7 +204,8 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   }
 };
 
-// Function to upload a file to Dropbox
+// Mettre à jour toutes les autres fonctions pour vérifier/rafraîchir le token avant utilisation
+// Par exemple, pour uploadFileToDropbox:
 export const uploadFileToDropbox = async (
   file: File,
   path: string
@@ -89,6 +218,16 @@ export const uploadFileToDropbox = async (
     throw new Error('Dropbox access token not configured');
   }
   
+  // Rafraîchir le token si nécessaire
+  if (isAccessTokenExpired()) {
+    const refreshed = await refreshAccessTokenIfNeeded();
+    if (!refreshed) {
+      console.error("Failed to refresh access token");
+      toast.error("Impossible de rafraîchir le token Dropbox");
+      throw new Error('Failed to refresh access token');
+    }
+  }
+  
   console.log(`Uploading file to Dropbox: ${path}`, file);
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
@@ -97,7 +236,7 @@ export const uploadFileToDropbox = async (
     const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
+        'Authorization': `Bearer ${getDropboxConfig().accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': JSON.stringify({
           path: `/${path}`,
@@ -162,7 +301,10 @@ export const uploadFileToDropbox = async (
   }
 };
 
-// Function to get a shared link for a file on Dropbox
+// De même, nous mettrions à jour getDropboxSharedLink et toutes les autres fonctions qui utilisent l'API Dropbox
+// en ajoutant la logique de rafraîchissement du token
+
+// Fonction pour récupérer un lien partagé pour un fichier sur Dropbox
 export const getDropboxSharedLink = async (path: string): Promise<string> => {
   const config = getDropboxConfig();
   

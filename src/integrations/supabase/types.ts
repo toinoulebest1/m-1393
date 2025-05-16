@@ -9,24 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       dropbox_files: {
         Row: {
           created_at: string
           dropbox_path: string
           id: string
           local_id: string
+          storage_provider: string | null
         }
         Insert: {
           created_at?: string
           dropbox_path: string
           id?: string
           local_id: string
+          storage_provider?: string | null
         }
         Update: {
           created_at?: string
           dropbox_path?: string
           id?: string
           local_id?: string
+          storage_provider?: string | null
         }
         Relationships: []
       }
@@ -204,6 +231,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          provider: string
+          state: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider: string
+          state: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          provider?: string
+          state?: string
+        }
+        Relationships: []
       }
       offline_songs: {
         Row: {
