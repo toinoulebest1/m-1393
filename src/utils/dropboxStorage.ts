@@ -1,3 +1,4 @@
+
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -235,8 +236,90 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
   }
 };
 
+// Fonction pour télécharger un fichier sur Dropbox
+export const uploadFileToDropbox = async (
+  file: File,
+  path: string
+): Promise<string> => {
+  try {
+    // Vérifier si Dropbox est activé
+    const dropboxEnabled = await isDropboxEnabled();
+    if (!dropboxEnabled) {
+      throw new Error('Dropbox n\'est pas activé');
+    }
+    
+    console.log(`Uploading file to Dropbox: ${path}`, file);
+    
+    // Convertir le fichier en ArrayBuffer
+    const fileBuffer = await file.arrayBuffer();
+    
+    // Utiliser l'edge function pour upload le fichier
+    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+      method: 'POST',
+      body: {
+        action: 'upload',
+        path: path,
+        fileContent: Array.from(new Uint8Array(fileBuffer)),
+        contentType: file.type
+      }
+    });
+    
+    if (error) {
+      console.error("Erreur lors de l'upload vers Dropbox:", error);
+      throw error;
+    }
+    
+    if (!data?.path) {
+      throw new Error('Chemin du fichier manquant dans la réponse');
+    }
+    
+    console.log(`Fichier téléchargé avec succès vers: ${data.path}`);
+    return data.path;
+  } catch (error) {
+    console.error('Error during file upload to Dropbox:', error);
+    toast.error("Échec de l'upload vers Dropbox");
+    throw error;
+  }
+};
+
+// Fonction pour télécharger des paroles sur Dropbox
+export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
+  try {
+    // Vérifier si Dropbox est activé
+    const dropboxEnabled = await isDropboxEnabled();
+    if (!dropboxEnabled) {
+      throw new Error('Dropbox n\'est pas activé');
+    }
+    
+    // Utiliser l'edge function pour upload les paroles
+    const { data, error } = await supabase.functions.invoke('dropbox-storage', {
+      method: 'POST',
+      body: {
+        action: 'upload',
+        path: `lyrics/${songId}`,
+        fileContent: lyricsContent,
+        contentType: 'text/plain'
+      }
+    });
+    
+    if (error) {
+      console.error("Erreur lors de l'upload des paroles vers Dropbox:", error);
+      throw error;
+    }
+    
+    if (!data?.path) {
+      throw new Error('Chemin du fichier de paroles manquant dans la réponse');
+    }
+    
+    return data.path;
+  } catch (error) {
+    console.error('Error uploading lyrics to Dropbox:', error);
+    toast.error("Échec de l'upload des paroles vers Dropbox");
+    throw error;
+  }
+};
+
 // Fonction pour migrer les fichiers audio de Supabase vers Dropbox
-// Cette fonction reste identique car elle est gérée par l'administrateur
 export const migrateFilesToDropbox = async (
   files: Array<{ id: string; file_path: string }>,
   callbacks?: {
@@ -351,61 +434,6 @@ export const migrateLyricsToDropbox = async (
     return migrationData;
   } catch (error) {
     console.error('Error during lyrics migration:', error);
-    throw error;
-  }
-};
-
-// Fonction qui va seulement être utilisée dans le modèle local pour garder la compatibilité
-export const uploadFileToDropbox = async (
-  file: File,
-  path: string
-): Promise<string> => {
-  try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
-    }
-    
-    // Cette fonction ne devrait plus être appelée directement, mais par compatibilité,
-    // nous allons simuler un succès en attendant l'implémentation complète
-    console.warn('La fonction uploadFileToDropbox est obsolète. Utilisez plutôt les Edge Functions.');
-    
-    // Délai simulé pour l'upload
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Simuler un chemin de retour
-    const returnPath = `/${path}`;
-    return returnPath;
-  } catch (error) {
-    console.error('Error during file upload to Dropbox:', error);
-    toast.error("Échec de l'upload vers Dropbox");
-    throw error;
-  }
-};
-
-// Fonction qui va seulement être utilisée dans le modèle local pour garder la compatibilité
-export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
-  try {
-    // Vérifier si Dropbox est activé
-    const dropboxEnabled = await isDropboxEnabled();
-    if (!dropboxEnabled) {
-      throw new Error('Dropbox n\'est pas activé');
-    }
-    
-    // Cette fonction ne devrait plus être appelée directement, mais par compatibilité,
-    // nous allons simuler un succès en attendant l'implémentation complète
-    console.warn('La fonction uploadLyricsToDropbox est obsolète. Utilisez plutôt les Edge Functions.');
-    
-    // Délai simulé pour l'upload
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Simuler un chemin de retour
-    const returnPath = `/lyrics/${songId}`;
-    return returnPath;
-  } catch (error) {
-    console.error('Error uploading lyrics to Dropbox:', error);
-    toast.error("Échec de l'upload des paroles vers Dropbox");
     throw error;
   }
 };

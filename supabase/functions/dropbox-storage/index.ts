@@ -134,6 +134,70 @@ async function checkFileExists(path: string) {
   }
 }
 
+// Fonction pour télécharger un fichier sur Dropbox
+async function uploadToDropbox(content: ArrayBuffer | string, path: string, contentType = 'application/octet-stream') {
+  try {
+    console.log(`Téléchargement du fichier vers Dropbox: ${path}`);
+    
+    // Obtenir la clé API
+    const dropboxApiKey = await getDropboxApiKey();
+    if (!dropboxApiKey) {
+      throw new Error('Clé API Dropbox non disponible');
+    }
+    
+    // Normaliser le chemin
+    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    
+    // Convertir le contenu en Uint8Array si nécessaire
+    let contentData: Uint8Array;
+    if (typeof content === 'string') {
+      const encoder = new TextEncoder();
+      contentData = encoder.encode(content);
+    } else {
+      contentData = new Uint8Array(content);
+    }
+    
+    // Upload vers Dropbox
+    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${dropboxApiKey}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          path: formattedPath,
+          mode: 'overwrite',
+          autorename: true,
+          mute: false
+        })
+      },
+      body: contentData
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erreur lors de l'upload: ${response.status} - ${errorText}`);
+      throw new Error(`Erreur d'upload: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Fichier téléchargé avec succès vers: ${data.path_display}`);
+    
+    // Enregistrer la référence dans la base de données
+    const localId = path.startsWith('/') ? path.substring(1) : path;
+    await supabase
+      .from('dropbox_files')
+      .upsert({
+        local_id: localId,
+        dropbox_path: data.path_display
+      });
+    
+    return data.path_display;
+  } catch (error) {
+    console.error('Erreur lors du téléchargement vers Dropbox:', error);
+    throw error;
+  }
+}
+
 // Fonction pour créer un lien de partage pour un fichier ou créer le fichier si nécessaire
 async function getSharedLink(path: string) {
   try {
@@ -145,7 +209,7 @@ async function getSharedLink(path: string) {
       throw new Error('Clé API Dropbox non disponible');
     }
     
-    // Assurer que le chemin est correctement formaté
+    // Assurer que le chemin est correctement formatté
     const formattedPath = path.startsWith('/') ? path : `/${path}`;
     console.log(`Chemin formatté: ${formattedPath}`);
     
@@ -297,6 +361,8 @@ serve(async (req: Request) => {
     let action;
     let path;
     let songId;
+    let fileContent;
+    let contentType;
     
     if (req.method === 'GET') {
       // Pour les requêtes GET, lire les paramètres depuis l'URL
@@ -312,11 +378,34 @@ serve(async (req: Request) => {
         action = body.action || '';
         path = body.path;
         songId = body.songId;
+        fileContent = body.fileContent;
+        contentType = body.contentType;
         console.log(`Requête ${req.method} avec action=${action}, path=${path}, songId=${songId}`);
       } catch (error) {
         console.error('Error parsing request body:', error);
         return new Response(JSON.stringify({ error: 'Invalid request body' }), {
           status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // Action pour uploader un fichier sur Dropbox
+    if (action === 'upload' && path && fileContent) {
+      try {
+        const uploadedPath = await uploadToDropbox(fileContent, path, contentType);
+        return new Response(JSON.stringify({ 
+          success: true,
+          path: uploadedPath 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error("Erreur lors de l'upload:", error);
+        return new Response(JSON.stringify({ 
+          error: `Erreur lors de l'upload: ${error.message}` 
+        }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }

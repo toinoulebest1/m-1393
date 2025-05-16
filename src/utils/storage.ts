@@ -6,7 +6,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
   // Check if we should use Dropbox instead of Supabase
-  const useDropbox = isDropboxEnabled();
+  const useDropbox = await isDropboxEnabled();
   console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
   
   let fileToUpload: File;
@@ -31,6 +31,19 @@ export const storeAudioFile = async (id: string, file: File | string) => {
     if (useDropbox) {
       console.log("Uploading file to Dropbox storage:", id);
       await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+      
+      // Ajouter une entrée dans dropbox_files pour lier l'ID local au chemin Dropbox
+      const { error: refError } = await supabase
+        .from('dropbox_files')
+        .upsert({
+          local_id: `audio/${id}`,
+          dropbox_path: `/audio/${id}`
+        });
+        
+      if (refError) {
+        console.error("Erreur lors de l'enregistrement de la référence Dropbox:", refError);
+      }
+      
       return `audio/${id}`;
     } else {
       console.log("Uploading file to Supabase storage:", id);
@@ -75,13 +88,31 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Si le fichier n'est pas en cache, procède normalement
-    const useDropbox = isDropboxEnabled();
+    const useDropbox = await isDropboxEnabled();
     console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
 
     let audioUrl: string;
     
     if (useDropbox) {
-      audioUrl = await getDropboxSharedLink(`audio/${path}`);
+      // Pour Dropbox, nous devons nous assurer que le format du chemin est correct
+      const dropboxPath = path.includes('/') ? path : `audio/${path}`;
+      console.log(`Chemin formaté pour Dropbox: ${dropboxPath}`);
+      
+      // Vérifiez d'abord si le fichier existe sur Dropbox
+      const { data: existCheck, error: existError } = await supabase.functions.invoke('dropbox-storage', {
+        method: 'POST',
+        body: {
+          action: 'check',
+          path: dropboxPath
+        }
+      });
+      
+      if (existError || !existCheck?.exists) {
+        console.error("Fichier non trouvé sur Dropbox:", existError || "Le fichier n'existe pas");
+        throw new Error("Fichier audio non trouvé sur Dropbox");
+      }
+      
+      audioUrl = await getDropboxSharedLink(dropboxPath);
     } else {
       // Vérifie si le fichier existe
       const { data: fileExists } = await supabase.storage
