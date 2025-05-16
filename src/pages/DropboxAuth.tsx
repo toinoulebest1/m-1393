@@ -12,13 +12,17 @@ export const DropboxAuth = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Authentification en cours...');
+  const [details, setDetails] = useState<string | null>(null);
 
   useEffect(() => {
     const exchangeCode = async () => {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
 
-      console.log('Dropbox callback parameters:', { code: code?.substring(0, 10) + '...', state });
+      console.log('Dropbox callback parameters:', { 
+        code: code ? `${code.substring(0, 10)}...` : 'manquant',
+        state: state || 'manquant'
+      });
 
       if (!code || !state) {
         console.error('Code d\'autorisation ou state manquant');
@@ -40,6 +44,7 @@ export const DropboxAuth = () => {
           console.error('Erreur lors de l\'échange du code:', error);
           setStatus('error');
           setMessage(`Erreur lors de l'authentification: ${error.message || 'Une erreur est survenue'}`);
+          setDetails(JSON.stringify(error, null, 2));
           return;
         }
 
@@ -47,6 +52,7 @@ export const DropboxAuth = () => {
           console.error('Échec de l\'authentification:', data?.error || 'Raison inconnue');
           setStatus('error');
           setMessage(data?.error || 'Erreur lors de l\'authentification');
+          setDetails(JSON.stringify(data, null, 2));
           return;
         }
 
@@ -61,6 +67,7 @@ export const DropboxAuth = () => {
         console.error('Erreur lors de l\'échange du code:', error);
         setStatus('error');
         setMessage(`Une erreur est survenue lors de l'authentification: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        setDetails(error instanceof Error ? error.stack : null);
       }
     };
 
@@ -93,6 +100,11 @@ export const DropboxAuth = () => {
             <>
               <XCircle className="w-16 h-16 text-red-500" />
               <p className="text-center text-lg">{message}</p>
+              {details && (
+                <div className="w-full mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md overflow-auto">
+                  <pre className="text-xs">{details}</pre>
+                </div>
+              )}
               <Button onClick={() => navigate('/dropbox-settings')}>
                 Retour aux paramètres
               </Button>

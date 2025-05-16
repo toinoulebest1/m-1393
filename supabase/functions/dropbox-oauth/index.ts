@@ -161,9 +161,14 @@ serve(async (req: Request) => {
       // Nettoyer les clés pour supprimer les espaces et tabulations
       const cleanAppKey = dropboxAppKey.trim();
       const cleanAppSecret = dropboxAppSecret.trim();
+      const cleanRedirectUri = redirectUri.trim();
 
-      if (!cleanAppKey || !cleanAppSecret || !redirectUri) {
+      if (!cleanAppKey || !cleanAppSecret || !cleanRedirectUri) {
         console.error('Configuration Dropbox incomplète pour l\'échange de jetons');
+        console.log(`App Key: ${cleanAppKey ? 'OK' : 'Manquant'}`);
+        console.log(`App Secret: ${cleanAppSecret ? 'OK' : 'Manquant'}`);
+        console.log(`Redirect URI: ${cleanRedirectUri ? 'OK' : 'Manquant'}`);
+        
         return new Response(JSON.stringify({ 
           error: 'Configuration Dropbox incomplète pour l\'échange de jetons.' 
         }), {
@@ -172,70 +177,92 @@ serve(async (req: Request) => {
         });
       }
 
-      // Échanger le code contre un token d'accès
-      console.log('Début de l\'échange du code contre un token...');
-      
-      const tokenResponse = await fetch('https://api.dropboxapi.com/oauth2/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
+      try {
+        // Échanger le code contre un token d'accès
+        console.log('Début de l\'échange du code contre un token...');
+        console.log(`Code: ${code.substring(0, 10)}...`);
+        console.log(`Redirect URI utilisée: ${cleanRedirectUri}`);
+        
+        const params = new URLSearchParams({
           code,
           grant_type: 'authorization_code',
           client_id: cleanAppKey,
           client_secret: cleanAppSecret,
-          redirect_uri: redirectUri,
-        }),
-      });
+          redirect_uri: cleanRedirectUri,
+        });
 
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        console.error(`Erreur lors de l'échange du code: ${tokenResponse.status} - ${errorText}`);
+        console.log(`Paramètres de la requête de token: ${params.toString()}`);
+
+        const tokenResponse = await fetch('https://api.dropboxapi.com/oauth2/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params,
+        });
+
+        // Log de la réponse brute pour le débogage
+        const responseText = await tokenResponse.text();
+        console.log(`Statut de la réponse token: ${tokenResponse.status}`);
+        console.log(`Réponse brute: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
+
+        if (!tokenResponse.ok) {
+          console.error(`Erreur lors de l'échange du code: ${tokenResponse.status}`);
+          return new Response(JSON.stringify({ 
+            error: `Erreur lors de l'échange du code: ${tokenResponse.status} - ${responseText}` 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Parser la réponse JSON
+        const tokenData = JSON.parse(responseText);
+        console.log('Token obtenu avec succès');
+        console.log(`Access Token: ${tokenData.access_token ? 'Présent' : 'Manquant'}`);
+        console.log(`Refresh Token: ${tokenData.refresh_token ? 'Présent' : 'Manquant'}`);
+        
+        // Enregistrer le token dans la base de données
+        const { error: updateError } = await supabase
+          .from('app_settings')
+          .upsert({ 
+            key: 'dropbox_config', 
+            value: { 
+              isEnabled: true,
+              accessToken: tokenData.access_token,
+              refreshToken: tokenData.refresh_token,
+              expiresAt: tokenData.expires_in ? 
+                new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : 
+                null
+            },
+            updated_at: new Date().toISOString()
+          });
+        
+        if (updateError) {
+          console.error(`Erreur lors de l'enregistrement du token:`, updateError);
+          return new Response(JSON.stringify({ 
+            error: `Erreur lors de l'enregistrement du token: ${updateError.message}` 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
         return new Response(JSON.stringify({ 
-          error: `Erreur lors de l'échange du code: ${tokenResponse.status} - ${errorText}` 
+          success: true, 
+          message: 'Authentification Dropbox réussie'
         }), {
-          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
-      }
-
-      // Extraire le token d'accès
-      const tokenData = await tokenResponse.json();
-      console.log('Token obtenu avec succès');
-      
-      // Enregistrer le token dans la base de données
-      const { error: updateError } = await supabase
-        .from('app_settings')
-        .upsert({ 
-          key: 'dropbox_config', 
-          value: { 
-            isEnabled: true,
-            accessToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token,
-            expiresAt: tokenData.expires_in ? 
-              new Date(Date.now() + tokenData.expires_in * 1000).toISOString() : 
-              null
-          },
-          updated_at: new Date().toISOString()
-        });
-      
-      if (updateError) {
-        console.error(`Erreur lors de l'enregistrement du token:`, updateError);
+      } catch (error) {
+        console.error(`Exception lors de l'échange du token:`, error);
         return new Response(JSON.stringify({ 
-          error: `Erreur lors de l'enregistrement du token: ${updateError.message}` 
+          error: `Exception lors de l'échange du token: ${error.message || 'Erreur inconnue'}` 
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Authentification Dropbox réussie'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
     
     console.error(`Action non supportée: ${action}`);
