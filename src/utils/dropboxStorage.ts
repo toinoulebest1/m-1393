@@ -1,3 +1,4 @@
+
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -271,11 +272,15 @@ export const uploadFileToDropbox = async (
       formData.append('file', file);
       formData.append('path', path);
       
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || '';
+      
       // Appel direct à l'edge function de Dropbox
       const response = await fetch(`https://pwknncursthenghqgevl.functions.supabase.co/dropbox-storage`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: formData
       });
