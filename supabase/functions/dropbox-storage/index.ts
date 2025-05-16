@@ -83,7 +83,7 @@ async function isDropboxEnabled() {
 }
 
 // Fonction pour vérifier si un fichier existe sur Dropbox
-async function checkFileExists(path: string) {
+async function checkFileExists(path) {
   try {
     // Normalisation du chemin
     const formattedPath = path.startsWith('/') ? path : `/${path}`;
@@ -134,10 +134,10 @@ async function checkFileExists(path: string) {
   }
 }
 
-// Fonction pour télécharger un fichier sur Dropbox
-async function uploadToDropbox(content: ArrayBuffer | string, path: string, contentType = 'application/octet-stream') {
+// Fonction optimisée pour télécharger un fichier sur Dropbox avec gestion des gros fichiers
+async function uploadToDropbox(content, path, contentType = 'application/octet-stream') {
   try {
-    console.log(`Téléchargement du fichier vers Dropbox: ${path}`);
+    console.log(`Téléchargement du fichier vers Dropbox: ${path}, taille: ${typeof content === 'string' ? content.length : 'binaire'}`);
     
     // Obtenir la clé API
     const dropboxApiKey = await getDropboxApiKey();
@@ -149,15 +149,25 @@ async function uploadToDropbox(content: ArrayBuffer | string, path: string, cont
     const formattedPath = path.startsWith('/') ? path : `/${path}`;
     
     // Convertir le contenu en Uint8Array si nécessaire
-    let contentData: Uint8Array;
+    let contentData;
     if (typeof content === 'string') {
       const encoder = new TextEncoder();
       contentData = encoder.encode(content);
+    } else if (content instanceof Array) {
+      // Si c'est déjà un tableau (comme envoyé depuis le client)
+      contentData = new Uint8Array(content);
     } else {
       contentData = new Uint8Array(content);
     }
     
-    // Upload vers Dropbox
+    console.log(`Taille du fichier à télécharger: ${contentData.length} octets`);
+    
+    // Pour les fichiers volumineux, utiliser l'API de session d'upload
+    if (contentData.length > 10 * 1024 * 1024) { // 10MB
+      return await uploadLargeFile(dropboxApiKey, formattedPath, contentData);
+    }
+    
+    // Pour les fichiers plus petits, utiliser l'API standard
     const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
@@ -198,8 +208,125 @@ async function uploadToDropbox(content: ArrayBuffer | string, path: string, cont
   }
 }
 
+// Fonction pour télécharger de gros fichiers par session
+async function uploadLargeFile(dropboxApiKey, path, contentData) {
+  console.log(`Utilisation de l'API de session pour fichier volumineux: ${path}`);
+  
+  try {
+    // 1. Démarrer une session d'upload
+    const startSessionResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/start', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${dropboxApiKey}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          close: false
+        })
+      },
+      body: new Uint8Array() // Session vide pour commencer
+    });
+    
+    if (!startSessionResp.ok) {
+      const errorText = await startSessionResp.text();
+      console.error(`Erreur lors du démarrage de la session: ${startSessionResp.status} - ${errorText}`);
+      throw new Error(`Erreur de démarrage de session: ${startSessionResp.status}`);
+    }
+    
+    const sessionData = await startSessionResp.json();
+    const sessionId = sessionData.session_id;
+    console.log(`Session d'upload créée avec ID: ${sessionId}`);
+    
+    // 2. Diviser le fichier en chunks de 4MB
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
+    let offset = 0;
+    
+    while (offset < contentData.length) {
+      const chunk = contentData.slice(offset, offset + CHUNK_SIZE);
+      const isLastChunk = offset + CHUNK_SIZE >= contentData.length;
+      
+      if (isLastChunk) {
+        // 3. Finaliser la session avec le dernier chunk
+        const finishResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/finish', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${dropboxApiKey}`,
+            'Content-Type': 'application/octet-stream',
+            'Dropbox-API-Arg': JSON.stringify({
+              cursor: {
+                session_id: sessionId,
+                offset: offset
+              },
+              commit: {
+                path: path,
+                mode: 'overwrite',
+                autorename: true,
+                mute: false
+              }
+            })
+          },
+          body: chunk
+        });
+        
+        if (!finishResp.ok) {
+          const errorText = await finishResp.text();
+          console.error(`Erreur lors de la finalisation: ${finishResp.status} - ${errorText}`);
+          throw new Error(`Erreur de finalisation: ${finishResp.status}`);
+        }
+        
+        const finishData = await finishResp.json();
+        console.log(`Upload terminé avec succès: ${finishData.path_display}`);
+        
+        // Enregistrer la référence dans la base de données
+        const localId = path.startsWith('/') ? path.substring(1) : path;
+        await supabase
+          .from('dropbox_files')
+          .upsert({
+            local_id: localId,
+            dropbox_path: finishData.path_display
+          });
+        
+        return finishData.path_display;
+      } else {
+        // Append pour les chunks intermédiaires
+        const appendResp = await fetch('https://content.dropboxapi.com/2/files/upload_session/append_v2', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${dropboxApiKey}`,
+            'Content-Type': 'application/octet-stream',
+            'Dropbox-API-Arg': JSON.stringify({
+              cursor: {
+                session_id: sessionId,
+                offset: offset
+              },
+              close: false
+            })
+          },
+          body: chunk
+        });
+        
+        if (!appendResp.ok) {
+          const errorText = await appendResp.text();
+          console.error(`Erreur lors de l'append: ${appendResp.status} - ${errorText}`);
+          throw new Error(`Erreur d'append: ${appendResp.status}`);
+        }
+        
+        console.log(`Chunk téléchargé: ${offset}-${offset + chunk.length}/${contentData.length}`);
+      }
+      
+      offset += chunk.length;
+    }
+    
+    // Ne devrait pas atteindre ici normalement
+    throw new Error("Erreur inattendue dans la logique d'upload");
+    
+  } catch (error) {
+    console.error("Erreur lors de l'upload par session:", error);
+    throw error;
+  }
+}
+
 // Fonction pour créer un lien de partage pour un fichier ou créer le fichier si nécessaire
-async function getSharedLink(path: string) {
+async function getSharedLink(path) {
   try {
     console.log(`Création du lien partagé pour: ${path}`);
     
@@ -364,6 +491,9 @@ serve(async (req: Request) => {
     let fileContent;
     let contentType;
     
+    // Détection de dépassement de mémoire pour prévenir les crashes
+    let reqSize = 0;
+    
     if (req.method === 'GET') {
       // Pour les requêtes GET, lire les paramètres depuis l'URL
       const url = new URL(req.url);
@@ -374,13 +504,41 @@ serve(async (req: Request) => {
     } else {
       // Pour les autres méthodes, lire les paramètres depuis le body
       try {
-        const body = await req.json();
-        action = body.action || '';
-        path = body.path;
-        songId = body.songId;
-        fileContent = body.fileContent;
-        contentType = body.contentType;
-        console.log(`Requête ${req.method} avec action=${action}, path=${path}, songId=${songId}`);
+        // Limiter la taille du body à 150MB
+        const MAX_SIZE = 150 * 1024 * 1024;
+        let bodyText = '';
+        
+        if (req.headers.get('Content-Type')?.includes('application/json')) {
+          bodyText = await req.text();
+          reqSize = bodyText.length;
+          
+          if (reqSize > MAX_SIZE) {
+            console.error(`Requête trop grande: ${reqSize} octets`);
+            return new Response(JSON.stringify({
+              error: 'Requête trop grande, maximum 150MB'
+            }), {
+              status: 413,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          const body = JSON.parse(bodyText);
+          action = body.action || '';
+          path = body.path;
+          songId = body.songId;
+          fileContent = body.fileContent;
+          contentType = body.contentType;
+          console.log(`Requête ${req.method} avec action=${action}, path=${path}, songId=${songId}, taille content=${fileContent ? (Array.isArray(fileContent) ? fileContent.length : 'texte') : 'aucun'}`);
+        } else {
+          // Pour les requêtes multipart/form-data ou autres
+          const formData = await req.formData();
+          action = formData.get('action') || '';
+          path = formData.get('path') || '';
+          songId = formData.get('songId') || '';
+          fileContent = formData.get('fileContent');
+          contentType = formData.get('contentType') || 'application/octet-stream';
+          console.log(`Requête ${req.method} form-data avec action=${action}, path=${path}, songId=${songId}`);
+        }
       } catch (error) {
         console.error('Error parsing request body:', error);
         return new Response(JSON.stringify({ error: 'Invalid request body' }), {
@@ -393,6 +551,7 @@ serve(async (req: Request) => {
     // Action pour uploader un fichier sur Dropbox
     if (action === 'upload' && path && fileContent) {
       try {
+        console.log(`Traitement de l'action 'upload' pour le chemin ${path}`);
         const uploadedPath = await uploadToDropbox(fileContent, path, contentType);
         return new Response(JSON.stringify({ 
           success: true,

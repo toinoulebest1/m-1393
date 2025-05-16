@@ -176,6 +176,20 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     
     console.log(`Chemin formaté pour la requête: ${formattedPath}`);
     
+    // Vérifier d'abord si le fichier existe
+    const { data: existCheck, error: existError } = await supabase.functions.invoke('dropbox-storage', {
+      method: 'POST',
+      body: {
+        action: 'check',
+        path: formattedPath
+      }
+    });
+    
+    if (existError || !existCheck?.exists) {
+      console.error(`Fichier non trouvé: ${formattedPath}`, existError);
+      throw new Error(`Le fichier ${formattedPath} n'existe pas sur Dropbox`);
+    }
+    
     // Utiliser l'edge function pour récupérer l'URL
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'POST',
@@ -236,7 +250,7 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
   }
 };
 
-// Fonction pour télécharger un fichier sur Dropbox
+// Fonction optimisée pour télécharger un fichier sur Dropbox
 export const uploadFileToDropbox = async (
   file: File,
   path: string
@@ -250,8 +264,12 @@ export const uploadFileToDropbox = async (
     
     console.log(`Uploading file to Dropbox: ${path}`, file);
     
-    // Convertir le fichier en ArrayBuffer
+    // Si le fichier est volumineux (>100MB), utiliser des morceaux
+    // La fonction edge se chargera de la méthode appropriée
     const fileBuffer = await file.arrayBuffer();
+    const contentArray = Array.from(new Uint8Array(fileBuffer));
+    
+    console.log(`Taille du fichier: ${contentArray.length} octets`);
     
     // Utiliser l'edge function pour upload le fichier
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
@@ -259,7 +277,7 @@ export const uploadFileToDropbox = async (
       body: {
         action: 'upload',
         path: path,
-        fileContent: Array.from(new Uint8Array(fileBuffer)),
+        fileContent: contentArray,
         contentType: file.type
       }
     });

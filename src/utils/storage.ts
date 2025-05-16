@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -30,14 +31,19 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   try {
     if (useDropbox) {
       console.log("Uploading file to Dropbox storage:", id);
-      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+      const dropboxPath = await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+      
+      if (!dropboxPath) {
+        console.error("Upload vers Dropbox a échoué: chemin manquant");
+        throw new Error("Échec de l'upload vers Dropbox");
+      }
       
       // Ajouter une entrée dans dropbox_files pour lier l'ID local au chemin Dropbox
       const { error: refError } = await supabase
         .from('dropbox_files')
         .upsert({
           local_id: `audio/${id}`,
-          dropbox_path: `/audio/${id}`
+          dropbox_path: dropboxPath
         });
         
       if (refError) {
