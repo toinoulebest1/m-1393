@@ -49,6 +49,10 @@ async function isDropboxEnabled() {
   try {
     // Vérifier d'abord dans les secrets d'environnement
     const envApiKey = Deno.env.get('DROPBOX_API_KEY');
+    if (envApiKey) {
+      console.log("Dropbox activé via secret d'environnement");
+      return true;
+    }
     
     // Chercher dans la base de données
     const { data, error } = await supabase
@@ -81,19 +85,18 @@ async function isDropboxEnabled() {
 // Fonction pour vérifier si un fichier existe sur Dropbox
 async function checkFileExists(path: string) {
   try {
-    console.log(`Vérification si le fichier existe sur Dropbox: ${path}`);
+    // Normalisation du chemin
+    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    console.log(`Vérification si le fichier existe sur Dropbox: ${formattedPath}`);
     
+    // Tentative de récupération de la clé API Dropbox
     const dropboxApiKey = await getDropboxApiKey();
     if (!dropboxApiKey) {
       console.error('Clé API Dropbox non disponible');
       return false;
     }
     
-    // Formater correctement le chemin
-    const formattedPath = path.startsWith('/') ? path : `/${path}`;
-    console.log(`Chemin formatté pour vérification: ${formattedPath}`);
-    
-    // Check if the file exists on Dropbox using the get_metadata API
+    // Vérifier si le fichier existe avec l'API Dropbox
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
       headers: {
@@ -106,10 +109,9 @@ async function checkFileExists(path: string) {
     });
     
     if (response.status === 409) {
-      // Le fichier n'existe pas (erreur 409)
-      console.error(`Le fichier ${formattedPath} n'existe pas sur Dropbox (erreur 409)`);
       const errorData = await response.json().catch(() => ({}));
-      console.error("Détails de l'erreur Dropbox:", JSON.stringify(errorData));
+      console.error("Le fichier n'existe pas sur Dropbox (erreur 409):", formattedPath);
+      console.error("Détails de l'erreur:", JSON.stringify(errorData));
       return false;
     }
     
@@ -117,36 +119,50 @@ async function checkFileExists(path: string) {
     console.log(`Le fichier ${formattedPath} existe: ${exists}`);
     
     if (!exists) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Détails de l'erreur Dropbox:", JSON.stringify(errorData));
+      try {
+        const errorData = await response.json();
+        console.error("Détails de l'erreur Dropbox:", JSON.stringify(errorData));
+      } catch (e) {
+        console.error("Impossible de lire la réponse d'erreur");
+      }
     }
     
     return exists;
   } catch (error) {
-    console.error('Error checking if file exists on Dropbox:', error);
+    console.error('Erreur lors de la vérification si le fichier existe:', error);
     return false;
   }
 }
 
-// Fonction pour récupérer un lien partagé
+// Fonction pour créer un lien de partage pour un fichier ou créer le fichier si nécessaire
 async function getSharedLink(path: string) {
-  console.log(`Création du lien partagé pour: ${path}`);
   try {
+    console.log(`Création du lien partagé pour: ${path}`);
+    
+    // Obtenir la clé API Dropbox
     const dropboxApiKey = await getDropboxApiKey();
     if (!dropboxApiKey) {
       throw new Error('Clé API Dropbox non disponible');
     }
     
-    // Assurons-nous que le chemin est formaté correctement
+    // Assurer que le chemin est correctement formaté
     const formattedPath = path.startsWith('/') ? path : `/${path}`;
     console.log(`Chemin formatté: ${formattedPath}`);
     
-    // Vérifier d'abord si le fichier existe
-    if (!await checkFileExists(formattedPath)) {
-      console.error(`Le fichier ${formattedPath} n'existe pas sur Dropbox!`);
-      throw new Error(`Fichier ${formattedPath} non trouvé sur Dropbox`);
+    // Vérifier si le fichier existe
+    const fileExists = await checkFileExists(formattedPath);
+    console.log(`Le fichier existe-t-il? ${fileExists}`);
+    
+    if (!fileExists) {
+      console.log(`Le fichier ${formattedPath} n'existe pas sur Dropbox.`);
+      // Retourner une erreur explicite
+      return new Response(
+        JSON.stringify({ error: `Fichier non trouvé: ${formattedPath}` }), 
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
+    // Tenter de créer un lien partagé
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
@@ -161,12 +177,19 @@ async function getSharedLink(path: string) {
       })
     });
     
-    // Si le lien existe déjà
+    // Gérer le cas où le lien existe déjà (code 409)
     if (response.status === 409) {
       console.log("Le lien existe déjà, récupération du lien existant");
-      const errorResponse = await response.json().catch(() => ({}));
-      console.log("Détails de la réponse 409:", JSON.stringify(errorResponse));
       
+      // Lire la réponse d'erreur pour le débogage
+      try {
+        const errorResponse = await response.json();
+        console.log("Détails de la réponse 409:", JSON.stringify(errorResponse));
+      } catch (e) {
+        console.log("Impossible de lire la réponse d'erreur");
+      }
+      
+      // Récupérer les liens partagés existants
       const listResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
         method: 'POST',
         headers: {
@@ -180,31 +203,37 @@ async function getSharedLink(path: string) {
       
       if (!listResponse.ok) {
         const errorData = await listResponse.json().catch(() => ({}));
-        console.error('Failed to list shared links:', errorData);
-        throw new Error(`Failed to list shared links: ${listResponse.status}`);
+        console.error('Échec de la récupération des liens partagés:', errorData);
+        throw new Error(`Échec de la récupération des liens partagés: ${listResponse.status}`);
       }
       
       const listData = await listResponse.json();
       console.log("Liste des liens partagés:", JSON.stringify(listData));
       
       if (listData.links && listData.links.length > 0) {
+        // Convertir l'URL pour accès direct
         let url = listData.links[0].url;
         url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
         url = url.replace('?dl=0', '');
         
         console.log(`Lien partagé existant trouvé: ${url}`);
-        return url;
+        return new Response(
+          JSON.stringify({ url }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
-      throw new Error('No shared links found');
+      throw new Error('Aucun lien partagé trouvé');
     }
     
+    // Gérer les autres erreurs
     if (!response.ok) {
       const errorResponse = await response.json().catch(() => ({}));
-      console.error('Failed to create shared link:', errorResponse);
-      throw new Error(`Failed to create shared link: ${response.status}`);
+      console.error('Échec de la création du lien partagé:', errorResponse);
+      throw new Error(`Échec de la création du lien partagé: ${response.status}`);
     }
     
+    // Traiter la réponse réussie
     const data = await response.json();
     console.log("Réponse de création de lien:", JSON.stringify(data));
     
@@ -214,10 +243,16 @@ async function getSharedLink(path: string) {
     url = url.replace('?dl=0', '');
     
     console.log(`Lien partagé créé: ${url}`);
-    return url;
+    return new Response(
+      JSON.stringify({ url }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error("Erreur lors de la création du lien partagé:", error);
-    throw error;
+    return new Response(
+      JSON.stringify({ error: `Erreur lors de la création du lien partagé: ${error.message}` }), 
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 }
 
@@ -233,10 +268,10 @@ serve(async (req: Request) => {
     console.log(`Requête reçue avec la méthode ${req.method}`);
     
     // Vérifier que Dropbox est activé
-    const enabled = await isDropboxEnabled();
-    console.log(`Statut Dropbox: ${enabled ? 'Activé' : 'Désactivé'}`);
+    const dropboxEnabled = await isDropboxEnabled();
+    console.log(`Statut Dropbox: ${dropboxEnabled ? 'Activé' : 'Désactivé'}`);
     
-    if (!enabled) {
+    if (!dropboxEnabled) {
       console.log("Dropbox n'est pas activé");
       return new Response(JSON.stringify({ 
         error: 'Dropbox n\'est pas activé' 
@@ -271,7 +306,7 @@ serve(async (req: Request) => {
       songId = url.searchParams.get('songId');
       console.log(`Requête GET avec action=${action}, path=${path}, songId=${songId}`);
     } else {
-      // Pour les autres méthodes, essayer de lire les paramètres depuis le body
+      // Pour les autres méthodes, lire les paramètres depuis le body
       try {
         const body = await req.json();
         action = body.action || '';
@@ -309,32 +344,8 @@ serve(async (req: Request) => {
         console.error('Erreur BD lors de la récupération de la référence:', dbError);
       }
       
-      // Vérifier si le fichier existe
-      const formattedDropboxPath = dropboxPath.startsWith('/') ? dropboxPath : `/${dropboxPath}`;
-      console.log(`Vérification si le fichier existe: ${formattedDropboxPath}`);
-      
-      const exists = await checkFileExists(formattedDropboxPath);
-      if (!exists) {
-        console.log(`Fichier ${formattedDropboxPath} non trouvé sur Dropbox`);
-        return new Response(JSON.stringify({ error: 'Fichier non trouvé' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      try {
-        const url = await getSharedLink(formattedDropboxPath);
-        console.log(`URL partagée récupérée: ${url}`);
-        return new Response(JSON.stringify({ url }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } catch (error) {
-        console.error(`Erreur lors de la récupération du lien: ${error.message}`);
-        return new Response(JSON.stringify({ error: `Erreur lors de la récupération du lien: ${error.message}` }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      // L'appel à getSharedLink renvoie directement une Response maintenant
+      return await getSharedLink(dropboxPath);
     }
     
     // Télécharger des lyrics
@@ -344,7 +355,7 @@ serve(async (req: Request) => {
         .from('dropbox_files')
         .select('dropbox_path')
         .eq('local_id', `lyrics/${songId}`)
-        .maybeSingle();  // Changed from single to maybeSingle
+        .maybeSingle();
       
       const dropboxPath = fileRef?.dropbox_path || `lyrics/${songId}`;
       
@@ -358,15 +369,25 @@ serve(async (req: Request) => {
       }
       
       try {
-        const url = await getSharedLink(dropboxPath);
+        // Utiliser la version modifiée de getSharedLink
+        const response = await getSharedLink(dropboxPath);
         
-        // Télécharger le contenu des paroles
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Erreur lors du téléchargement: ${response.status}`);
+        // Si c'est une réponse d'erreur, la renvoyer directement
+        if (response.status !== 200) {
+          return response;
         }
         
-        const lyrics = await response.text();
+        // Sinon, extraire l'URL et télécharger le contenu
+        const responseData = await response.json();
+        const url = responseData.url;
+        
+        // Télécharger le contenu des paroles
+        const lyricsResponse = await fetch(url);
+        if (!lyricsResponse.ok) {
+          throw new Error(`Erreur lors du téléchargement: ${lyricsResponse.status}`);
+        }
+        
+        const lyrics = await lyricsResponse.text();
         return new Response(JSON.stringify({ lyrics }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -378,7 +399,7 @@ serve(async (req: Request) => {
       }
     }
     
-    // Check if file exists
+    // Vérifier si un fichier existe
     if (action === 'check' && path) {
       const formattedPath = path.startsWith('/') ? path : `/${path}`;
       console.log(`Vérification d'existence pour: ${formattedPath}`);
