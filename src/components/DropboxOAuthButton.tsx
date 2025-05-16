@@ -219,6 +219,7 @@ export const DropboxOAuthButton = () => {
             size="sm"
             onClick={disconnectDropbox}
             disabled={isLoading}
+            className="w-full"
           >
             {isLoading ? (
               <>
