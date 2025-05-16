@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -54,66 +55,132 @@ export const useAudioControl = ({
       }
 
       try {
+        console.log(`Chargement du titre: ${song.title} (ID: ${song.id})`);
         let audioUrl;
-        try {
-          audioUrl = await getAudioFile(song.url);
-        } catch (firstError) {
-          console.warn("Première tentative échouée, nouvel essai avec le stockage direct:", firstError);
-          const { data } = supabase.storage.from('audio').getPublicUrl(song.url);
-          audioUrl = data.publicUrl;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (!audioUrl && attempts < maxAttempts) {
+          attempts++;
+          try {
+            console.log(`Tentative ${attempts}/${maxAttempts} pour récupérer l'audio`);
+            audioUrl = await getAudioFile(song.url);
+          } catch (attemptError) {
+            console.warn(`Tentative ${attempts} échouée:`, attemptError);
+            
+            if (attempts === maxAttempts) {
+              throw attemptError;
+            }
+            
+            // Small delay before retry
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         }
         
         if (!audioUrl) {
-          throw new Error('Fichier audio non trouvé');
+          throw new Error('URL audio non disponible après plusieurs tentatives');
         }
 
+        console.log(`URL audio récupérée: ${audioUrl.substring(0, 50)}...`);
+        
+        // Set audio attributes and prepare for playback
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
         audioRef.current.preload = "auto";
+        audioRef.current.crossOrigin = "anonymous"; // Important for CORS
         audioRef.current.load();
         
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-            audioRef.current.volume = volume / 100;
-            console.log("Lecture démarrée avec succès:", song.title);
-            
-            setTimeout(() => preloadNextTracks(), 1000);
-            
-            changeTimeoutRef.current = window.setTimeout(() => {
+        // Add event listeners to help debug playback issues
+        const onCanPlay = () => {
+          console.log("Audio prêt à être joué (événement canplay)");
+        };
+        
+        const onError = (e) => {
+          console.error("Erreur de l'élément audio:", e);
+          console.error("Code d'erreur:", audioRef.current.error ? audioRef.current.error.code : "inconnu");
+          console.error("Message d'erreur:", audioRef.current.error ? audioRef.current.error.message : "inconnu");
+        };
+        
+        audioRef.current.addEventListener('canplay', onCanPlay);
+        audioRef.current.addEventListener('error', onError);
+        
+        // Attempt to play with proper error handling
+        try {
+          console.log("Tentative de lecture...");
+          const playPromise = audioRef.current.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              console.log("Lecture démarrée avec succès!");
+              setIsPlaying(true);
+              audioRef.current.volume = volume / 100;
+              
+              // Clean up event listeners
+              audioRef.current.removeEventListener('canplay', onCanPlay);
+              audioRef.current.removeEventListener('error', onError);
+              
+              // Preload next track for smooth transition
+              setTimeout(() => preloadNextTracks(), 1000);
+              
+              changeTimeoutRef.current = window.setTimeout(() => {
+                setIsChangingSong(false);
+                changeTimeoutRef.current = null;
+              }, 1200);
+            }).catch(error => {
+              console.error("Erreur lors du démarrage de la lecture:", error);
+              
+              // If autoplay is prevented, show a gentle message
+              if (error.name === 'NotAllowedError') {
+                toast.error("Lecture automatique bloquée par le navigateur. Cliquez pour lire.");
+                setIsPlaying(false);
+              } else {
+                toast.error(`Impossible de lire le titre: ${error.message || "Erreur inconnue"}`);
+              }
+              
+              // Clean up
+              audioRef.current.removeEventListener('canplay', onCanPlay);
+              audioRef.current.removeEventListener('error', onError);
               setIsChangingSong(false);
-              changeTimeoutRef.current = null;
-            }, 1200);
-          }).catch(error => {
-            console.error("Error starting playback:", error);
-            setIsPlaying(false);
-            setIsChangingSong(false);
-          });
+            });
+          }
+        } catch (playError) {
+          console.error("Exception lors de la tentative de lecture:", playError);
+          audioRef.current.removeEventListener('canplay', onCanPlay);
+          audioRef.current.removeEventListener('error', onError);
+          setIsPlaying(false);
+          setIsChangingSong(false);
+          toast.error("Erreur lors de la lecture audio");
         }
       } catch (error) {
-        console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce titre");
+        console.error("Erreur lors du chargement audio:", error);
+        toast.error(`Impossible de charger ce titre: ${error.message || "Erreur inconnue"}`);
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
         setIsPlaying(false);
         setIsChangingSong(false);
       }
     } else if (audioRef.current) {
+      // Resume playback of current track
       try {
         audioRef.current.volume = volume / 100;
         const playPromise = audioRef.current.play();
+        
         if (playPromise !== undefined) {
           playPromise.then(() => {
+            console.log("Reprise de la lecture avec succès");
             setIsPlaying(true);
           }).catch(error => {
-            console.error("Error resuming playback:", error);
+            console.error("Erreur lors de la reprise de la lecture:", error);
+            if (error.name === 'NotAllowedError') {
+              toast.error("Lecture automatique bloquée par le navigateur. Cliquez pour lire.");
+            }
             setIsPlaying(false);
           });
         }
       } catch (error) {
-        console.error("Error resuming audio:", error);
+        console.error("Exception lors de la reprise de la lecture:", error);
         setIsPlaying(false);
+        toast.error("Impossible de reprendre la lecture");
       }
     }
   }, [audioRef, currentSong, isChangingSong, preloadNextTracks, setCurrentSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, volume]);

@@ -93,7 +93,7 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // Vérifie d'abord si le fichier est en cache pour une récupération rapide
+    // Check first if the file is cached for quick retrieval
     if (await isInCache(path)) {
       console.log(`Fichier audio trouvé dans le cache: ${path}`);
       const cachedUrl = await getFromCache(path);
@@ -102,41 +102,84 @@ export const getAudioFile = async (path: string) => {
       }
     }
 
-    // Si le fichier n'est pas en cache, procède normalement
+    // If file is not in cache, proceed normally
+    let audioUrl;
+    
     try {
-      // Essayer d'abord avec notre fonction getAudioFileUrl qui gère Dropbox et Supabase
+      // First try with our getAudioFileUrl function that handles both Dropbox and Supabase
       const { getAudioFileUrl } = await import('./getAudioFile');
-      const audioUrl = await getAudioFileUrl(path);
+      audioUrl = await getAudioFileUrl(path);
       
       if (!audioUrl) {
         throw new Error("URL audio non générée");
       }
+    } catch (primaryError) {
+      console.error("Erreur avec getAudioFileUrl, essai méthode alternative:", primaryError);
       
-      // Mise en cache pour les futures récupérations
+      // Fallback - try directly with Supabase Storage
       try {
-        const response = await fetch(audioUrl);
-        const blob = await response.blob();
-        await addToCache(path, blob);
-      } catch (cacheError) {
-        console.warn("Impossible de mettre en cache le fichier:", cacheError);
-        // Continue même en cas d'échec de mise en cache
-      }
-
-      return audioUrl;
-    } catch (storageError) {
-      console.error("Erreur avec getAudioFileUrl, essai méthode classique:", storageError);
-      
-      // Fallback - essayer directement avec Supabase Storage
-      const { data: { signedUrl } } = await supabase.storage
-        .from('audio')
-        .createSignedUrl(path, 3600);
+        // Try first with public URL (works better for most browsers)
+        const fileName = path.includes('/') ? path.split('/').pop() : path;
+        const { data: { publicUrl } } = supabase.storage
+          .from('audio')
+          .getPublicUrl(fileName || path);
+          
+        console.log("Fallback: URL publique générée:", publicUrl.substring(0, 50) + "...");
+        audioUrl = publicUrl;
+      } catch (fallbackError) {
+        console.error("Fallback également échoué:", fallbackError);
         
-      if (!signedUrl) {
-        throw new Error("URL signée non générée");
+        // Last resort - try with signed URL
+        try {
+          const { data: { signedUrl } } = await supabase.storage
+            .from('audio')
+            .createSignedUrl(path, 3600);
+            
+          if (!signedUrl) {
+            throw new Error("URL signée non générée");
+          }
+          
+          console.log("Dernier recours: URL signée générée");
+          audioUrl = signedUrl;
+        } catch (lastError) {
+          console.error("Toutes les méthodes ont échoué:", lastError);
+          throw new Error("Impossible de récupérer le fichier audio après plusieurs tentatives");
+        }
       }
-      
-      return signedUrl;
     }
+    
+    // Validate the URL before returning
+    if (!audioUrl) {
+      throw new Error("URL audio non disponible après toutes les tentatives");
+    }
+    
+    // Check if URL is accessible
+    try {
+      const response = await fetch(audioUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        console.warn(`L'URL audio n'est pas accessible (code ${response.status}), tentative de lecture tout de même`);
+      }
+    } catch (validationError) {
+      // Just log the validation error but still try to use the URL
+      console.warn("Impossible de vérifier l'URL, tentative de lecture tout de même:", validationError);
+    }
+    
+    // Cache for future retrievals
+    try {
+      const response = await fetch(audioUrl);
+      const blob = await response.blob();
+      if (blob.size > 0) {
+        await addToCache(path, blob);
+        console.log(`Mise en cache réussie pour ${path} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+      } else {
+        console.warn("Blob vide - pas de mise en cache");
+      }
+    } catch (cacheError) {
+      console.warn("Impossible de mettre en cache le fichier:", cacheError);
+      // Continue even if caching fails
+    }
+
+    return audioUrl;
   } catch (error) {
     console.error("Erreur lors de la récupération du fichier:", error);
     throw error;
