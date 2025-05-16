@@ -1,10 +1,10 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -157,8 +157,6 @@ export const useAudioControl = ({
 
   const refreshCurrentSong = useCallback(async () => {
     if (!currentSong) return;
-    
-    const { supabase } = await import('@/integrations/supabase/client');
     
     try {
       const { data, error } = await supabase
