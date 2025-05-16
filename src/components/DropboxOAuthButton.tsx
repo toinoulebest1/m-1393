@@ -62,6 +62,15 @@ export const DropboxOAuthButton = () => {
     try {
       console.log('Initiation de l\'OAuth Dropbox...');
       
+      // Instructions détaillées pour configurer l'API
+      toast.success(
+        "Pour configurer l'API Dropbox, suivez ces étapes:\n" + 
+        "1. Créez une app sur https://www.dropbox.com/developers/apps\n" +
+        "2. Sélectionnez 'Scoped Access' et 'Full Dropbox'\n" + 
+        "3. Dans les paramètres de l'app, ajoutez comme URI de redirection: " +
+        window.location.origin + "/dropbox-auth"
+      );
+
       const response = await supabase.functions.invoke('dropbox-oauth', {
         method: 'POST',
         body: { action: 'get-auth-url' }
@@ -86,7 +95,7 @@ export const DropboxOAuthButton = () => {
       }
       
       // Afficher l'URL pour le débogage
-      console.log('Redirection vers:', data.authUrl);
+      console.log('URL d\'authentification:', data.authUrl);
       
       // Marquer temporairement comme "en cours de connexion" en local
       // Cela permet aux utilisateurs de garder une indication visuelle pendant l'authentification
@@ -162,24 +171,45 @@ export const DropboxOAuthButton = () => {
           <span>Dropbox est connecté pour tous les utilisateurs</span>
         </div>
       ) : (
-        <Button 
-          variant="outline" 
-          onClick={initiateOAuth} 
-          disabled={isLoading}
-          className="w-full"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Connexion en cours...
-            </>
-          ) : (
-            <>
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Connecter Dropbox pour tous les utilisateurs
-            </>
-          )}
-        </Button>
+        <div className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md border border-blue-200 dark:border-blue-800 text-sm">
+            <h4 className="font-medium mb-2">Configuration de l'API Dropbox :</h4>
+            <ol className="list-decimal ml-5 space-y-2">
+              <li>Créez une app sur <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">Dropbox Developer Console</a></li>
+              <li>Sélectionnez <strong>Scoped Access</strong> et <strong>Full Dropbox</strong></li>
+              <li>Dans les paramètres de votre app, ajoutez comme URI de redirection :
+                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap break-all">
+                  {window.location.origin}/dropbox-auth
+                </pre>
+              </li>
+              <li>Dans Supabase, ajoutez vos clés d'API Dropbox dans les secrets de l'Edge Function :</li>
+              <ul className="list-disc ml-5 mt-1">
+                <li><strong>DROPBOX_APP_KEY</strong> : votre App key</li>
+                <li><strong>DROPBOX_APP_SECRET</strong> : votre App secret</li>
+                <li><strong>DROPBOX_REDIRECT_URI</strong> : {window.location.origin}/dropbox-auth</li>
+              </ul>
+            </ol>
+          </div>
+          
+          <Button 
+            variant="default" 
+            onClick={initiateOAuth} 
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connexion en cours...
+              </>
+            ) : (
+              <>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Connecter Dropbox pour tous les utilisateurs
+              </>
+            )}
+          </Button>
+        </div>
       )}
       
       {errorDetails && (
