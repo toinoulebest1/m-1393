@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -250,13 +249,13 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
   }
 };
 
-// Fonction optimisée pour télécharger un fichier sur Dropbox
+// Optimized function to upload file to Dropbox
 export const uploadFileToDropbox = async (
   file: File,
   path: string
 ): Promise<string> => {
   try {
-    // Vérifier si Dropbox est activé
+    // Check if Dropbox is enabled
     const dropboxEnabled = await isDropboxEnabled();
     if (!dropboxEnabled) {
       throw new Error('Dropbox n\'est pas activé');
@@ -264,20 +263,19 @@ export const uploadFileToDropbox = async (
     
     console.log(`Uploading file to Dropbox: ${path}`, file);
     
-    // Si le fichier est volumineux (>100MB), utiliser des morceaux
-    // La fonction edge se chargera de la méthode appropriée
+    // Convert the file to an array of bytes for better transfer performance
     const fileBuffer = await file.arrayBuffer();
-    const contentArray = Array.from(new Uint8Array(fileBuffer));
+    const fileBytes = new Uint8Array(fileBuffer);
     
-    console.log(`Taille du fichier: ${contentArray.length} octets`);
+    console.log(`Taille du fichier: ${fileBytes.length} octets`);
     
-    // Utiliser l'edge function pour upload le fichier
+    // Large file handling is now done in the edge function
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'POST',
       body: {
         action: 'upload',
         path: path,
-        fileContent: contentArray,
+        fileContent: Array.from(fileBytes), // Convert to array for JSON serialization
         contentType: file.type
       }
     });

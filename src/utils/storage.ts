@@ -38,16 +38,24 @@ export const storeAudioFile = async (id: string, file: File | string) => {
         throw new Error("Échec de l'upload vers Dropbox");
       }
       
-      // Ajouter une entrée dans dropbox_files pour lier l'ID local au chemin Dropbox
-      const { error: refError } = await supabase
-        .from('dropbox_files')
-        .upsert({
-          local_id: `audio/${id}`,
-          dropbox_path: dropboxPath
-        });
-        
-      if (refError) {
-        console.error("Erreur lors de l'enregistrement de la référence Dropbox:", refError);
+      // Ensure we add an entry in dropbox_files table to link local ID to Dropbox path
+      try {
+        const { error: refError } = await supabase
+          .from('dropbox_files')
+          .upsert({
+            local_id: `audio/${id}`,
+            dropbox_path: dropboxPath
+          });
+          
+        if (refError) {
+          console.error("Erreur lors de l'enregistrement de la référence Dropbox:", refError);
+          // Continue even if this fails - the upload succeeded
+        } else {
+          console.log(`Référence Dropbox enregistrée: audio/${id} -> ${dropboxPath}`);
+        }
+      } catch (refError) {
+        console.error("Exception lors de l'enregistrement de la référence:", refError);
+        // Continue even if this fails - the upload succeeded
       }
       
       return `audio/${id}`;
