@@ -39,18 +39,21 @@ export type Database = {
           dropbox_path: string
           id: string
           local_id: string
+          storage_provider: string | null
         }
         Insert: {
           created_at?: string
           dropbox_path: string
           id?: string
           local_id: string
+          storage_provider?: string | null
         }
         Update: {
           created_at?: string
           dropbox_path?: string
           id?: string
           local_id?: string
+          storage_provider?: string | null
         }
         Relationships: []
       }

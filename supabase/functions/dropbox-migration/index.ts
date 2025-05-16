@@ -83,7 +83,8 @@ async function migrateAudioFile(file: { id: string; file_path: string }) {
         .from('dropbox_files')
         .upsert({
           local_id: `audio/${file.id}`,
-          dropbox_path: `/audio/${file.id}`
+          dropbox_path: `/audio/${file.id}`,
+          storage_provider: 'dropbox'
         });
       
       return {
@@ -110,7 +111,8 @@ async function migrateAudioFile(file: { id: string; file_path: string }) {
       .from('dropbox_files')
       .upsert({
         local_id: `audio/${file.id}`,
-        dropbox_path: dropboxPath
+        dropbox_path: dropboxPath,
+        storage_provider: 'dropbox'
       });
     
     return {
