@@ -81,7 +81,7 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
     // Utiliser l'edge function pour vérifier si le fichier existe
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'GET',
-      params: {
+      body: {
         action: 'check',
         path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
       }
@@ -131,7 +131,7 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     // Utiliser l'edge function pour récupérer l'URL
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'GET',
-      params: {
+      body: {
         action: 'get',
         path: dropboxPath.startsWith('/') ? dropboxPath.substring(1) : dropboxPath
       }
@@ -161,7 +161,7 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
     // Utiliser l'edge function pour récupérer les paroles
     const { data, error } = await supabase.functions.invoke('dropbox-storage', {
       method: 'GET',
-      params: {
+      body: {
         action: 'get-lyrics',
         songId
       }

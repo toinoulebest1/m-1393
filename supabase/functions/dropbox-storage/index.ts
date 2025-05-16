@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
@@ -136,18 +137,29 @@ serve(async (req: Request) => {
     }
     
     const url = new URL(req.url);
-    const action = url.searchParams.get('action') || '';
+    let action;
+    let path;
+    let songId;
+    
+    if (req.method === 'GET') {
+      // Pour les requêtes GET, lire les paramètres depuis l'URL
+      action = url.searchParams.get('action') || '';
+      path = url.searchParams.get('path');
+      songId = url.searchParams.get('songId');
+    } else {
+      // Pour les autres méthodes, essayer de lire les paramètres depuis le body
+      try {
+        const body = await req.json();
+        action = body.action || '';
+        path = body.path;
+        songId = body.songId;
+      } catch (error) {
+        console.error('Error parsing request body:', error);
+      }
+    }
     
     // Récupérer un fichier
-    if (action === 'get' && req.method === 'GET') {
-      const path = url.searchParams.get('path');
-      if (!path) {
-        return new Response(JSON.stringify({ error: 'Chemin non spécifié' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
+    if (action === 'get' && path) {
       // Récupérer le chemin Dropbox depuis la base de données
       const { data: fileRef } = await supabase
         .from('dropbox_files')
@@ -180,15 +192,7 @@ serve(async (req: Request) => {
     }
     
     // Télécharger des lyrics
-    if (action === 'get-lyrics' && req.method === 'GET') {
-      const songId = url.searchParams.get('songId');
-      if (!songId) {
-        return new Response(JSON.stringify({ error: 'ID de chanson non spécifié' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
+    if (action === 'get-lyrics' && songId) {
       // Récupérer le chemin Dropbox depuis la base de données
       const { data: fileRef } = await supabase
         .from('dropbox_files')
@@ -229,15 +233,7 @@ serve(async (req: Request) => {
     }
     
     // Check if file exists
-    if (action === 'check' && req.method === 'GET') {
-      const path = url.searchParams.get('path');
-      if (!path) {
-        return new Response(JSON.stringify({ error: 'Chemin non spécifié' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
+    if (action === 'check' && path) {
       const exists = await checkFileExists(path);
       return new Response(JSON.stringify({ exists }), {
         headers: { 'Content-Type': 'application/json' }
