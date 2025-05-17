@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -5,11 +6,19 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
 import { isDropboxEnabled } from "@/utils/dropboxStorage";
+import { isGofileEnabled, uploadToGofile, storeGofileReference } from "@/utils/gofileStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { Button } from "@/components/ui/button";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 interface Song {
   id: string;
@@ -35,8 +44,13 @@ export const MusicUploader = () => {
   useEffect(() => {
     // Check which storage provider is active
     const checkStorageProvider = () => {
-      const useDropbox = isDropboxEnabled();
-      setStorageProvider(useDropbox ? "Dropbox" : "Supabase");
+      if (isGofileEnabled()) {
+        setStorageProvider("Gofile");
+      } else if (isDropboxEnabled()) {
+        setStorageProvider("Dropbox");
+      } else {
+        setStorageProvider("Supabase");
+      }
     };
     
     checkStorageProvider();
@@ -249,7 +263,20 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      await storeAudioFile(fileId, file);
+      // Choisir où stocker le fichier en fonction du provider actif
+      let fileUrl = fileId; // Par défaut, l'ID du fichier est utilisé pour Supabase
+      
+      if (storageProvider === "Gofile") {
+        // Upload sur Gofile.io
+        fileUrl = await uploadToGofile(file);
+        console.log("Fichier uploadé sur Gofile avec succès:", fileUrl);
+        
+        // Stocke la référence Gofile dans la base de données
+        await storeGofileReference(fileId, fileUrl);
+      } else {
+        // Upload sur Supabase ou Dropbox (comportement existant)
+        await storeAudioFile(fileId, file);
+      }
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -294,9 +321,10 @@ export const MusicUploader = () => {
           id: fileId,
           title: title,
           artist: artist,
-          file_path: fileId,
+          file_path: storageProvider === "Gofile" ? fileUrl : fileId,
           duration: formattedDuration,
           image_url: imageUrl,
+          storage_provider: storageProvider.toLowerCase()  // Ajout du provider
         })
         .select()
         .single();
@@ -353,7 +381,7 @@ export const MusicUploader = () => {
         title,
         artist,
         duration: formattedDuration,
-        url: fileId,
+        url: fileUrl,
         imageUrl,
         bitrate: formatBitrate(file.size, duration)
       };
@@ -541,8 +569,24 @@ export const MusicUploader = () => {
             />
           </label>
         </div>
-        <div className="text-xs text-spotify-neutral">
-          Using: {storageProvider}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-spotify-neutral">
+            Using:
+          </span>
+          <Select
+            defaultValue={storageProvider.toLowerCase()}
+            onValueChange={(value) => setStorageProvider(value === "gofile" ? "Gofile" : 
+                                              value === "dropbox" ? "Dropbox" : "Supabase")}
+          >
+            <SelectTrigger className="h-8 w-28">
+              <SelectValue placeholder="Storage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gofile">Gofile.io</SelectItem>
+              <SelectItem value="dropbox">Dropbox</SelectItem>
+              <SelectItem value="supabase">Supabase</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       {isDragging && (
