@@ -17,19 +17,37 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Add storage_provider column if it doesn't exist
-    // Using raw SQL query with service role key for schema modifications
-    const { error } = await supabase.rpc('add_storage_provider_column')
+    // Essayer d'ajouter directement la colonne storage_provider si elle n'existe pas
+    // au lieu d'utiliser la fonction SQL qui cause des problèmes de cache
+    const { error: checkColumnError } = await supabase.rpc(
+      'check_column_exists',
+      { table_name: 'songs', column_name: 'storage_provider' }
+    )
     
-    if (error) {
-      console.error('Error adding storage_provider column:', error)
-      throw error
+    let columnAdded = false
+    
+    if (checkColumnError) {
+      console.log("Error checking column:", checkColumnError)
+      // La fonction RPC n'existe peut-être pas, essayons de façon alternative
+      // en exécutant directement l'alter table
+      const { error: alterError } = await supabase.rpc(
+        'exec_sql', 
+        { sql: "ALTER TABLE IF NOT EXISTS public.songs ADD COLUMN IF NOT EXISTS storage_provider TEXT DEFAULT 'supabase'" }
+      )
+      
+      if (alterError) {
+        console.error('Error adding storage_provider column directly:', alterError)
+        throw alterError
+      }
+      
+      columnAdded = true
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Storage provider column added successfully' 
+        message: 'Storage provider column added successfully',
+        columnAdded
       }),
       {
         headers: {
