@@ -195,38 +195,89 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     }
     
     // Récupérer la configuration depuis la base de données
-    const config = await getDropboxConfig();
-    const dbEnabled = !!(config.isEnabled && config.accessToken && config.accessToken.length > 0);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      console.log('isDropboxEnabled - Aucune session utilisateur, utilisation de localStorage uniquement:', localEnabled ? 'activé' : 'désactivé');
+      return localEnabled;
+    }
     
+    // Vérifier directement dans la base de données pour les utilisateurs connectés
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('settings')
+      .eq('user_id', session.user.id)
+      .eq('key', 'dropbox_config')
+      .maybeSingle();
+    
+    if (error) {
+      console.error('isDropboxEnabled - Erreur lors de la vérification en base de données:', error);
+      return localEnabled; // Fallback to localStorage
+    }
+    
+    // Si aucune donnée n'est trouvée, utiliser localStorage
+    if (!data) {
+      console.log('isDropboxEnabled - Pas de configuration en base de données, utilisation de localStorage');
+      return localEnabled;
+    }
+    
+    // Vérifier si Dropbox est activé dans la base de données et a un token valide
+    const dbSettings = data.settings as Record<string, any>;
+    const dbEnabled = !!(dbSettings.isEnabled && dbSettings.accessToken);
     console.log('isDropboxEnabled - Statut depuis base de données:', dbEnabled ? 'activé' : 'désactivé');
     
-    // Si les deux sont différents, logger une alerte
+    // Si les deux sont différents, mettre à jour localStorage
     if (localEnabled !== dbEnabled) {
-      console.warn('isDropboxEnabled - Incohérence détectée entre localStorage et base de données');
-    }
-    
-    // La base de données est l'autorité finale
-    if (dbEnabled) {
-      // Si activé en base de données mais pas en local, mettre à jour localStorage
-      if (!localEnabled && localConfigStr) {
-        try {
-          const localConfig = JSON.parse(localConfigStr);
-          localStorage.setItem('dropbox_config', JSON.stringify({
-            ...localConfig,
-            isEnabled: true
-          }));
-        } catch (e) {
-          console.error('isDropboxEnabled - Erreur mise à jour localStorage:', e);
-        }
+      console.log('isDropboxEnabled - Incohérence détectée entre localStorage et base de données, mise à jour localStorage');
+      try {
+        localStorage.setItem('dropbox_config', JSON.stringify({
+          accessToken: dbSettings.accessToken || '',
+          refreshToken: dbSettings.refreshToken || undefined,
+          clientId: dbSettings.clientId || undefined,
+          clientSecret: dbSettings.clientSecret || undefined,
+          expiresAt: dbSettings.expiresAt || undefined,
+          isEnabled: dbEnabled
+        }));
+      } catch (e) {
+        console.error('isDropboxEnabled - Erreur mise à jour localStorage:', e);
       }
     }
-                          
-    // Le résultat final est basé sur la configuration de la base de données
+    
+    // Forcer à true si nous avons un accessToken (pour les nouveaux utilisateurs ou cas d'erreur)
+    if (dbSettings.accessToken && !dbEnabled) {
+      console.log('isDropboxEnabled - Token trouvé mais status désactivé, correction...');
+      const updatedConfig = {
+        ...dbSettings,
+        isEnabled: true
+      };
+      
+      try {
+        await saveDropboxConfig(updatedConfig);
+        console.log('isDropboxEnabled - Dropbox forcé à activé avec succès');
+        return true;
+      } catch (e) {
+        console.error('isDropboxEnabled - Erreur lors de l\'activation forcée:', e);
+      }
+    }
+    
     console.log('isDropboxEnabled - Vérification du fournisseur de stockage - Dropbox activé:', dbEnabled);
     return dbEnabled;
   } catch (error) {
     console.error('isDropboxEnabled - Erreur vérification statut Dropbox:', error);
-    // En cas d'erreur, on suppose que Dropbox n'est pas activé pour être prudent
+    
+    // En cas d'erreur avec la base de données, vérifier localStorage comme fallback
+    try {
+      const localConfigStr = localStorage.getItem('dropbox_config');
+      if (localConfigStr) {
+        const localConfig = JSON.parse(localConfigStr);
+        const isEnabled = !!(localConfig.isEnabled && localConfig.accessToken);
+        console.log('isDropboxEnabled - Fallback localStorage après erreur - Dropbox activé:', isEnabled);
+        return isEnabled;
+      }
+    } catch (e) {
+      console.error('isDropboxEnabled - Erreur avec fallback localStorage:', e);
+    }
+    
+    // En cas d'erreur complète, on suppose que Dropbox n'est pas activé
     return false;
   }
 };
