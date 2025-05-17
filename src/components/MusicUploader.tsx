@@ -501,7 +501,7 @@ export const MusicUploader = () => {
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragCounter(prev => prev - 1);
@@ -533,7 +533,7 @@ export const MusicUploader = () => {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
+      onDragLeave={handleLeave}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex gap-2">
