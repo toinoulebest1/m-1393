@@ -90,7 +90,6 @@ const Auth = () => {
         )}
 
         <div className="bg-white/5 backdrop-blur-lg p-6 rounded-lg shadow-xl">
-          {/* @ts-ignore - Ignoring the TypeScript error for onError prop */}
           <SupabaseAuth 
             supabaseClient={supabase}
             appearance={{
@@ -119,16 +118,7 @@ const Auth = () => {
               }
             }}
             providers={[]}
-            onError={(error) => {
-              setErrorMessage(getErrorMessage(error));
-              if (error.message.includes("sign up") && error.message.includes("email")) {
-                // Capture the email when there's a signup attempt
-                const emailMatch = /email: ([^\s]+)/.exec(error.message);
-                if (emailMatch && emailMatch[1]) {
-                  setEmail(emailMatch[1]);
-                }
-              }
-            }}
+            onAuthStateChange={handleAuthChange}
           />
 
           <div className="mt-6 pt-6 border-t border-white/10">
