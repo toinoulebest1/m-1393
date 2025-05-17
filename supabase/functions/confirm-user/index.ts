@@ -29,37 +29,42 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Email est requis");
     }
 
-    // Rechercher l'utilisateur par email
-    const { data: users, error: userError } = await supabaseClient
-      .from('auth.users')
-      .select('id, email')
-      .eq('email', email)
-      .limit(1);
+    // Using the admin API to confirm the user directly
+    const { data, error } = await supabaseClient.auth.admin.updateUserById(
+      'id', // This is a placeholder - we'll get the actual ID by email
+      { email_confirm: true }
+    );
 
+    // Since we can't directly update by email, we need to find the user first
+    const { data: users, error: userError } = await supabaseClient.auth.admin.listUsers();
+    
     if (userError) {
-      throw new Error(`Erreur lors de la recherche de l'utilisateur: ${userError.message}`);
+      throw new Error(`Erreur lors de la recherche des utilisateurs: ${userError.message}`);
     }
 
-    if (!users || users.length === 0) {
-      throw new Error("Utilisateur non trouvé");
+    const user = users?.users.find(u => u.email === email);
+    
+    if (!user) {
+      throw new Error("Utilisateur non trouvé avec cet email");
     }
 
-    const userId = users[0].id;
-
-    // Mettre à jour l'état de confirmation de l'email
-    const { error: updateError } = await supabaseClient
-      .rpc('admin_confirm_user', {
-        user_id: userId
-      });
+    // Now update the specific user to confirm their email
+    const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
+      user.id,
+      { email_confirm: true }
+    );
 
     if (updateError) {
       throw new Error(`Erreur lors de la confirmation de l'email: ${updateError.message}`);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return new Response(
+      JSON.stringify({ success: true, message: "Email confirmé avec succès" }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
   } catch (error: any) {
     console.error("Erreur dans la fonction confirm-user:", error);
     return new Response(

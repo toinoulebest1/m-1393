@@ -9,11 +9,13 @@ import type { AuthError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
   const [skipEmailConfirmation, setSkipEmailConfirmation] = useState(false);
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -43,30 +45,17 @@ const Auth = () => {
 
   const handleSkipEmailConfirmation = async () => {
     try {
-      // Récupérer le dernier utilisateur inscrit avec son email non confirmé
-      const { data: authUsers, error: fetchError } = await supabase.from('auth_users')
-        .select('id, email')
-        .eq('email_confirmed_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (fetchError || !authUsers || authUsers.length === 0) {
-        setErrorMessage("Impossible de trouver l'utilisateur à confirmer");
-        return;
-      }
-
-      // Confirmer l'email directement dans la base de données
-      // Note: Ceci est une solution temporaire pour le développement
-      const { error: updateError } = await supabase.rpc('admin_confirm_user', {
-        user_id: authUsers[0].id
+      // Call our edge function to confirm the user's email instead of directly accessing auth tables
+      const { data, error } = await supabase.functions.invoke('confirm-user', {
+        body: { email }
       });
-
-      if (updateError) {
-        setErrorMessage(`Erreur lors de la confirmation de l'email: ${updateError.message}`);
+      
+      if (error) {
+        setErrorMessage(`Erreur lors de la confirmation de l'email: ${error.message}`);
         return;
       }
-
-      setErrorMessage("Email confirmé avec succès! Vous pouvez maintenant vous connecter.");
+      
+      toast.success("Email confirmé avec succès! Vous pouvez maintenant vous connecter.");
     } catch (error: any) {
       setErrorMessage(`Une erreur est survenue: ${error.message}`);
     }
@@ -117,6 +106,13 @@ const Auth = () => {
             providers={[]}
             onError={(error) => {
               setErrorMessage(getErrorMessage(error));
+              if (error.message.includes("sign up") && error.message.includes("email")) {
+                // Capture the email when there's a signup attempt
+                const emailMatch = /email: ([^\s]+)/.exec(error.message);
+                if (emailMatch && emailMatch[1]) {
+                  setEmail(emailMatch[1]);
+                }
+              }
             }}
           />
 
@@ -132,13 +128,23 @@ const Auth = () => {
               </div>
               
               {skipEmailConfirmation && (
-                <Button 
-                  variant="outline"
-                  onClick={handleSkipEmailConfirmation}
-                  className="text-xs"
-                >
-                  Confirmer sans email
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="email"
+                    placeholder="Email à confirmer"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="text-xs bg-transparent border border-white/20 rounded px-2 py-1 text-white"
+                  />
+                  <Button 
+                    variant="outline"
+                    onClick={handleSkipEmailConfirmation}
+                    className="text-xs"
+                    disabled={!email}
+                  >
+                    Confirmer sans email
+                  </Button>
+                </div>
               )}
             </div>
             
