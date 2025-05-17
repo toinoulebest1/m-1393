@@ -228,7 +228,9 @@ const DropboxSettingsWrapper: React.FC = () => {
           )}
         </div>
       )}
-      <DropboxSettings />
+      
+      {/* Modification pour afficher le contenu de DropboxSettings.tsx aux utilisateurs non-admin seulement si Dropbox est activé */}
+      {(isAdmin || dropboxStatus === 'enabled') && <DropboxSettings />}
     </>
   );
 };

@@ -19,7 +19,7 @@ import './App.css';
 // Add new imports
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
-import { DropboxSettings } from "./components/DropboxSettings";
+import DropboxSettingsWrapper from "./components/DropboxSettingsWrapper"; // Updated import for DropboxSettings
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 function App() {
@@ -186,13 +186,13 @@ function App() {
                 } 
               />
               
-              {/* New dropbox settings route */}
+              {/* Updated dropbox settings route */}
               <Route 
                 path="/dropbox-settings" 
                 element={
                   session ? (
                     <Layout>
-                      <DropboxSettings />
+                      <DropboxSettingsWrapper />
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />
