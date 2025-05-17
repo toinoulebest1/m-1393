@@ -79,6 +79,7 @@ export const getAudioFile = async (path: string) => {
     let useDropbox = false;
     try {
       useDropbox = await isDropboxEnabled();
+      console.log("Vérification du fournisseur de stockage - Dropbox activé:", useDropbox);
     } catch (dropboxError) {
       console.warn("Erreur lors de la vérification de Dropbox, utilisation de Supabase:", dropboxError);
       useDropbox = false;
@@ -90,10 +91,13 @@ export const getAudioFile = async (path: string) => {
     
     if (useDropbox) {
       try {
+        console.log("Tentative de récupération depuis Dropbox:", path);
         audioUrl = await getDropboxSharedLink(`audio/${path}`);
+        console.log("URL Dropbox générée avec succès pour:", path);
       } catch (dropboxError) {
         console.error("Erreur Dropbox, repli vers Supabase:", dropboxError);
         // En cas d'erreur avec Dropbox, on essaie avec Supabase
+        console.log("Tentative de récupération de secours depuis Supabase:", path);
         const { data, error } = await supabase.storage
           .from('audio')
           .createSignedUrl(path, 3600);
@@ -111,9 +115,14 @@ export const getAudioFile = async (path: string) => {
       }
     } else {
       // Vérifie si le fichier existe dans Supabase
-      const { data: fileExists } = await supabase.storage
+      console.log("Vérification de l'existence du fichier dans Supabase:", path);
+      const { data: fileExists, error: existsError } = await supabase.storage
         .from('audio')
         .list('', { search: path });
+
+      if (existsError) {
+        console.error("Erreur lors de la vérification de l'existence du fichier:", existsError);
+      }
 
       if (!fileExists || fileExists.length === 0) {
         console.error("Fichier non trouvé dans le stockage:", path);
@@ -134,6 +143,7 @@ export const getAudioFile = async (path: string) => {
       }
 
       audioUrl = data.signedUrl;
+      console.log("URL Supabase générée avec succès pour:", path);
     }
 
     // Mise en cache pour les futures récupérations

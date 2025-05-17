@@ -1,85 +1,81 @@
 
-import React, { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { UserSettingInsert } from '@/types/userSettings';
+import { getDropboxConfig, saveDropboxConfig } from './dropboxStorage';
 
-/**
- * Utilitaire pour migrer les paramètres de localStorage vers Supabase
- */
-export const migrateLocalStorageToSupabase = async (): Promise<void> => {
-  // Vérifier si l'utilisateur est connecté
-  const { data: { session } } = await supabase.auth.getSession();
+export const useSettingsMigration = () => {
+  const [migrationComplete, setMigrationComplete] = useState(false);
   
-  if (!session?.user) {
-    console.log('Aucun utilisateur connecté, impossible de migrer les données');
-    return;
-  }
-  
-  // Liste des clés à migrer
-  const keysToMigrate = ['dropbox_config'];
-  
-  for (const key of keysToMigrate) {
-    try {
-      // Vérifier si la configuration existe déjà dans Supabase
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .eq('key', key)
-        .maybeSingle();  // Utiliser maybeSingle() au lieu de single()
-        
-      if (error) {
-        console.error(`Erreur lors de la vérification de ${key}:`, error);
-        continue;
-      }
-      
-      // Si la configuration existe déjà, passer à la suite
-      if (data) {
-        console.log(`${key} existe déjà dans Supabase, ignoré`);
-        continue;
-      }
-      
-      // Récupérer la configuration depuis localStorage
-      const localValue = localStorage.getItem(key);
-      if (!localValue) {
-        console.log(`${key} n'existe pas dans localStorage, ignoré`);
-        continue;
-      }
-      
-      // Analyser la valeur
-      try {
-        const settings = JSON.parse(localValue);
-        
-        // Créer une nouvelle entrée dans Supabase
-        const newSetting: UserSettingInsert = {
-          user_id: session.user.id,
-          key,
-          settings
-        };
-        
-        const { error: insertError } = await supabase
-          .from('user_settings')
-          .insert(newSetting);
-          
-        if (insertError) {
-          console.error(`Erreur lors de la migration de ${key}:`, insertError);
-        } else {
-          console.log(`${key} migré avec succès vers Supabase`);
-        }
-      } catch (parseError) {
-        console.error(`Erreur lors de l'analyse de ${key}:`, parseError);
-      }
-    } catch (e) {
-      console.error(`Erreur lors de la migration de ${key}:`, e);
-    }
-  }
-};
-
-/**
- * Hook à utiliser dans les composants principaux pour déclencher la migration
- */
-export const useSettingsMigration = (): void => {
   useEffect(() => {
-    migrateLocalStorageToSupabase();
+    const migrateSettings = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.log('No active session, skipping settings migration');
+          setMigrationComplete(true);
+          return;
+        }
+        
+        // Migrer les paramètres Dropbox de localStorage vers Supabase
+        const dropboxConfigStr = localStorage.getItem('dropbox_config');
+        if (dropboxConfigStr) {
+          try {
+            console.log('Dropbox config found in localStorage, migrating to database...');
+            const localConfig = JSON.parse(dropboxConfigStr);
+            
+            // Vérifier si la configuration est déjà dans la base de données
+            const { data, error } = await supabase
+              .from('user_settings')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .eq('key', 'dropbox_config')
+              .maybeSingle();
+            
+            if (error) {
+              console.error('Error checking existing Dropbox config in database:', error);
+            } else if (!data) {
+              console.log('No Dropbox config found in database, saving local config...');
+              // Si pas de configuration dans la base de données, sauvegarder celle du localStorage
+              await saveDropboxConfig(localConfig);
+            } else {
+              console.log('Dropbox config exists in database, comparing with localStorage...');
+              // Si la configuration existe déjà, vérifier si la version locale est plus récente
+              const dbConfig = data.settings as any;
+              
+              // Si la configuration locale est activée mais pas celle de la base de données,
+              // ou si la configuration locale a un token plus récent, la synchroniser
+              if ((localConfig.isEnabled && !dbConfig.isEnabled) || 
+                  (localConfig.expiresAt && dbConfig.expiresAt && localConfig.expiresAt > dbConfig.expiresAt)) {
+                console.log('Local Dropbox config is more recent, updating database...');
+                await saveDropboxConfig(localConfig);
+              } else {
+                console.log('Database Dropbox config is more recent or the same, syncing to localStorage...');
+                // Sinon, synchroniser la configuration de la base de données vers le localStorage
+                localStorage.setItem('dropbox_config', JSON.stringify({
+                  accessToken: dbConfig.accessToken || '',
+                  refreshToken: dbConfig.refreshToken || undefined,
+                  clientId: dbConfig.clientId || undefined,
+                  clientSecret: dbConfig.clientSecret || undefined,
+                  expiresAt: dbConfig.expiresAt || undefined,
+                  isEnabled: dbConfig.isEnabled || false
+                }));
+              }
+            }
+          } catch (e) {
+            console.error('Error during Dropbox config migration:', e);
+          }
+        }
+        
+        setMigrationComplete(true);
+      } catch (error) {
+        console.error('Settings migration error:', error);
+        setMigrationComplete(true);
+      }
+    };
+    
+    migrateSettings();
   }, []);
+  
+  return { migrationComplete };
 };
