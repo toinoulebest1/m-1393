@@ -35,10 +35,13 @@ export const isOneDriveEnabled = async (): Promise<boolean> => {
       return false;
     }
     
-    // Cast the settings to OneDriveConfig type
-    const oneDriveSettings = data.settings as OneDriveConfig;
-    if (!oneDriveSettings.accessToken) {
-      console.log("No OneDrive access token found");
+    // First convert to unknown, then to OneDriveConfig to avoid TypeScript error
+    const settings = data.settings as unknown;
+    const oneDriveSettings = settings as OneDriveConfig;
+    
+    // Validate that the required properties exist
+    if (!oneDriveSettings || typeof oneDriveSettings !== 'object' || !oneDriveSettings.accessToken) {
+      console.log("Invalid OneDrive configuration or missing access token");
       return false;
     }
 
