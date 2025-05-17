@@ -11,89 +11,180 @@ export const getDropboxConfig = async (): Promise<DropboxConfig> => {
   // Vérifier si l'utilisateur est connecté
   const { data: { session } } = await supabase.auth.getSession();
   
-  if (!session?.user) {
-    console.log('Utilisateur non connecté, utilisation de la configuration locale');
-    // Fallback vers localStorage si l'utilisateur n'est pas connecté
-    const configStr = localStorage.getItem('dropbox_config');
-    if (!configStr) {
-      return { accessToken: '', isEnabled: false };
+  try {
+    // D'abord, essayer d'obtenir la configuration par défaut depuis app_settings
+    const { data: defaultConfig, error: defaultError } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'default_dropbox_config')
+      .maybeSingle();
+    
+    // Si une configuration par défaut est disponible, nous l'utiliserons comme base
+    const baseConfig = defaultConfig?.value ? defaultConfig.value as any : null;
+    
+    if (baseConfig) {
+      console.log('Configuration Dropbox par défaut trouvée dans app_settings');
+    } else {
+      console.log('Pas de configuration Dropbox par défaut dans app_settings');
     }
     
-    try {
-      return JSON.parse(configStr) as DropboxConfig;
-    } catch (e) {
-      console.error('Error parsing Dropbox config:', e);
-      return { accessToken: '', isEnabled: false };
+    // Si l'utilisateur n'est pas connecté, utiliser la configuration locale ou par défaut
+    if (!session?.user) {
+      console.log('Utilisateur non connecté, utilisation de la configuration locale ou par défaut');
+      const configStr = localStorage.getItem('dropbox_config');
+      
+      if (configStr) {
+        try {
+          const localConfig = JSON.parse(configStr) as DropboxConfig;
+          // S'assurer que Dropbox est activé
+          localConfig.isEnabled = true;
+          return localConfig;
+        } catch (e) {
+          console.error('Error parsing Dropbox config:', e);
+        }
+      }
+      
+      // Si pas de config locale, mais une config par défaut existe, l'utiliser
+      if (baseConfig) {
+        const defaultDropboxConfig: DropboxConfig = {
+          accessToken: baseConfig.accessToken || '',
+          refreshToken: baseConfig.refreshToken,
+          clientId: baseConfig.clientId,
+          clientSecret: baseConfig.clientSecret,
+          expiresAt: baseConfig.expiresAt,
+          isEnabled: true // Forcer l'activation
+        };
+        
+        // Sauvegarder en local pour les utilisations futures
+        localStorage.setItem('dropbox_config', JSON.stringify(defaultDropboxConfig));
+        return defaultDropboxConfig;
+      }
+      
+      return { accessToken: '', isEnabled: true }; // Par défaut activé mais vide
     }
-  }
-  
-  try {
+    
     // Récupérer la configuration de l'utilisateur depuis Supabase
-    const { data, error } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('user_settings')
       .select('*')
       .eq('user_id', session.user.id)
       .eq('key', 'dropbox_config')
-      .maybeSingle();  // Utiliser maybeSingle() au lieu de single()
+      .maybeSingle();
     
-    if (error) {
-      console.error('Erreur lors de la récupération de la configuration Dropbox:', error);
+    if (userError) {
+      console.error('Erreur lors de la récupération de la configuration Dropbox:', userError);
       
-      // Fallback vers localStorage si erreur avec Supabase
-      const configStr = localStorage.getItem('dropbox_config');
-      if (configStr) {
-        try {
-          return JSON.parse(configStr) as DropboxConfig;
-        } catch (e) {
-          console.error('Error parsing Dropbox config from localStorage:', e);
-        }
-      }
-      
-      return { accessToken: '', isEnabled: false };
-    }
-    
-    if (!data) {
-      // Si pas de configuration dans Supabase, essayer localStorage
+      // Si erreur, utiliser la config locale ou la config par défaut
       const configStr = localStorage.getItem('dropbox_config');
       if (configStr) {
         try {
           const localConfig = JSON.parse(configStr) as DropboxConfig;
-          console.log('Using Dropbox config from localStorage:', localConfig.isEnabled ? 'enabled' : 'disabled');
+          localConfig.isEnabled = true; // Forcer l'activation
           return localConfig;
         } catch (e) {
           console.error('Error parsing Dropbox config from localStorage:', e);
         }
       }
-      return { accessToken: '', isEnabled: false };
+      
+      // Si pas de config locale mais config par défaut disponible
+      if (baseConfig) {
+        const defaultDropboxConfig: DropboxConfig = {
+          accessToken: baseConfig.accessToken || '',
+          refreshToken: baseConfig.refreshToken,
+          clientId: baseConfig.clientId,
+          clientSecret: baseConfig.clientSecret,
+          expiresAt: baseConfig.expiresAt,
+          isEnabled: true // Forcer l'activation
+        };
+        
+        // Sauvegarder pour cet utilisateur
+        await saveDropboxConfig(defaultDropboxConfig);
+        return defaultDropboxConfig;
+      }
     }
     
-    // Conversion sûre de settings en DropboxConfig
-    const settings = data.settings as Record<string, any>;
-    const config: DropboxConfig = {
-      accessToken: settings.accessToken || '',
-      refreshToken: settings.refreshToken || undefined,
-      clientId: settings.clientId || undefined,
-      clientSecret: settings.clientSecret || undefined,
-      expiresAt: settings.expiresAt || undefined,
-      isEnabled: settings.isEnabled || false
+    // Si pas de configuration utilisateur mais config par défaut disponible
+    if (!userData && baseConfig) {
+      console.log('Pas de configuration utilisateur, application de la configuration par défaut');
+      const defaultDropboxConfig: DropboxConfig = {
+        accessToken: baseConfig.accessToken || '',
+        refreshToken: baseConfig.refreshToken,
+        clientId: baseConfig.clientId,
+        clientSecret: baseConfig.clientSecret,
+        expiresAt: baseConfig.expiresAt,
+        isEnabled: true // Forcer l'activation
+      };
+      
+      // Sauvegarder pour cet utilisateur
+      await saveDropboxConfig(defaultDropboxConfig);
+      return defaultDropboxConfig;
+    }
+    
+    // Si configuration utilisateur disponible, l'utiliser
+    if (userData) {
+      // Conversion sûre de settings en DropboxConfig
+      const settings = userData.settings as Record<string, any>;
+      const config: DropboxConfig = {
+        accessToken: settings.accessToken || '',
+        refreshToken: settings.refreshToken,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret,
+        expiresAt: settings.expiresAt,
+        isEnabled: true // Forcer l'activation ici aussi
+      };
+      
+      // Si pas de token utilisateur mais config par défaut disponible avec token
+      if (!config.accessToken && baseConfig && baseConfig.accessToken) {
+        console.log('Pas de token utilisateur, utilisation du token par défaut');
+        config.accessToken = baseConfig.accessToken;
+        config.refreshToken = baseConfig.refreshToken;
+        config.clientId = baseConfig.clientId;
+        config.clientSecret = baseConfig.clientSecret;
+        config.expiresAt = baseConfig.expiresAt;
+        
+        // Mettre à jour la configuration de l'utilisateur
+        await saveDropboxConfig(config);
+      }
+      
+      console.log('Dropbox config from database:', config.isEnabled ? 'enabled' : 'disabled');
+      return config;
+    }
+    
+    // Si aucune configuration n'est disponible, créer une configuration vide mais activée
+    console.log('Aucune configuration Dropbox trouvée, création d\'une configuration vide');
+    const emptyConfig: DropboxConfig = {
+      accessToken: baseConfig?.accessToken || '',
+      refreshToken: baseConfig?.refreshToken,
+      clientId: baseConfig?.clientId,
+      clientSecret: baseConfig?.clientSecret,
+      expiresAt: baseConfig?.expiresAt,
+      isEnabled: true // Toujours activé
     };
     
-    console.log('Dropbox config from database:', config.isEnabled ? 'enabled' : 'disabled');
-    return config;
-  } catch (e) {
-    console.error('Error fetching Dropbox config from Supabase:', e);
+    // Sauvegarder pour cet utilisateur
+    if (session?.user) {
+      await saveDropboxConfig(emptyConfig);
+    } else {
+      localStorage.setItem('dropbox_config', JSON.stringify(emptyConfig));
+    }
     
-    // Fallback vers localStorage en cas d'erreur générale
+    return emptyConfig;
+  } catch (e) {
+    console.error('Error fetching Dropbox config:', e);
+    
+    // En cas d'erreur complète, essayer la config locale
     const configStr = localStorage.getItem('dropbox_config');
     if (configStr) {
       try {
-        return JSON.parse(configStr) as DropboxConfig;
+        const localConfig = JSON.parse(configStr) as DropboxConfig;
+        localConfig.isEnabled = true; // Forcer l'activation
+        return localConfig;
       } catch (parseError) {
         console.error('Error parsing Dropbox config from localStorage:', parseError);
       }
     }
     
-    return { accessToken: '', isEnabled: false };
+    return { accessToken: '', isEnabled: true };
   }
 };
 
@@ -175,129 +266,24 @@ export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> =>
   }
 };
 
-// Fonction modifiée pour vérifier si Dropbox est réellement configuré ET activé
+// Fonction simplifiée pour isDropboxEnabled - toujours retourne true
 export const isDropboxEnabled = async (): Promise<boolean> => {
   console.log('isDropboxEnabled - Vérification du statut Dropbox');
   
   try {
-    // Vérifier d'abord dans localStorage pour une réponse rapide
-    const localConfigStr = localStorage.getItem('dropbox_config');
-    let localEnabled = false;
+    // Récupérer la configuration
+    const config = await getDropboxConfig();
     
-    if (localConfigStr) {
-      try {
-        const localConfig = JSON.parse(localConfigStr);
-        localEnabled = !!(localConfig.isEnabled);
-        console.log('isDropboxEnabled - Statut depuis localStorage:', localEnabled ? 'activé' : 'désactivé');
-      } catch (e) {
-        console.error('isDropboxEnabled - Erreur parsing localStorage config:', e);
-      }
-    }
+    // Journaliser l'état
+    console.log('isDropboxEnabled - Statut:', config.accessToken ? 'Token OK' : 'Pas de token', 'Dropbox activé:', true);
     
-    // Récupérer la configuration depuis la base de données
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      console.log('isDropboxEnabled - Aucune session utilisateur, utilisation de localStorage uniquement:', localEnabled ? 'activé' : 'désactivé');
-      if (!localEnabled) {
-        // Si pas de configuration locale ou désactivée, créer une par défaut et activée
-        const defaultConfig = createDefaultConfig();
-        localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
-        localEnabled = true;
-        console.log('isDropboxEnabled - Configuration par défaut créée et activée');
-      }
-      return localEnabled;
-    }
-    
-    // Vérifier directement dans la base de données pour les utilisateurs connectés
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select('settings')
-      .eq('user_id', session.user.id)
-      .eq('key', 'dropbox_config')
-      .maybeSingle();
-    
-    if (error) {
-      console.error('isDropboxEnabled - Erreur lors de la vérification en base de données:', error);
-      if (!localEnabled) {
-        // Si erreur et pas de config locale, créer une par défaut
-        const defaultConfig = createDefaultConfig();
-        localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
-        console.log('isDropboxEnabled - Erreur DB mais config par défaut créée et activée');
-        return true;
-      }
-      return localEnabled;
-    }
-    
-    // Si aucune donnée n'est trouvée, créer une configuration par défaut
-    if (!data) {
-      console.log('isDropboxEnabled - Pas de configuration en base de données, création d\'une configuration par défaut');
-      
-      const defaultConfig = createDefaultConfig();
-      await saveDropboxConfig(defaultConfig);
-      localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
-      
-      console.log('isDropboxEnabled - Configuration par défaut créée et activée');
-      return true;
-    }
-    
-    // Vérifier si Dropbox est activé dans la base de données
-    const dbSettings = data.settings as Record<string, any>;
-    const dbEnabled = !!(dbSettings.isEnabled);
-    console.log('isDropboxEnabled - Statut depuis base de données:', dbEnabled ? 'activé' : 'désactivé');
-    
-    // Si les deux sont différents, mettre à jour localStorage
-    if (localEnabled !== dbEnabled) {
-      console.log('isDropboxEnabled - Incohérence détectée entre localStorage et base de données, mise à jour localStorage');
-      try {
-        localStorage.setItem('dropbox_config', JSON.stringify({
-          accessToken: dbSettings.accessToken || '',
-          refreshToken: dbSettings.refreshToken || undefined,
-          clientId: dbSettings.clientId || undefined,
-          clientSecret: dbSettings.clientSecret || undefined,
-          expiresAt: dbSettings.expiresAt || undefined,
-          isEnabled: dbEnabled
-        }));
-      } catch (e) {
-        console.error('isDropboxEnabled - Erreur mise à jour localStorage:', e);
-      }
-    }
-    
-    // Si désactivé mais devrait être activé, activer
-    if (!dbEnabled) {
-      console.log('isDropboxEnabled - Dropbox désactivé, activation forcée');
-      const updatedConfig: DropboxConfig = {
-        accessToken: dbSettings.accessToken || '',
-        refreshToken: dbSettings.refreshToken || undefined,
-        clientId: dbSettings.clientId || undefined,
-        clientSecret: dbSettings.clientSecret || undefined,
-        expiresAt: dbSettings.expiresAt || undefined,
-        isEnabled: true
-      };
-      
-      try {
-        await saveDropboxConfig(updatedConfig);
-        console.log('isDropboxEnabled - Dropbox forcé à activé avec succès');
-        return true;
-      } catch (e) {
-        console.error('isDropboxEnabled - Erreur lors de l\'activation forcée:', e);
-      }
-    }
-    
-    console.log('isDropboxEnabled - Vérification du fournisseur de stockage - Dropbox activé:', true);
-    return true; // Toujours retourner true car nous voulons forcer l'activation
+    // On retourne toujours true pour forcer l'utilisation de Dropbox
+    return true;
   } catch (error) {
     console.error('isDropboxEnabled - Erreur vérification statut Dropbox:', error);
     
-    // En cas d'erreur, s'assurer que Dropbox est activé
-    try {
-      const defaultConfig = createDefaultConfig();
-      localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
-      console.log('isDropboxEnabled - Erreur mais configuration par défaut créée et activée');
-    } catch (e) {
-      console.error('isDropboxEnabled - Erreur avec fallback localStorage:', e);
-    }
-    
-    return true; // En cas d'erreur complète, activer Dropbox par défaut
+    // Même en cas d'erreur, on active Dropbox
+    return true;
   }
 };
 

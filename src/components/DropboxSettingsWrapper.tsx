@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { DropboxSettings } from './DropboxSettings';
 import { useSettingsMigration } from '@/utils/userSettingsMigration';
@@ -13,17 +14,14 @@ const DropboxSettingsWrapper: React.FC = () => {
   const [dropboxStatus, setDropboxStatus] = useState<string | null>(null);
   const [enableDropbox, setEnableDropbox] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
   
   // Vérifier l'état de Dropbox une fois la migration terminée
   useEffect(() => {
     if (migrationComplete) {
       const checkDropboxStatus = async () => {
         try {
-          // Premièrement, vérifier si Dropbox est activé
-          const isEnabled = await isDropboxEnabled();
-          console.log('DropboxSettingsWrapper - Dropbox activé:', isEnabled);
-          
-          // Ensuite, récupérer la configuration complète pour plus de détails
+          // Récupérer la configuration complète pour plus de détails
           const config = await getDropboxConfig();
           console.log('DropboxSettingsWrapper - Configuration Dropbox:', {
             isEnabled: config.isEnabled,
@@ -34,25 +32,14 @@ const DropboxSettingsWrapper: React.FC = () => {
             expiresAt: config.expiresAt ? new Date(config.expiresAt).toISOString() : 'non défini'
           });
           
-          // Définir le statut en fonction des deux vérifications
-          const finalStatus = isEnabled ? 'enabled' : 'disabled';
+          // Vérifier si nous avons un token valide
+          setHasToken(!!config.accessToken && config.accessToken.length > 0);
+          
+          // Définir le statut en fonction de la présence du token
+          const finalStatus = !!config.accessToken && config.accessToken.length > 0 ? 'enabled' : 'disabled';
           setDropboxStatus(finalStatus);
+          setEnableDropbox(!!config.accessToken && config.accessToken.length > 0);
           
-          // Si les deux valeurs sont incohérentes, c'est potentiellement un problème
-          if (isEnabled !== config.isEnabled) {
-            console.warn('Incohérence détectée: isDropboxEnabled() retourne', isEnabled, 
-                         'mais config.isEnabled est', config.isEnabled);
-            
-            // Auto-correction: si nous avons un token mais que Dropbox n'est pas activé, l'activer
-            if (config.accessToken && config.accessToken.length > 0 && !config.isEnabled) {
-              console.log('Auto-correction: Dropbox a un token mais n\'est pas activé, correction...');
-              const updatedConfig = { ...config, isEnabled: true };
-              await saveDropboxConfig(updatedConfig);
-              setDropboxStatus('enabled');
-            }
-          }
-          
-          setEnableDropbox(config.isEnabled && !!config.accessToken);
         } catch (error) {
           console.error('Error checking Dropbox status:', error);
           setDropboxStatus('error');
@@ -68,79 +55,49 @@ const DropboxSettingsWrapper: React.FC = () => {
   const handleQuickEnable = async () => {
     try {
       setIsActivating(true);
-      const config = await getDropboxConfig();
       
-      // Activer Dropbox pour tous les cas
-      config.isEnabled = true;
-      
-      await saveDropboxConfig(config);
-      toast.success("Dropbox a été activé avec succès");
-      setDropboxStatus('enabled');
-      setEnableDropbox(true);
-      
-      // Rafraîchir la page pour prendre en compte les changements
-      window.location.reload();
-    } catch (error) {
-      console.error("Erreur lors de l'activation de Dropbox:", error);
-      toast.error("Une erreur est survenue lors de l'activation de Dropbox");
-    } finally {
-      setIsActivating(false);
-    }
-  };
-  
-  const handleForceEnable = async () => {
-    try {
-      setIsActivating(true);
-      let config = await getDropboxConfig();
-      
-      // Si on n'a pas de token, utiliser les tokens par défaut depuis app_settings
-      if (!config.accessToken) {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await supabase
-          .from('app_settings')
-          .select('value')
-          .eq('key', 'default_dropbox_config')
-          .maybeSingle();
+      // Récupérer la configuration admin par défaut
+      const { data: adminConfig, error: adminError } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'default_dropbox_config')
+        .maybeSingle();
         
-        if (error || !data) {
-          console.error("Erreur lors de la récupération de la configuration par défaut:", error || "Aucune donnée");
-          toast.error("Impossible de trouver une configuration par défaut");
-          setIsActivating(false);
-          return;
-        }
-        
-        const defaultConfig = data.value as any;
-        if (defaultConfig && defaultConfig.accessToken) {
-          // Appliquer la configuration par défaut
-          config = {
-            accessToken: defaultConfig.accessToken,
-            refreshToken: defaultConfig.refreshToken,
-            clientId: defaultConfig.clientId,
-            clientSecret: defaultConfig.clientSecret,
-            expiresAt: defaultConfig.expiresAt,
-            isEnabled: true
-          };
-          console.log("Configuration par défaut appliquée depuis app_settings");
-        } else {
-          toast.error("La configuration par défaut ne contient pas de token valide");
-          setIsActivating(false);
-          return;
-        }
-      } else {
-        // Juste activer la configuration existante
-        config.isEnabled = true;
+      if (adminError) {
+        console.error('Erreur récupération config admin:', adminError);
+        toast.error("Impossible de récupérer la configuration admin");
+        setIsActivating(false);
+        return;
       }
       
-      // Activer Dropbox
+      const adminDropboxConfig = adminConfig?.value as any;
+      if (!adminDropboxConfig || !adminDropboxConfig.accessToken) {
+        console.error('Configuration admin invalide ou sans token');
+        toast.error("La configuration admin ne contient pas de token valide");
+        setIsActivating(false);
+        return;
+      }
+      
+      // Appliquer la configuration admin
+      const config: DropboxConfig = {
+        accessToken: adminDropboxConfig.accessToken,
+        refreshToken: adminDropboxConfig.refreshToken,
+        clientId: adminDropboxConfig.clientId,
+        clientSecret: adminDropboxConfig.clientSecret,
+        expiresAt: adminDropboxConfig.expiresAt,
+        isEnabled: true
+      };
+      
       await saveDropboxConfig(config);
-      toast.success("Dropbox a été activé avec succès");
+      toast.success("Dropbox a été activé avec succès avec les paramètres admin");
       setDropboxStatus('enabled');
       setEnableDropbox(true);
+      setHasToken(true);
       
       // Rafraîchir la page pour prendre en compte les changements
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
-      console.error("Erreur lors de l'activation forcée de Dropbox:", error);
+      console.error("Erreur lors de l'activation de Dropbox:", error);
       toast.error("Une erreur est survenue lors de l'activation de Dropbox");
     } finally {
       setIsActivating(false);
@@ -181,8 +138,8 @@ const DropboxSettingsWrapper: React.FC = () => {
               <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               <div className="flex flex-col space-y-2 w-full">
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
-                  Dropbox est actuellement <span className="font-semibold">désactivé</span>.
-                  Les fichiers seront stockés sur Supabase.
+                  Dropbox n'est pas configuré avec un token valide.
+                  Cliquez ci-dessous pour utiliser le token de l'administrateur.
                 </AlertDescription>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Button 
@@ -199,7 +156,7 @@ const DropboxSettingsWrapper: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> Activer maintenant
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Utiliser le token admin
                       </>
                     )}
                   </Button>
