@@ -128,8 +128,10 @@ export const exchangeCodeForTokens = async (
   }
 };
 
-// Fonction pour générer l'URL d'autorisation
+// Fonction pour générer l'URL d'autorisation avec des paramètres améliorés
 export const getAuthorizationUrl = (clientId: string, redirectUri: string): string => {
+  console.log("Génération d'URL d'autorisation avec:", { clientId, redirectUri });
+  
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
@@ -137,7 +139,9 @@ export const getAuthorizationUrl = (clientId: string, redirectUri: string): stri
     redirect_uri: redirectUri
   });
   
-  return `https://www.dropbox.com/oauth2/authorize?${params.toString()}`;
+  const url = `https://www.dropbox.com/oauth2/authorize?${params.toString()}`;
+  console.log("URL d'autorisation générée:", url);
+  return url;
 };
 
 // Version modifiée de la fonction existante pour vérifier/rafraîchir le token avant utilisation

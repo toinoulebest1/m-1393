@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ export const DropboxSettings = () => {
   const [refreshToken, setRefreshToken] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [redirectUri, setRedirectUri] = useState(window.location.origin);
+  const [redirectUri, setRedirectUri] = useState('https://preview--m-1393.lovable.app/dropbox-auth');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -68,9 +69,10 @@ export const DropboxSettings = () => {
     const code = url.searchParams.get('code');
     
     if (code) {
+      console.log("Code d'autorisation Dropbox détecté dans l'URL");
       setAuthCode(code);
       // Effacer le code de l'URL pour éviter les réutilisations accidentelles
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({}, document.title, '/dropbox-settings');
     }
   }, []);
 
@@ -120,6 +122,9 @@ export const DropboxSettings = () => {
       
       setIsSaving(true);
       try {
+        console.log("Traitement du code d'autorisation Dropbox:", authCode.substring(0, 5) + "...");
+        console.log("URL de redirection utilisée:", redirectUri);
+        
         const tokenResponse = await exchangeCodeForTokens(
           authCode,
           clientId,
@@ -128,6 +133,7 @@ export const DropboxSettings = () => {
         );
         
         if (tokenResponse) {
+          console.log("Réponse de token reçue:", tokenResponse);
           const expiresAt = Date.now() + ((tokenResponse.expires_in || 14400) * 1000);
           
           // Sauvegarder la nouvelle configuration
@@ -150,6 +156,7 @@ export const DropboxSettings = () => {
           
           toast.success('Authentification Dropbox réussie');
         } else {
+          console.error("Échec de l'échange du code d'autorisation, réponse vide");
           toast.error('Échec de l\'échange du code d\'autorisation');
           setTestResult('error');
         }
@@ -267,6 +274,7 @@ export const DropboxSettings = () => {
     }
     
     const authUrl = getAuthorizationUrl(clientId, redirectUri);
+    console.log("URL d'autorisation générée:", authUrl);
     window.open(authUrl, '_blank');
   };
 
