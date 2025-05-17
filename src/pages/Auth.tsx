@@ -61,6 +61,20 @@ const Auth = () => {
     }
   };
 
+  // Auth state change handler
+  const handleAuthChange = async (event: any) => {
+    if (event?.error) {
+      setErrorMessage(getErrorMessage(event.error));
+      
+      if (event.error.message.includes("sign up") && event.error.message.includes("email")) {
+        const emailMatch = /email: ([^\s]+)/.exec(event.error.message);
+        if (emailMatch && emailMatch[1]) {
+          setEmail(emailMatch[1]);
+        }
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
@@ -76,6 +90,7 @@ const Auth = () => {
         )}
 
         <div className="bg-white/5 backdrop-blur-lg p-6 rounded-lg shadow-xl">
+          {/* @ts-ignore - Ignoring the TypeScript error for onError prop */}
           <SupabaseAuth 
             supabaseClient={supabase}
             appearance={{
