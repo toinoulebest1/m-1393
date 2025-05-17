@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -237,8 +238,8 @@ export const MusicUploader = () => {
       return null;
     }
 
-    // Using crypto.randomUUID() for a properly formatted UUID
-    const fileId = crypto.randomUUID();
+    // Explicitly create a UUID that matches the required format
+    const fileId = crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`;
 
     try {
       let { artist, title } = parseFileName(file.name);
