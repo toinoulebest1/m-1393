@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { DropboxSettings } from './DropboxSettings';
 import { useSettingsMigration } from '@/utils/userSettingsMigration';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { DropboxConfig } from '@/types/dropbox';
+import AdminDropboxConfigForm from './AdminDropboxConfigForm';
 
 const DropboxSettingsWrapper: React.FC = () => {
   const { migrationComplete } = useSettingsMigration();
@@ -16,13 +18,36 @@ const DropboxSettingsWrapper: React.FC = () => {
   const [enableDropbox, setEnableDropbox] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [hasToken, setHasToken] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   
-  // Vérifier l'état de Dropbox une fois la migration terminée
+  // Checking if the current user is an admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+            
+          setIsAdmin(roles?.role === 'admin');
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, []);
+  
+  // Check Dropbox status once migration is completed
   useEffect(() => {
     if (migrationComplete) {
       const checkDropboxStatus = async () => {
         try {
-          // Récupérer la configuration complète pour plus de détails
+          // Retrieve complete configuration for more details
           const config = await getDropboxConfig();
           console.log('DropboxSettingsWrapper - Configuration Dropbox:', {
             isEnabled: config.isEnabled,
@@ -33,13 +58,16 @@ const DropboxSettingsWrapper: React.FC = () => {
             expiresAt: config.expiresAt ? new Date(config.expiresAt).toISOString() : 'non défini'
           });
           
-          // Vérifier si nous avons un token valide
-          setHasToken(!!config.accessToken && config.accessToken.length > 0);
+          // Check if we have a valid token
+          const hasValidToken = !!config.accessToken && 
+                               config.accessToken.length > 0 && 
+                               config.accessToken !== 'YOUR_DEFAULT_ACCESS_TOKEN';
+          setHasToken(hasValidToken);
           
-          // Définir le statut en fonction de la présence du token
-          const finalStatus = !!config.accessToken && config.accessToken.length > 0 ? 'enabled' : 'disabled';
+          // Set status based on token presence
+          const finalStatus = hasValidToken ? 'enabled' : 'disabled';
           setDropboxStatus(finalStatus);
-          setEnableDropbox(!!config.accessToken && config.accessToken.length > 0);
+          setEnableDropbox(hasValidToken);
           
         } catch (error) {
           console.error('Error checking Dropbox status:', error);
@@ -57,7 +85,7 @@ const DropboxSettingsWrapper: React.FC = () => {
     try {
       setIsActivating(true);
       
-      // Récupérer la configuration admin par défaut
+      // Retrieve default admin configuration
       const { data: adminConfig, error: adminError } = await supabase
         .from('app_settings')
         .select('value')
@@ -65,21 +93,23 @@ const DropboxSettingsWrapper: React.FC = () => {
         .maybeSingle();
         
       if (adminError) {
-        console.error('Erreur récupération config admin:', adminError);
+        console.error('Error retrieving admin config:', adminError);
         toast.error("Impossible de récupérer la configuration admin");
         setIsActivating(false);
         return;
       }
       
       const adminDropboxConfig = adminConfig?.value as any;
-      if (!adminDropboxConfig || !adminDropboxConfig.accessToken) {
-        console.error('Configuration admin invalide ou sans token');
-        toast.error("La configuration admin ne contient pas de token valide");
+      if (!adminDropboxConfig || 
+          !adminDropboxConfig.accessToken || 
+          adminDropboxConfig.accessToken === 'YOUR_DEFAULT_ACCESS_TOKEN') {
+        console.error('Invalid admin configuration or token not configured');
+        toast.error("La configuration admin n'est pas configurée. Un administrateur doit d'abord configurer les identifiants Dropbox.");
         setIsActivating(false);
         return;
       }
       
-      // Appliquer la configuration admin
+      // Apply admin configuration
       const config: DropboxConfig = {
         accessToken: adminDropboxConfig.accessToken,
         refreshToken: adminDropboxConfig.refreshToken,
@@ -95,10 +125,10 @@ const DropboxSettingsWrapper: React.FC = () => {
       setEnableDropbox(true);
       setHasToken(true);
       
-      // Rafraîchir la page pour prendre en compte les changements
+      // Refresh page to apply changes
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
-      console.error("Erreur lors de l'activation de Dropbox:", error);
+      console.error("Error activating Dropbox:", error);
       toast.error("Une erreur est survenue lors de l'activation de Dropbox");
     } finally {
       setIsActivating(false);
@@ -124,6 +154,8 @@ const DropboxSettingsWrapper: React.FC = () => {
   
   return (
     <>
+      {isAdmin && <AdminDropboxConfigForm />}
+      
       {dropboxStatus && (
         <div className="mb-6">
           {dropboxStatus === 'enabled' ? (
@@ -139,28 +171,31 @@ const DropboxSettingsWrapper: React.FC = () => {
               <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               <div className="flex flex-col space-y-2 w-full">
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
-                  Dropbox n'est pas configuré avec un token valide.
-                  Cliquez ci-dessous pour utiliser le token de l'administrateur.
+                  {isAdmin ? 
+                    "Dropbox n'est pas configuré. Utilisez le formulaire ci-dessus pour configurer les paramètres admin." :
+                    "Dropbox n'est pas configuré avec un token valide. Cliquez ci-dessous pour utiliser le token de l'administrateur."}
                 </AlertDescription>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleQuickEnable}
-                    disabled={isActivating}
-                    className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-700"
-                  >
-                    {isActivating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
-                        Activation...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> Utiliser le token admin
-                      </>
-                    )}
-                  </Button>
+                  {!isAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleQuickEnable}
+                      disabled={isActivating}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-700"
+                    >
+                      {isActivating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
+                          Activation...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-1" /> Utiliser le token admin
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </Alert>
