@@ -65,6 +65,11 @@ export const storeGofileReference = async (
   gofileUrl: string
 ): Promise<void> => {
   try {
+    // Ensure songId is a UUID string with the correct format
+    if (!songId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      throw new Error("Invalid song ID format");
+    }
+
     const { error } = await supabase
       .from('gofile_references')
       .insert({

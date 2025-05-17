@@ -89,6 +89,35 @@ export type Database = {
           },
         ]
       }
+      gofile_references: {
+        Row: {
+          created_at: string
+          gofile_url: string
+          id: string
+          song_id: string
+        }
+        Insert: {
+          created_at?: string
+          gofile_url: string
+          id?: string
+          song_id: string
+        }
+        Update: {
+          created_at?: string
+          gofile_url?: string
+          id?: string
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gofile_references_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hidden_songs: {
         Row: {
           hidden_at: string | null

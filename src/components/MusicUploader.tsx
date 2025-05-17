@@ -242,7 +242,8 @@ export const MusicUploader = () => {
       return null;
     }
 
-    const fileId = generateUUID();
+    // Using crypto.randomUUID() directly to ensure proper UUID format
+    const fileId = crypto.randomUUID();
 
     try {
       let { artist, title } = parseFileName(file.name);
