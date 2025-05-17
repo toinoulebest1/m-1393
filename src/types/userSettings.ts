@@ -13,3 +13,12 @@ export interface DropboxConfig {
   expiresAt?: number;
   isEnabled: boolean;
 }
+
+export interface OneDriveConfig {
+  accessToken: string;
+  refreshToken?: string;
+  clientId?: string;
+  clientSecret?: string;
+  expiresAt?: number;
+  isEnabled: boolean;
+}

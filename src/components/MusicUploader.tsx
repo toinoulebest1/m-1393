@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
+import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 
 interface Song {
   id: string;
@@ -27,6 +28,24 @@ export const MusicUploader = () => {
   const [dragCounter, setDragCounter] = useState(0);
   // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
+  const [storageProvider, setStorageProvider] = useState<string>("supabase");
+
+  // Check if OneDrive is available
+  const checkOneDriveStatus = async () => {
+    const oneDriveAvailable = await isOneDriveEnabled();
+    if (oneDriveAvailable) {
+      setStorageProvider("onedrive");
+      console.log("OneDrive est disponible et sera utilisé pour le stockage");
+    } else {
+      setStorageProvider("supabase");
+      console.log("OneDrive n'est pas disponible, utilisation de Supabase par défaut");
+    }
+  };
+  
+  // Check OneDrive status on component mount
+  useState(() => {
+    checkOneDriveStatus();
+  });
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -222,8 +241,9 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Always use Supabase for storage since we're removing the other options
+      // Store file using the current storage provider
       await storeAudioFile(fileId, file);
+      toast.success(`Upload réussi vers ${storageProvider === "onedrive" ? "OneDrive" : "Supabase"}`);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -271,7 +291,7 @@ export const MusicUploader = () => {
           file_path: fileId,
           duration: formattedDuration,
           image_url: imageUrl,
-          storage_provider: 'supabase'  // Always use Supabase
+          storage_provider: storageProvider  // Utiliser le fournisseur sélectionné
         })
         .select()
         .single();
@@ -491,7 +511,7 @@ export const MusicUploader = () => {
           {/* Single file upload button */}
           <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
             <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un fichier</span>
+            <span>{t('common.upload')} un fichier {storageProvider === "onedrive" ? "vers OneDrive" : ""}</span>
             <input
               type="file"
               accept="audio/*,.lrc"
@@ -504,7 +524,7 @@ export const MusicUploader = () => {
           {/* Directory upload button */}
           <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
             <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un dossier</span>
+            <span>{t('common.upload')} un dossier {storageProvider === "onedrive" ? "vers OneDrive" : ""}</span>
             <input
               type="file"
               accept="audio/*,.lrc"
@@ -526,7 +546,7 @@ export const MusicUploader = () => {
           onDrop={handleDrop}
         >
           <p className="text-white text-lg font-medium">
-            Déposez vos fichiers ici
+            Déposez vos fichiers ici pour les téléverser{storageProvider === "onedrive" ? " vers OneDrive" : ""}
           </p>
         </div>
       )}

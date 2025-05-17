@@ -1,14 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
+import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
-  // Check if we should use Dropbox instead of Supabase
-  const useDropbox = isDropboxEnabled();
-  console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
+  // Check if we should use OneDrive instead of Supabase
+  const useOneDrive = await isOneDriveEnabled();
+  console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
   
   let fileToUpload: File;
   if (typeof file === 'string') {
@@ -29,9 +29,9 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   }
 
   try {
-    if (useDropbox) {
-      console.log("Uploading file to Dropbox storage:", id);
-      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+    if (useOneDrive) {
+      console.log("Uploading file to OneDrive storage:", id);
+      await uploadFileToOneDrive(fileToUpload, `audio/${id}`);
       return `audio/${id}`;
     } else {
       console.log("Uploading file to Supabase storage:", id);
@@ -76,27 +76,27 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Si le fichier n'est pas en cache, procède normalement
-    let useDropbox = false;
+    let useOneDrive = false;
     try {
-      useDropbox = await isDropboxEnabled();
-      console.log("Vérification du fournisseur de stockage - Dropbox activé:", useDropbox);
-    } catch (dropboxError) {
-      console.warn("Erreur lors de la vérification de Dropbox, utilisation de Supabase:", dropboxError);
-      useDropbox = false;
+      useOneDrive = await isOneDriveEnabled();
+      console.log("Vérification du fournisseur de stockage - OneDrive activé:", useOneDrive);
+    } catch (oneDriveError) {
+      console.warn("Erreur lors de la vérification de OneDrive, utilisation de Supabase:", oneDriveError);
+      useOneDrive = false;
     }
     
-    console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
+    console.log("Using storage provider for retrieval:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
-    if (useDropbox) {
+    if (useOneDrive) {
       try {
-        console.log("Tentative de récupération depuis Dropbox:", path);
-        audioUrl = await getDropboxSharedLink(`audio/${path}`);
-        console.log("URL Dropbox générée avec succès pour:", path);
-      } catch (dropboxError) {
-        console.error("Erreur Dropbox, repli vers Supabase:", dropboxError);
-        // En cas d'erreur avec Dropbox, on essaie avec Supabase
+        console.log("Tentative de récupération depuis OneDrive:", path);
+        audioUrl = await getOneDriveSharedLink(`audio/${path}`);
+        console.log("URL OneDrive générée avec succès pour:", path);
+      } catch (oneDriveError) {
+        console.error("Erreur OneDrive, repli vers Supabase:", oneDriveError);
+        // En cas d'erreur avec OneDrive, on essaie avec Supabase
         console.log("Tentative de récupération de secours depuis Supabase:", path);
         const { data, error } = await supabase.storage
           .from('audio')
