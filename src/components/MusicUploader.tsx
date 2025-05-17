@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -94,10 +93,6 @@ export const MusicUploader = () => {
       artist: "Unknown Artist",
       title: nameWithoutExt.trim()
     };
-  };
-
-  const generateUUID = () => {
-    return crypto.randomUUID();
   };
 
   const extractMetadata = async (file: File) => {
@@ -242,7 +237,7 @@ export const MusicUploader = () => {
       return null;
     }
 
-    // Using crypto.randomUUID() directly to ensure proper UUID format
+    // Using crypto.randomUUID() for a properly formatted UUID
     const fileId = crypto.randomUUID();
 
     try {
