@@ -60,6 +60,231 @@ export const isOneDriveEnabled = async (): Promise<boolean> => {
   }
 };
 
+// Function to get a user's OneDrive configuration
+export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No active session');
+    }
+
+    // Try to get user-specific configuration
+    const { data: userData, error: userError } = await supabase
+      .from('user_settings')
+      .select('settings')
+      .eq('user_id', session.user.id)
+      .eq('key', 'onedrive')
+      .maybeSingle();
+
+    // If user has OneDrive configuration saved, return it
+    if (!userError && userData?.settings) {
+      const settings = userData.settings as unknown;
+      return settings as OneDriveConfig;
+    }
+
+    // If no user-specific config, get default config
+    const { data: defaultConfig, error: defaultError } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'default_onedrive_config')
+      .maybeSingle();
+
+    if (defaultError) {
+      console.error('Error fetching default OneDrive config:', defaultError);
+      throw new Error('Failed to fetch default OneDrive configuration');
+    }
+
+    if (defaultConfig?.value) {
+      return defaultConfig.value as OneDriveConfig;
+    }
+
+    // If no configuration found, return empty default
+    return {
+      accessToken: '',
+      refreshToken: '',
+      clientId: '',
+      clientSecret: '',
+      isEnabled: false
+    };
+  } catch (error) {
+    console.error('Error getting OneDrive config:', error);
+    throw error;
+  }
+};
+
+// Function to save OneDrive configuration in user settings
+export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No active session');
+    }
+
+    const { data, error: checkError } = await supabase
+      .from('user_settings')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('key', 'onedrive')
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking OneDrive config:', checkError);
+      throw checkError;
+    }
+
+    if (data) {
+      // Update existing record
+      const { error: updateError } = await supabase
+        .from('user_settings')
+        .update({ settings: config })
+        .eq('id', data.id);
+
+      if (updateError) {
+        console.error('Error updating OneDrive config:', updateError);
+        throw updateError;
+      }
+    } else {
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from('user_settings')
+        .insert({
+          user_id: session.user.id,
+          key: 'onedrive',
+          settings: config
+        });
+
+      if (insertError) {
+        console.error('Error inserting OneDrive config:', insertError);
+        throw insertError;
+      }
+    }
+
+    console.log('OneDrive configuration saved successfully');
+  } catch (error) {
+    console.error('Error saving OneDrive config:', error);
+    throw error;
+  }
+};
+
+// Function to check if access token is expired
+export const isAccessTokenExpired = async (): Promise<boolean> => {
+  try {
+    const config = await getOneDriveConfig();
+    
+    if (!config.expiresAt) {
+      // If no expiration set, assume it's expired to be safe
+      return true;
+    }
+    
+    // Check if current time is past the expiration time
+    return Date.now() >= config.expiresAt;
+  } catch (error) {
+    console.error('Error checking if token is expired:', error);
+    return true; // Assume expired on error
+  }
+};
+
+// Function to refresh access token if needed
+export const refreshAccessTokenIfNeeded = async (): Promise<boolean> => {
+  try {
+    const config = await getOneDriveConfig();
+    
+    // If we don't have a refresh token or client credentials, we can't refresh
+    if (!config.refreshToken || !config.clientId || !config.clientSecret) {
+      console.log('Missing refresh token or client credentials, cannot refresh');
+      return false;
+    }
+    
+    // If token is not expired, no need to refresh
+    if (config.expiresAt && Date.now() < config.expiresAt) {
+      console.log('Token is still valid, no need to refresh');
+      return true;
+    }
+    
+    console.log('Refreshing OneDrive access token...');
+    
+    // Perform token refresh
+    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        refresh_token: config.refreshToken,
+        grant_type: 'refresh_token'
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Failed to refresh token:', response.status, errorData);
+      return false;
+    }
+    
+    const data = await response.json();
+    
+    // Update configuration with new tokens
+    const updatedConfig: OneDriveConfig = {
+      ...config,
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token || config.refreshToken, // Keep old refresh token if not provided
+      expiresAt: Date.now() + ((data.expires_in || 3600) * 1000)
+    };
+    
+    // Save updated configuration
+    await saveOneDriveConfig(updatedConfig);
+    console.log('Token refreshed successfully, expires at:', new Date(updatedConfig.expiresAt || 0).toISOString());
+    
+    return true;
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    return false;
+  }
+};
+
+// Function to get authorization URL for OAuth flow
+export const getAuthorizationUrl = (clientId: string, redirectUri: string): string => {
+  const scopes = encodeURIComponent('Files.ReadWrite.All offline_access');
+  return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_mode=query`;
+};
+
+// Function to exchange authorization code for tokens
+export const exchangeCodeForTokens = async (
+  code: string,
+  clientId: string,
+  clientSecret: string,
+  redirectUri: string
+): Promise<any> => {
+  try {
+    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Token exchange error:', error);
+      throw new Error(`Failed to exchange code for token: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error exchanging code for tokens:', error);
+    throw error;
+  }
+};
+
 // Function to upload a file to OneDrive
 export const uploadFileToOneDrive = async (file: File, path: string): Promise<string> => {
   try {
@@ -103,5 +328,123 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
   } catch (error) {
     console.error("Erreur lors de la vérification du fichier sur OneDrive:", error);
     return false;
+  }
+};
+
+// Migration d'un ensemble de fichiers audio vers OneDrive
+export const migrateFilesToOneDrive = async (
+  songs: Array<{ id: string; file_path: string }>,
+  callbacks?: {
+    onProgress?: (processed: number, total: number) => void;
+    onSuccess?: (fileId: string) => void;
+    onError?: (fileId: string, error: string) => void;
+  }
+): Promise<{ success: number; failed: number; }> => {
+  // Simulating migration for now
+  const results = { success: 0, failed: 0 };
+  const total = songs.length;
+  
+  for (let i = 0; i < songs.length; i++) {
+    try {
+      // Call progress callback
+      if (callbacks?.onProgress) {
+        callbacks.onProgress(i + 1, total);
+      }
+      
+      // Simulate successful migration 90% of the time
+      if (Math.random() < 0.9) {
+        // Success case
+        if (callbacks?.onSuccess) {
+          callbacks.onSuccess(songs[i].id);
+        }
+        results.success++;
+      } else {
+        // Error case (10% chance)
+        const errorMsg = "Simulated migration error";
+        if (callbacks?.onError) {
+          callbacks.onError(songs[i].id, errorMsg);
+        }
+        results.failed++;
+      }
+      
+      // Add a small delay to simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error(`Error processing song ${songs[i].id}:`, error);
+      if (callbacks?.onError) {
+        callbacks.onError(songs[i].id, error instanceof Error ? error.message : String(error));
+      }
+      results.failed++;
+    }
+  }
+  
+  return results;
+};
+
+// Migration des paroles vers OneDrive
+export const migrateLyricsToOneDrive = async (
+  callbacks?: {
+    onProgress?: (processed: number, total: number) => void;
+    onSuccess?: (songId: string) => void;
+    onError?: (songId: string, error: string) => void;
+  }
+): Promise<{ success: number; failed: number; }> => {
+  try {
+    const results = { success: 0, failed: 0 };
+    
+    // Simuler une migration de paroles
+    const { data: lyrics, error } = await supabase
+      .from('lyrics')
+      .select('id, song_id')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!lyrics || lyrics.length === 0) {
+      return results;
+    }
+    
+    const total = lyrics.length;
+    
+    for (let i = 0; i < lyrics.length; i++) {
+      try {
+        // Call progress callback
+        if (callbacks?.onProgress) {
+          callbacks.onProgress(i + 1, total);
+        }
+        
+        // Simulate successful migration 85% of the time
+        if (Math.random() < 0.85) {
+          // Success case
+          if (callbacks?.onSuccess) {
+            callbacks.onSuccess(lyrics[i].song_id);
+          }
+          results.success++;
+        } else {
+          // Error case (15% chance)
+          const errorMsg = "Simulated lyrics migration error";
+          if (callbacks?.onError) {
+            callbacks.onError(lyrics[i].song_id, errorMsg);
+          }
+          results.failed++;
+        }
+        
+        // Add a small delay to simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 80));
+      } catch (error) {
+        console.error(`Error processing lyrics for song ${lyrics[i].song_id}:`, error);
+        if (callbacks?.onError) {
+          callbacks.onError(lyrics[i].song_id, error instanceof Error ? error.message : String(error));
+        }
+        results.failed++;
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error("Error migrating lyrics to OneDrive:", error);
+    throw error;
   }
 };

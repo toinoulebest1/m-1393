@@ -1,223 +1,61 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import Auth from "./pages/Auth";
-import Index from "./pages/Index";
-import { PlayerProvider } from "./contexts/PlayerContext";
 import { Layout } from "./components/Layout";
-import Favorites from "./pages/Favorites";
+import Index from "./pages/Index";
 import Search from "./pages/Search";
+import Favorites from "./pages/Favorites";
 import History from "./pages/History";
 import Top100 from "./pages/Top100";
 import BlindTest from "./pages/BlindTest";
+import PlaylistDetail from "./pages/PlaylistDetail";
+import Playlists from "./pages/Playlists";
 import Reports from "./pages/Reports";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
-import { ThemeProvider } from "next-themes";
+import { Toaster } from "./components/ui/sonner";
+import { PlayerProvider } from "./contexts/PlayerContext";
 import { CastProvider } from "./contexts/CastContext";
-import './App.css';
+import OneDriveSettingsWrapper from "./components/OneDriveSettingsWrapper";
+import "./App.css";
 
-// Add new imports
-import Playlists from "./pages/Playlists";
-import PlaylistDetail from "./pages/PlaylistDetail";
-import DropboxSettingsWrapper from "./components/DropboxSettingsWrapper"; // Updated import for DropboxSettings
-import { SyncedLyricsView } from "./components/SyncedLyricsView";
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+    },
+  },
+});
 
 function App() {
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setLoading(false);
-      }
-    );
-
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setLoading(false);
-    };
-
-    checkSession();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-spotify-base">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-accent"></div>
-      </div>
-    );
-  }
-
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark">
-      <Router>
-        {/* Fixed provider order: PlayerProvider should wrap CastProvider */}
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
         <PlayerProvider>
           <CastProvider>
             <Routes>
-              <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
-              <Route 
-                path="/" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Index />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/favorites" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Favorites />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/search" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Search />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/history" 
-                element={
-                  session ? (
-                    <Layout>
-                      <History />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/top100" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Top100 />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/blind-test" 
-                element={
-                  session ? (
-                    <Layout>
-                      <BlindTest />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/reports" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Reports />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/metadata-update" 
-                element={
-                  session ? (
-                    <Layout>
-                      <SongMetadataUpdate />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-
-              {/* New playlist routes */}
-              <Route 
-                path="/playlists" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Playlists />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/playlist/:playlistId" 
-                element={
-                  session ? (
-                    <Layout>
-                      <PlaylistDetail />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* Updated dropbox settings route */}
-              <Route 
-                path="/dropbox-settings" 
-                element={
-                  session ? (
-                    <Layout>
-                      <DropboxSettingsWrapper />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* New synced lyrics route */}
-              <Route 
-                path="/synced-lyrics" 
-                element={
-                  session ? (
-                    <Layout hideNavbar>
-                      <SyncedLyricsView />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<Layout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/playlists" element={<Playlists />} />
+                <Route path="/playlists/:id" element={<PlaylistDetail />} />
+                <Route path="/top100" element={<Top100 />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/blind-test" element={<BlindTest />} />
+                <Route path="/metadata-update" element={<SongMetadataUpdate />} />
+                <Route path="/onedrive-settings" element={<OneDriveSettingsWrapper />} />
+              </Route>
             </Routes>
+            <Toaster richColors position="top-center" />
           </CastProvider>
         </PlayerProvider>
-      </Router>
-    </ThemeProvider>
+      </BrowserRouter>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

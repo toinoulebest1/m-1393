@@ -54,7 +54,7 @@ export const Sidebar = () => {
   if (isAdmin) {
     links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
     links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
-    links.push({ to: "/dropbox-settings", icon: CloudUpload, label: "Dropbox" });
+    links.push({ to: "/onedrive-settings", icon: CloudUpload, label: "OneDrive" });
   }
 
   const handleLanguageChange = (value: string) => {
