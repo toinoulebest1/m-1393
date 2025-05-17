@@ -230,17 +230,15 @@ export const MusicUploader = () => {
   };
 
   const processAudioFile = async (file: File) => {
-    console.log("Début du traitement pour:", file.name);
+    console.log("Beginning processing for:", file.name);
     
     if (!file.type.startsWith('audio/')) {
-      toast.error("Type de fichier non supporté");
+      toast.error("Unsupported file type");
       return null;
     }
 
-    // Create a UUID string that TypeScript recognizes as having the correct format
-    // Need to provide explicit typing for the template literal type
-    const generatedUUID = crypto.randomUUID();
-    const fileId = generatedUUID as unknown as `${string}-${string}-${string}-${string}-${string}`;
+    // Generate a UUID that matches the TypeScript template literal type requirement
+    const fileId = crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`;
 
     try {
       let { artist, title } = parseFileName(file.name);
@@ -253,26 +251,26 @@ export const MusicUploader = () => {
 
       const songExists = await checkIfSongExists(artist, title);
       if (songExists) {
-        toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
+        toast.error(`"${title}" by ${artist} already exists in the library`);
         return null;
       }
 
-      console.log("Stockage du fichier audio:", fileId);
+      console.log("Storing audio file:", fileId);
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Choisir où stocker le fichier en fonction du provider actif
-      let fileUrl = fileId; // Par défaut, l'ID du fichier est utilisé pour Supabase
+      // Choose where to store the file based on the active provider
+      let fileUrl = fileId; // By default, the file ID is used for Supabase
       
       if (storageProvider === "Gofile") {
-        // Upload sur Gofile.io
+        // Upload to Gofile.io
         fileUrl = await uploadToGofile(file);
-        console.log("Fichier uploadé sur Gofile avec succès:", fileUrl);
+        console.log("File successfully uploaded to Gofile:", fileUrl);
         
-        // Stocke la référence Gofile dans la base de données
+        // Store the Gofile reference in the database
         await storeGofileReference(fileId, fileUrl);
       } else {
-        // Upload sur Supabase ou Dropbox (comportement existant)
+        // Upload to Supabase or Dropbox (existing behavior)
         await storeAudioFile(fileId, file);
       }
 
@@ -385,8 +383,8 @@ export const MusicUploader = () => {
       };
 
     } catch (error) {
-      console.error("Erreur lors du traitement du fichier:", error);
-      toast.error("Erreur lors de l'upload du fichier");
+      console.error("Error processing file:", error);
+      toast.error("Error uploading file");
       setIsUploading(false);
       setUploadProgress(0);
       return null;
@@ -592,7 +590,7 @@ export const MusicUploader = () => {
           className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
+          onDragLeave={handleLeave}
           onDrop={handleDrop}
         >
           <p className="text-white text-lg font-medium">

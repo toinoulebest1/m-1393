@@ -16,50 +16,74 @@ interface GofileUploadResponse {
   };
 }
 
-// Fonction pour vérifier si Gofile est configuré et activé
+// Function to check if Gofile is configured and enabled
 export const isGofileEnabled = (): boolean => {
-  // Pour l'instant, nous retournons simplement true car nous n'avons pas
-  // de configuration particulière requise pour Gofile
+  // For now, we simply return true as we don't have
+  // any particular configuration required for Gofile
   return true;
 };
 
-// Fonction pour uploader un fichier audio sur Gofile
+// Function to get current Gofile server
+async function getGofileServer(): Promise<string> {
+  try {
+    const response = await fetch('https://api.gofile.io/getServer');
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.status !== 'ok' || !data.data?.server) {
+      throw new Error('Invalid server response');
+    }
+    
+    return data.data.server;
+  } catch (error) {
+    console.error("Error getting Gofile server:", error);
+    throw new Error('Failed to get Gofile server');
+  }
+}
+
+// Function to upload an audio file to Gofile
 export const uploadToGofile = async (file: File): Promise<string> => {
   try {
     console.log("Uploading to Gofile:", file.name);
     
-    // Créer un FormData pour l'upload
+    // Get the best available server first
+    const server = await getGofileServer();
+    console.log("Using Gofile server:", server);
+    
+    // Create a FormData for the upload
     const formData = new FormData();
     formData.append('file', file);
     
-    // Faire une requête POST à l'API Gofile
-    const response = await fetch('https://api.gofile.io/uploadFile', {
+    // Make a POST request to the Gofile API using the assigned server
+    const response = await fetch(`https://${server}.gofile.io/uploadFile`, {
       method: 'POST',
       body: formData
     });
     
     if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
+      throw new Error(`HTTP Error: ${response.status}`);
     }
     
     const result: GofileUploadResponse = await response.json();
     
     if (result.status !== 'ok') {
-      throw new Error(`Erreur Gofile: ${result.status}`);
+      throw new Error(`Gofile Error: ${result.status}`);
     }
     
     console.log("Gofile upload successful:", result.data);
     
-    // Retourner le lien direct
+    // Return the direct link
     return result.data.directLink;
   } catch (error) {
-    console.error("Erreur lors de l'upload vers Gofile:", error);
-    toast.error("Erreur lors de l'upload vers Gofile");
+    console.error("Error uploading to Gofile:", error);
+    toast.error("Error uploading to Gofile");
     throw error;
   }
 };
 
-// Fonction pour stocker les informations du fichier Gofile dans la base de données
+// Function to store the Gofile file information in the database
 export const storeGofileReference = async (
   songId: string, 
   gofileUrl: string
@@ -82,15 +106,15 @@ export const storeGofileReference = async (
       throw error;
     }
     
-    console.log("Référence Gofile stockée avec succès pour:", songId);
+    console.log("Gofile reference stored successfully for:", songId);
   } catch (error) {
-    console.error("Erreur lors du stockage de la référence Gofile:", error);
-    toast.error("Erreur lors du stockage de la référence Gofile");
+    console.error("Error storing Gofile reference:", error);
+    toast.error("Error storing Gofile reference");
     throw error;
   }
 };
 
-// Fonction pour vérifier si un fichier existe déjà sur Gofile
+// Function to check if a file exists on Gofile
 export const checkFileExistsOnGofile = async (gofileUrl: string): Promise<boolean> => {
   try {
     const response = await fetch(gofileUrl, {
@@ -98,7 +122,7 @@ export const checkFileExistsOnGofile = async (gofileUrl: string): Promise<boolea
     });
     return response.ok;
   } catch (error) {
-    console.error("Erreur lors de la vérification du fichier Gofile:", error);
+    console.error("Error checking Gofile file:", error);
     return false;
   }
 };
