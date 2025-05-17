@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OneDriveConfig } from "@/types/userSettings";
@@ -89,7 +88,7 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     if (!userError && userData?.settings) {
       const settings = userData.settings;
       
-      // Safely convert to OneDriveConfig
+      // Safely convert to OneDriveConfig with validation
       if (
         typeof settings === 'object' && 
         settings !== null && 
@@ -113,7 +112,7 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     }
 
     if (defaultConfig?.value) {
-      // Safely convert to OneDriveConfig
+      // Safely convert to OneDriveConfig with validation
       const value = defaultConfig.value;
       if (
         typeof value === 'object' && 
@@ -167,7 +166,7 @@ export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> 
       clientSecret: config.clientSecret || '',
       expiresAt: config.expiresAt,
       isEnabled: !!config.isEnabled
-    } as unknown as Json;
+    } as Json;
 
     if (data) {
       // Update existing record
