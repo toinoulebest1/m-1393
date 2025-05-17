@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OneDriveConfig } from "@/types/userSettings";
@@ -6,7 +7,7 @@ import { Database } from '@/integrations/supabase/types';
 // Type for the JSON data stored in Supabase
 type Json = Database['public']['Tables']['user_settings']['Row']['settings'];
 
-// Configuration de l'authentification Microsoft Graph pour OneDrive
+// Configuration pour Microsoft Graph API pour OneDrive
 const MICROSOFT_GRAPH_API = 'https://graph.microsoft.com/v1.0';
 
 // Constants for OneDrive configuration
@@ -121,7 +122,8 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     }
 
     if (defaultConfig?.value) {
-      return jsonToOneDriveConfig(defaultConfig.value as Json);
+      // Cast to any first to avoid TypeScript error, then use our conversion function
+      return jsonToOneDriveConfig(defaultConfig.value as any);
     }
 
     // If no configuration found, return empty default
@@ -158,7 +160,7 @@ export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> 
       throw checkError;
     }
 
-    // Convert the OneDriveConfig to a plain object to make it serializable
+    // Convert the OneDriveConfig to a format suitable for the database
     const settingsAsJson = oneDriveConfigToJson(config);
 
     if (data) {
