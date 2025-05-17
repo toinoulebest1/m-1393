@@ -36,12 +36,20 @@ const jsonToOneDriveConfig = (json: Json): OneDriveConfig => {
 
 // Helper function to safely convert OneDriveConfig to database JSON
 const oneDriveConfigToJson = (config: OneDriveConfig): Json => {
+  // Si un token est présent mais que l'expiration n'est pas définie,
+  // définir une expiration par défaut (1 heure à partir de maintenant)
+  let expiresAt = config.expiresAt;
+  if (config.accessToken && !config.expiresAt) {
+    expiresAt = Date.now() + 3600000; // +1 heure
+    console.log("Token sans expiration détecté, définition d'une expiration par défaut:", new Date(expiresAt));
+  }
+  
   return {
     accessToken: config.accessToken,
     refreshToken: config.refreshToken || '',
     clientId: config.clientId || '',
     clientSecret: config.clientSecret || '',
-    expiresAt: config.expiresAt,
+    expiresAt: expiresAt,
     isEnabled: !!config.isEnabled
   } as unknown as Json;
 };

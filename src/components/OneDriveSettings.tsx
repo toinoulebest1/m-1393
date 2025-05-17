@@ -11,9 +11,15 @@ import {
   refreshAccessTokenIfNeeded
 } from '@/utils/oneDriveStorage';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Save, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, Save, ExternalLink, RefreshCw, Info, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -50,12 +56,19 @@ export const OneDriveSettings = () => {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
+      // Si un token est présent mais pas d'expiration, définir une expiration par défaut (+1 heure)
+      let updatedExpiresAt = expiresAt;
+      if (accessToken && !expiresAt) {
+        updatedExpiresAt = Date.now() + 3600000; // +1 heure
+        setExpiresAt(updatedExpiresAt);
+      }
+      
       await saveOneDriveConfig({
         accessToken,
         refreshToken,
         clientId,
         clientSecret,
-        expiresAt,
+        expiresAt: updatedExpiresAt,
         isEnabled
       });
       toast.success('Configuration OneDrive enregistrée');
@@ -92,6 +105,13 @@ export const OneDriveSettings = () => {
       setIsSaving(false);
     }
   };
+  
+  const handleManuallySetExpiration = () => {
+    // Définir une expiration d'une heure à partir de maintenant
+    const newExpiresAt = Date.now() + 3600000; // +1 heure
+    setExpiresAt(newExpiresAt);
+    toast.success('Expiration du token définie à 1 heure à partir de maintenant');
+  };
 
   // Format token status (valid/expired)
   const getTokenStatus = () => {
@@ -114,7 +134,8 @@ export const OneDriveSettings = () => {
 
   const tokenStatusColor = () => {
     if (!accessToken) return "secondary";
-    if (!expiresAt || Date.now() >= expiresAt) return "destructive";
+    if (!expiresAt) return "warning";
+    if (Date.now() >= expiresAt) return "destructive";
     return "success";
   };
 
@@ -131,13 +152,42 @@ export const OneDriveSettings = () => {
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Configuration Microsoft Graph</CardTitle>
-          <Badge variant={tokenStatusColor()}>{getTokenStatus()}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={tokenStatusColor()}>{getTokenStatus()}</Badge>
+            {accessToken && !expiresAt && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={handleManuallySetExpiration}
+                    >
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Définir l'expiration à 1h</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
         <CardDescription>
           Configurer Microsoft Graph pour stocker vos fichiers musicaux et paroles sur OneDrive
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {accessToken && !expiresAt && (
+          <Alert variant="warning" className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              L'expiration du token n'est pas définie. Cliquez sur l'icône pour définir une expiration d'une heure ou utilisez le bouton "Rafraîchir Token" pour obtenir un nouveau token avec une expiration valide.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
           <AlertDescription>
             <p className="font-medium">Comment configurer Microsoft Graph pour OneDrive:</p>
