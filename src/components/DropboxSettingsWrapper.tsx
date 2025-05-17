@@ -6,7 +6,7 @@ import { getDropboxConfig, isDropboxEnabled, saveDropboxConfig } from '@/utils/d
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { DropboxConfig } from '@/types/dropbox';
 import AdminDropboxConfigForm from './AdminDropboxConfigForm';
@@ -19,6 +19,7 @@ const DropboxSettingsWrapper: React.FC = () => {
   const [isActivating, setIsActivating] = useState(false);
   const [hasToken, setHasToken] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastTokenUpdate, setLastTokenUpdate] = useState<string | null>(null);
   
   // Checking if the current user is an admin
   useEffect(() => {
@@ -57,6 +58,17 @@ const DropboxSettingsWrapper: React.FC = () => {
             hasClientSecret: !!config.clientSecret,
             expiresAt: config.expiresAt ? new Date(config.expiresAt).toISOString() : 'non défini'
           });
+          
+          // Get the last update time of the admin token
+          const { data: adminConfig } = await supabase
+            .from('app_settings')
+            .select('updated_at')
+            .eq('key', 'default_dropbox_config')
+            .maybeSingle();
+            
+          if (adminConfig) {
+            setLastTokenUpdate(new Date(adminConfig.updated_at).toLocaleString());
+          }
           
           // Check if we have a valid token
           const hasValidToken = !!config.accessToken && 
@@ -109,18 +121,20 @@ const DropboxSettingsWrapper: React.FC = () => {
         return;
       }
       
-      // Apply admin configuration
+      // Apply admin configuration but only copy the necessary fields
+      // Do NOT include refresh token or credentials for non-admin users
       const config: DropboxConfig = {
         accessToken: adminDropboxConfig.accessToken,
-        refreshToken: adminDropboxConfig.refreshToken,
-        clientId: adminDropboxConfig.clientId,
-        clientSecret: adminDropboxConfig.clientSecret,
+        refreshToken: '', // Intentionally empty - non-admins shouldn't refresh the token
+        clientId: '',     // Intentionally empty - non-admins don't need these credentials
+        clientSecret: '', // Intentionally empty - non-admins don't need these credentials
         expiresAt: adminDropboxConfig.expiresAt,
         isEnabled: true
       };
       
+      // Save the limited configuration to the user's settings
       await saveDropboxConfig(config);
-      toast.success("Dropbox a été activé avec succès avec les paramètres admin");
+      toast.success("Dropbox a été activé avec succès avec le token admin");
       setDropboxStatus('enabled');
       setEnableDropbox(true);
       setHasToken(true);
@@ -164,6 +178,11 @@ const DropboxSettingsWrapper: React.FC = () => {
               <AlertDescription className="text-green-800 dark:text-green-200">
                 Dropbox est actuellement <span className="font-semibold">activé</span>. 
                 Tous les nouveaux fichiers seront stockés sur Dropbox.
+                {lastTokenUpdate && !isAdmin && (
+                  <div className="text-xs mt-1 text-green-700 dark:text-green-300">
+                    Token admin mis à jour le : {lastTokenUpdate}
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           ) : dropboxStatus === 'disabled' ? (
@@ -173,7 +192,7 @@ const DropboxSettingsWrapper: React.FC = () => {
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
                   {isAdmin ? 
                     "Dropbox n'est pas configuré. Utilisez le formulaire ci-dessus pour configurer les paramètres admin." :
-                    "Dropbox n'est pas configuré avec un token valide. Cliquez ci-dessous pour utiliser le token de l'administrateur."}
+                    "Dropbox n'est pas activé. Vous pouvez utiliser le token configuré par l'administrateur en cliquant ci-dessous."}
                 </AlertDescription>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {!isAdmin && (
@@ -186,7 +205,7 @@ const DropboxSettingsWrapper: React.FC = () => {
                     >
                       {isActivating ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Activation...
                         </>
                       ) : (

@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Save, CheckCircle } from 'lucide-react';
+import { Loader2, Save, CheckCircle, KeyRound, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const AdminDropboxConfigForm: React.FC = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -16,6 +17,9 @@ const AdminDropboxConfigForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [expiryTime, setExpiryTime] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<number | undefined>(undefined);
 
   // Check if current user is an admin
   useEffect(() => {
@@ -36,7 +40,7 @@ const AdminDropboxConfigForm: React.FC = () => {
         // Load existing config
         const { data: configData } = await supabase
           .from('app_settings')
-          .select('value')
+          .select('value, updated_at')
           .eq('key', 'default_dropbox_config')
           .maybeSingle();
           
@@ -46,6 +50,23 @@ const AdminDropboxConfigForm: React.FC = () => {
           setRefreshToken(config.refreshToken || '');
           setClientId(config.clientId || '');
           setClientSecret(config.clientSecret || '');
+          setExpiresAt(config.expiresAt);
+          
+          // Format last update time
+          if (configData.updated_at) {
+            setLastUpdate(new Date(configData.updated_at).toLocaleString());
+          }
+          
+          // Calculate expiry time
+          if (config.expiresAt) {
+            const expiry = new Date(config.expiresAt);
+            setExpiryTime(expiry.toLocaleString());
+            
+            // Check if the token is expired
+            if (Date.now() > config.expiresAt) {
+              toast.warning('Le token Dropbox est expiré. Veuillez le rafraîchir ou en générer un nouveau.');
+            }
+          }
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
@@ -79,6 +100,11 @@ const AdminDropboxConfigForm: React.FC = () => {
         
       if (error) throw error;
       
+      // Update local state
+      setExpiresAt(expiresAt);
+      setExpiryTime(new Date(expiresAt).toLocaleString());
+      setLastUpdate(new Date().toLocaleString());
+      
       toast.success('Configuration Dropbox admin mise à jour avec succès');
     } catch (error) {
       console.error('Error saving Dropbox config:', error);
@@ -99,13 +125,36 @@ const AdminDropboxConfigForm: React.FC = () => {
   if (!isAdmin) {
     return null;
   }
+
+  // Calculate token status
+  const getTokenStatus = () => {
+    if (!expiresAt) return 'inconnu';
+    
+    const now = Date.now();
+    if (now > expiresAt) return 'expiré';
+    
+    const hoursRemaining = Math.floor((expiresAt - now) / (1000 * 60 * 60));
+    return `valide pour ${hoursRemaining} heures`;
+  };
+  
+  const tokenStatus = getTokenStatus();
+  const tokenStatusColor = tokenStatus === 'expiré' ? 'destructive' : 
+                          tokenStatus === 'inconnu' ? 'secondary' : 'success';
   
   return (
     <Card className="w-full mb-6 bg-card/50 backdrop-blur">
       <CardHeader>
-        <CardTitle>Configuration Dropbox Admin</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle>Configuration Dropbox Admin</CardTitle>
+          <Badge variant={tokenStatusColor}>Token {tokenStatus}</Badge>
+        </div>
         <CardDescription>
           Ces informations seront utilisées comme configuration par défaut pour tous les utilisateurs.
+          {lastUpdate && (
+            <div className="mt-1 text-xs flex items-center gap-1">
+              <Clock className="h-3 w-3" /> Dernière mise à jour: {lastUpdate}
+            </div>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -116,7 +165,13 @@ const AdminDropboxConfigForm: React.FC = () => {
             value={accessToken} 
             onChange={(e) => setAccessToken(e.target.value)} 
             placeholder="Access Token Dropbox"
+            className="font-mono text-xs"
           />
+          {expiryTime && (
+            <p className="text-xs text-muted-foreground">
+              Expiration: {expiryTime}
+            </p>
+          )}
         </div>
         
         <div className="space-y-2">
@@ -126,7 +181,12 @@ const AdminDropboxConfigForm: React.FC = () => {
             value={refreshToken} 
             onChange={(e) => setRefreshToken(e.target.value)}
             placeholder="Refresh Token Dropbox"
+            className="font-mono text-xs"
+            type="password"
           />
+          <p className="text-xs text-muted-foreground">
+            Utilisé pour rafraîchir automatiquement le token d'accès
+          </p>
         </div>
         
         <div className="space-y-2">
@@ -136,6 +196,7 @@ const AdminDropboxConfigForm: React.FC = () => {
             value={clientId} 
             onChange={(e) => setClientId(e.target.value)} 
             placeholder="Client ID de l'application Dropbox"
+            className="font-mono text-xs"
           />
         </div>
         
@@ -147,14 +208,21 @@ const AdminDropboxConfigForm: React.FC = () => {
             onChange={(e) => setClientSecret(e.target.value)} 
             placeholder="Client Secret de l'application Dropbox"
             type="password"
+            className="font-mono text-xs"
           />
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={() => window.open('https://www.dropbox.com/developers/apps', '_blank')}
+        >
+          <KeyRound className="mr-2 h-4 w-4" />
+          Console Dropbox
+        </Button>
         <Button 
           onClick={handleSave} 
           disabled={isSaving || !accessToken || !clientId || !clientSecret}
-          className="ml-auto"
         >
           {isSaving ? (
             <>
