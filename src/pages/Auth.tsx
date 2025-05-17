@@ -1,4 +1,3 @@
-
 import { Auth as SupabaseAuth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,6 +89,7 @@ const Auth = () => {
         )}
 
         <div className="bg-white/5 backdrop-blur-lg p-6 rounded-lg shadow-xl">
+          {/* @ts-ignore - Ignoring TypeScript errors for props that exist but aren't in type definitions */}
           <SupabaseAuth 
             supabaseClient={supabase}
             appearance={{
