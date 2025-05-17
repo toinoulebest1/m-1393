@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Save, CheckCircle, KeyRound, Clock } from 'lucide-react';
+import { Loader2, Save, CheckCircle, KeyRound, Clock, InfoIcon, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const AdminDropboxConfigForm: React.FC = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -157,6 +159,21 @@ const AdminDropboxConfigForm: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+          <InfoIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <p><strong>Comment obtenir un Refresh Token:</strong></p>
+            <ol className="list-decimal ml-4 mt-2 space-y-1 text-sm">
+              <li>Allez dans la <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">Console Dropbox Developer</a></li>
+              <li>Sélectionnez votre application</li>
+              <li>Dans la section <strong>OAuth 2</strong>, sous <strong>Settings</strong>, recherchez l'option <strong>"Access token expiration"</strong></li>
+              <li>Choisissez <strong>"No expiration" ou activez "Allow offline access"</strong> si disponible</li>
+              <li>Cliquez sur <strong>Generate</strong> pour obtenir un token</li>
+              <li>Le token généré sera un refresh token que vous pouvez copier/coller ci-dessous</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-2">
           <Label htmlFor="accessToken">Access Token</Label>
           <Input 
@@ -227,9 +244,11 @@ const AdminDropboxConfigForm: React.FC = () => {
         <Button 
           variant="outline" 
           onClick={() => window.open('https://www.dropbox.com/developers/apps', '_blank')}
+          className="flex items-center gap-1"
         >
-          <KeyRound className="mr-2 h-4 w-4" />
-          Console Dropbox
+          <KeyRound className="h-4 w-4" />
+          <span>Console Dropbox</span>
+          <ExternalLink className="h-3 w-3 ml-1" />
         </Button>
         <Button 
           onClick={handleSave} 

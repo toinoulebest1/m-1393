@@ -6,6 +6,7 @@ export interface DropboxConfig {
   clientSecret?: string;
   expiresAt?: number;
   isEnabled: boolean;
+  hasValidRefreshToken?: boolean; // Ajouté pour tracer si nous avons un refresh token valide
 }
 
 export interface DropboxFileReference {
