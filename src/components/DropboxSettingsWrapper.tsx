@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { DropboxSettings } from './DropboxSettings';
 import { useSettingsMigration } from '@/utils/userSettingsMigration';
@@ -7,6 +6,8 @@ import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import type { DropboxConfig } from '@/types/dropbox';
 
 const DropboxSettingsWrapper: React.FC = () => {
   const { migrationComplete } = useSettingsMigration();

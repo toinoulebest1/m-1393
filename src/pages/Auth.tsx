@@ -1,3 +1,4 @@
+
 import { Auth as SupabaseAuth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,16 +61,14 @@ const Auth = () => {
     }
   };
 
-  // Auth state change handler
-  const handleAuthChange = async (event: any) => {
-    if (event?.error) {
-      setErrorMessage(getErrorMessage(event.error));
-      
-      if (event.error.message.includes("sign up") && event.error.message.includes("email")) {
-        const emailMatch = /email: ([^\s]+)/.exec(event.error.message);
-        if (emailMatch && emailMatch[1]) {
-          setEmail(emailMatch[1]);
-        }
+  // Error handler for auth
+  const handleAuthError = (error: AuthError) => {
+    setErrorMessage(getErrorMessage(error));
+    
+    if (error.message.includes("sign up") && error.message.includes("email")) {
+      const emailMatch = /email: ([^\s]+)/.exec(error.message);
+      if (emailMatch && emailMatch[1]) {
+        setEmail(emailMatch[1]);
       }
     }
   };
@@ -118,7 +117,6 @@ const Auth = () => {
               }
             }}
             providers={[]}
-            onAuthStateChange={handleAuthChange}
           />
 
           <div className="mt-6 pt-6 border-t border-white/10">
