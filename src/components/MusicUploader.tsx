@@ -1,23 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
-import { isDropboxEnabled } from "@/utils/dropboxStorage";
-import { isGofileEnabled, uploadToGofile, storeGofileReference } from "@/utils/gofileStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
-import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 
 interface Song {
   id: string;
@@ -33,37 +23,10 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
-  const [storageProvider, setStorageProvider] = useState<string>("Supabase");
   // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
-
-  useEffect(() => {
-    // Check which storage provider is active
-    const checkStorageProvider = () => {
-      if (isGofileEnabled()) {
-        setStorageProvider("Gofile");
-      } else if (isDropboxEnabled()) {
-        setStorageProvider("Dropbox");
-      } else {
-        setStorageProvider("Supabase");
-      }
-    };
-    
-    checkStorageProvider();
-    
-    // Re-check when the window gets focus
-    const handleFocus = () => {
-      checkStorageProvider();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -237,7 +200,7 @@ export const MusicUploader = () => {
       return null;
     }
 
-    // Generate a UUID that matches the TypeScript template literal type requirement
+    // Generate a UUID with proper typing for TypeScript
     const fileId = crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`;
 
     try {
@@ -259,20 +222,8 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Choose where to store the file based on the active provider
-      let fileUrl = fileId; // By default, the file ID is used for Supabase
-      
-      if (storageProvider === "Gofile") {
-        // Upload to Gofile.io
-        fileUrl = await uploadToGofile(file);
-        console.log("File successfully uploaded to Gofile:", fileUrl);
-        
-        // Store the Gofile reference in the database
-        await storeGofileReference(fileId, fileUrl);
-      } else {
-        // Upload to Supabase or Dropbox (existing behavior)
-        await storeAudioFile(fileId, file);
-      }
+      // Always use Supabase for storage since we're removing the other options
+      await storeAudioFile(fileId, file);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -317,10 +268,10 @@ export const MusicUploader = () => {
           id: fileId,
           title: title,
           artist: artist,
-          file_path: storageProvider === "Gofile" ? fileUrl : fileId,
+          file_path: fileId,
           duration: formattedDuration,
           image_url: imageUrl,
-          storage_provider: storageProvider.toLowerCase()  // Ajout du provider
+          storage_provider: 'supabase'  // Always use Supabase
         })
         .select()
         .single();
@@ -377,7 +328,7 @@ export const MusicUploader = () => {
         title,
         artist,
         duration: formattedDuration,
-        url: fileUrl,
+        url: fileId,
         imageUrl,
         bitrate: formatBitrate(file.size, duration)
       };
@@ -564,25 +515,6 @@ export const MusicUploader = () => {
               onChange={handleFileUpload}
             />
           </label>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-spotify-neutral">
-            Using:
-          </span>
-          <Select
-            defaultValue={storageProvider.toLowerCase()}
-            onValueChange={(value) => setStorageProvider(value === "gofile" ? "Gofile" : 
-                                              value === "dropbox" ? "Dropbox" : "Supabase")}
-          >
-            <SelectTrigger className="h-8 w-28">
-              <SelectValue placeholder="Storage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gofile">Gofile.io</SelectItem>
-              <SelectItem value="dropbox">Dropbox</SelectItem>
-              <SelectItem value="supabase">Supabase</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
       {isDragging && (
