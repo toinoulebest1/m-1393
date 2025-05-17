@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { DropboxSettings } from './DropboxSettings';
 import { useSettingsMigration } from '@/utils/userSettingsMigration';
@@ -71,19 +70,16 @@ const DropboxSettingsWrapper: React.FC = () => {
       setIsActivating(true);
       const config = await getDropboxConfig();
       
-      // Activer Dropbox uniquement si on a un token valide
-      if (config.accessToken) {
-        config.isEnabled = true;
-        await saveDropboxConfig(config);
-        toast.success("Dropbox a été activé avec succès");
-        setDropboxStatus('enabled');
-        setEnableDropbox(true);
-        
-        // Rafraîchir la page pour prendre en compte les changements
-        window.location.reload();
-      } else {
-        toast.error("Impossible d'activer Dropbox: aucun token d'accès configuré");
-      }
+      // Activer Dropbox pour tous les cas
+      config.isEnabled = true;
+      
+      await saveDropboxConfig(config);
+      toast.success("Dropbox a été activé avec succès");
+      setDropboxStatus('enabled');
+      setEnableDropbox(true);
+      
+      // Rafraîchir la page pour prendre en compte les changements
+      window.location.reload();
     } catch (error) {
       console.error("Erreur lors de l'activation de Dropbox:", error);
       toast.error("Une erreur est survenue lors de l'activation de Dropbox");
@@ -95,7 +91,7 @@ const DropboxSettingsWrapper: React.FC = () => {
   const handleForceEnable = async () => {
     try {
       setIsActivating(true);
-      const config = await getDropboxConfig();
+      let config = await getDropboxConfig();
       
       // Si on n'a pas de token, utiliser les tokens par défaut depuis app_settings
       if (!config.accessToken) {
@@ -116,21 +112,26 @@ const DropboxSettingsWrapper: React.FC = () => {
         const defaultConfig = data.value as any;
         if (defaultConfig && defaultConfig.accessToken) {
           // Appliquer la configuration par défaut
-          config.accessToken = defaultConfig.accessToken;
-          config.refreshToken = defaultConfig.refreshToken;
-          config.clientId = defaultConfig.clientId;
-          config.clientSecret = defaultConfig.clientSecret;
-          config.expiresAt = defaultConfig.expiresAt;
+          config = {
+            accessToken: defaultConfig.accessToken,
+            refreshToken: defaultConfig.refreshToken,
+            clientId: defaultConfig.clientId,
+            clientSecret: defaultConfig.clientSecret,
+            expiresAt: defaultConfig.expiresAt,
+            isEnabled: true
+          };
           console.log("Configuration par défaut appliquée depuis app_settings");
         } else {
           toast.error("La configuration par défaut ne contient pas de token valide");
           setIsActivating(false);
           return;
         }
+      } else {
+        // Juste activer la configuration existante
+        config.isEnabled = true;
       }
       
       // Activer Dropbox
-      config.isEnabled = true;
       await saveDropboxConfig(config);
       toast.success("Dropbox a été activé avec succès");
       setDropboxStatus('enabled');
@@ -184,45 +185,24 @@ const DropboxSettingsWrapper: React.FC = () => {
                   Les fichiers seront stockés sur Supabase.
                 </AlertDescription>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {enableDropbox ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleQuickEnable}
-                      disabled={isActivating}
-                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-700"
-                    >
-                      {isActivating ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
-                          Activation...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-1" /> Activer maintenant
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleForceEnable}
-                      disabled={isActivating}
-                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-700"
-                    >
-                      {isActivating ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
-                          Activation forcée...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-1" /> Activation forcée
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleQuickEnable}
+                    disabled={isActivating}
+                    className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-900/30 dark:text-amber-100 dark:border-amber-700"
+                  >
+                    {isActivating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current mr-2"></div>
+                        Activation...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Activer maintenant
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </Alert>

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDropboxConfig, saveDropboxConfig, isDropboxEnabled } from './dropboxStorage';
+import { DropboxConfig } from '@/types/dropbox';
 
 export const useSettingsMigration = () => {
   const [migrationComplete, setMigrationComplete] = useState(false);
@@ -42,6 +43,7 @@ export const useSettingsMigration = () => {
               // S'assurer que isEnabled est à true pour les nouveaux utilisateurs
               const updatedLocalConfig = {
                 ...localConfig,
+                accessToken: localConfig.accessToken || '',
                 isEnabled: true // Force enable Dropbox for new users
               };
               
@@ -105,33 +107,62 @@ export const useSettingsMigration = () => {
         } else {
           console.log('useSettingsMigration - Aucune config Dropbox dans localStorage');
           
-          // Pour les nouveaux utilisateurs sans configuration Dropbox, vérifier s'il existe une configuration par défaut
-          // dans la base de données (paramètres globaux) et l'appliquer
+          // Créer une configuration par défaut pour les nouveaux utilisateurs
           try {
-            const { data, error } = await supabase
-              .from('app_settings')
+            // Vérifier si l'utilisateur a déjà une configuration
+            const { data: userConfig, error: userConfigError } = await supabase
+              .from('user_settings')
               .select('*')
-              .eq('key', 'default_dropbox_config')
+              .eq('user_id', session.user.id)
+              .eq('key', 'dropbox_config')
               .maybeSingle();
               
-            if (!error && data) {
-              console.log('useSettingsMigration - Configuration Dropbox par défaut trouvée dans app_settings');
-              const defaultConfig = data.value as any;
+            if (!userConfigError && !userConfig) {
+              console.log('useSettingsMigration - Création d\'une nouvelle configuration par défaut pour l\'utilisateur');
               
-              if (defaultConfig && defaultConfig.accessToken) {
-                console.log('useSettingsMigration - Application de la configuration par défaut pour le nouvel utilisateur');
-                await saveDropboxConfig({
-                  accessToken: defaultConfig.accessToken,
-                  refreshToken: defaultConfig.refreshToken,
-                  clientId: defaultConfig.clientId,
-                  clientSecret: defaultConfig.clientSecret,
-                  expiresAt: defaultConfig.expiresAt,
+              // Vérifier s'il existe une configuration globale par défaut dans app_settings
+              const { data: appConfig, error: appConfigError } = await supabase
+                .from('app_settings')
+                .select('*')
+                .eq('key', 'default_dropbox_config')
+                .maybeSingle();
+              
+              if (!appConfigError && appConfig) {
+                console.log('useSettingsMigration - Configuration Dropbox par défaut trouvée dans app_settings');
+                const defaultConfig = appConfig.value as any;
+                
+                // Créer une configuration par défaut basée sur app_settings
+                const newConfig: DropboxConfig = {
+                  accessToken: defaultConfig.accessToken || '',
+                  refreshToken: defaultConfig.refreshToken || undefined,
+                  clientId: defaultConfig.clientId || undefined,
+                  clientSecret: defaultConfig.clientSecret || undefined,
+                  expiresAt: defaultConfig.expiresAt || undefined,
                   isEnabled: true // Force enable for new users
-                });
+                };
+                
+                console.log('useSettingsMigration - Sauvegarde de la configuration par défaut pour le nouvel utilisateur');
+                await saveDropboxConfig(newConfig);
+                
+                // Mettre également à jour le localStorage
+                localStorage.setItem('dropbox_config', JSON.stringify(newConfig));
+              } else {
+                console.log('useSettingsMigration - Aucune configuration par défaut dans app_settings, création d\'une configuration vide');
+                
+                // Créer une configuration vide mais activée
+                const emptyConfig: DropboxConfig = {
+                  accessToken: '',
+                  isEnabled: true // L'activer par défaut même si vide
+                };
+                
+                await saveDropboxConfig(emptyConfig);
+                localStorage.setItem('dropbox_config', JSON.stringify(emptyConfig));
               }
+            } else {
+              console.log('useSettingsMigration - L\'utilisateur a déjà une configuration Dropbox');
             }
           } catch (e) {
-            console.error('useSettingsMigration - Erreur lors de la recherche de config par défaut:', e);
+            console.error('useSettingsMigration - Erreur lors de la création de la config par défaut:', e);
           }
         }
         

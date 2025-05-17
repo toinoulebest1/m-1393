@@ -187,7 +187,7 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     if (localConfigStr) {
       try {
         const localConfig = JSON.parse(localConfigStr);
-        localEnabled = !!(localConfig.isEnabled && localConfig.accessToken);
+        localEnabled = !!(localConfig.isEnabled);
         console.log('isDropboxEnabled - Statut depuis localStorage:', localEnabled ? 'activé' : 'désactivé');
       } catch (e) {
         console.error('isDropboxEnabled - Erreur parsing localStorage config:', e);
@@ -198,6 +198,13 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       console.log('isDropboxEnabled - Aucune session utilisateur, utilisation de localStorage uniquement:', localEnabled ? 'activé' : 'désactivé');
+      if (!localEnabled) {
+        // Si pas de configuration locale ou désactivée, créer une par défaut et activée
+        const defaultConfig = createDefaultConfig();
+        localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
+        localEnabled = true;
+        console.log('isDropboxEnabled - Configuration par défaut créée et activée');
+      }
       return localEnabled;
     }
     
@@ -211,18 +218,31 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
     
     if (error) {
       console.error('isDropboxEnabled - Erreur lors de la vérification en base de données:', error);
-      return localEnabled; // Fallback to localStorage
-    }
-    
-    // Si aucune donnée n'est trouvée, utiliser localStorage
-    if (!data) {
-      console.log('isDropboxEnabled - Pas de configuration en base de données, utilisation de localStorage');
+      if (!localEnabled) {
+        // Si erreur et pas de config locale, créer une par défaut
+        const defaultConfig = createDefaultConfig();
+        localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
+        console.log('isDropboxEnabled - Erreur DB mais config par défaut créée et activée');
+        return true;
+      }
       return localEnabled;
     }
     
-    // Vérifier si Dropbox est activé dans la base de données et a un token valide
+    // Si aucune donnée n'est trouvée, créer une configuration par défaut
+    if (!data) {
+      console.log('isDropboxEnabled - Pas de configuration en base de données, création d\'une configuration par défaut');
+      
+      const defaultConfig = createDefaultConfig();
+      await saveDropboxConfig(defaultConfig);
+      localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
+      
+      console.log('isDropboxEnabled - Configuration par défaut créée et activée');
+      return true;
+    }
+    
+    // Vérifier si Dropbox est activé dans la base de données
     const dbSettings = data.settings as Record<string, any>;
-    const dbEnabled = !!(dbSettings.isEnabled && dbSettings.accessToken);
+    const dbEnabled = !!(dbSettings.isEnabled);
     console.log('isDropboxEnabled - Statut depuis base de données:', dbEnabled ? 'activé' : 'désactivé');
     
     // Si les deux sont différents, mettre à jour localStorage
@@ -242,11 +262,15 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
       }
     }
     
-    // Forcer à true si nous avons un accessToken (pour les nouveaux utilisateurs ou cas d'erreur)
-    if (dbSettings.accessToken && !dbEnabled) {
-      console.log('isDropboxEnabled - Token trouvé mais status désactivé, correction...');
-      const updatedConfig = {
-        ...dbSettings,
+    // Si désactivé mais devrait être activé, activer
+    if (!dbEnabled) {
+      console.log('isDropboxEnabled - Dropbox désactivé, activation forcée');
+      const updatedConfig: DropboxConfig = {
+        accessToken: dbSettings.accessToken || '',
+        refreshToken: dbSettings.refreshToken || undefined,
+        clientId: dbSettings.clientId || undefined,
+        clientSecret: dbSettings.clientSecret || undefined,
+        expiresAt: dbSettings.expiresAt || undefined,
         isEnabled: true
       };
       
@@ -259,26 +283,21 @@ export const isDropboxEnabled = async (): Promise<boolean> => {
       }
     }
     
-    console.log('isDropboxEnabled - Vérification du fournisseur de stockage - Dropbox activé:', dbEnabled);
-    return dbEnabled;
+    console.log('isDropboxEnabled - Vérification du fournisseur de stockage - Dropbox activé:', true);
+    return true; // Toujours retourner true car nous voulons forcer l'activation
   } catch (error) {
     console.error('isDropboxEnabled - Erreur vérification statut Dropbox:', error);
     
-    // En cas d'erreur avec la base de données, vérifier localStorage comme fallback
+    // En cas d'erreur, s'assurer que Dropbox est activé
     try {
-      const localConfigStr = localStorage.getItem('dropbox_config');
-      if (localConfigStr) {
-        const localConfig = JSON.parse(localConfigStr);
-        const isEnabled = !!(localConfig.isEnabled && localConfig.accessToken);
-        console.log('isDropboxEnabled - Fallback localStorage après erreur - Dropbox activé:', isEnabled);
-        return isEnabled;
-      }
+      const defaultConfig = createDefaultConfig();
+      localStorage.setItem('dropbox_config', JSON.stringify(defaultConfig));
+      console.log('isDropboxEnabled - Erreur mais configuration par défaut créée et activée');
     } catch (e) {
       console.error('isDropboxEnabled - Erreur avec fallback localStorage:', e);
     }
     
-    // En cas d'erreur complète, on suppose que Dropbox n'est pas activé
-    return false;
+    return true; // En cas d'erreur complète, activer Dropbox par défaut
   }
 };
 
@@ -290,6 +309,14 @@ export const isAccessTokenExpired = async (): Promise<boolean> => {
   // Ajouter une marge de 5 minutes avant l'expiration réelle
   const safetyMarginMs = 5 * 60 * 1000;
   return Date.now() >= (config.expiresAt - safetyMarginMs);
+};
+
+// Fonction pour créer une configuration par défaut vide mais activée
+const createDefaultConfig = (): DropboxConfig => {
+  return {
+    accessToken: '',
+    isEnabled: true
+  };
 };
 
 // Nouvelle fonction pour rafraîchir le token d'accès si nécessaire
