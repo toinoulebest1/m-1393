@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,26 +10,34 @@ import { Loader2 } from 'lucide-react';
 import { getLyricsFromDropbox, isDropboxEnabled, uploadLyricsToDropbox } from '@/utils/dropboxStorage';
 
 interface LyricsModalProps {
-  song: Song | null;
+  song?: Song | null;
+  songId?: string;
+  songTitle?: string;
+  artist?: string;
   isOpen: boolean;
   onClose: () => void;
+  onEditRequest?: () => void;
 }
 
-export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
+export const LyricsModal = ({ song, songId, songTitle, artist, isOpen, onClose, onEditRequest }: LyricsModalProps) => {
   const [lyrics, setLyrics] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Récupérer l'ID de la chanson, soit directement, soit à partir de l'objet song
+  const effectiveSongId = song?.id || songId;
+  const effectiveTitle = song?.title || songTitle;
+
   useEffect(() => {
     const fetchLyrics = async () => {
-      if (!song) return;
+      if (!effectiveSongId) return;
       
       setIsLoading(true);
       
       try {
         // Vérifier d'abord dans Dropbox si activé
         if (await isDropboxEnabled()) {
-          const dropboxLyrics = await getLyricsFromDropbox(song.id);
+          const dropboxLyrics = await getLyricsFromDropbox(effectiveSongId);
           if (dropboxLyrics) {
             setLyrics(dropboxLyrics);
             setIsLoading(false);
@@ -40,7 +49,7 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
         const { data, error } = await supabase
           .from('lyrics')
           .select('content')
-          .eq('song_id', song.id)
+          .eq('song_id', effectiveSongId)
           .maybeSingle();
           
         if (error) {
@@ -58,15 +67,15 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
       }
     };
 
-    if (isOpen && song) {
+    if (isOpen && effectiveSongId) {
       fetchLyrics();
     } else {
       setLyrics('');
     }
-  }, [isOpen, song]);
+  }, [isOpen, effectiveSongId]);
 
   const handleSave = async () => {
-    if (!song) return;
+    if (!effectiveSongId) return;
     
     setIsSaving(true);
     
@@ -74,7 +83,7 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
       // Sauvegarder dans Dropbox si activé
       if (await isDropboxEnabled()) {
         try {
-          await uploadLyricsToDropbox(song.id, lyrics);
+          await uploadLyricsToDropbox(effectiveSongId, lyrics);
         } catch (error) {
           console.error('Erreur lors de l\'upload des paroles vers Dropbox:', error);
           // Continuer avec Supabase en cas d'erreur Dropbox
@@ -85,7 +94,7 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
       const { error } = await supabase
         .from('lyrics')
         .upsert({
-          song_id: song.id,
+          song_id: effectiveSongId,
           content: lyrics
         }, {
           onConflict: 'song_id'
@@ -96,6 +105,9 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
         toast.error('Erreur lors de la sauvegarde des paroles');
       } else {
         toast.success('Paroles sauvegardées avec succès');
+        if (onEditRequest) {
+          onEditRequest();
+        }
         onClose();
       }
     } catch (error) {
@@ -110,7 +122,7 @@ export const LyricsModal = ({ song, isOpen, onClose }: LyricsModalProps) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Paroles - {song?.title}</DialogTitle>
+          <DialogTitle>Paroles - {effectiveTitle}</DialogTitle>
           <DialogDescription>
             Ajoutez ou modifiez les paroles de cette chanson.
           </DialogDescription>

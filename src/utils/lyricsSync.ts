@@ -1,5 +1,4 @@
 
-import { getLyrics } from '@/utils/lrcParser';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadLyricsToDropbox, isDropboxEnabled } from '@/utils/dropboxStorage';
 

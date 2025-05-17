@@ -1,4 +1,5 @@
 
+import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserSettingInsert } from '@/types/userSettings';
 
@@ -78,7 +79,7 @@ export const migrateLocalStorageToSupabase = async (): Promise<void> => {
  * Hook à utiliser dans les composants principaux pour déclencher la migration
  */
 export const useSettingsMigration = (): void => {
-  React.useEffect(() => {
+  useEffect(() => {
     migrateLocalStorageToSupabase();
   }, []);
 };

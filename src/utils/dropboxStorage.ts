@@ -1,7 +1,11 @@
+
 import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { UserSettingInsert } from '@/types/userSettings';
+
+// Type pour Json compatible avec DropboxConfig
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 // Fonction modifiée pour récupérer la configuration depuis Supabase
 export const getDropboxConfig = async (): Promise<DropboxConfig> => {
@@ -42,7 +46,18 @@ export const getDropboxConfig = async (): Promise<DropboxConfig> => {
       return { accessToken: '', isEnabled: false };
     }
     
-    return data.settings as DropboxConfig;
+    // Conversion sûre de settings en DropboxConfig
+    const settings = data.settings as Record<string, any>;
+    const config: DropboxConfig = {
+      accessToken: settings.accessToken || '',
+      refreshToken: settings.refreshToken || undefined,
+      clientId: settings.clientId || undefined,
+      clientSecret: settings.clientSecret || undefined,
+      expiresAt: settings.expiresAt || undefined,
+      isEnabled: settings.isEnabled || false
+    };
+    
+    return config;
   } catch (e) {
     console.error('Error fetching Dropbox config from Supabase:', e);
     return { accessToken: '', isEnabled: false };
@@ -76,11 +91,21 @@ export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> =>
       return;
     }
     
+    // Préparer l'objet settings pour stockage dans la base
+    const settingsObject = {
+      accessToken: config.accessToken,
+      refreshToken: config.refreshToken,
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      expiresAt: config.expiresAt,
+      isEnabled: config.isEnabled
+    };
+    
     if (data) {
       // Mise à jour de la configuration existante
       const { error: updateError } = await supabase
         .from('user_settings')
-        .update({ settings: config })
+        .update({ settings: settingsObject })
         .eq('id', data.id);
       
       if (updateError) {
@@ -95,7 +120,7 @@ export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> =>
       const newSettings: UserSettingInsert = {
         user_id: session.user.id,
         key: 'dropbox_config',
-        settings: config
+        settings: settingsObject
       };
       
       const { error: insertError } = await supabase
