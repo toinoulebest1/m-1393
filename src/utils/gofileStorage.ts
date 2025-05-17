@@ -24,7 +24,7 @@ export const isGofileEnabled = (): boolean => {
 };
 
 // Function to get current Gofile server
-async function getGofileServer(): Promise<string> {
+export async function getGofileServer(): Promise<string> {
   try {
     const response = await fetch('https://api.gofile.io/getServer');
     if (!response.ok) {
