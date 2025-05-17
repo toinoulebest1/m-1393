@@ -12,6 +12,39 @@ const MICROSOFT_GRAPH_API = 'https://graph.microsoft.com/v1.0';
 // Constants for OneDrive configuration
 const ONEDRIVE_FOLDER = 'Lovable Music App';
 
+// Helper function to safely convert database JSON to OneDriveConfig
+const jsonToOneDriveConfig = (json: Json): OneDriveConfig => {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) {
+    return {
+      accessToken: '',
+      isEnabled: false
+    };
+  }
+  
+  const data = json as Record<string, any>;
+  
+  return {
+    accessToken: typeof data.accessToken === 'string' ? data.accessToken : '',
+    refreshToken: typeof data.refreshToken === 'string' ? data.refreshToken : undefined,
+    clientId: typeof data.clientId === 'string' ? data.clientId : undefined,
+    clientSecret: typeof data.clientSecret === 'string' ? data.clientSecret : undefined,
+    expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : undefined,
+    isEnabled: !!data.isEnabled
+  };
+};
+
+// Helper function to safely convert OneDriveConfig to database JSON
+const oneDriveConfigToJson = (config: OneDriveConfig): Json => {
+  return {
+    accessToken: config.accessToken,
+    refreshToken: config.refreshToken || '',
+    clientId: config.clientId || '',
+    clientSecret: config.clientSecret || '',
+    expiresAt: config.expiresAt,
+    isEnabled: !!config.isEnabled
+  } as unknown as Json;
+};
+
 // Check if OneDrive is enabled in user settings
 export const isOneDriveEnabled = async (): Promise<boolean> => {
   try {
@@ -38,30 +71,16 @@ export const isOneDriveEnabled = async (): Promise<boolean> => {
       return false;
     }
     
-    // Safely convert to OneDriveConfig with validation
-    const settings = data.settings;
-    if (
-      typeof settings === 'object' && 
-      settings !== null && 
-      !Array.isArray(settings) &&
-      'accessToken' in settings && 
-      typeof settings.accessToken === 'string'
-    ) {
-      const oneDriveSettings = settings as unknown as OneDriveConfig;
-      
-      // Check if token is expired and needs refresh
-      if (oneDriveSettings.expiresAt && new Date(oneDriveSettings.expiresAt) <= new Date()) {
-        console.log("OneDrive token expired, needs refresh");
-        // In a real implementation, we would refresh the token here
-        return false;
-      }
-
-      console.log("OneDrive is enabled and configured");
-      return true;
-    }
+    const oneDriveSettings = jsonToOneDriveConfig(data.settings);
     
-    console.log("Invalid OneDrive configuration");
-    return false;
+    // Check if token is expired and needs refresh
+    if (oneDriveSettings.expiresAt && new Date(oneDriveSettings.expiresAt) <= new Date()) {
+      console.log("OneDrive token expired, needs refresh");
+      return false;
+    }
+
+    console.log("OneDrive is enabled and configured");
+    return oneDriveSettings.isEnabled;
   } catch (error) {
     console.error("Error checking OneDrive configuration:", error);
     return false;
@@ -86,17 +105,7 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
 
     // If user has OneDrive configuration saved, return it
     if (!userError && userData?.settings) {
-      const settings = userData.settings;
-      
-      // Safely convert to OneDriveConfig with validation
-      if (
-        typeof settings === 'object' && 
-        settings !== null && 
-        !Array.isArray(settings) &&
-        'accessToken' in settings
-      ) {
-        return settings as unknown as OneDriveConfig;
-      }
+      return jsonToOneDriveConfig(userData.settings);
     }
 
     // If no user-specific config, get default config
@@ -112,16 +121,7 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     }
 
     if (defaultConfig?.value) {
-      // Safely convert to OneDriveConfig with validation
-      const value = defaultConfig.value;
-      if (
-        typeof value === 'object' && 
-        value !== null && 
-        !Array.isArray(value) &&
-        'accessToken' in value
-      ) {
-        return value as unknown as OneDriveConfig;
-      }
+      return jsonToOneDriveConfig(defaultConfig.value as Json);
     }
 
     // If no configuration found, return empty default
@@ -158,15 +158,8 @@ export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> 
       throw checkError;
     }
 
-    // Convert the OneDriveConfig to a plain object to make it serializable as Json
-    const settingsAsJson = {
-      accessToken: config.accessToken,
-      refreshToken: config.refreshToken || '',
-      clientId: config.clientId || '',
-      clientSecret: config.clientSecret || '',
-      expiresAt: config.expiresAt,
-      isEnabled: !!config.isEnabled
-    } as Json;
+    // Convert the OneDriveConfig to a plain object to make it serializable
+    const settingsAsJson = oneDriveConfigToJson(config);
 
     if (data) {
       // Update existing record
