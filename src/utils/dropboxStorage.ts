@@ -1,6 +1,7 @@
 import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { UserSettingInsert } from '@/types/userSettings';
 
 // Fonction modifiée pour récupérer la configuration depuis Supabase
 export const getDropboxConfig = async (): Promise<DropboxConfig> => {
@@ -27,7 +28,7 @@ export const getDropboxConfig = async (): Promise<DropboxConfig> => {
     // Récupérer la configuration de l'utilisateur depuis Supabase
     const { data, error } = await supabase
       .from('user_settings')
-      .select('settings')
+      .select('*')
       .eq('user_id', session.user.id)
       .eq('key', 'dropbox_config')
       .single();
@@ -91,13 +92,15 @@ export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> =>
       }
     } else {
       // Création d'une nouvelle entrée de configuration
+      const newSettings: UserSettingInsert = {
+        user_id: session.user.id,
+        key: 'dropbox_config',
+        settings: config
+      };
+      
       const { error: insertError } = await supabase
         .from('user_settings')
-        .insert({
-          user_id: session.user.id,
-          key: 'dropbox_config',
-          settings: config
-        });
+        .insert(newSettings);
       
       if (insertError) {
         console.error('Erreur lors de la création de la configuration Dropbox:', insertError);
