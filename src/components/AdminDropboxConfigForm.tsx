@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -174,18 +173,30 @@ const AdminDropboxConfigForm: React.FC = () => {
           )}
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="refreshToken">Refresh Token</Label>
-          <Input 
-            id="refreshToken" 
-            value={refreshToken} 
-            onChange={(e) => setRefreshToken(e.target.value)}
-            placeholder="Refresh Token Dropbox"
-            className="font-mono text-xs"
-            type="password"
-          />
+        <div className="space-y-2 relative">
+          <Label htmlFor="refreshToken" className="flex items-center">
+            Refresh Token
+            <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200">
+              Nécessaire pour l'accès permanent
+            </Badge>
+          </Label>
+          <div className="relative">
+            <Input 
+              id="refreshToken" 
+              value={refreshToken} 
+              onChange={(e) => setRefreshToken(e.target.value)}
+              placeholder="Refresh Token Dropbox"
+              className="font-mono text-xs border-2 border-blue-300 dark:border-blue-700 focus-visible:ring-blue-500"
+              type="password"
+            />
+            <div className="absolute right-2 top-2 animate-pulse">
+              <Badge className="bg-blue-500">
+                Entrez le token ici
+              </Badge>
+            </div>
+          </div>
           <p className="text-xs text-muted-foreground">
-            Utilisé pour rafraîchir automatiquement le token d'accès
+            Utilisé pour rafraîchir automatiquement le token d'accès. <strong>Important pour un fonctionnement continu.</strong>
           </p>
         </div>
         
