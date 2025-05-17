@@ -2,6 +2,10 @@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OneDriveConfig } from "@/types/userSettings";
+import { Database } from '@/integrations/supabase/types';
+
+// Type for the JSON data stored in Supabase
+type Json = Database['public']['Tables']['user_settings']['Row']['settings'];
 
 // Configuration de l'authentification Microsoft Graph pour OneDrive
 const MICROSOFT_GRAPH_API = 'https://graph.microsoft.com/v1.0';
@@ -35,25 +39,30 @@ export const isOneDriveEnabled = async (): Promise<boolean> => {
       return false;
     }
     
-    // First convert to unknown, then to OneDriveConfig to avoid TypeScript error
-    const settings = data.settings as unknown;
-    const oneDriveSettings = settings as OneDriveConfig;
+    // Safely convert to OneDriveConfig with validation
+    const settings = data.settings;
+    if (
+      typeof settings === 'object' && 
+      settings !== null && 
+      !Array.isArray(settings) &&
+      'accessToken' in settings && 
+      typeof settings.accessToken === 'string'
+    ) {
+      const oneDriveSettings = settings as unknown as OneDriveConfig;
+      
+      // Check if token is expired and needs refresh
+      if (oneDriveSettings.expiresAt && new Date(oneDriveSettings.expiresAt) <= new Date()) {
+        console.log("OneDrive token expired, needs refresh");
+        // In a real implementation, we would refresh the token here
+        return false;
+      }
+
+      console.log("OneDrive is enabled and configured");
+      return true;
+    }
     
-    // Validate that the required properties exist
-    if (!oneDriveSettings || typeof oneDriveSettings !== 'object' || !oneDriveSettings.accessToken) {
-      console.log("Invalid OneDrive configuration or missing access token");
-      return false;
-    }
-
-    // Check if token is expired and needs refresh
-    if (oneDriveSettings.expiresAt && new Date(oneDriveSettings.expiresAt) <= new Date()) {
-      console.log("OneDrive token expired, needs refresh");
-      // In a real implementation, we would refresh the token here
-      return false;
-    }
-
-    console.log("OneDrive is enabled and configured");
-    return true;
+    console.log("Invalid OneDrive configuration");
+    return false;
   } catch (error) {
     console.error("Error checking OneDrive configuration:", error);
     return false;
@@ -78,8 +87,17 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
 
     // If user has OneDrive configuration saved, return it
     if (!userError && userData?.settings) {
-      const settings = userData.settings as unknown;
-      return settings as OneDriveConfig;
+      const settings = userData.settings;
+      
+      // Safely convert to OneDriveConfig
+      if (
+        typeof settings === 'object' && 
+        settings !== null && 
+        !Array.isArray(settings) &&
+        'accessToken' in settings
+      ) {
+        return settings as unknown as OneDriveConfig;
+      }
     }
 
     // If no user-specific config, get default config
@@ -95,7 +113,16 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     }
 
     if (defaultConfig?.value) {
-      return defaultConfig.value as OneDriveConfig;
+      // Safely convert to OneDriveConfig
+      const value = defaultConfig.value;
+      if (
+        typeof value === 'object' && 
+        value !== null && 
+        !Array.isArray(value) &&
+        'accessToken' in value
+      ) {
+        return value as unknown as OneDriveConfig;
+      }
     }
 
     // If no configuration found, return empty default
@@ -132,11 +159,21 @@ export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> 
       throw checkError;
     }
 
+    // Convert the OneDriveConfig to a plain object to make it serializable as Json
+    const settingsAsJson = {
+      accessToken: config.accessToken,
+      refreshToken: config.refreshToken || '',
+      clientId: config.clientId || '',
+      clientSecret: config.clientSecret || '',
+      expiresAt: config.expiresAt,
+      isEnabled: !!config.isEnabled
+    } as unknown as Json;
+
     if (data) {
       // Update existing record
       const { error: updateError } = await supabase
         .from('user_settings')
-        .update({ settings: config })
+        .update({ settings: settingsAsJson })
         .eq('id', data.id);
 
       if (updateError) {
@@ -150,7 +187,7 @@ export const saveOneDriveConfig = async (config: OneDriveConfig): Promise<void> 
         .insert({
           user_id: session.user.id,
           key: 'onedrive',
-          settings: config
+          settings: settingsAsJson
         });
 
       if (insertError) {

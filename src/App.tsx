@@ -36,19 +36,17 @@ function App() {
           <CastProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route element={<Layout />}>
-                <Route path="/" element={<Index />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/favorites" element={<Favorites />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/playlists" element={<Playlists />} />
-                <Route path="/playlists/:id" element={<PlaylistDetail />} />
-                <Route path="/top100" element={<Top100 />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/blind-test" element={<BlindTest />} />
-                <Route path="/metadata-update" element={<SongMetadataUpdate />} />
-                <Route path="/onedrive-settings" element={<OneDriveSettingsWrapper />} />
-              </Route>
+              <Route path="/" element={<Layout><Index /></Layout>} />
+              <Route path="/search" element={<Layout><Search /></Layout>} />
+              <Route path="/favorites" element={<Layout><Favorites /></Layout>} />
+              <Route path="/history" element={<Layout><History /></Layout>} />
+              <Route path="/playlists" element={<Layout><Playlists /></Layout>} />
+              <Route path="/playlists/:id" element={<Layout><PlaylistDetail /></Layout>} />
+              <Route path="/top100" element={<Layout><Top100 /></Layout>} />
+              <Route path="/reports" element={<Layout><Reports /></Layout>} />
+              <Route path="/blind-test" element={<Layout><BlindTest /></Layout>} />
+              <Route path="/metadata-update" element={<Layout><SongMetadataUpdate /></Layout>} />
+              <Route path="/onedrive-settings" element={<Layout><OneDriveSettingsWrapper /></Layout>} />
             </Routes>
             <Toaster richColors position="top-center" />
           </CastProvider>
