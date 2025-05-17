@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,13 +99,18 @@ export const DropboxSettings = () => {
         toast.error('Accès non autorisé');
       } else {
         // Load config only if admin
-        const config = getDropboxConfig();
-        setAccessToken(config.accessToken || '');
-        setRefreshToken(config.refreshToken || '');
-        setClientId(config.clientId || '');
-        setClientSecret(config.clientSecret || '');
-        setIsEnabled(config.isEnabled || false);
-        setExpiresAt(config.expiresAt);
+        try {
+          const config = await getDropboxConfig();
+          setAccessToken(config.accessToken || '');
+          setRefreshToken(config.refreshToken || '');
+          setClientId(config.clientId || '');
+          setClientSecret(config.clientSecret || '');
+          setIsEnabled(config.isEnabled || false);
+          setExpiresAt(config.expiresAt);
+        } catch (error) {
+          console.error('Erreur lors du chargement de la configuration Dropbox:', error);
+          toast.error('Erreur lors du chargement de la configuration Dropbox');
+        }
       }
       
       setIsLoading(false);
@@ -137,7 +141,7 @@ export const DropboxSettings = () => {
           const expiresAt = Date.now() + ((tokenResponse.expires_in || 14400) * 1000);
           
           // Sauvegarder la nouvelle configuration
-          saveDropboxConfig({
+          await saveDropboxConfig({
             accessToken: tokenResponse.access_token,
             refreshToken: tokenResponse.refresh_token || refreshToken, // Garder l'ancien refresh token si pas de nouveau
             clientId,
@@ -175,7 +179,7 @@ export const DropboxSettings = () => {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      saveDropboxConfig({
+      await saveDropboxConfig({
         accessToken,
         refreshToken,
         clientId,
@@ -197,24 +201,24 @@ export const DropboxSettings = () => {
     setIsTesting(true);
     setTestResult(null);
     
-    // Si le token est expiré, tentative de rafraîchissement
-    if (isAccessTokenExpired()) {
-      const refreshed = await refreshAccessTokenIfNeeded();
-      if (!refreshed) {
-        setTestResult('error');
-        toast.error('Impossible de rafraîchir le token. Vérifiez vos identifiants et le refresh token.');
-        setIsTesting(false);
-        return;
+    try {
+      // Si le token est expiré, tentative de rafraîchissement
+      if (await isAccessTokenExpired()) {
+        const refreshed = await refreshAccessTokenIfNeeded();
+        if (!refreshed) {
+          setTestResult('error');
+          toast.error('Impossible de rafraîchir le token. Vérifiez vos identifiants et le refresh token.');
+          setIsTesting(false);
+          return;
+        }
+        
+        // Mettre à jour l'interface avec le nouveau token
+        const updatedConfig = await getDropboxConfig();
+        setAccessToken(updatedConfig.accessToken || '');
+        setExpiresAt(updatedConfig.expiresAt);
+        toast.success('Token rafraîchi avec succès');
       }
       
-      // Mettre à jour l'interface avec le nouveau token
-      const updatedConfig = getDropboxConfig();
-      setAccessToken(updatedConfig.accessToken || '');
-      setExpiresAt(updatedConfig.expiresAt);
-      toast.success('Token rafraîchi avec succès');
-    }
-    
-    try {
       // Use Dropbox API to test the token by getting account information
       const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
         method: 'POST',
@@ -250,7 +254,7 @@ export const DropboxSettings = () => {
     try {
       const refreshed = await refreshAccessTokenIfNeeded();
       if (refreshed) {
-        const updatedConfig = getDropboxConfig();
+        const updatedConfig = await getDropboxConfig();
         setAccessToken(updatedConfig.accessToken || '');
         setExpiresAt(updatedConfig.expiresAt);
         toast.success('Token rafraîchi avec succès');
