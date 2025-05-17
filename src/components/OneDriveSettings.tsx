@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,7 +133,7 @@ export const OneDriveSettings = () => {
 
   const tokenStatusColor = () => {
     if (!accessToken) return "secondary";
-    if (!expiresAt) return "warning";
+    if (!expiresAt) return "outline";
     if (Date.now() >= expiresAt) return "destructive";
     return "success";
   };
@@ -180,7 +179,7 @@ export const OneDriveSettings = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {accessToken && !expiresAt && (
-          <Alert variant="warning" className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+          <Alert variant="default" className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
             <AlertCircle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-amber-800 dark:text-amber-200">
               L'expiration du token n'est pas définie. Cliquez sur l'icône pour définir une expiration d'une heure ou utilisez le bouton "Rafraîchir Token" pour obtenir un nouveau token avec une expiration valide.

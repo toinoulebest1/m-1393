@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
+import { ensureStorageProviderColumn } from "@/utils/databaseSetup";
 
 interface Song {
   id: string;
@@ -30,7 +31,20 @@ export const MusicUploader = () => {
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
   const [storageProvider, setStorageProvider] = useState<string>("supabase");
 
-  // Check if OneDrive is available
+  // Use effect to check and ensure database structure on component mount
+  useEffect(() => {
+    const setupDatabase = async () => {
+      // Ensure the storage_provider column exists
+      await ensureStorageProviderColumn();
+      
+      // Check OneDrive status
+      await checkOneDriveStatus();
+    };
+    
+    setupDatabase();
+  }, []);
+
+  // Replace the useState hook with useEffect for OneDrive check
   const checkOneDriveStatus = async () => {
     const oneDriveAvailable = await isOneDriveEnabled();
     if (oneDriveAvailable) {
@@ -43,9 +57,9 @@ export const MusicUploader = () => {
   };
   
   // Check OneDrive status on component mount
-  useState(() => {
+  useEffect(() => {
     checkOneDriveStatus();
-  });
+  }, []);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
