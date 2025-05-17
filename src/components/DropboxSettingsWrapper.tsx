@@ -6,7 +6,7 @@ import { getDropboxConfig, isDropboxEnabled, saveDropboxConfig } from '@/utils/d
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { DropboxConfig } from '@/types/dropbox';
 import AdminDropboxConfigForm from './AdminDropboxConfigForm';
@@ -20,6 +20,7 @@ const DropboxSettingsWrapper: React.FC = () => {
   const [hasToken, setHasToken] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [lastTokenUpdate, setLastTokenUpdate] = useState<string | null>(null);
+  const [refreshTokenStatus, setRefreshTokenStatus] = useState<'present' | 'missing' | 'unknown'>('unknown');
   
   // Checking if the current user is an admin
   useEffect(() => {
@@ -53,11 +54,16 @@ const DropboxSettingsWrapper: React.FC = () => {
           console.log('DropboxSettingsWrapper - Configuration Dropbox:', {
             isEnabled: config.isEnabled,
             hasAccessToken: !!config.accessToken && config.accessToken.length > 0,
-            hasRefreshToken: !!config.refreshToken,
+            hasRefreshToken: !!config.refreshToken && config.refreshToken.length > 0,
             hasClientId: !!config.clientId,
             hasClientSecret: !!config.clientSecret,
             expiresAt: config.expiresAt ? new Date(config.expiresAt).toISOString() : 'non défini'
           });
+          
+          // Vérifier le statut du refresh token
+          setRefreshTokenStatus(
+            !!config.refreshToken && config.refreshToken.length > 0 ? 'present' : 'missing'
+          );
           
           // Get the last update time of the admin token
           const { data: adminConfig } = await supabase
@@ -168,6 +174,20 @@ const DropboxSettingsWrapper: React.FC = () => {
   
   return (
     <>
+      {isAdmin && (
+        <div className="mb-4">
+          <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <span className="font-semibold">Mode administrateur activé.</span> Vous pouvez configurer tous les paramètres Dropbox, y compris le refresh token.
+              <div className="mt-2 text-sm">
+                Le refresh token se trouve dans le champ <span className="font-mono bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">Refresh Token</span> du formulaire ci-dessous.
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+      
       {isAdmin && <AdminDropboxConfigForm />}
       
       {dropboxStatus && (
@@ -181,6 +201,18 @@ const DropboxSettingsWrapper: React.FC = () => {
                 {lastTokenUpdate && !isAdmin && (
                   <div className="text-xs mt-1 text-green-700 dark:text-green-300">
                     Token admin mis à jour le : {lastTokenUpdate}
+                  </div>
+                )}
+                {refreshTokenStatus === 'present' && isAdmin && (
+                  <div className="flex items-center gap-1 mt-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" /> 
+                    <span>Refresh Token configuré et utilisable pour un accès permanent</span>
+                  </div>
+                )}
+                {refreshTokenStatus === 'missing' && isAdmin && (
+                  <div className="flex items-center gap-1 mt-2 text-sm text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4" /> 
+                    <span>Refresh Token non configuré. L'accès expirera après quelques heures.</span>
                   </div>
                 )}
               </AlertDescription>
