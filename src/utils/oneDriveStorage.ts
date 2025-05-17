@@ -1,6 +1,7 @@
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { OneDriveConfig } from "@/types/userSettings";
 
 // Configuration de l'authentification Microsoft Graph pour OneDrive
 const MICROSOFT_GRAPH_API = 'https://graph.microsoft.com/v1.0';
@@ -29,14 +30,20 @@ export const isOneDriveEnabled = async (): Promise<boolean> => {
       return false;
     }
 
-    if (!data || !data.settings || !data.settings.accessToken) {
+    if (!data || !data.settings) {
       console.log("No OneDrive configuration found");
+      return false;
+    }
+    
+    // Cast the settings to OneDriveConfig type
+    const oneDriveSettings = data.settings as OneDriveConfig;
+    if (!oneDriveSettings.accessToken) {
+      console.log("No OneDrive access token found");
       return false;
     }
 
     // Check if token is expired and needs refresh
-    const expiresAt = data.settings.expiresAt;
-    if (expiresAt && new Date(expiresAt) <= new Date()) {
+    if (oneDriveSettings.expiresAt && new Date(oneDriveSettings.expiresAt) <= new Date()) {
       console.log("OneDrive token expired, needs refresh");
       // In a real implementation, we would refresh the token here
       return false;
@@ -95,12 +102,3 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
     return false;
   }
 };
-
-export interface OneDriveConfig {
-  accessToken: string;
-  refreshToken?: string;
-  clientId?: string;
-  clientSecret?: string;
-  expiresAt?: number;
-  isEnabled: boolean;
-}
