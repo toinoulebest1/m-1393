@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -75,15 +76,41 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Si le fichier n'est pas en cache, procède normalement
-    const useDropbox = isDropboxEnabled();
+    let useDropbox = false;
+    try {
+      useDropbox = await isDropboxEnabled();
+    } catch (dropboxError) {
+      console.warn("Erreur lors de la vérification de Dropbox, utilisation de Supabase:", dropboxError);
+      useDropbox = false;
+    }
+    
     console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
 
     let audioUrl: string;
     
     if (useDropbox) {
-      audioUrl = await getDropboxSharedLink(`audio/${path}`);
+      try {
+        audioUrl = await getDropboxSharedLink(`audio/${path}`);
+      } catch (dropboxError) {
+        console.error("Erreur Dropbox, repli vers Supabase:", dropboxError);
+        // En cas d'erreur avec Dropbox, on essaie avec Supabase
+        const { data, error } = await supabase.storage
+          .from('audio')
+          .createSignedUrl(path, 3600);
+
+        if (error) {
+          console.error("Erreur lors de la récupération du fichier depuis Supabase:", error);
+          throw error;
+        }
+
+        if (!data?.signedUrl) {
+          throw new Error("URL signée non générée");
+        }
+
+        audioUrl = data.signedUrl;
+      }
     } else {
-      // Vérifie si le fichier existe
+      // Vérifie si le fichier existe dans Supabase
       const { data: fileExists } = await supabase.storage
         .from('audio')
         .list('', { search: path });

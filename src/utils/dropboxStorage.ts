@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -142,9 +141,37 @@ export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> =>
   }
 };
 
+// Fonction modifiée pour vérifier si Dropbox est réellement configuré ET activé
 export const isDropboxEnabled = async (): Promise<boolean> => {
   const config = await getDropboxConfig();
-  return config.isEnabled && !!config.accessToken;
+  
+  // Vérification plus stricte: Dropbox doit être activé ET avoir un token d'accès valide
+  const hasValidConfig = config.isEnabled && 
+                        !!config.accessToken && 
+                        config.accessToken.length > 0;
+  
+  // Si la configuration n'est pas valide mais qu'un token avait été stocké dans localStorage,
+  // désactiver l'utilisation de Dropbox pour éviter les erreurs
+  if (!hasValidConfig) {
+    const localConfig = localStorage.getItem('dropbox_config');
+    if (localConfig) {
+      try {
+        const parsedConfig = JSON.parse(localConfig);
+        if (parsedConfig && parsedConfig.isEnabled) {
+          console.log('Configuration Dropbox invalide mais trouvée dans localStorage. Désactivation...');
+          // Désactiver Dropbox dans localStorage pour éviter les erreurs futures
+          localStorage.setItem('dropbox_config', JSON.stringify({
+            ...parsedConfig,
+            isEnabled: false
+          }));
+        }
+      } catch (e) {
+        console.error('Erreur lors de la lecture/mise à jour de la config localStorage:', e);
+      }
+    }
+  }
+  
+  return hasValidConfig;
 };
 
 // Nouvelle fonction pour vérifier si le token d'accès est expiré
@@ -439,10 +466,9 @@ export const uploadFileToDropbox = async (
 export const getDropboxSharedLink = async (path: string): Promise<string> => {
   const config = await getDropboxConfig();
   
-  if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    toast.error("Token d'accès Dropbox non configuré");
-    throw new Error('Dropbox access token not configured');
+  if (!config.accessToken || !config.isEnabled) {
+    console.error("Dropbox access token not configured or Dropbox is not enabled");
+    throw new Error('Dropbox configuration non valide ou désactivée');
   }
   
   try {
