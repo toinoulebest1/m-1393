@@ -9,10 +9,11 @@ export const useSettingsMigration = () => {
   useEffect(() => {
     const migrateSettings = async () => {
       try {
+        console.log('useSettingsMigration - Début de la migration des paramètres');
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.log('No active session, skipping settings migration');
+          console.log('useSettingsMigration - Aucune session active, migration ignorée');
           setMigrationComplete(true);
           return;
         }
@@ -21,7 +22,7 @@ export const useSettingsMigration = () => {
         const dropboxConfigStr = localStorage.getItem('dropbox_config');
         if (dropboxConfigStr) {
           try {
-            console.log('Dropbox config found in localStorage, migrating to database...');
+            console.log('useSettingsMigration - Config Dropbox trouvée dans localStorage, migration vers DB...');
             const localConfig = JSON.parse(dropboxConfigStr);
             
             // Vérifier si la configuration est déjà dans la base de données
@@ -33,24 +34,33 @@ export const useSettingsMigration = () => {
               .maybeSingle();
             
             if (error) {
-              console.error('Error checking existing Dropbox config in database:', error);
+              console.error('useSettingsMigration - Erreur vérification config Dropbox dans DB:', error);
             } else if (!data) {
-              console.log('No Dropbox config found in database, saving local config...');
+              console.log('useSettingsMigration - Aucune config dans DB, sauvegarde de la config locale');
               // Si pas de configuration dans la base de données, sauvegarder celle du localStorage
               await saveDropboxConfig(localConfig);
             } else {
-              console.log('Dropbox config exists in database, comparing with localStorage...');
+              console.log('useSettingsMigration - Config existante en DB, comparaison avec localStorage');
               // Si la configuration existe déjà, vérifier si la version locale est plus récente
               const dbConfig = data.settings as any;
+              
+              console.log('useSettingsMigration - Config DB:', {
+                isEnabled: dbConfig.isEnabled,
+                hasToken: !!dbConfig.accessToken
+              });
+              console.log('useSettingsMigration - Config locale:', {
+                isEnabled: localConfig.isEnabled,
+                hasToken: !!localConfig.accessToken
+              });
               
               // Si la configuration locale est activée mais pas celle de la base de données,
               // ou si la configuration locale a un token plus récent, la synchroniser
               if ((localConfig.isEnabled && !dbConfig.isEnabled) || 
                   (localConfig.expiresAt && dbConfig.expiresAt && localConfig.expiresAt > dbConfig.expiresAt)) {
-                console.log('Local Dropbox config is more recent, updating database...');
+                console.log('useSettingsMigration - Config locale plus récente, mise à jour DB');
                 await saveDropboxConfig(localConfig);
               } else {
-                console.log('Database Dropbox config is more recent or the same, syncing to localStorage...');
+                console.log('useSettingsMigration - Config DB plus récente ou identique, sync vers localStorage');
                 // Sinon, synchroniser la configuration de la base de données vers le localStorage
                 localStorage.setItem('dropbox_config', JSON.stringify({
                   accessToken: dbConfig.accessToken || '',
@@ -63,13 +73,16 @@ export const useSettingsMigration = () => {
               }
             }
           } catch (e) {
-            console.error('Error during Dropbox config migration:', e);
+            console.error('useSettingsMigration - Erreur migration config Dropbox:', e);
           }
+        } else {
+          console.log('useSettingsMigration - Aucune config Dropbox dans localStorage');
         }
         
+        console.log('useSettingsMigration - Migration terminée');
         setMigrationComplete(true);
       } catch (error) {
-        console.error('Settings migration error:', error);
+        console.error('useSettingsMigration - Erreur de migration:', error);
         setMigrationComplete(true);
       }
     };
