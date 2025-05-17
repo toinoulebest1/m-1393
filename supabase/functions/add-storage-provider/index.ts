@@ -17,37 +17,61 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Essayer d'ajouter directement la colonne storage_provider si elle n'existe pas
-    // au lieu d'utiliser la fonction SQL qui cause des problèmes de cache
-    const { error: checkColumnError } = await supabase.rpc(
-      'check_column_exists',
-      { table_name: 'songs', column_name: 'storage_provider' }
-    )
-    
-    let columnAdded = false
-    
-    if (checkColumnError) {
-      console.log("Error checking column:", checkColumnError)
-      // La fonction RPC n'existe peut-être pas, essayons de façon alternative
-      // en exécutant directement l'alter table
-      const { error: alterError } = await supabase.rpc(
-        'exec_sql', 
-        { sql: "ALTER TABLE IF NOT EXISTS public.songs ADD COLUMN IF NOT EXISTS storage_provider TEXT DEFAULT 'supabase'" }
+    // Utiliser le client SQL de Supabase pour exécuter directement l'ALTER TABLE
+    // Cette approche est plus directe et ne dépend pas de fonctions RPC
+    const { error } = await supabase
+      .from('songs')
+      .select('id')
+      .limit(1)
+      .then(async () => {
+        // Si on arrive ici, la table songs existe
+        console.log("Table songs trouvée, tentative d'ajout de la colonne storage_provider")
+        
+        // On utilise la méthode de contournement pour exécuter une commande SQL directe
+        return await fetch(`${supabaseUrl}/rest/v1/rpc/alter_table_add_column`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({
+            table_name: 'songs',
+            column_name: 'storage_provider',
+            column_type: 'text',
+            column_default: "'supabase'"
+          })
+        }).then(res => res.json())
+          .catch(err => ({ error: err }))
+      })
+      .catch(err => ({ error: err }))
+
+    if (error) {
+      console.error('Error adding storage_provider column:', error)
+      
+      // Approche de secours : enregistrer l'erreur et retourner un message pour informer l'utilisateur
+      // de créer manuellement la colonne via la console SQL de Supabase
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          message: 'Could not add storage_provider column automatically. Please check logs.',
+          error: error.message,
+          instruction: "Please execute this SQL in Supabase: ALTER TABLE public.songs ADD COLUMN IF NOT EXISTS storage_provider TEXT DEFAULT 'supabase'"
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
       )
-      
-      if (alterError) {
-        console.error('Error adding storage_provider column directly:', alterError)
-        throw alterError
-      }
-      
-      columnAdded = true
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Storage provider column added successfully',
-        columnAdded
+        message: 'Storage provider column added or already exists',
       }),
       {
         headers: {
