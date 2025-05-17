@@ -26,7 +26,7 @@ export const migrateLocalStorageToSupabase = async (): Promise<void> => {
         .select('id')
         .eq('user_id', session.user.id)
         .eq('key', key)
-        .maybeSingle();
+        .maybeSingle();  // Utiliser maybeSingle() au lieu de single()
         
       if (error) {
         console.error(`Erreur lors de la vérification de ${key}:`, error);

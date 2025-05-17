@@ -35,7 +35,7 @@ export const getDropboxConfig = async (): Promise<DropboxConfig> => {
       .select('*')
       .eq('user_id', session.user.id)
       .eq('key', 'dropbox_config')
-      .single();
+      .maybeSingle();  // Utiliser maybeSingle() au lieu de single()
     
     if (error) {
       console.error('Erreur lors de la récupération de la configuration Dropbox:', error);

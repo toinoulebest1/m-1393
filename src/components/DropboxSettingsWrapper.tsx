@@ -1,10 +1,12 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DropboxSettings } from './DropboxSettings';
+import { useSettingsMigration } from '@/utils/userSettingsMigration';
 
 const DropboxSettingsWrapper: React.FC = () => {
-  // Ce composant wrapper existe pour garder la compatibilité avec le code existant
-  // tout en permettant l'utilisation de la nouvelle table user_settings
+  // Utiliser le hook de migration pour assurer que les paramètres sont migrés
+  useSettingsMigration();
+  
   return <DropboxSettings />;
 };
 

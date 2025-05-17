@@ -18,7 +18,7 @@ export const syncLyricsToDropbox = async (songId: string): Promise<boolean> => {
       .from('lyrics')
       .select('content')
       .eq('song_id', songId)
-      .maybeSingle();
+      .maybeSingle();  // Utiliser maybeSingle() au lieu de single()
       
     if (error) {
       console.error('Erreur lors de la récupération des paroles:', error);
