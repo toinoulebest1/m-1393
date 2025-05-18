@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, ExternalLink, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, ExternalLink, Info, Edit, Save, Lock } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -125,6 +124,9 @@ export const OneDriveSettings = () => {
   
   // Ajouter un état pour le Client ID Microsoft
   const [clientId, setClientId] = useState('');
+  
+  // État pour l'édition manuelle du token
+  const [isTokenEditable, setIsTokenEditable] = useState(false);
   
   // États pour la migration des fichiers audio
   const [isMigrating, setIsMigrating] = useState(false);
@@ -333,6 +335,35 @@ export const OneDriveSettings = () => {
     });
   };
 
+  // Fonction pour gérer la sauvegarde manuelle du token
+  const handleManualTokenSave = () => {
+    if (!accessToken || accessToken.trim() === '') {
+      toast({
+        title: "Erreur",
+        description: "Le token d'accès ne peut pas être vide",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Sauvegarder le token
+    const config = getOneDriveConfig();
+    saveOneDriveConfig({
+      ...config,
+      accessToken,
+      refreshToken,
+      isEnabled: true
+    });
+
+    // Désactiver l'édition et afficher un message de succès
+    setIsTokenEditable(false);
+    setCurrentStep(3);
+    toast.success("Token d'accès OneDrive sauvegardé manuellement");
+    
+    // Réinitialiser les résultats de test
+    setTestResult(null);
+  };
+
   // Fonction pour migrer les fichiers audio
   const handleMigrateFiles = async () => {
     if (!accessToken) {
@@ -531,7 +562,7 @@ export const OneDriveSettings = () => {
             </Step>
             <Step title="Authentification Microsoft">
               <p className="text-sm text-muted-foreground mt-2">
-                Utilisez votre Client ID pour vous authentifier avec Microsoft OneDrive.
+                Utilisez votre Client ID pour vous authentifier avec Microsoft OneDrive ou saisissez manuellement un token d'accès.
               </p>
             </Step>
             <Step title="Configuration terminée">
@@ -578,26 +609,101 @@ export const OneDriveSettings = () => {
           ) : 'Enregistrer le Client ID'}
         </Button>
         
+        {/* Options d'authentification avec séparateur */}
+        <div className="relative border-t border-border pt-4 mt-4">
+          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+            Options d'authentification
+          </div>
+        </div>
+
         {/* Bouton d'authentification avec indication de l'étape */}
         <div className="space-y-2">
           <Label className="flex items-center space-x-1">
-            <span>Authentification Microsoft</span>
-            {currentStep === 2 && (
+            <span>Authentification automatique</span>
+            {currentStep === 2 && !isTokenEditable && (
               <Badge variant="outline" className="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
-                Étape actuelle
+                Recommandé
               </Badge>
             )}
           </Label>
           <MicrosoftOAuthButton clientId={clientId} />
         </div>
         
-        <div className="flex items-center gap-2 mt-2">
-          <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
-            Info
-          </Badge>
-          <p className="text-xs text-muted-foreground">
-            Si vous rencontrez des problèmes d'authentification, vérifiez que l'URL de redirection est correcte dans votre application Azure.
-          </p>
+        {/* Option pour saisir manuellement le token */}
+        <div className="space-y-2 pt-2">
+          <Label className="flex items-center space-x-1">
+            <span>Ou saisir manuellement le token d'accès</span>
+            {isTokenEditable && (
+              <Badge variant="outline" className="ml-2 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border-none">
+                Mode manuel
+              </Badge>
+            )}
+          </Label>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="access-token">Token d'accès</Label>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsTokenEditable(!isTokenEditable)}
+                className="h-7 px-3"
+              >
+                {isTokenEditable ? (
+                  <>
+                    <Lock className="h-3.5 w-3.5 mr-1" />
+                    Verrouiller
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-3.5 w-3.5 mr-1" />
+                    Éditer
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            <Input
+              id="access-token"
+              type="password"
+              placeholder="Collez votre token d'accès Microsoft Graph ici"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              readOnly={!isTokenEditable}
+              className={!isTokenEditable ? "bg-muted" : "border-amber-500"}
+            />
+            
+            <Label htmlFor="refresh-token">Refresh Token (optionnel)</Label>
+            <Input
+              id="refresh-token"
+              type="password"
+              placeholder="Collez votre refresh token ici (facultatif)"
+              value={refreshToken}
+              onChange={(e) => setRefreshToken(e.target.value)}
+              readOnly={!isTokenEditable}
+              className={!isTokenEditable ? "bg-muted" : ""}
+            />
+          </div>
+
+          {isTokenEditable && (
+            <Button 
+              onClick={handleManualTokenSave} 
+              disabled={!accessToken || accessToken.trim() === ''}
+              className="w-full mt-2"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Enregistrer le token manuellement
+            </Button>
+          )}
+
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
+              Info
+            </Badge>
+            <p className="text-xs text-muted-foreground">
+              Cette option est destinée aux utilisateurs expérimentés qui ont généré un token d'accès par d'autres moyens.
+            </p>
+          </div>
         </div>
         
         {/* Jeton d'accès et configuration avancée - affichée uniquement si le Client ID est configuré */}
@@ -606,32 +712,6 @@ export const OneDriveSettings = () => {
             <div className="pt-4 border-t border-border">
               <h3 className="text-lg font-semibold mb-4">Configuration avancée</h3>
               
-              <div className="space-y-2">
-                <Label htmlFor="onedrive-token">Jeton d'accès OneDrive</Label>
-                <Input
-                  id="onedrive-token"
-                  type="password"
-                  placeholder="Jeton obtenu après authentification Microsoft"
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  readOnly={currentStep > 1}
-                  className={currentStep === 3 ? "bg-muted" : ""}
-                />
-              </div>
-              
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="refresh-token">Refresh Token</Label>
-                <Input
-                  id="refresh-token"
-                  type="password"
-                  placeholder="Refresh token obtenu après authentification"
-                  value={refreshToken}
-                  onChange={(e) => setRefreshToken(e.target.value)}
-                  readOnly={currentStep > 1}
-                  className={currentStep === 3 ? "bg-muted" : ""}
-                />
-              </div>
-
               <div className="flex items-center space-x-2 mt-4">
                 <Switch
                   id="enable-onedrive"
@@ -669,6 +749,7 @@ export const OneDriveSettings = () => {
                       <li>Les permissions demandées ont été modifiées</li>
                       <li>L'application a été désactivée dans Azure</li>
                       <li>L'application n'est pas configurée comme SPA dans le portail Azure</li>
+                      <li>Des permissions sont manquantes (files.readwrite)</li>
                     </ul>
                     <Button 
                       variant="outline" 
