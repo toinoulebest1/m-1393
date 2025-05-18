@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { getAuthorizationUrl, exchangeCodeForTokens } from "@/utils/oneDriveStorage";
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ExternalLink, Microsoft } from "lucide-react";
+import { Loader2, ExternalLink } from "lucide-react";
 
 interface MicrosoftOAuthButtonProps {
   clientId: string;
@@ -114,7 +114,7 @@ const MicrosoftOAuthButton = ({
         </>
       ) : (
         <>
-          <Microsoft className="mr-2 h-4 w-4" />
+          <ExternalLink className="mr-2 h-4 w-4" />
           Authentifier avec Microsoft
         </>
       )}
