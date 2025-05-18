@@ -8,6 +8,11 @@ export interface Song {
   imageUrl?: string;
   bitrate?: string;
   genre?: string;
+  deezerInfo?: {
+    id?: number;
+    preview?: string;
+    albumCover?: string;
+  };
 }
 
 export interface FavoriteStat {

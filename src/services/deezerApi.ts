@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DeezerArtist {
@@ -45,6 +44,7 @@ export interface DeezerTrack {
     cover_big: string;
     cover_xl: string;
     type: string;
+    link: string;
   };
   type: string;
 }
