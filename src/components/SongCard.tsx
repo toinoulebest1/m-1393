@@ -1,8 +1,10 @@
+
 import React from "react";
 import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
+import { Song } from "@/types/player";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -24,6 +26,7 @@ interface SongCardProps {
     artist?: string;
     duration?: string;
     imageUrl?: string;
+    url?: string; // Make url optional in the props
   };
   isCurrentSong?: boolean;
   isFavorite?: boolean;
@@ -49,7 +52,14 @@ export const SongCard = ({
     if (isCurrentSong) {
       isPlaying ? pause() : play();
     } else {
-      play(song);
+      // Ensure the song object has all required properties for Song type
+      const fullSong: Song = {
+        ...song,
+        url: song.url || '', // Provide a default empty string if url is missing
+        artist: song.artist || '',
+        duration: song.duration || '0:00',
+      };
+      play(fullSong);
     }
   };
 
@@ -101,7 +111,14 @@ export const SongCard = ({
           size="icon"
           onClick={(e) => {
             e.stopPropagation();
-            toggleFavorite(song);
+            // Ensure the song object has all required properties for Song type
+            const fullSong: Song = {
+              ...song,
+              url: song.url || '', // Provide a default empty string if url is missing
+              artist: song.artist || '',
+              duration: song.duration || '0:00',
+            };
+            toggleFavorite(fullSong);
           }}
           className={cn(
             "text-muted-foreground hover:text-foreground",
