@@ -372,6 +372,13 @@ const ArtistProfile = () => {
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
+                                  {/* Badge "Disponible Ici" */}
+                                  <button 
+                                    onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
+                                    className="text-xs bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white px-3 py-1 rounded-full hover:from-[#9B87F5] hover:to-[#F97316] transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
+                                  >
+                                    Disponible Ici
+                                  </button>
                                   <span className="text-xs text-white/40 hidden md:block">
                                     {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
                                   </span>
