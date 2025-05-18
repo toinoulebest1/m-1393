@@ -1,3 +1,4 @@
+
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -230,7 +231,8 @@ export const uploadFileToOneDrive = async (
   }
 };
 
-// Function to get a shared link for a file on OneDrive
+// Updated function to get a download URL for a file on OneDrive
+// This version uses the Graph API to get a direct download URL instead of a shared link
 export const getOneDriveSharedLink = async (path: string): Promise<string> => {
   const config = getOneDriveConfig();
   
@@ -300,36 +302,34 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
       throw new Error('Could not find file ID in OneDrive');
     }
     
-    // Create a sharing link
-    const linkResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/createLink`, {
-      method: 'POST',
+    // Use the Graph API to get a direct download URL instead of a sharing link
+    // This avoids CORS issues since we're getting a direct download URL
+    const downloadUrlResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}?select=@microsoft.graph.downloadUrl`, {
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: "view",
-        scope: "anonymous"
-      })
+        'Authorization': `Bearer ${config.accessToken}`
+      }
     });
     
-    if (!linkResponse.ok) {
-      const errorText = await linkResponse.text();
-      console.error('OneDrive shared link error:', errorText);
-      throw new Error(`Failed to create OneDrive shared link: ${linkResponse.status} ${linkResponse.statusText}`);
+    if (!downloadUrlResponse.ok) {
+      const errorText = await downloadUrlResponse.text();
+      console.error('OneDrive download URL error:', errorText);
+      throw new Error(`Failed to get OneDrive download URL: ${downloadUrlResponse.status} ${downloadUrlResponse.statusText}`);
     }
     
-    const linkData = await linkResponse.json();
-    const url = linkData.link.webUrl;
+    const downloadUrlData = await downloadUrlResponse.json();
     
-    // For audio files, we need to convert the URL to a direct download link
-    // This may need to be adjusted depending on how OneDrive handles direct downloads
-    const downloadUrl = url.replace("view.aspx", "download.aspx");
+    // The download URL is returned as '@microsoft.graph.downloadUrl'
+    const downloadUrl = downloadUrlData['@microsoft.graph.downloadUrl'];
     
+    if (!downloadUrl) {
+      throw new Error('No download URL returned from OneDrive API');
+    }
+    
+    console.log('OneDrive direct download URL obtained:', downloadUrl);
     return downloadUrl;
   } catch (error) {
-    console.error('Error getting OneDrive shared link:', error);
-    toast.error("Impossible d'obtenir un lien de partage OneDrive");
+    console.error('Error getting OneDrive download URL:', error);
+    toast.error("Impossible d'obtenir l'URL de téléchargement OneDrive");
     throw error;
   }
 };

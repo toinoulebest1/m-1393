@@ -82,7 +82,9 @@ export const getAudioFile = async (path: string) => {
     let audioUrl: string;
     
     if (useOneDrive) {
+      // Récupération de l'URL de téléchargement direct depuis OneDrive
       audioUrl = await getOneDriveSharedLink(`audio/${path}`);
+      console.log("OneDrive direct download URL retrieved:", audioUrl);
     } else {
       // Vérifie si le fichier existe
       const { data: fileExists } = await supabase.storage
@@ -112,9 +114,14 @@ export const getAudioFile = async (path: string) => {
 
     // Mise en cache pour les futures récupérations
     try {
+      console.log("Fetching audio for cache:", audioUrl);
       const response = await fetch(audioUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+      }
       const blob = await response.blob();
       await addToCache(path, blob);
+      console.log(`Audio file cached successfully: ${path}, size: ${blob.size} bytes`);
     } catch (cacheError) {
       console.warn("Impossible de mettre en cache le fichier:", cacheError);
       // Continue même en cas d'échec de mise en cache
