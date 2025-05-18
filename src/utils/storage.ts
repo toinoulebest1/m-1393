@@ -139,7 +139,9 @@ export const storePlaylistCover = async (playlistId: string, file: File): Promis
     // Vérifier et créer le bucket si nécessaire
     try {
       const { data, error } = await supabase.storage.getBucket('playlists');
-      if (error && error.code === '404') {
+      
+      // Fix: StorageError doesn't have a code property, check error message instead
+      if (error && error.message && error.message.includes('not found')) {
         // Le bucket n'existe pas, le créer
         await supabase.storage.createBucket('playlists', {
           public: true
