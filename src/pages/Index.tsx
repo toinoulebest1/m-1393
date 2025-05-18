@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
@@ -12,14 +11,17 @@ import { updateMediaSessionMetadata } from "@/utils/mediaSession";
 import { AudioCacheManager } from "@/components/AudioCacheManager";
 import { checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
 import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
+import { UnavailableSongCard } from "@/components/UnavailableSongCard";
+import { Song } from "@/types/player";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying, stopCurrentSong } = usePlayerContext();
+  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying, stopCurrentSong, removeSong } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [unavailableSong, setUnavailableSong] = useState<Song | null>(null);
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -60,7 +62,9 @@ const Index = () => {
               position: "top-center"
             });
             stopCurrentSong();
-            refreshCurrentSong();
+            setUnavailableSong(currentSong);
+          } else {
+            setUnavailableSong(null);
           }
         } catch (error) {
           console.error("Erreur lors de la vérification de disponibilité:", error);
@@ -71,7 +75,7 @@ const Index = () => {
     };
 
     checkCurrentSongAvailability();
-  }, [currentSong, stopCurrentSong, refreshCurrentSong]);
+  }, [currentSong, stopCurrentSong]);
 
   useEffect(() => {
     if (currentSong) {
@@ -221,6 +225,16 @@ const Index = () => {
             Cache Audio
           </button>
           <AccountSettingsDialog />
+        </div>
+      )}
+      
+      {/* Afficher la chanson indisponible si elle existe */}
+      {unavailableSong && (
+        <div className="fixed top-16 right-4 z-50 w-80">
+          <div className="p-3 bg-black/60 backdrop-blur-md rounded-lg border border-red-500/30">
+            <h3 className="text-sm font-medium text-white mb-2">Fichier audio manquant</h3>
+            <UnavailableSongCard song={unavailableSong} />
+          </div>
         </div>
       )}
       

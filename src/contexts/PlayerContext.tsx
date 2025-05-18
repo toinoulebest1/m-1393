@@ -308,6 +308,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
 
+  // Fonction pour supprimer une chanson de toutes les listes
+  const removeSong = useCallback((songId: string) => {
+    // Si c'est la chanson en cours, on l'arrête
+    if (currentSong?.id === songId) {
+      stopCurrentSong();
+      setCurrentSong(null);
+      localStorage.removeItem('currentSong');
+    }
+    
+    // Suppression de la file d'attente
+    setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
+    
+    // Suppression de l'historique
+    setHistory(prevHistory => prevHistory.filter(song => song.id !== songId));
+    
+    // Suppression des favoris si présent
+    if (favorites.some(song => song.id === songId)) {
+      removeFavorite(songId);
+    }
+    
+    toast.success("La chanson a été supprimée de votre bibliothèque");
+  }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
+
   // L'objet context complet
   const playerContext: PlayerContextType = {
     currentSong,
@@ -324,6 +347,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     history,
     isChangingSong,
     stopCurrentSong,
+    removeSong,
     setQueue,
     setHistory,
     play,

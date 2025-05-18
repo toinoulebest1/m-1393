@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Clock, Signal, Heart, Flag, FileText } from "lucide-react";
+import { Clock, Signal, Heart, Flag, FileText, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
 
 interface SongCardProps {
   song: any;
@@ -21,7 +22,27 @@ export function SongCard({
   onLyricsClick,
   onReportClick
 }: SongCardProps) {
-  const { toggleFavorite, play, pause, isPlaying } = usePlayer();
+  const { toggleFavorite, play, pause, isPlaying, removeSong } = usePlayer();
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  
+  // Vérifier la disponibilité du fichier audio au chargement du composant
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (isOneDriveEnabled()) {
+        try {
+          const exists = await checkFileExistsOnOneDrive(`audio/${song.id}`);
+          setIsAvailable(exists);
+        } catch (error) {
+          console.error("Erreur lors de la vérification de disponibilité:", error);
+          setIsAvailable(null);
+        }
+      } else {
+        setIsAvailable(true); // Supposer que le fichier est disponible si OneDrive n'est pas activé
+      }
+    };
+    
+    checkAvailability();
+  }, [song.id]);
   
   const glowStyle = isCurrentSong && dominantColor ? {
     "--glow-shadow": `
@@ -32,6 +53,10 @@ export function SongCard({
   } as React.CSSProperties : {};
 
   const handlePlay = () => {
+    if (isAvailable === false) {
+      return; // Ne rien faire si le fichier n'est pas disponible
+    }
+    
     if (isCurrentSong) {
       if (isPlaying) {
         pause();
@@ -46,7 +71,8 @@ export function SongCard({
       className={cn(
         "group flex items-center justify-between p-4 rounded-lg transition-all duration-500 cursor-pointer",
         isCurrentSong ? "bg-white/5 backdrop-blur-sm" : "hover:bg-white/5",
-        "transform hover:scale-[1.02] hover:-translate-y-0.5 transition-transform duration-300"
+        "transform hover:scale-[1.02] hover:-translate-y-0.5 transition-transform duration-300",
+        isAvailable === false && "opacity-75 border border-red-500/20"
       )}
       onClick={() => handlePlay()}
     >
@@ -80,8 +106,16 @@ export function SongCard({
             <img
               src={song.imageUrl || "https://picsum.photos/56/56"}
               alt={song.title}
-              className="w-14 h-14 object-cover rounded-md"
+              className={cn(
+                "w-14 h-14 object-cover rounded-md",
+                isAvailable === false && "opacity-50"
+              )}
             />
+            {isAvailable === false && (
+              <div className="absolute inset-0 bg-black/50 rounded-md flex items-center justify-center">
+                <span className="text-xs text-white font-medium">Non disponible</span>
+              </div>
+            )}
           </div>
           <div className="ml-4">
             <h3 className={cn(
@@ -117,24 +151,37 @@ export function SongCard({
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(song);
-              }}
-              className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
-            >
-              <Heart
-                className={cn(
-                  "w-5 h-5 transition-all duration-300 hover:scale-110",
-                  isFavorite
-                    ? "text-red-500 fill-red-500"
-                    : "text-spotify-neutral hover:text-white"
-                )}
-              />
-            </button>
+            {isAvailable === false ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeSong(song.id);
+                }}
+                className="p-2 hover:bg-red-500/20 rounded-full transition-all duration-300"
+                title="Supprimer cette chanson"
+              >
+                <Trash2 className="w-5 h-5 text-red-400 hover:text-red-300 transition-all duration-300 hover:scale-110" />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(song);
+                }}
+                className="p-2 hover:bg-white/5 rounded-full transition-all duration-300"
+              >
+                <Heart
+                  className={cn(
+                    "w-5 h-5 transition-all duration-300 hover:scale-110",
+                    isFavorite
+                      ? "text-red-500 fill-red-500"
+                      : "text-spotify-neutral hover:text-white"
+                  )}
+                />
+              </button>
+            )}
 
-            {onLyricsClick && (
+            {onLyricsClick && isAvailable !== false && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -146,7 +193,7 @@ export function SongCard({
               </button>
             )}
 
-            {onReportClick && (
+            {onReportClick && isAvailable !== false && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
