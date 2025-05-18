@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,120 +14,23 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, ExternalLink, Info, Edit, Save, Lock } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, Cloud, RefreshCw } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from './ui/badge';
-import { Steps, Step } from "@/components/ui/steps";
-
-// Fonction pour générer un code challenge PKCE
-const generateCodeVerifier = (): string => {
-  const array = new Uint8Array(32);
-  window.crypto.getRandomValues(array);
-  return Array.from(array, (b) => String.fromCharCode(b))
-    .join('')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .substring(0, 43);
-};
-
-// Base64 URL encode
-const base64UrlEncode = (str: string): string => {
-  return btoa(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-};
-
-// Générer un code challenge depuis un verifier
-const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await window.crypto.subtle.digest('SHA-256', data);
-  const base64Digest = base64UrlEncode(String.fromCharCode(...new Uint8Array(digest)));
-  return base64Digest;
-};
-
-// Bouton d'authentification Microsoft
-export const MicrosoftOAuthButton = ({ clientId }) => {
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-
-  const handleAuth = async () => {
-    if (!clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID' || clientId.trim() === '') {
-      toast({
-        title: "Erreur",
-        description: "Veuillez saisir un Client ID Microsoft valide avant de vous authentifier",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsAuthenticating(true);
-    
-    try {
-      // Générer le code verifier et challenge pour PKCE
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
-      
-      // Sauvegarder le code verifier pour l'utiliser lors du callback
-      localStorage.setItem('pkce_code_verifier', codeVerifier);
-      
-      // Microsoft OAuth settings pour SPA avec PKCE
-      const redirectUri = window.location.origin + '/onedrive-callback';
-      const scopes = ['files.readwrite', 'offline_access'];
-      
-      // Créer l'URL d'authentification avec PKCE
-      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&code_challenge=${codeChallenge}&code_challenge_method=S256&response_mode=fragment`;
-      
-      console.log("Redirection vers l'authentification Microsoft avec PKCE...");
-      // Rediriger vers la page d'authentification Microsoft
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error("Erreur lors de la préparation de l'authentification PKCE:", error);
-      toast({
-        title: "Erreur",
-        description: "Une erreur s'est produite lors de la préparation de l'authentification",
-        variant: "destructive"
-      });
-      setIsAuthenticating(false);
-    }
-  };
-
-  return (
-    <Button 
-      variant="outline" 
-      className="w-full flex items-center justify-center gap-2"
-      onClick={handleAuth}
-      disabled={isAuthenticating}
-    >
-      {isAuthenticating ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <ExternalLink className="h-4 w-4" />
-      )}
-      {isAuthenticating ? "Authentification en cours..." : "S'authentifier avec Microsoft"}
-    </Button>
-  );
-};
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
   const [refreshToken, setRefreshToken] = useState('');
+  const [clientId, setClientId] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
-  const [testErrorDetails, setTestErrorDetails] = useState<string>('');
   const navigate = useNavigate();
-  
-  // Ajouter un état pour le Client ID Microsoft
-  const [clientId, setClientId] = useState('');
-  
-  // État pour l'édition manuelle du token
-  const [isTokenEditable, setIsTokenEditable] = useState(false);
   
   // États pour la migration des fichiers audio
   const [isMigrating, setIsMigrating] = useState(false);
@@ -150,25 +54,9 @@ export const OneDriveSettings = () => {
     failedItems: Array<{ id: string; error: string }>;
   }>({ success: 0, failed: 0, failedItems: [] });
 
-  // Guide étape par étape pour la configuration
-  const [currentStep, setCurrentStep] = useState(1);
-  
-  useEffect(() => {
-    const checkConfigStatus = () => {
-      const config = getOneDriveConfig();
-      if (config.clientId && config.clientId.trim() !== '' && config.clientId !== 'YOUR_MICROSOFT_CLIENT_ID') {
-        setCurrentStep(2);
-        if (config.accessToken && config.accessToken.trim() !== '') {
-          setCurrentStep(3);
-        }
-      } else {
-        setCurrentStep(1);
-      }
-    };
+  // État pour le mode de connexion
+  const [authMode, setAuthMode] = useState<'manual' | 'oauth'>('manual');
 
-    checkConfigStatus();
-  }, [clientId, accessToken]);
-  
   useEffect(() => {
     const checkAdminStatus = async () => {
       setIsLoading(true);
@@ -196,8 +84,8 @@ export const OneDriveSettings = () => {
         const config = getOneDriveConfig();
         setAccessToken(config.accessToken || '');
         setRefreshToken(config.refreshToken || '');
+        setClientId(config.clientId || '');
         setIsEnabled(config.isEnabled || false);
-        setClientId(config.clientId || ''); // Charger le Client ID depuis la configuration
       }
       
       setIsLoading(false);
@@ -209,17 +97,6 @@ export const OneDriveSettings = () => {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      // Validation supplémentaire pour le client ID
-      if (!clientId || clientId.trim() === '' || clientId === 'YOUR_MICROSOFT_CLIENT_ID') {
-        toast({
-          title: "Erreur",
-          description: "Veuillez saisir un Client ID Microsoft valide avant d'enregistrer",
-          variant: "destructive"
-        });
-        setIsSaving(false);
-        return;
-      }
-      
       saveOneDriveConfig({
         accessToken,
         refreshToken,
@@ -228,7 +105,6 @@ export const OneDriveSettings = () => {
       });
       toast.success('Configuration OneDrive enregistrée');
       setTestResult(null); // Reset test result when saving new token
-      setCurrentStep(prev => prev < 2 ? 2 : prev);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration OneDrive:', error);
       toast.error('Échec de l\'enregistrement de la configuration OneDrive');
@@ -240,28 +116,12 @@ export const OneDriveSettings = () => {
   const testOneDriveToken = async () => {
     setIsTesting(true);
     setTestResult(null);
-    setTestErrorDetails('');
     
     try {
-      // Vérifier d'abord si le token existe
-      if (!accessToken || accessToken.trim() === '') {
-        toast({
-          title: "Erreur",
-          description: 'Aucun jeton d\'accès à tester. Veuillez vous authentifier avec Microsoft.',
-          variant: "destructive"
-        });
-        setTestResult('error');
-        setIsTesting(false);
-        return;
-      }
-      
-      // Use OneDrive API to test the token by getting account information
-      console.log("Test du jeton OneDrive...");
+      // Use Microsoft Graph API to test the token
       const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-        method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
         }
       });
       
@@ -271,242 +131,240 @@ export const OneDriveSettings = () => {
         setTestResult('success');
         toast.success('Jeton OneDrive valide');
       } else {
-        const errorData = await response.text();
         console.error('Erreur lors du test du jeton OneDrive:', response.status, response.statusText);
-        console.error('Détails de l\'erreur:', errorData);
-        
-        // Capturer les détails de l'erreur pour l'affichage
-        setTestErrorDetails(`Status: ${response.status}, ${errorData}`);
-        
-        // Vérifier si c'est une erreur d'authentification
-        if (response.status === 401) {
-          toast({
-            title: "Jeton expiré", 
-            description: 'Votre jeton OneDrive est expiré. Veuillez vous réauthentifier.',
-            variant: "destructive"
-          });
-        } else if (response.status === 403) {
-          toast({
-            title: "Accès refusé", 
-            description: 'Votre jeton OneDrive n\'a pas les permissions nécessaires. Vérifiez les scopes d\'autorisation.',
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Jeton invalide", 
-            description: `Erreur ${response.status}: ${errorData.substring(0, 100)}${errorData.length > 100 ? '...' : ''}`,
-            variant: "destructive"
-          });
-        }
-        
         setTestResult('error');
+        toast.error('Jeton OneDrive invalide');
       }
     } catch (error) {
       console.error('Erreur lors du test du jeton OneDrive:', error);
-      setTestErrorDetails(error instanceof Error ? error.message : String(error));
-      toast.error('Erreur lors du test du jeton OneDrive: ' + (error instanceof Error ? error.message : String(error)));
       setTestResult('error');
+      toast.error('Erreur lors du test du jeton OneDrive');
     } finally {
       setIsTesting(false);
     }
   };
 
-  // Fonction de réauthentification
-  const handleReauthenticate = () => {
-    // Supprimer les tokens existants mais garder le client ID
-    const config = getOneDriveConfig();
-    saveOneDriveConfig({
-      ...config,
-      accessToken: '',
-      refreshToken: '',
-      isEnabled: false
-    });
+  const handleStartOAuth = () => {
+    if (!clientId) {
+      toast.error('Veuillez entrer un Client ID Microsoft');
+      return;
+    }
+
+    // Generate a random state for CSRF protection
+    const state = Math.random().toString(36).substring(2, 15);
+
+    // Save the state to verify when the callback returns
+    localStorage.setItem('onedrive_auth_state', state);
+
+    // Set the redirect URL to the callback URL of your application
+    const redirectUri = `${window.location.origin}/onedrive-callback`;
     
-    // Mettre à jour l'état pour refléter les changements
-    setAccessToken('');
-    setRefreshToken('');
-    setIsEnabled(false);
-    setTestResult(null);
-    setCurrentStep(2); // Revenir à l'étape d'authentification
-    
-    toast({
-      title: "Information",
-      description: 'Tokens supprimés. Veuillez vous réauthentifier.',
+    // Build the OAuth URL
+    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}`;
+
+    // Record the state in the database for verification
+    const saveState = async () => {
+      try {
+        await supabase
+          .from('oauth_states')
+          .insert({
+            state,
+            provider: 'onedrive'
+          });
+      } catch (error) {
+        console.error('Error saving OAuth state:', error);
+      }
+    };
+
+    // Save state and then redirect
+    saveState().then(() => {
+      // Redirect to the OAuth URL
+      window.location.href = oauthUrl;
     });
   };
 
-  // Fonction pour gérer la sauvegarde manuelle du token
-  const handleManualTokenSave = () => {
-    if (!accessToken || accessToken.trim() === '') {
+  // Fonction pour la migration des fichiers audio
+  const handleMigrateFiles = async () => {
+    if (!accessToken) {
       toast({
         title: "Erreur",
-        description: "Le token d'accès ne peut pas être vide",
+        description: 'Veuillez configurer un jeton OneDrive valide',
         variant: "destructive"
       });
       return;
     }
 
-    // Sauvegarder le token
-    const config = getOneDriveConfig();
-    saveOneDriveConfig({
-      ...config,
-      accessToken,
-      refreshToken,
-      isEnabled: true
-    });
-
-    // Désactiver l'édition et afficher un message de succès
-    setIsTokenEditable(false);
-    setCurrentStep(3);
-    toast.success("Token d'accès OneDrive sauvegardé manuellement");
-    
-    // Réinitialiser les résultats de test
-    setTestResult(null);
-  };
-
-  // Fonction pour migrer les fichiers audio
-  const handleMigrateFiles = async () => {
-    if (!accessToken) {
-      toast.error("Veuillez vous authentifier auprès de Microsoft avant de migrer des fichiers");
-      return;
-    }
-    
     setIsMigrating(true);
     setMigrationProgress(0);
     setProcessedFiles(0);
     setMigrationResults({ success: 0, failed: 0, failedFiles: [] });
-    
+
     try {
-      // Récupérer tous les fichiers audio depuis Supabase
-      const { data: audioFiles, error } = await supabase
+      // Ensure the audio bucket exists
+      const bucketExists = await ensureAudioBucketExists();
+      
+      if (!bucketExists) {
+        setIsMigrating(false);
+        return;
+      }
+
+      // Get the list of audio files in Supabase
+      const { data: songs, error: songsError } = await supabase
         .from('songs')
-        .select('id, file_path');
-      
-      if (error) {
-        toast.error("Erreur lors de la récupération des fichiers audio");
-        console.error("Erreur lors de la récupération des fichiers audio:", error);
-        setIsMigrating(false);
-        return;
-      }
-      
-      if (!audioFiles || audioFiles.length === 0) {
+        .select('id, file_path')
+        .order('created_at', { ascending: false });
+
+      if (songsError) {
+        console.error('Erreur lors de la récupération des chansons:', songsError);
         toast({
-          title: "Information",
-          description: "Aucun fichier audio à migrer"
-        });
-        setIsMigrating(false);
-        return;
-      }
-      
-      // Configurer les paramètres de migration
-      setTotalFiles(audioFiles.length);
-      
-      // Démarrer la migration
-      const results = await migrateFilesToOneDrive(audioFiles, {
-        onProgress: (processed, total) => {
-          setProcessedFiles(processed);
-          setMigrationProgress(Math.floor((processed / total) * 100));
-        },
-        onSuccess: (fileId) => {
-          console.log(`Fichier migré avec succès: ${fileId}`);
-        },
-        onError: (fileId, error) => {
-          console.error(`Erreur lors de la migration du fichier ${fileId}:`, error);
-        }
-      });
-      
-      // Mettre à jour les résultats
-      setMigrationResults(results);
-      
-      // Afficher un message de succès
-      if (results.success > 0) {
-        toast.success(`${results.success} fichiers audio migrés avec succès vers OneDrive`);
-      }
-      
-      if (results.failed > 0) {
-        toast({
-          title: "Attention",
-          description: `${results.failed} fichiers n'ont pas pu être migrés. Consultez les détails pour plus d'informations.`,
+          title: "Erreur",
+          description: 'Erreur lors de la récupération des chansons',
           variant: "destructive"
         });
+        setIsMigrating(false);
+        return;
       }
+
+      if (!songs || songs.length === 0) {
+        toast({
+          title: "Information",
+          description: 'Aucun fichier audio à migrer'
+        });
+        setIsMigrating(false);
+        return;
+      }
+
+      setTotalFiles(songs.length);
+      toast({
+        title: "Information", 
+        description: `Démarrage de la migration de ${songs.length} fichiers...`
+      });
+      
+      // Start migration with progress callbacks
+      const results = await migrateFilesToOneDrive(songs, {
+        onProgress: (processed, total) => {
+          setProcessedFiles(processed);
+          setMigrationProgress(Math.round((processed / total) * 100));
+        },
+        onSuccess: (fileId) => {
+          console.log(`Migration réussie pour le fichier: ${fileId}`);
+          setMigrationResults(prev => ({ 
+            ...prev, 
+            success: prev.success + 1 
+          }));
+        },
+        onError: (fileId, error) => {
+          console.error(`Échec de la migration pour le fichier: ${fileId}`, error);
+          setMigrationResults(prev => ({ 
+            ...prev, 
+            failed: prev.failed + 1,
+            failedFiles: [...prev.failedFiles, { id: fileId, error }]
+          }));
+        }
+      });
+
+      console.log('Résultats de la migration:', results);
+      toast({
+        title: "Succès",
+        description: `Migration terminée: ${results.success} fichiers migrés, ${results.failed} échecs`
+      });
+      
     } catch (error) {
-      console.error("Erreur lors de la migration des fichiers:", error);
-      toast.error("Erreur lors de la migration des fichiers: " + (error instanceof Error ? error.message : String(error)));
+      console.error('Erreur lors de la migration des fichiers:', error);
+      toast({
+        title: "Erreur",
+        description: 'Échec de la migration des fichiers',
+        variant: "destructive"
+      });
     } finally {
       setIsMigrating(false);
     }
   };
-
-  // Fonction pour migrer les paroles
+  
+  // Fonction pour la migration des paroles
   const handleMigrateLyrics = async () => {
     if (!accessToken) {
-      toast.error("Veuillez vous authentifier auprès de Microsoft avant de migrer des paroles");
+      toast({
+        title: "Erreur",
+        description: 'Veuillez configurer un jeton OneDrive valide',
+        variant: "destructive"
+      });
       return;
     }
-    
+
     setIsMigratingLyrics(true);
     setLyricsProgress(0);
     setProcessedLyrics(0);
     setLyricsResults({ success: 0, failed: 0, failedItems: [] });
-    
+
     try {
-      // Récupérer le nombre de paroles stockées dans Supabase
-      const { count, error } = await supabase
+      // Vérifier si des paroles existent dans la base de données
+      const { count, error: countError } = await supabase
         .from('lyrics')
         .select('*', { count: 'exact', head: true });
       
-      if (error) {
-        toast.error("Erreur lors du comptage des paroles");
-        console.error("Erreur lors du comptage des paroles:", error);
+      if (countError) {
+        console.error('Erreur lors du comptage des paroles:', countError);
+        toast({
+          title: "Erreur",
+          description: 'Erreur lors du comptage des paroles',
+          variant: "destructive"
+        });
         setIsMigratingLyrics(false);
         return;
       }
-      
+
       if (!count || count === 0) {
         toast({
           title: "Information",
-          description: "Aucune parole à migrer"
+          description: 'Aucune parole à migrer'
         });
         setIsMigratingLyrics(false);
         return;
       }
-      
-      // Configurer les paramètres de migration
+
       setTotalLyrics(count);
+      toast({
+        title: "Information", 
+        description: `Démarrage de la migration de ${count} paroles...`
+      });
       
-      // Démarrer la migration
+      // Lancer la migration avec des callbacks de progression
       const results = await migrateLyricsToOneDrive({
         onProgress: (processed, total) => {
           setProcessedLyrics(processed);
-          setLyricsProgress(Math.floor((processed / total) * 100));
+          setLyricsProgress(Math.round((processed / total) * 100));
         },
         onSuccess: (songId) => {
-          console.log(`Paroles migrées avec succès pour la chanson: ${songId}`);
+          console.log(`Migration réussie pour les paroles: ${songId}`);
+          setLyricsResults(prev => ({ 
+            ...prev, 
+            success: prev.success + 1 
+          }));
         },
         onError: (songId, error) => {
-          console.error(`Erreur lors de la migration des paroles pour la chanson ${songId}:`, error);
+          console.error(`Échec de la migration pour les paroles: ${songId}`, error);
+          setLyricsResults(prev => ({ 
+            ...prev, 
+            failed: prev.failed + 1,
+            failedItems: [...prev.failedItems, { id: songId, error }]
+          }));
         }
       });
+
+      console.log('Résultats de la migration des paroles:', results);
+      toast({
+        title: "Succès",
+        description: `Migration des paroles terminée: ${results.success} paroles migrées, ${results.failed} échecs`
+      });
       
-      // Mettre à jour les résultats
-      setLyricsResults(results);
-      
-      // Afficher un message de succès
-      if (results.success > 0) {
-        toast.success(`${results.success} paroles migrées avec succès vers OneDrive`);
-      }
-      
-      if (results.failed > 0) {
-        toast({
-          title: "Attention",
-          description: `${results.failed} paroles n'ont pas pu être migrées. Consultez les détails pour plus d'informations.`,
-          variant: "destructive"
-        });
-      }
     } catch (error) {
-      console.error("Erreur lors de la migration des paroles:", error);
-      toast.error("Erreur lors de la migration des paroles: " + (error instanceof Error ? error.message : String(error)));
+      console.error('Erreur lors de la migration des paroles:', error);
+      toast({
+        title: "Erreur",
+        description: 'Échec de la migration des paroles',
+        variant: "destructive"
+      });
     } finally {
       setIsMigratingLyrics(false);
     }
@@ -527,361 +385,223 @@ export const OneDriveSettings = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Intégration OneDrive</CardTitle>
+        <CardTitle>Intégration Microsoft OneDrive</CardTitle>
         <CardDescription>
           Configurer OneDrive pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Guide d'installation étape par étape */}
-        <div className="border rounded-md p-4 bg-muted/30">
-          <h3 className="font-medium text-lg mb-3">Configuration de l'intégration OneDrive</h3>
-          <Steps 
-            currentStep={currentStep} 
-            className="pb-4"
-          >
-            <Step title="Créer une application Azure">
-              <p className="text-sm text-muted-foreground mt-2">
-                Créez une application dans le portail Azure pour obtenir un Client ID et configurez les redirections.
+      <CardContent className="space-y-4">
+        <Tabs defaultValue="manual" onValueChange={(value) => setAuthMode(value as 'manual' | 'oauth')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="manual">Configuration manuelle</TabsTrigger>
+            <TabsTrigger value="oauth">Connexion OAuth</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="manual" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="onedrive-token">Jeton d'accès OneDrive</Label>
+              <Input
+                id="onedrive-token"
+                type="password"
+                placeholder="Entrez votre jeton d'accès OneDrive"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Jeton d'accès pour l'API Microsoft Graph.
               </p>
-              <Alert className="mt-4 bg-muted/50">
-                <Info className="h-4 w-4" />
-                <AlertTitle>Instructions</AlertTitle>
-                <AlertDescription>
-                  <ol className="list-decimal ml-5 space-y-2 text-sm mt-2">
-                    <li>Connectez-vous au <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">portail Azure</a></li>
-                    <li>Accédez à "Azure Active Directory" &gt; "Inscriptions d'applications" &gt; "Nouvelle inscription"</li>
-                    <li>Donnez un nom à votre application</li>
-                    <li>Sélectionnez "Comptes dans n'importe quel annuaire organisationnel et comptes Microsoft personnels"</li>
-                    <li>Dans URI de redirection, sélectionnez "Application à page unique (SPA)" et ajoutez <code className="px-1 py-0.5 bg-muted">{window.location.origin}/onedrive-callback</code></li>
-                    <li>Notez l'ID d'application (client) affiché après la création</li>
-                    <li>Dans "Authentification", vérifiez que vous utilisez bien le flux implicite et les jetons d'accès pour SPA</li>
-                  </ol>
-                </AlertDescription>
-              </Alert>
-            </Step>
-            <Step title="Authentification Microsoft">
-              <p className="text-sm text-muted-foreground mt-2">
-                Utilisez votre Client ID pour vous authentifier avec Microsoft OneDrive ou saisissez manuellement un token d'accès.
-              </p>
-            </Step>
-            <Step title="Configuration terminée">
-              <p className="text-sm text-muted-foreground mt-2">
-                Vous pouvez maintenant utiliser OneDrive pour stocker vos fichiers et migrer votre contenu existant.
-              </p>
-            </Step>
-          </Steps>
-        </div>
-        
-        {/* Champ pour le Client ID Microsoft */}
-        <div className="space-y-2">
-          <Label htmlFor="microsoft-client-id" className="flex items-center space-x-1">
-            <span>Client ID Microsoft</span>
-            {currentStep === 1 && (
-              <Badge variant="outline" className="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
-                Étape actuelle
-              </Badge>
-            )}
-          </Label>
-          <Input
-            id="microsoft-client-id"
-            placeholder="Entrez votre Client ID Microsoft"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className={clientId === 'YOUR_MICROSOFT_CLIENT_ID' || !clientId ? "border-amber-500" : ""}
-          />
-          <p className="text-xs text-muted-foreground">
-            Vous devez créer une application dans le portail Azure pour obtenir un Client ID.
-          </p>
-        </div>
-        
-        {/* Bouton pour sauvegarder uniquement le Client ID */}
-        <Button 
-          onClick={handleSaveConfig} 
-          disabled={isSaving || !clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID'}
-          className="w-full"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Enregistrement...
-            </>
-          ) : 'Enregistrer le Client ID'}
-        </Button>
-        
-        {/* Options d'authentification avec séparateur */}
-        <div className="relative border-t border-border pt-4 mt-4">
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-            Options d'authentification
-          </div>
-        </div>
-
-        {/* Bouton d'authentification avec indication de l'étape */}
-        <div className="space-y-2">
-          <Label className="flex items-center space-x-1">
-            <span>Authentification automatique</span>
-            {currentStep === 2 && !isTokenEditable && (
-              <Badge variant="outline" className="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
-                Recommandé
-              </Badge>
-            )}
-          </Label>
-          <MicrosoftOAuthButton clientId={clientId} />
-        </div>
-        
-        {/* Option pour saisir manuellement le token */}
-        <div className="space-y-2 pt-2">
-          <Label className="flex items-center space-x-1">
-            <span>Ou saisir manuellement le token d'accès</span>
-            {isTokenEditable && (
-              <Badge variant="outline" className="ml-2 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border-none">
-                Mode manuel
-              </Badge>
-            )}
-          </Label>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="access-token">Token d'accès</Label>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsTokenEditable(!isTokenEditable)}
-                className="h-7 px-3"
-              >
-                {isTokenEditable ? (
-                  <>
-                    <Lock className="h-3.5 w-3.5 mr-1" />
-                    Verrouiller
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Éditer
-                  </>
-                )}
-              </Button>
             </div>
             
-            <Input
-              id="access-token"
-              type="password"
-              placeholder="Collez votre token d'accès Microsoft Graph ici"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              readOnly={!isTokenEditable}
-              className={!isTokenEditable ? "bg-muted" : "border-amber-500"}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="refresh-token">Jeton de rafraîchissement</Label>
+              <Input
+                id="refresh-token"
+                type="password"
+                placeholder="Jeton de rafraîchissement (optionnel)"
+                value={refreshToken}
+                onChange={(e) => setRefreshToken(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Jeton de rafraîchissement pour générer de nouveaux jetons d'accès.
+              </p>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="oauth" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="client-id">Client ID Microsoft</Label>
+              <Input
+                id="client-id"
+                type="text"
+                placeholder="Entrez l'ID client de votre application Microsoft"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Obtenez un Client ID depuis le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">Portail Azure</a>.
+              </p>
+            </div>
             
-            <Label htmlFor="refresh-token">Refresh Token (optionnel)</Label>
-            <Input
-              id="refresh-token"
-              type="password"
-              placeholder="Collez votre refresh token ici (facultatif)"
-              value={refreshToken}
-              onChange={(e) => setRefreshToken(e.target.value)}
-              readOnly={!isTokenEditable}
-              className={!isTokenEditable ? "bg-muted" : ""}
-            />
-          </div>
-
-          {isTokenEditable && (
             <Button 
-              onClick={handleManualTokenSave} 
-              disabled={!accessToken || accessToken.trim() === ''}
-              className="w-full mt-2"
+              onClick={handleStartOAuth} 
+              disabled={!clientId || isSaving}
+              className="w-full"
             >
-              <Save className="mr-2 h-4 w-4" />
-              Enregistrer le token manuellement
+              <Cloud className="mr-2 h-4 w-4" />
+              Se connecter à Microsoft OneDrive
             </Button>
-          )}
-
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
-              Info
-            </Badge>
-            <p className="text-xs text-muted-foreground">
-              Cette option est destinée aux utilisateurs expérimentés qui ont généré un token d'accès par d'autres moyens.
-            </p>
-          </div>
-        </div>
-        
-        {/* Jeton d'accès et configuration avancée - affichée uniquement si le Client ID est configuré */}
-        {currentStep >= 2 && (
-          <>
-            <div className="pt-4 border-t border-border">
-              <h3 className="text-lg font-semibold mb-4">Configuration avancée</h3>
-              
-              <div className="flex items-center space-x-2 mt-4">
-                <Switch
-                  id="enable-onedrive"
-                  checked={isEnabled}
-                  onCheckedChange={setIsEnabled}
-                />
-                <Label htmlFor="enable-onedrive">Utiliser OneDrive pour le stockage de fichiers</Label>
-              </div>
-            </div>
             
-            {testResult === 'success' && (
-              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription className="text-green-800 dark:text-green-400">
-                  Le jeton OneDrive est valide et fonctionne correctement.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {testResult === 'error' && (
-              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertTitle>Jeton OneDrive invalide</AlertTitle>
-                <AlertDescription>
-                  <div className="text-red-800 dark:text-red-400">
-                    Le jeton OneDrive est invalide ou n'a pas les permissions requises.
-                    {testErrorDetails && (
-                      <div className="mt-2 text-xs border border-red-300 p-2 rounded bg-red-50 dark:bg-red-900/30 overflow-x-auto">
-                        <code>{testErrorDetails}</code>
-                      </div>
-                    )}
-                    <p className="mt-2 text-sm">Causes possibles:</p>
-                    <ul className="list-disc ml-5 text-sm mt-1">
-                      <li>Le jeton est expiré</li>
-                      <li>Les permissions demandées ont été modifiées</li>
-                      <li>L'application a été désactivée dans Azure</li>
-                      <li>L'application n'est pas configurée comme SPA dans le portail Azure</li>
-                      <li>Des permissions sont manquantes (files.readwrite)</li>
-                    </ul>
-                    <Button 
-                      variant="outline" 
-                      className="mt-3 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60"
-                      onClick={handleReauthenticate}
-                    >
-                      Se réauthentifier
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </>
-        )}
+            <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+              <RefreshCw className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-blue-800 dark:text-blue-400">
+                La connexion OAuth générera automatiquement un jeton d'accès et un jeton de rafraîchissement.
+              </AlertDescription>
+            </Alert>
+          </TabsContent>
+        </Tabs>
         
-        {/* Section des migrations - affiché uniquement si tout est configuré */}
-        {currentStep >= 3 && (
-          <div className="border-t border-border pt-4 mt-4">
-            <Tabs defaultValue="audio">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="audio">Fichiers Audio</TabsTrigger>
-                <TabsTrigger value="lyrics">Paroles</TabsTrigger>
-              </TabsList>
-              
-              {/* Onglet migration audio */}
-              <TabsContent value="audio" className="pt-4">
-                <h3 className="text-lg font-semibold mb-2">Migration des fichiers audio</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Transférez tous les fichiers audio de Supabase vers OneDrive. Cette opération peut prendre du temps selon le nombre de fichiers.
-                </p>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="enable-onedrive"
+            checked={isEnabled}
+            onCheckedChange={setIsEnabled}
+          />
+          <Label htmlFor="enable-onedrive">Utiliser OneDrive pour le stockage de fichiers</Label>
+        </div>
 
-                {isMigrating ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
-                      <span>{migrationProgress}%</span>
-                    </div>
-                    <Progress value={migrationProgress} className="h-2" />
-                    
-                    <div className="flex justify-between text-sm mt-2">
-                      <span className="text-green-500">Succès: {migrationResults.success}</span>
-                      <span className="text-red-500">Échecs: {migrationResults.failed}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleMigrateFiles} 
-                    disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
-                    className="w-full mt-2"
-                  >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Démarrer la migration des fichiers audio
-                  </Button>
-                )}
-
-                {/* Afficher les erreurs de migration audio s'il y en a */}
-                {migrationResults.failedFiles.length > 0 && (
-                  <Alert variant="destructive" className="mt-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <details>
-                        <summary className="cursor-pointer font-medium">
-                          {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
-                        </summary>
-                        <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
-                          {migrationResults.failedFiles.map((file, index) => (
-                            <li key={index} className="break-all">
-                              ID: {file.id} - <span className="text-red-400">{file.error}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-              
-              {/* Onglet migration paroles */}
-              <TabsContent value="lyrics" className="pt-4">
-                <h3 className="text-lg font-semibold mb-2">Migration des paroles</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Transférez toutes les paroles de Supabase vers OneDrive pour permettre leur synchronisation.
-                </p>
-
-                {isMigratingLyrics ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Progression: {processedLyrics}/{totalLyrics} paroles</span>
-                      <span>{lyricsProgress}%</span>
-                    </div>
-                    <Progress value={lyricsProgress} className="h-2" />
-                    
-                    <div className="flex justify-between text-sm mt-2">
-                      <span className="text-green-500">Succès: {lyricsResults.success}</span>
-                      <span className="text-red-500">Échecs: {lyricsResults.failed}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleMigrateLyrics} 
-                    disabled={!accessToken || isSaving || isTesting || isMigrating} 
-                    className="w-full mt-2"
-                  >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Démarrer la migration des paroles
-                  </Button>
-                )}
-
-                {/* Afficher les erreurs de migration des paroles s'il y en a */}
-                {lyricsResults.failedItems.length > 0 && (
-                  <Alert variant="destructive" className="mt-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <details>
-                        <summary className="cursor-pointer font-medium">
-                          {lyricsResults.failedItems.length} paroles ont échoué lors de la migration
-                        </summary>
-                        <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
-                          {lyricsResults.failedItems.map((item, index) => (
-                            <li key={index} className="break-all">
-                              ID: {item.id} - <span className="text-red-400">{item.error}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
+        {testResult === 'success' && (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="text-green-800 dark:text-green-400">
+              Le jeton OneDrive est valide et fonctionne correctement.
+            </AlertDescription>
+          </Alert>
         )}
+
+        {testResult === 'error' && (
+          <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-400">
+              Le jeton OneDrive est invalide ou n'a pas les permissions requises.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Section des migrations avec onglets */}
+        <div className="border-t border-border pt-4 mt-4">
+          <Tabs defaultValue="audio">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="audio">Fichiers Audio</TabsTrigger>
+              <TabsTrigger value="lyrics">Paroles</TabsTrigger>
+            </TabsList>
+            
+            {/* Onglet migration audio */}
+            <TabsContent value="audio" className="pt-4">
+              <h3 className="text-lg font-semibold mb-2">Migration des fichiers audio</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Transférez tous les fichiers audio de Supabase vers OneDrive. Cette opération peut prendre du temps selon le nombre de fichiers.
+              </p>
+
+              {isMigrating ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
+                    <span>{migrationProgress}%</span>
+                  </div>
+                  <Progress value={migrationProgress} className="h-2" />
+                  
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-green-500">Succès: {migrationResults.success}</span>
+                    <span className="text-red-500">Échecs: {migrationResults.failed}</span>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleMigrateFiles} 
+                  disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
+                  className="w-full mt-2"
+                >
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Démarrer la migration des fichiers audio
+                </Button>
+              )}
+
+              {/* Afficher les erreurs de migration audio s'il y en a */}
+              {migrationResults.failedFiles.length > 0 && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <details>
+                      <summary className="cursor-pointer font-medium">
+                        {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
+                      </summary>
+                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {migrationResults.failedFiles.map((file, index) => (
+                          <li key={index} className="break-all">
+                            ID: {file.id} - <span className="text-red-400">{file.error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+            
+            {/* Onglet migration paroles */}
+            <TabsContent value="lyrics" className="pt-4">
+              <h3 className="text-lg font-semibold mb-2">Migration des paroles</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Transférez toutes les paroles de Supabase vers OneDrive pour permettre leur synchronisation.
+              </p>
+
+              {isMigratingLyrics ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Progression: {processedLyrics}/{totalLyrics} paroles</span>
+                    <span>{lyricsProgress}%</span>
+                  </div>
+                  <Progress value={lyricsProgress} className="h-2" />
+                  
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-green-500">Succès: {lyricsResults.success}</span>
+                    <span className="text-red-500">Échecs: {lyricsResults.failed}</span>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleMigrateLyrics} 
+                  disabled={!accessToken || isSaving || isTesting || isMigrating} 
+                  className="w-full mt-2"
+                >
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Démarrer la migration des paroles
+                </Button>
+              )}
+
+              {/* Afficher les erreurs de migration des paroles s'il y en a */}
+              {lyricsResults.failedItems.length > 0 && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <details>
+                      <summary className="cursor-pointer font-medium">
+                        {lyricsResults.failedItems.length} paroles ont échoué lors de la migration
+                      </summary>
+                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {lyricsResults.failedItems.map((item, index) => (
+                          <li key={index} className="break-all">
+                            ID: {item.id} - <span className="text-red-400">{item.error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </CardContent>
       <CardFooter className="flex space-x-2">
         <Button 
@@ -898,25 +618,11 @@ export const OneDriveSettings = () => {
             'Tester le jeton'
           )}
         </Button>
-        
-        {/* Ajouter un bouton spécifique pour la réauthentification */}
-        {accessToken && (
-          <Button 
-            variant="outline"
-            onClick={handleReauthenticate}
-            disabled={isSaving || isMigrating || isMigratingLyrics}
-            className="border-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Réauthentifier
-          </Button>
-        )}
-        
         <Button 
           onClick={handleSaveConfig} 
-          disabled={isSaving || isMigrating || isMigratingLyrics || !clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID'}
+          disabled={isSaving || isMigrating || isMigratingLyrics}
         >
-          {isSaving ? 'Enregistrement...' : 'Enregistrer tous les paramètres'}
+          {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>
       </CardFooter>
     </Card>

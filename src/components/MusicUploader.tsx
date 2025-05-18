@@ -1,10 +1,11 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
-import { isDropboxEnabled } from "@/utils/dropboxStorage";
+import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,8 @@ export const MusicUploader = () => {
   useEffect(() => {
     // Check which storage provider is active
     const checkStorageProvider = () => {
-      const useDropbox = isDropboxEnabled();
-      setStorageProvider(useDropbox ? "Dropbox" : "Supabase");
+      const useOneDrive = isOneDriveEnabled();
+      setStorageProvider(useOneDrive ? "OneDrive" : "Supabase");
     };
     
     checkStorageProvider();

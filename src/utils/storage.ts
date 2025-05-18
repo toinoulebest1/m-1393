@@ -1,13 +1,14 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
+import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
-  // Check if we should use Dropbox instead of Supabase
-  const useDropbox = isDropboxEnabled();
-  console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
+  // Check if we should use OneDrive instead of Supabase
+  const useOneDrive = isOneDriveEnabled();
+  console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
   
   let fileToUpload: File;
   if (typeof file === 'string') {
@@ -28,9 +29,9 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   }
 
   try {
-    if (useDropbox) {
-      console.log("Uploading file to Dropbox storage:", id);
-      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+    if (useOneDrive) {
+      console.log("Uploading file to OneDrive storage:", id);
+      await uploadFileToOneDrive(fileToUpload, `audio/${id}`);
       return `audio/${id}`;
     } else {
       console.log("Uploading file to Supabase storage:", id);
@@ -75,13 +76,13 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Si le fichier n'est pas en cache, procède normalement
-    const useDropbox = isDropboxEnabled();
-    console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
+    const useOneDrive = isOneDriveEnabled();
+    console.log("Using storage provider for retrieval:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
-    if (useDropbox) {
-      audioUrl = await getDropboxSharedLink(`audio/${path}`);
+    if (useOneDrive) {
+      audioUrl = await getOneDriveSharedLink(`audio/${path}`);
     } else {
       // Vérifie si le fichier existe
       const { data: fileExists } = await supabase.storage

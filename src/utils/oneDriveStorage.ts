@@ -1,8 +1,9 @@
+
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-// Helper pour la configuration OneDrive
+// Add a simple local storage helper for OneDrive configuration
 export const getOneDriveConfig = (): OneDriveConfig => {
   const configStr = localStorage.getItem('onedrive_config');
   if (!configStr) {
@@ -26,81 +27,7 @@ export const isOneDriveEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
-// Fonction pour actualiser le token si nécessaire
-export const refreshOneDriveToken = async (): Promise<string | null> => {
-  const config = getOneDriveConfig();
-  
-  if (!config.refreshToken) {
-    console.error("OneDrive refresh token not configured");
-    toast.error("Token de rafraîchissement OneDrive non configuré");
-    return null;
-  }
-  
-  try {
-    console.log("Tentative de rafraîchissement du token OneDrive...");
-    const clientId = config.clientId;
-    const redirectUri = window.location.origin + '/onedrive-callback';
-    
-    if (!clientId) {
-      console.error("Client ID missing for token refresh");
-      toast.error("Client ID manquant pour le rafraîchissement du token");
-      return null;
-    }
-    
-    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        client_id: clientId,
-        grant_type: 'refresh_token',
-        refresh_token: config.refreshToken,
-        redirect_uri: redirectUri,
-        scope: 'files.readwrite offline_access'
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Failed to refresh OneDrive token:', errorText);
-      
-      // Si le refresh token est invalide, nous devons nous réauthentifier
-      if (response.status === 400 && errorText.includes('invalid_grant')) {
-        toast.error("Session OneDrive expirée, réauthentification nécessaire");
-        // Effacer les tokens mais garder le client ID
-        saveOneDriveConfig({
-          ...config,
-          accessToken: '',
-          refreshToken: '',
-          isEnabled: false
-        });
-      } else {
-        toast.error("Échec du rafraîchissement du token OneDrive");
-      }
-      
-      return null;
-    }
-    
-    const data = await response.json();
-    console.log("Token OneDrive rafraîchi avec succès");
-    
-    // Mise à jour du token dans la configuration
-    saveOneDriveConfig({
-      ...config,
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || config.refreshToken
-    });
-    
-    return data.access_token;
-  } catch (error) {
-    console.error('Error refreshing OneDrive token:', error);
-    toast.error("Erreur lors du rafraîchissement du token OneDrive");
-    return null;
-  }
-};
-
-// Vérifier si un fichier existe sur OneDrive
+// Function to check if a file exists on OneDrive
 export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> => {
   const config = getOneDriveConfig();
   
@@ -110,13 +37,13 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
   }
   
   try {
-    // D'abord, vérifier si nous avons ce chemin de fichier enregistré dans notre base de données
-    let onedrivePath = `/app/${path}`;
+    // First check if we have this file path saved in our database
+    let onedrivePath = `/${path}`;
     
     try {
       const { data: fileRef, error } = await supabase
         .from('onedrive_files')
-        .select('onedrive_path')
+        .select('onedrive_path, file_id')
         .eq('local_id', path)
         .maybeSingle();
         
@@ -125,36 +52,29 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
       } else if (fileRef) {
         onedrivePath = fileRef.onedrive_path;
         console.log('Found stored OneDrive path:', onedrivePath);
+        
+        // If we have the file_id, use it directly
+        if (fileRef.file_id) {
+          const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileRef.file_id}`, {
+            headers: {
+              'Authorization': `Bearer ${config.accessToken}`
+            }
+          });
+          
+          return response.ok;
+        }
       }
     } catch (dbError) {
       console.error('Database error when fetching reference:', dbError);
     }
     
-    // Vérifier si le fichier existe sur OneDrive en utilisant l'API Graph
+    // Use path-based approach if we don't have the file_id
     const encodedPath = encodeURIComponent(onedrivePath);
     const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}`, {
-      method: 'GET',
       headers: {
         'Authorization': `Bearer ${config.accessToken}`
       }
     });
-    
-    if (response.status === 401) {
-      // Token expiré, essayer de le rafraîchir
-      const newToken = await refreshOneDriveToken();
-      if (newToken) {
-        // Réessayer avec le nouveau token
-        const retryResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${newToken}`
-          }
-        });
-        
-        return retryResponse.ok;
-      }
-      return false;
-    }
     
     return response.ok;
   } catch (error) {
@@ -163,7 +83,7 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
   }
 };
 
-// Fonction pour télécharger un fichier vers OneDrive
+// Function to upload a file to OneDrive
 export const uploadFileToOneDrive = async (
   file: File,
   path: string
@@ -180,78 +100,74 @@ export const uploadFileToOneDrive = async (
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Chemin complet du fichier sur OneDrive
-    const onedrivePath = `/app/${path}`;
-    
-    // Pour les fichiers de moins de 4 Mo, utiliser l'upload simple
-    if (file.size < 4 * 1024 * 1024) {
-      // Première étape : créer le dossier parent si nécessaire
-      const folderPath = onedrivePath.substring(0, onedrivePath.lastIndexOf('/'));
-      
-      try {
-        // Créer le dossier parent récursivement
-        await createFolderPath(folderPath);
-      } catch (folderError) {
-        console.error('Error creating parent folders:', folderError);
-        // Continue anyway, the upload might still succeed
-      }
-      
-      // Upload du fichier
-      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodeURIComponent(onedrivePath)}:/content`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': file.type || 'application/octet-stream'
-        },
-        body: file
-      });
-      
-      if (response.status === 401) {
-        // Token expiré, essayer de le rafraîchir
-        const newToken = await refreshOneDriveToken();
-        if (newToken) {
-          // Réessayer avec le nouveau token
-          const retryResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodeURIComponent(onedrivePath)}:/content`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${newToken}`,
-              'Content-Type': file.type || 'application/octet-stream'
-            },
-            body: file
-          });
-          
-          if (!retryResponse.ok) {
-            const errorText = await retryResponse.text();
-            throw new Error(`Failed to upload to OneDrive after token refresh: ${retryResponse.status} ${retryResponse.statusText} - ${errorText}`);
-          }
-          
-          const data = await retryResponse.json();
-          
-          // Stocker la référence dans Supabase
-          await storeFileReference(path, data.id, data.name);
-          
-          return data.webUrl || onedrivePath;
+    // Create upload session for large files
+    const sessionResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/createUploadSession`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        item: {
+          "@microsoft.graph.conflictBehavior": "replace"
         }
-        
-        throw new Error('Failed to refresh OneDrive token');
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to upload to OneDrive: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Stocker la référence dans Supabase
-      await storeFileReference(path, data.id, data.name);
-      
-      return data.webUrl || onedrivePath;
-    } else {
-      // Pour les fichiers plus grands, implémenter l'upload en plusieurs parties ici
-      // Cette partie est plus complexe et nécessite la création d'une session d'upload
-      throw new Error('Large file upload not implemented yet');
+      })
+    });
+    
+    if (!sessionResponse.ok) {
+      const errorText = await sessionResponse.text();
+      console.error('OneDrive upload session error status:', sessionResponse.status, sessionResponse.statusText);
+      console.error('OneDrive upload session error details:', errorText);
+      throw new Error(`Failed to create OneDrive upload session: ${sessionResponse.status} ${sessionResponse.statusText} - ${errorText}`);
     }
+    
+    const sessionData = await sessionResponse.json();
+    const uploadUrl = sessionData.uploadUrl;
+    
+    // Read file content
+    const fileContent = await file.arrayBuffer();
+    
+    // Upload file to the session
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': `${file.size}`
+      },
+      body: fileContent
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('OneDrive upload error status:', uploadResponse.status, uploadResponse.statusText);
+      console.error('OneDrive upload error details:', errorText);
+      throw new Error(`Failed to upload to OneDrive: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
+    }
+    
+    const uploadData = await uploadResponse.json();
+    console.log('OneDrive upload successful:', uploadData);
+    toast.success("Fichier téléchargé avec succès vers OneDrive");
+    
+    // Store the reference in Supabase
+    try {
+      const { error } = await supabase
+        .from('onedrive_files')
+        .insert({
+          local_id: path,
+          onedrive_path: path,
+          file_id: uploadData.id,
+          file_name: uploadData.name
+        });
+        
+      if (error) {
+        console.error('Error saving OneDrive reference:', error);
+        // Continue anyway since the upload succeeded
+      }
+    } catch (dbError) {
+      console.error('Database error when saving reference:', dbError);
+      // Continue anyway since the upload succeeded
+    }
+    
+    return path;
   } catch (error) {
     console.error('Error uploading to OneDrive:', error);
     toast.error("Échec de l'upload vers OneDrive. Vérifiez votre connexion et les permissions.");
@@ -259,72 +175,7 @@ export const uploadFileToOneDrive = async (
   }
 };
 
-// Fonction auxiliaire pour créer un chemin de dossier récursivement
-const createFolderPath = async (path: string): Promise<void> => {
-  if (!path || path === '/' || path === '') return;
-  
-  const config = getOneDriveConfig();
-  if (!config.accessToken) return;
-  
-  const folders = path.split('/').filter(f => f);
-  let currentPath = '';
-  
-  for (const folder of folders) {
-    currentPath = currentPath ? `${currentPath}/${folder}` : `/${folder}`;
-    
-    // Vérifier si le dossier existe déjà
-    const checkResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodeURIComponent(currentPath)}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`
-      }
-    });
-    
-    // Si le dossier n'existe pas, le créer
-    if (!checkResponse.ok) {
-      const createResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root/children`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: folder,
-          folder: {},
-          '@microsoft.graph.conflictBehavior': 'fail'
-        })
-      });
-      
-      if (!createResponse.ok && createResponse.status !== 409) {
-        // Ignorer l'erreur de conflit (409) si le dossier existe déjà
-        const errorText = await createResponse.text();
-        console.warn(`Conflict when creating folder: ${currentPath}`, errorText);
-      }
-    }
-  }
-};
-
-// Fonction pour stocker la référence de fichier dans Supabase
-const storeFileReference = async (localPath: string, fileId: string, fileName: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('onedrive_files')
-      .insert({
-        local_id: localPath,
-        onedrive_path: `/app/${localPath}`,
-        file_id: fileId,
-        file_name: fileName
-      });
-      
-    if (error) {
-      console.error('Error saving OneDrive reference:', error);
-    }
-  } catch (dbError) {
-    console.error('Database error when saving OneDrive reference:', dbError);
-  }
-};
-
-// Fonction pour obtenir un lien partagé pour un fichier sur OneDrive
+// Function to get a shared link for a file on OneDrive
 export const getOneDriveSharedLink = async (path: string): Promise<string> => {
   const config = getOneDriveConfig();
   
@@ -335,81 +186,92 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
   }
   
   try {
-    // D'abord, vérifier si nous avons ce chemin de fichier enregistré dans notre base de données
-    let onedrivePath = `/app/${path}`;
-    let fileId = '';
+    // First check if we have this file path saved in our database
+    let fileId: string | undefined;
     
     try {
       const { data: fileRef, error } = await supabase
         .from('onedrive_files')
-        .select('onedrive_path, file_id')
+        .select('file_id')
         .eq('local_id', path)
         .maybeSingle();
         
       if (error) {
         console.error('Error fetching OneDrive file reference:', error);
-      } else if (fileRef) {
-        onedrivePath = fileRef.onedrive_path;
+      } else if (fileRef?.file_id) {
         fileId = fileRef.file_id;
-        console.log('Found stored OneDrive path:', onedrivePath);
+        console.log('Found stored OneDrive file ID:', fileId);
       }
     } catch (dbError) {
       console.error('Database error when fetching reference:', dbError);
     }
     
-    // Si nous avons un ID de fichier, l'utiliser directement
-    let apiPath = fileId 
-      ? `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/createLink` 
-      : `https://graph.microsoft.com/v1.0/me/drive/root:${encodeURIComponent(onedrivePath)}:/createLink`;
+    // If we don't have the file ID, try to get it by path
+    if (!fileId) {
+      const encodedPath = encodeURIComponent(path.startsWith('/') ? path : `/${path}`);
+      const itemResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}`, {
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`
+        }
+      });
+      
+      if (!itemResponse.ok) {
+        const errorText = await itemResponse.text();
+        console.error('OneDrive file lookup error:', errorText);
+        throw new Error(`Failed to find OneDrive file: ${itemResponse.status} ${itemResponse.statusText}`);
+      }
+      
+      const itemData = await itemResponse.json();
+      fileId = itemData.id;
+      
+      // Save this file_id for future reference
+      if (fileId) {
+        try {
+          await supabase
+            .from('onedrive_files')
+            .upsert({
+              local_id: path,
+              onedrive_path: path,
+              file_id: fileId,
+              file_name: itemData.name
+            });
+        } catch (dbError) {
+          console.error('Database error when saving file ID:', dbError);
+        }
+      }
+    }
     
-    const response = await fetch(apiPath, {
+    if (!fileId) {
+      throw new Error('Could not find file ID in OneDrive');
+    }
+    
+    // Create a sharing link
+    const linkResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/createLink`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        type: 'view',
-        scope: 'anonymous'
+        type: "view",
+        scope: "anonymous"
       })
     });
     
-    if (response.status === 401) {
-      // Token expiré, essayer de le rafraîchir
-      const newToken = await refreshOneDriveToken();
-      if (newToken) {
-        // Réessayer avec le nouveau token
-        const retryResponse = await fetch(apiPath, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${newToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            type: 'view',
-            scope: 'anonymous'
-          })
-        });
-        
-        if (!retryResponse.ok) {
-          const errorText = await retryResponse.text();
-          throw new Error(`Failed to create shared link after token refresh: ${retryResponse.status} ${retryResponse.statusText} - ${errorText}`);
-        }
-        
-        const data = await retryResponse.json();
-        return data.link.webUrl;
-      }
-      
-      throw new Error('Failed to refresh OneDrive token');
+    if (!linkResponse.ok) {
+      const errorText = await linkResponse.text();
+      console.error('OneDrive shared link error:', errorText);
+      throw new Error(`Failed to create OneDrive shared link: ${linkResponse.status} ${linkResponse.statusText}`);
     }
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText} - ${errorText}`);
-    }
+    const linkData = await linkResponse.json();
+    const url = linkData.link.webUrl;
     
-    const data = await response.json();
-    return data.link.webUrl;
+    // For audio files, we need to convert the URL to a direct download link
+    // This may need to be adjusted depending on how OneDrive handles direct downloads
+    const downloadUrl = url.replace("view.aspx", "download.aspx");
+    
+    return downloadUrl;
   } catch (error) {
     console.error('Error getting OneDrive shared link:', error);
     toast.error("Impossible d'obtenir un lien de partage OneDrive");
@@ -417,7 +279,7 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
   }
 };
 
-// Fonction pour migrer les fichiers audio de Supabase vers OneDrive
+// Function to migrate files from Supabase to OneDrive
 export const migrateFilesToOneDrive = async (
   files: Array<{ id: string; file_path: string }>,
   callbacks?: {
@@ -439,16 +301,16 @@ export const migrateFilesToOneDrive = async (
   let failedCount = 0;
   const failedFiles: Array<{ id: string; error: string }> = [];
 
-  // Vérifier si le fichier existe déjà dans OneDrive
+  // Check if file exists in OneDrive
   const checkFileExistsInOneDrive = async (path: string): Promise<boolean> => {
-    return await checkFileExistsOnOneDrive(path);
+    return checkFileExistsOnOneDrive(path);
   };
   
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const processedCount = i + 1;
     
-    // Appeler la callback de progression si elle existe
+    // Call the progress callback if it exists
     if (callbacks?.onProgress) {
       callbacks.onProgress(processedCount, files.length);
     }
@@ -456,35 +318,11 @@ export const migrateFilesToOneDrive = async (
     try {
       console.log(`Processing file ${processedCount}/${files.length}: ${file.id}`);
       
-      // Vérifier si le fichier existe déjà dans OneDrive
+      // Check if the file already exists in OneDrive
       const fileExists = await checkFileExistsInOneDrive(`audio/${file.id}`);
       
       if (fileExists) {
         console.log(`File already exists in OneDrive: ${file.id}`);
-        
-        // Enregistrer la référence dans la base de données si elle n'existe pas déjà
-        try {
-          const { data, error } = await supabase
-            .from('onedrive_files')
-            .select('id')
-            .eq('local_id', `audio/${file.id}`)
-            .maybeSingle();
-            
-          if (error) {
-            console.error(`Error checking OneDrive reference for ${file.id}:`, error);
-          } else if (!data) {
-            // La référence n'existe pas, l'ajouter
-            await supabase
-              .from('onedrive_files')
-              .insert({
-                local_id: `audio/${file.id}`,
-                onedrive_path: `/app/audio/${file.id}`
-              });
-          }
-        } catch (dbError) {
-          console.error('Database error when checking reference:', dbError);
-        }
-        
         successCount++;
         if (callbacks?.onSuccess) {
           callbacks.onSuccess(file.id);
@@ -492,7 +330,7 @@ export const migrateFilesToOneDrive = async (
         continue;
       }
       
-      // Télécharger le fichier depuis Supabase
+      // Download the file from Supabase
       const { data: fileData, error: fileError } = await supabase.storage
         .from('audio')
         .download(file.file_path || file.id);
@@ -509,32 +347,21 @@ export const migrateFilesToOneDrive = async (
         continue;
       }
       
-      // Créer un objet File à partir du Blob
+      // Create a File object from the Blob
       const audioFile = new File([fileData], file.id, { 
         type: fileData.type || 'audio/mpeg' 
       });
       
       console.log(`Successfully downloaded file from Supabase: ${file.id}, size: ${audioFile.size} bytes`);
       
-      // Uploader vers OneDrive
+      // Upload to OneDrive
       if (audioFile.size > 0) {
-        try {
-          await uploadFileToOneDrive(audioFile, `audio/${file.id}`);
-          console.log(`Successfully uploaded ${file.id} to OneDrive`);
-          
-          successCount++;
-          if (callbacks?.onSuccess) {
-            callbacks.onSuccess(file.id);
-          }
-        } catch (uploadError) {
-          console.error(`Error uploading file ${file.id} to OneDrive:`, uploadError);
-          failedCount++;
-          const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
-          failedFiles.push({ id: file.id, error: errorMessage });
-          
-          if (callbacks?.onError) {
-            callbacks.onError(file.id, errorMessage);
-          }
+        const onedrivePath = await uploadFileToOneDrive(audioFile, `audio/${file.id}`);
+        console.log(`Successfully uploaded ${file.id} to OneDrive: ${onedrivePath}`);
+        
+        successCount++;
+        if (callbacks?.onSuccess) {
+          callbacks.onSuccess(file.id);
         }
       } else {
         console.error(`File ${file.id} has zero size, skipping upload`);
@@ -566,117 +393,7 @@ export const migrateFilesToOneDrive = async (
   };
 };
 
-// Fonctions pour gérer les paroles dans OneDrive
-export const uploadLyricsToOneDrive = async (songId: string, lyricsContent: string): Promise<string> => {
-  const config = getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    toast.error("Token d'accès OneDrive non configuré");
-    throw new Error('OneDrive access token not configured');
-  }
-  
-  console.log(`Uploading lyrics for song ${songId} to OneDrive`);
-  
-  try {
-    // Convertir le contenu des paroles en fichier
-    const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
-    const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
-    
-    // Chemin OneDrive pour les paroles
-    const path = `lyrics/${songId}`;
-    
-    // Utiliser la fonction existante pour télécharger le fichier
-    const onedrivePath = await uploadFileToOneDrive(lyricsFile, path);
-    
-    return onedrivePath;
-  } catch (error) {
-    console.error('Error uploading lyrics to OneDrive:', error);
-    toast.error("Échec de l'upload des paroles vers OneDrive");
-    throw error;
-  }
-};
-
-export const getLyricsFromOneDrive = async (songId: string): Promise<string | null> => {
-  const config = getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    return null;
-  }
-  
-  try {
-    // Vérifier d'abord si nous avons déjà une référence dans la base de données
-    let onedrivePath = `/app/lyrics/${songId}`;
-    let fileId = '';
-    
-    try {
-      const { data: fileRef, error } = await supabase
-        .from('onedrive_files')
-        .select('onedrive_path, file_id')
-        .eq('local_id', `lyrics/${songId}`)
-        .maybeSingle();
-        
-      if (error) {
-        console.error('Error fetching lyrics reference:', error);
-      } else if (fileRef) {
-        onedrivePath = fileRef.onedrive_path;
-        fileId = fileRef.file_id;
-        console.log('Found stored OneDrive lyrics path:', onedrivePath);
-      }
-    } catch (dbError) {
-      console.error('Database error when fetching lyrics reference:', dbError);
-    }
-    
-    // Utiliser l'API Graph pour récupérer le contenu du fichier
-    let apiPath = fileId 
-      ? `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`
-      : `https://graph.microsoft.com/v1.0/me/drive/root:${encodeURIComponent(onedrivePath)}:/content`;
-    
-    const response = await fetch(apiPath, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`
-      }
-    });
-    
-    if (response.status === 401) {
-      // Token expiré, essayer de le rafraîchir
-      const newToken = await refreshOneDriveToken();
-      if (newToken) {
-        // Réessayer avec le nouveau token
-        const retryResponse = await fetch(apiPath, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${newToken}`
-          }
-        });
-        
-        if (!retryResponse.ok) {
-          console.error('Error downloading lyrics from OneDrive after token refresh:', retryResponse.status, retryResponse.statusText);
-          return null;
-        }
-        
-        const lyrics = await retryResponse.text();
-        return lyrics;
-      }
-      
-      return null;
-    }
-    
-    if (!response.ok) {
-      console.error('Error downloading lyrics from OneDrive:', response.status, response.statusText);
-      return null;
-    }
-    
-    const lyrics = await response.text();
-    return lyrics;
-  } catch (error) {
-    console.error('Error retrieving lyrics from OneDrive:', error);
-    return null;
-  }
-};
-
+// Function to migrate lyrics to OneDrive
 export const migrateLyricsToOneDrive = async (
   callbacks?: {
     onProgress?: (processed: number, total: number) => void;
@@ -694,7 +411,7 @@ export const migrateLyricsToOneDrive = async (
   console.log('Starting migration of lyrics from Supabase to OneDrive');
   
   try {
-    // Récupérer toutes les paroles stockées dans Supabase
+    // Get all lyrics stored in Supabase
     const { data: lyrics, error } = await supabase
       .from('lyrics')
       .select('song_id, content');
@@ -719,7 +436,7 @@ export const migrateLyricsToOneDrive = async (
       const lyric = lyrics[i];
       const processedCount = i + 1;
       
-      // Appeler la callback de progression si elle existe
+      // Call the progress callback if it exists
       if (callbacks?.onProgress) {
         callbacks.onProgress(processedCount, lyrics.length);
       }
@@ -727,31 +444,11 @@ export const migrateLyricsToOneDrive = async (
       try {
         console.log(`Processing lyrics ${processedCount}/${lyrics.length}: ${lyric.song_id}`);
         
-        // Vérifier si les paroles existent déjà dans OneDrive
+        // Check if the lyrics already exist in OneDrive
         const fileExists = await checkFileExistsOnOneDrive(`lyrics/${lyric.song_id}`);
         
         if (fileExists) {
           console.log(`Lyrics already exist in OneDrive: ${lyric.song_id}`);
-          
-          // Vérifier si la référence existe dans la base de données
-          const { data, error } = await supabase
-            .from('onedrive_files')
-            .select('id')
-            .eq('local_id', `lyrics/${lyric.song_id}`)
-            .maybeSingle();
-          
-          if (error) {
-            console.error(`Error checking reference for lyrics ${lyric.song_id}:`, error);
-          } else if (!data) {
-            // Ajouter la référence si elle n'existe pas
-            await supabase
-              .from('onedrive_files')
-              .insert({
-                local_id: `lyrics/${lyric.song_id}`,
-                onedrive_path: `/app/lyrics/${lyric.song_id}`
-              });
-          }
-          
           successCount++;
           if (callbacks?.onSuccess) {
             callbacks.onSuccess(lyric.song_id);
@@ -759,9 +456,13 @@ export const migrateLyricsToOneDrive = async (
           continue;
         }
         
-        // Télécharger les paroles vers OneDrive
+        // Upload the lyrics to OneDrive
         if (lyric.content) {
-          await uploadLyricsToOneDrive(lyric.song_id, lyric.content);
+          // Convert the lyrics content to a file
+          const lyricsBlob = new Blob([lyric.content], { type: 'text/plain' });
+          const lyricsFile = new File([lyricsBlob], `${lyric.song_id}_lyrics.txt`, { type: 'text/plain' });
+          
+          await uploadFileToOneDrive(lyricsFile, `lyrics/${lyric.song_id}`);
           console.log(`Successfully uploaded lyrics for ${lyric.song_id} to OneDrive`);
           
           successCount++;
@@ -799,5 +500,64 @@ export const migrateLyricsToOneDrive = async (
   } catch (error) {
     console.error('Error migrating lyrics to OneDrive:', error);
     throw error;
+  }
+};
+
+// Function to upload lyrics to OneDrive
+export const uploadLyricsToOneDrive = async (songId: string, lyricsContent: string): Promise<string> => {
+  const config = getOneDriveConfig();
+  
+  if (!config.accessToken) {
+    console.error("OneDrive access token not configured");
+    toast.error("Token d'accès OneDrive non configuré");
+    throw new Error('OneDrive access token not configured');
+  }
+  
+  console.log(`Uploading lyrics for song ${songId} to OneDrive`);
+  
+  try {
+    // Convert the lyrics content to a file
+    const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
+    const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
+    
+    // OneDrive path for lyrics
+    const path = `lyrics/${songId}`;
+    
+    // Use the existing function to upload the file
+    const onedrivePath = await uploadFileToOneDrive(lyricsFile, path);
+    
+    return onedrivePath;
+  } catch (error) {
+    console.error('Error uploading lyrics to OneDrive:', error);
+    toast.error("Échec de l'upload des paroles vers OneDrive");
+    throw error;
+  }
+};
+
+// Function to get lyrics from OneDrive
+export const getLyricsFromOneDrive = async (songId: string): Promise<string | null> => {
+  const config = getOneDriveConfig();
+  
+  if (!config.accessToken) {
+    console.error("OneDrive access token not configured");
+    return null;
+  }
+  
+  try {
+    // Get a shared link to download the lyrics
+    const url = await getOneDriveSharedLink(`lyrics/${songId}`);
+    
+    // Download the lyrics content
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('Error downloading lyrics from OneDrive:', response.status, response.statusText);
+      return null;
+    }
+    
+    const lyrics = await response.text();
+    return lyrics;
+  } catch (error) {
+    console.error('Error retrieving lyrics from OneDrive:', error);
+    return null;
   }
 };

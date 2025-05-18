@@ -19,7 +19,6 @@ import './App.css';
 // Add new imports
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
-import { DropboxSettings } from "./components/DropboxSettings";
 import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import OneDriveCallback from "./pages/OneDriveCallback";
@@ -195,20 +194,6 @@ function App() {
                   session ? (
                     <Layout>
                       <PlaylistDetail />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* Dropbox settings route */}
-              <Route 
-                path="/dropbox-settings" 
-                element={
-                  session ? (
-                    <Layout>
-                      <DropboxSettings />
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />

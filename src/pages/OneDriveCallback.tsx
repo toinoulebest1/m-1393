@@ -1,197 +1,171 @@
 
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getOneDriveConfig, saveOneDriveConfig } from '@/utils/oneDriveStorage';
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { toast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card } from '@/components/ui/card';
 
-export default function OneDriveCallback() {
+const OneDriveCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log("Traitement du callback OneDrive...");
-        
-        // Récupérer le code d'autorisation depuis l'URL
-        // Note: Microsoft peut renvoyer le code dans le fragment (#) ou dans les paramètres de requête (?) selon la réponse
-        const searchParams = new URLSearchParams(location.search);
-        const hashParams = new URLSearchParams(location.hash.substring(1)); // Supprimer le # initial
-        
-        const code = searchParams.get('code') || hashParams.get('code');
-        const error = searchParams.get('error') || hashParams.get('error');
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const error = urlParams.get('error');
 
         if (error) {
-          console.error('Error from Microsoft OAuth:', error);
-          const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
-          setError(`Erreur Microsoft: ${errorDescription || error}`);
-          toast({
-            title: "Erreur d'authentification", 
-            description: errorDescription || error,
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/onedrive-settings'), 3000);
+          console.error("OAuth error:", error);
+          setError(`Erreur d'authentification: ${error}`);
+          setIsProcessing(false);
           return;
         }
 
         if (!code) {
-          setError('Code d\'autorisation manquant dans la réponse');
-          toast({
-            title: "Erreur",
-            description: 'Code d\'autorisation manquant dans la réponse',
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/onedrive-settings'), 3000);
+          setError("Aucun code d'autorisation reçu");
+          setIsProcessing(false);
           return;
         }
 
-        // Récupérer le code verifier pour PKCE
-        const codeVerifier = localStorage.getItem('pkce_code_verifier');
-        if (!codeVerifier) {
-          setError('Code verifier PKCE non trouvé. Veuillez réessayer l\'authentification.');
-          toast({
-            title: "Erreur",
-            description: 'Code verifier PKCE non trouvé. Veuillez réessayer l\'authentification.',
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/onedrive-settings'), 3000);
+        if (!state) {
+          setError("Aucun état reçu pour la validation");
+          setIsProcessing(false);
           return;
         }
 
-        // Récupérer la configuration OneDrive
+        // Verify the state parameter
+        const savedState = localStorage.getItem('onedrive_auth_state');
+        
+        if (!savedState || savedState !== state) {
+          setError("État invalide, possible tentative de CSRF");
+          setIsProcessing(false);
+          return;
+        }
+
+        // Also verify state in the database
+        const { data: stateData, error: stateError } = await supabase
+          .from('oauth_states')
+          .select('*')
+          .eq('state', state)
+          .eq('provider', 'onedrive')
+          .single();
+
+        if (stateError || !stateData) {
+          console.error("State verification error:", stateError);
+          setError("État non trouvé dans la base de données");
+          setIsProcessing(false);
+          return;
+        }
+
+        // Get the client ID from config
         const config = getOneDriveConfig();
-        console.log("Configuration OneDrive récupérée:", { ...config, accessToken: "***", refreshToken: "***" });
+        const clientId = config.clientId;
         
-        if (!config.clientId) {
-          setError('Client ID Microsoft non configuré');
-          toast({
-            title: "Erreur",
-            description: 'Client ID Microsoft non configuré',
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/onedrive-settings'), 3000);
+        if (!clientId) {
+          setError("Client ID non configuré");
+          setIsProcessing(false);
           return;
         }
 
-        // Échanger le code contre des tokens en utilisant PKCE
-        const redirectUri = window.location.origin + '/onedrive-callback';
-        console.log("URL de redirection:", redirectUri);
-        
-        console.log("Échange du code d'autorisation contre des tokens avec PKCE...");
-        
-        try {
-          const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              client_id: config.clientId,
-              scope: 'files.readwrite offline_access',
-              code: code,
-              redirect_uri: redirectUri,
-              grant_type: 'authorization_code',
-              code_verifier: codeVerifier
-            })
-          });
+        // Create the redirect URI
+        const redirectUri = `${window.location.origin}/onedrive-callback`;
 
-          // Nettoyer le code verifier
-          localStorage.removeItem('pkce_code_verifier');
-
-          if (!response.ok) {
-            const errorData = await response.text();
-            console.error('Error exchanging code for tokens:', errorData);
-            setError(`Erreur lors de l'échange du code : ${errorData}`);
-            toast({
-              title: "Échec de l'authentification",
-              description: 'Erreur lors de l\'échange du code d\'autorisation',
-              variant: "destructive"
-            });
-            setTimeout(() => navigate('/onedrive-settings'), 3000);
-            return;
+        // Exchange the code for tokens using edge function
+        const { data, error: tokenError } = await supabase.functions.invoke('onedrive-token-exchange', {
+          body: {
+            code,
+            redirectUri,
+            clientId
           }
-
-          const data = await response.json();
-          console.log('OAuth tokens received successfully');
-
-          // Vérifier que les tokens ont bien été reçus
-          if (!data.access_token || !data.refresh_token) {
-            console.error('Tokens manquants dans la réponse:', data);
-            setError('Tokens OAuth manquants dans la réponse');
-            toast({
-              title: "Erreur",
-              description: 'Tokens OAuth manquants dans la réponse',
-              variant: "destructive"
-            });
-            setTimeout(() => navigate('/onedrive-settings'), 3000);
-            return;
-          }
-
-          // Mettre à jour la configuration avec les nouveaux tokens
-          saveOneDriveConfig({
-            ...config,
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-            isEnabled: true
-          });
-
-          toast({
-            title: "Succès",
-            description: 'Connexion à Microsoft réussie',
-            variant: "default"
-          });
-          
-          navigate('/onedrive-settings');
-        } catch (fetchError) {
-          console.error('Erreur réseau lors de l\'échange du code:', fetchError);
-          setError(`Erreur réseau: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
-          toast({
-            title: "Erreur réseau", 
-            description: 'Une erreur de connexion est survenue lors de l\'authentification',
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/onedrive-settings'), 3000);
-        }
-      } catch (err) {
-        console.error('Error processing OAuth callback:', err);
-        setError('Une erreur est survenue lors du traitement de l\'authentification');
-        toast({
-          title: "Erreur", 
-          description: 'Une erreur est survenue lors du traitement de l\'authentification',
-          variant: "destructive"
         });
-        setTimeout(() => navigate('/onedrive-settings'), 3000);
-      } finally {
+
+        if (tokenError || !data) {
+          console.error("Token exchange error:", tokenError || "No data returned");
+          setError("Erreur lors de l'échange du code contre des jetons");
+          setIsProcessing(false);
+          return;
+        }
+
+        // Save the tokens to local storage
+        saveOneDriveConfig({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token || '',
+          isEnabled: true,
+          clientId
+        });
+
+        // Delete the used state from local storage and database
+        localStorage.removeItem('onedrive_auth_state');
+        await supabase
+          .from('oauth_states')
+          .delete()
+          .eq('state', state);
+
+        // Success!
+        setSuccess(true);
+        setIsProcessing(false);
+        toast.success("Connexion à OneDrive réussie");
+        
+        // Wait for 2 seconds then redirect
+        setTimeout(() => {
+          navigate('/onedrive-settings');
+        }, 2000);
+      } catch (err) {
+        console.error("Error in OneDrive callback:", err);
+        setError(err instanceof Error ? err.message : "Une erreur inattendue s'est produite");
         setIsProcessing(false);
       }
     };
 
     handleCallback();
-  }, [location, navigate]);
+  }, [navigate]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full">
-      {isProcessing ? (
-        <>
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-accent mb-4"></div>
-          <p className="text-lg">Traitement de l'authentification Microsoft...</p>
-        </>
-      ) : error ? (
-        <div className="text-center p-4">
-          <div className="text-red-500 text-xl mb-2">Erreur</div>
-          <p className="mb-4">{error}</p>
-          <p>Redirection vers les paramètres OneDrive...</p>
-        </div>
-      ) : (
-        <div className="text-center p-4">
-          <div className="text-green-500 text-xl mb-2">Succès</div>
-          <p className="mb-4">Authentification Microsoft réussie!</p>
-          <p>Redirection vers les paramètres OneDrive...</p>
-        </div>
-      )}
+    <div className="min-h-screen bg-spotify-base flex items-center justify-center p-4">
+      <Card className="w-full max-w-md p-6">
+        <h1 className="text-2xl font-bold text-center mb-6">Connexion OneDrive</h1>
+        
+        {isProcessing ? (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-spotify-accent" />
+            <p className="text-center text-spotify-neutral">
+              Traitement de l'authentification OneDrive en cours...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="space-y-4">
+            <Alert variant="destructive">
+              <AlertTitle>Erreur</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <div className="flex justify-center">
+              <Button onClick={() => navigate('/onedrive-settings')}>
+                Retourner aux paramètres
+              </Button>
+            </div>
+          </div>
+        ) : success ? (
+          <div className="space-y-4">
+            <Alert className="border-green-400 bg-green-50 dark:bg-green-900/20">
+              <AlertTitle className="text-green-800 dark:text-green-400">Connexion réussie!</AlertTitle>
+              <AlertDescription className="text-green-700 dark:text-green-300">
+                Vous avez été connecté à OneDrive avec succès. Redirection en cours...
+              </AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+      </Card>
     </div>
   );
-}
+};
+
+export default OneDriveCallback;
