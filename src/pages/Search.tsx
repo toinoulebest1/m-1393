@@ -37,6 +37,20 @@ interface ArtistResult {
   nb_fan: number;
 }
 
+// Define an extended song type to include optional deezer_artist_id
+interface SongWithDeezer {
+  id: string;
+  title: string;
+  artist?: string;
+  duration?: string;
+  file_path: string;
+  image_url?: string;
+  genre?: string; 
+  uploaded_by?: string;
+  created_at: string;
+  deezer_artist_id?: string;
+}
+
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState(() => {
     const savedSearch = localStorage.getItem('lastSearch') || "";
@@ -119,7 +133,7 @@ const Search = () => {
           throw error;
         }
 
-        const formattedResults = data.map(song => ({
+        const formattedResults = data.map((song: SongWithDeezer) => ({
           id: song.id,
           title: song.title,
           artist: song.artist || '',
@@ -127,8 +141,6 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          // Use optional chaining to safely access the deezer_artist_id property
-          // if it exists in the database record
           deezerArtistId: song.deezer_artist_id ? String(song.deezer_artist_id) : undefined
         }));
 
