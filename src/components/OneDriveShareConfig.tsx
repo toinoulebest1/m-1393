@@ -85,7 +85,9 @@ export const OneDriveShareConfig = () => {
                     setShowConfirmation(true);
                   } else {
                     // Implémenter la logique pour arrêter le partage si nécessaire
-                    toast.info("Fonctionnalité de désactivation du partage non implémentée");
+                    toast({
+                      description: "Fonctionnalité de désactivation du partage non implémentée"
+                    });
                   }
                 }}
                 disabled={isProcessing}

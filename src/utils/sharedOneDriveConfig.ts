@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { OneDriveConfig } from '@/types/onedrive';
+import { OneDriveConfig, OneDriveConfigJson } from '@/types/onedrive';
 import { toast } from '@/hooks/use-toast';
 
 // Cache for the shared configuration to avoid repeated database queries
@@ -36,11 +36,13 @@ export const fetchSharedOneDriveConfig = async (): Promise<OneDriveConfig | null
     }
 
     // Cast the data.value to OneDriveConfig with proper type checking
+    // First ensure it's an object with the expected structure
+    const value = data.value as Record<string, any>;
     const config: OneDriveConfig = {
-      accessToken: data.value.accessToken || '',
-      refreshToken: data.value.refreshToken || '',
-      isEnabled: !!data.value.isEnabled,
-      clientId: data.value.clientId || '',
+      accessToken: typeof value.accessToken === 'string' ? value.accessToken : '',
+      refreshToken: typeof value.refreshToken === 'string' ? value.refreshToken : '',
+      isEnabled: !!value.isEnabled,
+      clientId: typeof value.clientId === 'string' ? value.clientId : '',
       isShared: true
     };
     
@@ -62,7 +64,7 @@ export const fetchSharedOneDriveConfig = async (): Promise<OneDriveConfig | null
 export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<boolean> => {
   try {
     // Ensure we're storing a value that matches Supabase's expectations for JSONB
-    const configValue = {
+    const configValue: OneDriveConfigJson = {
       accessToken: config.accessToken,
       refreshToken: config.refreshToken,
       isEnabled: config.isEnabled,
