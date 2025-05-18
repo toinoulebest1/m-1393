@@ -453,7 +453,7 @@ export const migrateFilesToOneDrive = async (
             // La référence n'existe pas, l'ajouter
             await supabase
               .from('onedrive_files')
-              .upsert({
+              .insert({
                 local_id: `audio/${file.id}`,
                 onedrive_path: `/app/audio/${file.id}`
               });
@@ -709,6 +709,26 @@ export const migrateLyricsToOneDrive = async (
         
         if (fileExists) {
           console.log(`Lyrics already exist in OneDrive: ${lyric.song_id}`);
+          
+          // Vérifier si la référence existe dans la base de données
+          const { data, error } = await supabase
+            .from('onedrive_files')
+            .select('id')
+            .eq('local_id', `lyrics/${lyric.song_id}`)
+            .maybeSingle();
+          
+          if (error) {
+            console.error(`Error checking reference for lyrics ${lyric.song_id}:`, error);
+          } else if (!data) {
+            // Ajouter la référence si elle n'existe pas
+            await supabase
+              .from('onedrive_files')
+              .insert({
+                local_id: `lyrics/${lyric.song_id}`,
+                onedrive_path: `/app/lyrics/${lyric.song_id}`
+              });
+          }
+          
           successCount++;
           if (callbacks?.onSuccess) {
             callbacks.onSuccess(lyric.song_id);

@@ -95,7 +95,11 @@
     "songsDeletedSuccess": "{{count}} song(s) deleted because files not found",
     "errorDeletingSongs": "Error deleting songs",
     "libraryUpToDate": "Library up to date, all files are present",
-    "syncError": "Error syncing library"
+    "syncError": "Error syncing library",
+    "blindTest": "Blind Test",
+    "playlists": "Playlists",
+    "reports": "Reports",
+    "language": "Language"
   },
   "playlists": {
     "title": "Playlists",
