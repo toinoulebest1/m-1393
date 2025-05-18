@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
@@ -73,6 +74,8 @@ export function SongCard({
       } else {
         play();
       }
+    } else {
+      play(song);
     }
   };
   
@@ -144,10 +147,12 @@ export function SongCard({
                     !artistId && "cursor-default"
                   )}
                   onClick={(e) => {
-                    if (!artistId) {
-                      e.preventDefault();
-                    } else {
-                      e.stopPropagation(); // Prevent triggering the parent's onClick
+                    e.preventDefault(); // Prevent default behavior first
+                    e.stopPropagation(); // Stop propagation before anything else
+                    
+                    if (artistId) {
+                      // Navigate programmatically to prevent parent click handling
+                      window.location.href = `/artist/${artistId}`;
                     }
                   }}
                 >
@@ -255,3 +260,4 @@ export function SongCard({
     </div>
   );
 }
+
