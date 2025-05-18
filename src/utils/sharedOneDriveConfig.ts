@@ -35,7 +35,14 @@ export const fetchSharedOneDriveConfig = async (): Promise<OneDriveConfig | null
       return null;
     }
 
-    const config = data.value as OneDriveConfig;
+    // Cast the data.value to OneDriveConfig with proper type checking
+    const config: OneDriveConfig = {
+      accessToken: data.value.accessToken || '',
+      refreshToken: data.value.refreshToken || '',
+      isEnabled: !!data.value.isEnabled,
+      clientId: data.value.clientId || '',
+      isShared: true
+    };
     
     // Update cache
     sharedConfigCache = config;
@@ -54,12 +61,21 @@ export const fetchSharedOneDriveConfig = async (): Promise<OneDriveConfig | null
  */
 export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<boolean> => {
   try {
+    // Ensure we're storing a value that matches Supabase's expectations for JSONB
+    const configValue = {
+      accessToken: config.accessToken,
+      refreshToken: config.refreshToken,
+      isEnabled: config.isEnabled,
+      clientId: config.clientId,
+      isShared: true
+    };
+
     const { error } = await supabase
       .from('app_settings')
       .upsert(
         { 
           key: 'shared_onedrive_config', 
-          value: config 
+          value: configValue
         },
         { 
           onConflict: 'key',

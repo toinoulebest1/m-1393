@@ -60,6 +60,7 @@ export const saveOneDriveConfig = (config: OneDriveConfig): void => {
   localStorage.setItem('onedrive_config', JSON.stringify(config));
 };
 
+// Only updating isOneDriveEnabled function to be async-compatible
 export const isOneDriveEnabled = async (): Promise<boolean> => {
   const config = await getOneDriveConfig();
   return config.isEnabled && !!config.accessToken;

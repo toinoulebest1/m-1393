@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  getOneDriveConfig, 
+  getOneDriveConfigSync, 
   saveOneDriveConfig, 
   migrateFilesToOneDrive,
   migrateLyricsToOneDrive
@@ -80,8 +80,8 @@ export const OneDriveSettings = () => {
         navigate('/');
         toast.error('Accès non autorisé');
       } else {
-        // Load config only if admin
-        const config = getOneDriveConfig();
+        // Load config only if admin - use sync version to avoid awaiting
+        const config = getOneDriveConfigSync();
         setAccessToken(config.accessToken || '');
         setRefreshToken(config.refreshToken || '');
         setClientId(config.clientId || '');

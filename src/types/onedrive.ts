@@ -15,3 +15,12 @@ export interface OneDriveFileReference {
   file_name?: string;
   created_at?: string;
 }
+
+// Helper type for JSON compatibility
+export type OneDriveConfigJson = {
+  accessToken: string;
+  refreshToken: string;
+  isEnabled: boolean;
+  clientId: string;
+  isShared?: boolean;
+}

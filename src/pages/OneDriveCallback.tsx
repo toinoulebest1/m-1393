@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { getOneDriveConfig, saveOneDriveConfig } from '@/utils/oneDriveStorage';
+import { getOneDriveConfigSync, saveOneDriveConfig } from '@/utils/oneDriveStorage';
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from '@/hooks/use-toast';
@@ -66,8 +66,8 @@ const OneDriveCallback = () => {
           return;
         }
 
-        // Get the client ID from config
-        const config = getOneDriveConfig();
+        // Get the client ID from config - use sync version
+        const config = getOneDriveConfigSync();
         const clientId = config.clientId;
         
         if (!clientId) {

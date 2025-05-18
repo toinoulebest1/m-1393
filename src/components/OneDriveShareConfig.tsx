@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { getOneDriveConfig } from '@/utils/oneDriveStorage';
+import { getOneDriveConfigSync } from '@/utils/oneDriveStorage';
 import { saveSharedOneDriveConfig } from '@/utils/sharedOneDriveConfig';
 import { Loader2, Share2, Shield } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,8 +19,8 @@ export const OneDriveShareConfig = () => {
     setIsProcessing(true);
     
     try {
-      // Get the current user's OneDrive configuration
-      const config = getOneDriveConfig();
+      // Get the current user's OneDrive configuration - use sync version
+      const config = getOneDriveConfigSync();
       
       if (!config.accessToken) {
         toast.error("Vous devez d'abord configurer votre propre connexion OneDrive");
