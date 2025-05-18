@@ -23,7 +23,11 @@ export const OneDriveShareConfig = () => {
       const config = getOneDriveConfigSync();
       
       if (!config.accessToken) {
-        toast.error("Vous devez d'abord configurer votre propre connexion OneDrive");
+        toast({
+          title: "Erreur",
+          description: "Vous devez d'abord configurer votre propre connexion OneDrive",
+          variant: "destructive"
+        });
         setIsProcessing(false);
         return;
       }
@@ -39,13 +43,21 @@ export const OneDriveShareConfig = () => {
       
       if (success) {
         setIsSharing(true);
-        toast.success("Votre configuration OneDrive est maintenant partagée avec tous les utilisateurs");
+        toast({
+          title: "Succès",
+          description: "Votre configuration OneDrive est maintenant partagée avec tous les utilisateurs",
+          variant: "default"
+        });
       }
       
       setShowConfirmation(false);
     } catch (error) {
       console.error('Error sharing OneDrive config:', error);
-      toast.error("Une erreur s'est produite lors du partage de la configuration");
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors du partage de la configuration",
+        variant: "destructive"
+      });
     } finally {
       setIsProcessing(false);
     }

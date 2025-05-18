@@ -87,7 +87,11 @@ export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<
     
     if (error) {
       console.error('Error saving shared OneDrive config:', error);
-      toast.error('Erreur lors de l\'enregistrement de la configuration OneDrive partagée');
+      toast({
+        title: "Erreur",
+        description: 'Erreur lors de l\'enregistrement de la configuration OneDrive partagée',
+        variant: "destructive"
+      });
       return false;
     }
 
@@ -95,11 +99,19 @@ export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<
     sharedConfigCache = config;
     lastFetchTime = Date.now();
     
-    toast.success('Configuration OneDrive partagée enregistrée avec succès');
+    toast({
+      title: "Succès",
+      description: 'Configuration OneDrive partagée enregistrée avec succès',
+      variant: "default"
+    });
     return true;
   } catch (error) {
     console.error('Exception while saving shared OneDrive config:', error);
-    toast.error('Erreur lors de l\'enregistrement de la configuration OneDrive partagée');
+    toast({
+      title: "Erreur",
+      description: 'Erreur lors de l\'enregistrement de la configuration OneDrive partagée',
+      variant: "destructive"
+    });
     return false;
   }
 };
