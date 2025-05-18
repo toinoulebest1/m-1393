@@ -17,13 +17,16 @@ export default function OneDriveCallback() {
         console.log("Traitement du callback OneDrive...");
         
         // Récupérer le code d'autorisation depuis l'URL
-        const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
+        // Note: Microsoft peut renvoyer le code dans le fragment (#) ou dans les paramètres de requête (?) selon la réponse
+        const searchParams = new URLSearchParams(location.search);
+        const hashParams = new URLSearchParams(location.hash.substring(1)); // Supprimer le # initial
+        
+        const code = searchParams.get('code') || hashParams.get('code');
+        const error = searchParams.get('error') || hashParams.get('error');
 
         if (error) {
           console.error('Error from Microsoft OAuth:', error);
-          const errorDescription = urlParams.get('error_description');
+          const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
           setError(`Erreur Microsoft: ${errorDescription || error}`);
           toast({
             title: "Erreur d'authentification", 
@@ -45,6 +48,19 @@ export default function OneDriveCallback() {
           return;
         }
 
+        // Récupérer le code verifier pour PKCE
+        const codeVerifier = localStorage.getItem('pkce_code_verifier');
+        if (!codeVerifier) {
+          setError('Code verifier PKCE non trouvé. Veuillez réessayer l\'authentification.');
+          toast({
+            title: "Erreur",
+            description: 'Code verifier PKCE non trouvé. Veuillez réessayer l\'authentification.',
+            variant: "destructive"
+          });
+          setTimeout(() => navigate('/onedrive-settings'), 3000);
+          return;
+        }
+
         // Récupérer la configuration OneDrive
         const config = getOneDriveConfig();
         console.log("Configuration OneDrive récupérée:", { ...config, accessToken: "***", refreshToken: "***" });
@@ -60,27 +76,29 @@ export default function OneDriveCallback() {
           return;
         }
 
-        // Échanger le code contre des tokens en utilisant l'approche PKCE adaptée aux SPA
+        // Échanger le code contre des tokens en utilisant PKCE
         const redirectUri = window.location.origin + '/onedrive-callback';
         console.log("URL de redirection:", redirectUri);
         
-        console.log("Échange du code d'autorisation contre des tokens avec type d'application SPA...");
+        console.log("Échange du code d'autorisation contre des tokens avec PKCE...");
         
-        // Utiliser MSAL pour les SPA ou adapter la requête pour qu'elle fonctionne avec SPA
         const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': window.location.origin
           },
           body: new URLSearchParams({
             client_id: config.clientId,
             scope: 'files.readwrite offline_access',
             code: code,
             redirect_uri: redirectUri,
-            grant_type: 'authorization_code'
+            grant_type: 'authorization_code',
+            code_verifier: codeVerifier
           })
         });
+
+        // Nettoyer le code verifier
+        localStorage.removeItem('pkce_code_verifier');
 
         if (!response.ok) {
           const errorData = await response.text();

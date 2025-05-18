@@ -21,11 +21,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Steps, Step } from "@/components/ui/steps";
 
+// Fonction pour générer un code challenge PKCE
+const generateCodeVerifier = (): string => {
+  const array = new Uint8Array(32);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, (b) => String.fromCharCode(b))
+    .join('')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .substring(0, 43);
+};
+
+// Base64 URL encode
+const base64UrlEncode = (str: string): string => {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+// Générer un code challenge depuis un verifier
+const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  const base64Digest = base64UrlEncode(String.fromCharCode(...new Uint8Array(digest)));
+  return base64Digest;
+};
+
 // Bouton d'authentification Microsoft
 export const MicrosoftOAuthButton = ({ clientId, onTokenReceived }) => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const handleAuth = () => {
+  const handleAuth = async () => {
     if (!clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID' || clientId.trim() === '') {
       toast({
         title: "Erreur",
@@ -37,15 +64,33 @@ export const MicrosoftOAuthButton = ({ clientId, onTokenReceived }) => {
     
     setIsAuthenticating(true);
     
-    // Microsoft OAuth settings pour SPA
-    const redirectUri = window.location.origin + '/onedrive-callback';
-    const scopes = ['files.readwrite', 'offline_access'];
-    
-    // Créer l'URL d'authentification avec responseMode=fragment pour SPA
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&response_mode=fragment`;
-    
-    // Rediriger vers la page d'authentification Microsoft
-    window.open(authUrl, "_self");
+    try {
+      // Générer le code verifier et challenge pour PKCE
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      
+      // Sauvegarder le code verifier pour l'utiliser lors du callback
+      localStorage.setItem('pkce_code_verifier', codeVerifier);
+      
+      // Microsoft OAuth settings pour SPA avec PKCE
+      const redirectUri = window.location.origin + '/onedrive-callback';
+      const scopes = ['files.readwrite', 'offline_access'];
+      
+      // Créer l'URL d'authentification avec PKCE
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+      
+      console.log("Redirection vers l'authentification Microsoft avec PKCE...");
+      // Rediriger vers la page d'authentification Microsoft
+      window.open(authUrl, "_self");
+    } catch (error) {
+      console.error("Erreur lors de la préparation de l'authentification PKCE:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de la préparation de l'authentification",
+        variant: "destructive"
+      });
+      setIsAuthenticating(false);
+    }
   };
 
   return (
