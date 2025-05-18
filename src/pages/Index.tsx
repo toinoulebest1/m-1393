@@ -121,8 +121,8 @@ const Index = () => {
             <div className="absolute inset-0 bg-black/10" />
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('common.welcome')}</h1>
-                <p className="text-white/80">{t('common.discoverMusic')}</p>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('welcome')}</h1>
+                <p className="text-white/80">{t('discoverMusic')}</p>
               </div>
               <div className="mt-4 md:mt-0">
                 <Button 
@@ -130,7 +130,7 @@ const Index = () => {
                   size="lg" 
                   className="bg-white text-spotify-accent hover:bg-white/90"
                 >
-                  {t('common.exploreNow')}
+                  {t('exploreNow')}
                 </Button>
               </div>
             </div>
@@ -142,9 +142,9 @@ const Index = () => {
           {/* Chansons récentes */}
           <div className="mt-12">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">{t('common.recentSongs')}</h2>
+              <h2 className="text-2xl font-bold">{t('recentSongs')}</h2>
               <Button variant="ghost" onClick={() => navigate('/search')}>
-                {t('common.viewAll')}
+                {t('viewAll')}
               </Button>
             </div>
             
@@ -166,8 +166,8 @@ const Index = () => {
               ) : (
                 <div className="col-span-full flex flex-col items-center justify-center p-8 bg-spotify-card rounded-lg">
                   <Music2 className="w-12 h-12 text-spotify-neutral mb-4" />
-                  <p className="text-lg font-medium text-white mb-2">{t('common.noSongsYet')}</p>
-                  <p className="text-sm text-spotify-neutral mb-4">{t('common.uploadMusicPrompt')}</p>
+                  <p className="text-lg font-medium text-white mb-2">{t('noSongsYet')}</p>
+                  <p className="text-sm text-spotify-neutral mb-4">{t('uploadMusicPrompt')}</p>
                 </div>
               )}
             </div>
@@ -176,9 +176,9 @@ const Index = () => {
           {/* Playlists */}
           <div className="mt-12">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">{t('common.playlists')}</h2>
+              <h2 className="text-2xl font-bold">{t('playlists')}</h2>
               <Button variant="ghost" onClick={() => navigate('/playlists')}>
-                {t('common.viewAll')}
+                {t('viewAll')}
               </Button>
             </div>
             
@@ -206,15 +206,15 @@ const Index = () => {
                       )}
                     </div>
                     <h3 className="font-bold truncate">{playlist.name}</h3>
-                    <p className="text-spotify-neutral text-sm truncate">{playlist.description || t('common.noDescription')}</p>
+                    <p className="text-spotify-neutral text-sm truncate">{playlist.description || t('noDescription')}</p>
                   </div>
                 ))
               ) : (
                 <div className="col-span-full flex flex-col items-center justify-center p-8 bg-spotify-card rounded-lg">
                   <Disc3 className="w-12 h-12 text-spotify-neutral mb-4" />
-                  <p className="text-lg font-medium text-white mb-2">{t('common.noPlaylistsYet')}</p>
-                  <p className="text-sm text-spotify-neutral mb-4">{t('common.createPlaylistPrompt')}</p>
-                  <Button onClick={() => navigate('/playlists')}>{t('common.createPlaylist')}</Button>
+                  <p className="text-lg font-medium text-white mb-2">{t('noPlaylistsYet')}</p>
+                  <p className="text-sm text-spotify-neutral mb-4">{t('createPlaylistPrompt')}</p>
+                  <Button onClick={() => navigate('/playlists')}>{t('createPlaylist')}</Button>
                 </div>
               )}
             </div>
