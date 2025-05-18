@@ -82,55 +82,79 @@ export default function OneDriveCallback() {
         
         console.log("Échange du code d'autorisation contre des tokens avec PKCE...");
         
-        const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            client_id: config.clientId,
-            scope: 'files.readwrite offline_access',
-            code: code,
-            redirect_uri: redirectUri,
-            grant_type: 'authorization_code',
-            code_verifier: codeVerifier
-          })
-        });
+        try {
+          const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: config.clientId,
+              scope: 'files.readwrite offline_access',
+              code: code,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code',
+              code_verifier: codeVerifier
+            })
+          });
 
-        // Nettoyer le code verifier
-        localStorage.removeItem('pkce_code_verifier');
+          // Nettoyer le code verifier
+          localStorage.removeItem('pkce_code_verifier');
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Error exchanging code for tokens:', errorData);
-          setError(`Erreur lors de l'échange du code : ${errorData}`);
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Error exchanging code for tokens:', errorData);
+            setError(`Erreur lors de l'échange du code : ${errorData}`);
+            toast({
+              title: "Échec de l'authentification",
+              description: 'Erreur lors de l\'échange du code d\'autorisation',
+              variant: "destructive"
+            });
+            setTimeout(() => navigate('/onedrive-settings'), 3000);
+            return;
+          }
+
+          const data = await response.json();
+          console.log('OAuth tokens received successfully');
+
+          // Vérifier que les tokens ont bien été reçus
+          if (!data.access_token || !data.refresh_token) {
+            console.error('Tokens manquants dans la réponse:', data);
+            setError('Tokens OAuth manquants dans la réponse');
+            toast({
+              title: "Erreur",
+              description: 'Tokens OAuth manquants dans la réponse',
+              variant: "destructive"
+            });
+            setTimeout(() => navigate('/onedrive-settings'), 3000);
+            return;
+          }
+
+          // Mettre à jour la configuration avec les nouveaux tokens
+          saveOneDriveConfig({
+            ...config,
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            isEnabled: true
+          });
+
           toast({
-            title: "Échec de l'authentification",
-            description: 'Erreur lors de l\'échange du code d\'autorisation',
+            title: "Succès",
+            description: 'Connexion à Microsoft réussie',
+            variant: "default"
+          });
+          
+          navigate('/onedrive-settings');
+        } catch (fetchError) {
+          console.error('Erreur réseau lors de l\'échange du code:', fetchError);
+          setError(`Erreur réseau: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+          toast({
+            title: "Erreur réseau", 
+            description: 'Une erreur de connexion est survenue lors de l\'authentification',
             variant: "destructive"
           });
           setTimeout(() => navigate('/onedrive-settings'), 3000);
-          return;
         }
-
-        const data = await response.json();
-        console.log('OAuth tokens received successfully');
-
-        // Mettre à jour la configuration avec les nouveaux tokens
-        saveOneDriveConfig({
-          ...config,
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token,
-          isEnabled: true
-        });
-
-        toast({
-          title: "Succès",
-          description: 'Connexion à Microsoft réussie',
-          variant: "default"
-        });
-        
-        navigate('/onedrive-settings');
       } catch (err) {
         console.error('Error processing OAuth callback:', err);
         setError('Une erreur est survenue lors du traitement de l\'authentification');

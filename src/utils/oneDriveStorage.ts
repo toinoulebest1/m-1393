@@ -32,12 +32,20 @@ export const refreshOneDriveToken = async (): Promise<string | null> => {
   
   if (!config.refreshToken) {
     console.error("OneDrive refresh token not configured");
+    toast.error("Token de rafraîchissement OneDrive non configuré");
     return null;
   }
   
   try {
-    const clientId = config.clientId; // Utiliser le Client ID depuis la configuration
+    console.log("Tentative de rafraîchissement du token OneDrive...");
+    const clientId = config.clientId;
     const redirectUri = window.location.origin + '/onedrive-callback';
+    
+    if (!clientId) {
+      console.error("Client ID missing for token refresh");
+      toast.error("Client ID manquant pour le rafraîchissement du token");
+      return null;
+    }
     
     const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
       method: 'POST',
@@ -48,17 +56,34 @@ export const refreshOneDriveToken = async (): Promise<string | null> => {
         client_id: clientId,
         grant_type: 'refresh_token',
         refresh_token: config.refreshToken,
-        redirect_uri: redirectUri
+        redirect_uri: redirectUri,
+        scope: 'files.readwrite offline_access'
       })
     });
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Failed to refresh OneDrive token:', errorText);
+      
+      // Si le refresh token est invalide, nous devons nous réauthentifier
+      if (response.status === 400 && errorText.includes('invalid_grant')) {
+        toast.error("Session OneDrive expirée, réauthentification nécessaire");
+        // Effacer les tokens mais garder le client ID
+        saveOneDriveConfig({
+          ...config,
+          accessToken: '',
+          refreshToken: '',
+          isEnabled: false
+        });
+      } else {
+        toast.error("Échec du rafraîchissement du token OneDrive");
+      }
+      
       return null;
     }
     
     const data = await response.json();
+    console.log("Token OneDrive rafraîchi avec succès");
     
     // Mise à jour du token dans la configuration
     saveOneDriveConfig({
@@ -70,6 +95,7 @@ export const refreshOneDriveToken = async (): Promise<string | null> => {
     return data.access_token;
   } catch (error) {
     console.error('Error refreshing OneDrive token:', error);
+    toast.error("Erreur lors du rafraîchissement du token OneDrive");
     return null;
   }
 };
