@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, SlidersHorizontal, Music } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Music, User } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -19,12 +20,22 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 
 const GENRES = [
   "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
   "Classique", "R&B", "Folk", "Blues", "Country",
   "Reggae", "Metal", "Soul", "Funk", "Dance"
 ];
+
+interface ArtistResult {
+  id: string;
+  name: string;
+  picture_medium: string;
+  nb_fan: number;
+}
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -36,17 +47,20 @@ const Search = () => {
   });
   
   const [results, setResults] = useState<any[]>([]);
+  const [artistResults, setArtistResults] = useState<ArtistResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre">(() => {
-    return (localStorage.getItem('lastSearchFilter') as "all" | "title" | "artist" | "genre") || "all";
+  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre" | "deezer">(() => {
+    return (localStorage.getItem('lastSearchFilter') as "all" | "title" | "artist" | "genre" | "deezer") || "all";
   });
   const [selectedGenre, setSelectedGenre] = useState(() => {
     return localStorage.getItem('lastSelectedGenre') || "";
   });
   const [songToReport, setSongToReport] = useState<any>(null);
   const [songToShowLyrics, setSongToShowLyrics] = useState<any>(null);
+  const [songForDeezerSearch, setSongForDeezerSearch] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -72,49 +86,83 @@ const Search = () => {
     
     if (!isWildcardSearch && query.length < 2 && searchFilter !== "genre") {
       setResults([]);
+      setArtistResults([]);
       return;
     }
 
     setIsLoading(true);
+    
     try {
-      let queryBuilder = supabase
-        .from('songs')
-        .select('*');
+      // Recherche normale dans la base de données Supabase
+      if (searchFilter !== "deezer") {
+        let queryBuilder = supabase
+          .from('songs')
+          .select('*');
 
-      if (!isWildcardSearch) {
-        if (searchFilter === "title") {
-          queryBuilder = queryBuilder.ilike('title', `%${query}%`);
-        } else if (searchFilter === "artist") {
-          queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
-        } else if (searchFilter === "genre") {
-          if (selectedGenre) {
-            queryBuilder = queryBuilder.eq('genre', selectedGenre);
+        if (!isWildcardSearch) {
+          if (searchFilter === "title") {
+            queryBuilder = queryBuilder.ilike('title', `%${query}%`);
+          } else if (searchFilter === "artist") {
+            queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
+          } else if (searchFilter === "genre") {
+            if (selectedGenre) {
+              queryBuilder = queryBuilder.eq('genre', selectedGenre);
+            }
+          } else {
+            queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
           }
-        } else {
-          queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
         }
-      }
+        
+        const { data, error } = await queryBuilder;
+
+        if (error) {
+          throw error;
+        }
+
+        const formattedResults = data.map(song => ({
+          id: song.id,
+          title: song.title,
+          artist: song.artist || '',
+          duration: song.duration || '0:00',
+          url: song.file_path,
+          imageUrl: song.image_url,
+          bitrate: '320 kbps',
+          deezerArtistId: song.deezer_artist_id
+        }));
+
+        setResults(formattedResults);
+        
+        if (isWildcardSearch) {
+          toast.success(`Tous les morceaux listés (${formattedResults.length})`);
+        }
+      } 
       
-      const { data, error } = await queryBuilder;
-
-      if (error) {
-        throw error;
-      }
-
-      const formattedResults = data.map(song => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist || '',
-        duration: song.duration || '0:00',
-        url: song.file_path,
-        imageUrl: song.image_url,
-        bitrate: '320 kbps'
-      }));
-
-      setResults(formattedResults);
-      
-      if (isWildcardSearch) {
-        toast.success(`Tous les morceaux listés (${formattedResults.length})`);
+      // Recherche d'artistes via Deezer
+      if (searchFilter === "deezer" || searchFilter === "artist") {
+        // Recherche Deezer seulement si le filtre est "deezer" ou "artist"
+        try {
+          const { data: deezerData, error: deezerError } = await supabase.functions.invoke("deezer-search", {
+            body: { query, type: 'artist' }
+          });
+          
+          if (deezerError) {
+            console.error("Erreur lors de la recherche Deezer:", deezerError);
+          } else if (deezerData && deezerData.data) {
+            const artists = deezerData.data.map((artist: any) => ({
+              id: artist.id,
+              name: artist.name,
+              picture_medium: artist.picture_medium,
+              nb_fan: artist.nb_fan
+            }));
+            setArtistResults(artists);
+          }
+        } catch (deezerErr) {
+          console.error("Erreur lors de la recherche Deezer:", deezerErr);
+          // Ne pas faire échouer toute la recherche si Deezer échoue
+        }
+      } else {
+        // Réinitialiser les résultats d'artistes si on ne recherche pas d'artistes
+        setArtistResults([]);
       }
     } catch (error) {
       console.error('Erreur de recherche:', error);
@@ -151,6 +199,20 @@ const Search = () => {
     handleSearch(text);
   };
 
+  const handleDeezerUpdateSuccess = () => {
+    // Rafraîchir la recherche après mise à jour via Deezer
+    handleSearch(searchQuery);
+  };
+
+  const formatFanCount = (count: number) => {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M fans`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K fans`;
+    }
+    return `${count} fans`;
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto w-full">
@@ -174,6 +236,17 @@ const Search = () => {
               100% { background-position: 0% 50%; }
             }
 
+            @keyframes fadeIn {
+              0% {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
             .animate-gradient {
               background-size: 200% 200%;
               animation: gradient 3s linear infinite;
@@ -195,7 +268,11 @@ const Search = () => {
                 )} />
                 <Input
                   type="text"
-                  placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste (ou * pour tout afficher)"}
+                  placeholder={
+                    searchFilter === "genre" ? "Sélectionnez un genre..." : 
+                    searchFilter === "deezer" ? "Rechercher un artiste sur Deezer..." :
+                    "Rechercher une chanson ou un artiste (ou * pour tout afficher)"
+                  }
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   className={cn(
@@ -240,7 +317,8 @@ const Search = () => {
                   <span className="text-sm">
                     {searchFilter === "all" ? "Tout" : 
                      searchFilter === "title" ? "Titre" : 
-                     searchFilter === "artist" ? "Artiste" : "Genre"}
+                     searchFilter === "artist" ? "Artiste" : 
+                     searchFilter === "deezer" ? "Artiste Deezer" : "Genre"}
                   </span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -261,6 +339,14 @@ const Search = () => {
                     setSelectedGenre("");
                   }}>
                     Artiste
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => {
+                    setSearchFilter("deezer");
+                    setSelectedGenre("");
+                  }}>
+                    <User className="h-4 w-4 mr-2" />
+                    Artiste Deezer
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
@@ -296,41 +382,103 @@ const Search = () => {
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
               </div>
-            ) : results.length > 0 ? (
-              <div className="space-y-2">
-                {results.map((song, index) => {
-                  const isFavorite = favorites.some(s => s.id === song.id);
-                  const isCurrentSong = currentSong?.id === song.id;
-                  
-                  return (
-                    <div
-                      key={song.id}
-                      style={{ 
-                        animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                        opacity: 0,
-                      }}
-                      onClick={() => handlePlay(song)}
-                    >
-                      <SongCard
-                        song={song}
-                        isCurrentSong={isCurrentSong}
-                        isFavorite={isFavorite}
-                        dominantColor={dominantColor}
-                        onLyricsClick={() => setSongToShowLyrics(song)}
-                        onReportClick={() => setSongToReport(song)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : searchQuery ? (
-              <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                Aucun résultat trouvé pour "{searchQuery}"
-              </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
-              </div>
+              <>
+                {/* Résultats d'artistes Deezer */}
+                {artistResults.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center">
+                      <User className="mr-2 h-5 w-5 text-spotify-accent" /> 
+                      Artistes
+                    </h2>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {artistResults.map((artist, index) => (
+                        <Card 
+                          key={artist.id}
+                          className="overflow-hidden bg-white/5 hover:bg-white/10 transition-all duration-300 hover:shadow-lg border-0"
+                          style={{ 
+                            animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                            opacity: 0
+                          }}
+                          onClick={() => navigate(`/artist/${artist.id}`)}
+                        >
+                          <div className="p-4 cursor-pointer flex flex-col items-center text-center">
+                            <div className="relative w-24 h-24 mb-3 group">
+                              <img 
+                                src={artist.picture_medium} 
+                                alt={artist.name}
+                                className="w-24 h-24 rounded-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                              />
+                              <div className="absolute inset-0 bg-spotify-accent/0 group-hover:bg-spotify-accent/10 rounded-full transition-all duration-300 flex items-center justify-center">
+                                <User className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                              </div>
+                            </div>
+                            <h3 className="font-medium text-sm mb-1 line-clamp-1">{artist.name}</h3>
+                            <p className="text-xs text-spotify-neutral">{formatFanCount(artist.nb_fan)}</p>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              
+                {/* Résultats de musiques */}
+                {results.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center">
+                      <Music className="mr-2 h-5 w-5 text-spotify-accent" /> 
+                      Musiques
+                    </h2>
+                    <div className="space-y-2">
+                      {results.map((song, index) => {
+                        const isFavorite = favorites.some(s => s.id === song.id);
+                        const isCurrentSong = currentSong?.id === song.id;
+                        
+                        return (
+                          <div
+                            key={song.id}
+                            style={{ 
+                              animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                              opacity: 0,
+                            }}
+                          >
+                            <SongCard
+                              song={song}
+                              isCurrentSong={isCurrentSong}
+                              isFavorite={isFavorite}
+                              dominantColor={dominantColor}
+                              onLyricsClick={() => setSongToShowLyrics(song)}
+                              onReportClick={() => setSongToReport(song)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {artistResults.length === 0 && results.length === 0 && searchQuery ? (
+                  <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                    Aucun résultat trouvé pour "{searchQuery}"
+                    <div className="mt-4">
+                      <Button 
+                        variant="outline"
+                        onClick={() => setSongForDeezerSearch({
+                          title: searchQuery,
+                          artist: "Inconnu"
+                        })}
+                        className="mx-auto"
+                      >
+                        Rechercher "{searchQuery}" sur Deezer
+                      </Button>
+                    </div>
+                  </div>
+                ) : (!searchQuery && (
+                  <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                    Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -349,6 +497,12 @@ const Search = () => {
           artist={songToShowLyrics.artist}
         />
       )}
+      <DeezerSearchDialog
+        open={!!songForDeezerSearch}
+        onClose={() => setSongForDeezerSearch(null)}
+        song={songForDeezerSearch}
+        onUpdateSuccess={handleDeezerUpdateSuccess}
+      />
     </div>
   );
 };

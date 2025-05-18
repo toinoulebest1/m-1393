@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ import PlaylistDetail from "./pages/PlaylistDetail";
 import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import OneDriveCallback from "./pages/OneDriveCallback";
+import ArtistProfile from "./pages/ArtistProfile";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -225,6 +227,20 @@ function App() {
                     <Navigate to="/auth" />
                   )
                 } 
+              />
+
+              {/* New Artist Profile route */}
+              <Route 
+                path="/artist/:artistId" 
+                element={
+                  session ? (
+                    <Layout>
+                      <ArtistProfile />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                }
               />
             </Routes>
           </CastProvider>

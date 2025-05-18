@@ -1,9 +1,10 @@
 
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Clock, Signal, Heart, Flag, FileText, Trash2 } from "lucide-react";
+import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
+import { Link } from "react-router-dom";
 
 interface SongCardProps {
   song: any;
@@ -12,6 +13,7 @@ interface SongCardProps {
   dominantColor: [number, number, number] | null;
   onLyricsClick?: (song: any) => void;
   onReportClick?: (song: any) => void;
+  hideArtistLink?: boolean;
 }
 
 export function SongCard({
@@ -20,10 +22,12 @@ export function SongCard({
   isFavorite,
   dominantColor,
   onLyricsClick,
-  onReportClick
+  onReportClick,
+  hideArtistLink = false
 }: SongCardProps) {
   const { toggleFavorite, play, pause, isPlaying, removeSong } = usePlayer();
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [artistId, setArtistId] = useState<string | null>(null);
   
   // Vérifier la disponibilité du fichier audio au chargement du composant
   useEffect(() => {
@@ -42,7 +46,12 @@ export function SongCard({
     };
     
     checkAvailability();
-  }, [song.id]);
+    
+    // Si la chanson contient un deezerId pour l'artiste, on le récupère
+    if (song.deezerArtistId) {
+      setArtistId(song.deezerArtistId);
+    }
+  }, [song.id, song.deezerArtistId]);
   
   const glowStyle = isCurrentSong && dominantColor ? {
     "--glow-shadow": `
@@ -124,12 +133,38 @@ export function SongCard({
             )}>
               {song.title}
             </h3>
-            <p className={cn(
-              "text-sm transition-all duration-300",
-              isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
-            )}>
-              {song.artist}
-            </p>
+            <div className="flex items-center">
+              {!hideArtistLink && song.artist && (
+                <Link 
+                  to={artistId ? `/artist/${artistId}` : "#"} 
+                  className={cn(
+                    "text-sm transition-all duration-300 hover:text-spotify-accent",
+                    isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80",
+                    !artistId && "pointer-events-none"
+                  )}
+                  onClick={(e) => {
+                    if (!artistId) {
+                      e.preventDefault();
+                    } else {
+                      e.stopPropagation();  // Éviter de déclencher le onClick du parent
+                    }
+                  }}
+                >
+                  {song.artist}
+                </Link>
+              )}
+              {!hideArtistLink && song.artist && artistId && (
+                <User className="ml-1 w-3 h-3 text-spotify-accent/70" />
+              )}
+              {hideArtistLink && song.artist && (
+                <span className={cn(
+                  "text-sm transition-all duration-300",
+                  isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                )}>
+                  {song.artist}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

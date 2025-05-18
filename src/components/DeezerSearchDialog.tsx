@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LoaderIcon, Search, Music } from "lucide-react";
+import { LoaderIcon, Search, Music, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 
@@ -97,6 +97,11 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
       
       if (track.title) {
         updates.title = track.title;
+      }
+      
+      // Add Deezer artist ID to enable profile linking
+      if (track.artist?.id) {
+        updates.deezer_artist_id = String(track.artist.id);
       }
       
       if (Object.keys(updates).length > 0) {
@@ -196,9 +201,14 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
                     )}
                     <div className="flex-1 overflow-hidden">
                       <p className="font-medium truncate">{track.title}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {track.artist?.name || t("common.noArtist")}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground truncate">
+                          {track.artist?.name || t("common.noArtist")}
+                        </p>
+                        {track.artist?.id && (
+                          <User className="w-3 h-3 text-spotify-accent/70" />
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {track.album?.title && `${track.album.title} • `}
                         {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
