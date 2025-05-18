@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { searchArtist, getArtistById, ArtistProfileResponse } from "@/services/deezerApi";
@@ -179,9 +178,9 @@ const ArtistProfile = () => {
                   backgroundPosition: 'center',
                 }}
               >
-                {/* Gradient overlay */}
+                {/* Gradient overlay with shimmer effect */}
                 <div 
-                  className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"
+                  className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent animate-theme-transition"
                   style={{ opacity: gradientOpacity }}
                 />
                 
@@ -302,7 +301,8 @@ const ArtistProfile = () => {
                                     alt={track.title}
                                     className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
                                   />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-700 animate-gradient"></div>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <Button 
                                       size="icon" 
                                       variant="ghost"
@@ -377,7 +377,7 @@ const ArtistProfile = () => {
                     )}
                   </TabsContent>
                   
-                  {/* Albums section */}
+                  {/* Albums section with improved shimmer effect */}
                   <TabsContent value="albums" className="mt-0">
                     {profileData.albums.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
@@ -397,6 +397,8 @@ const ArtistProfile = () => {
                                   alt={album.title}
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
+                                {/* Shimmer effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-700 animate-gradient"></div>
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <a 
                                     href={album.link}

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DeezerArtist {
@@ -51,7 +52,7 @@ export interface DeezerTrack {
 export interface DeezerAlbum {
   id: number;
   title: string;
-  link: string;  // Correction: Ajout de la propriété link manquante
+  link: string;
   cover: string;
   cover_small: string;
   cover_medium: string;
