@@ -3,6 +3,7 @@ export interface OneDriveConfig {
   accessToken: string;
   refreshToken: string;
   isEnabled: boolean;
+  clientId: string; // Ajouté pour stocker le Client ID Microsoft
 }
 
 export interface OneDriveFileReference {

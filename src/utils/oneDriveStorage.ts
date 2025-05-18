@@ -1,4 +1,3 @@
-
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -7,14 +6,14 @@ import { toast } from '@/hooks/use-toast';
 export const getOneDriveConfig = (): OneDriveConfig => {
   const configStr = localStorage.getItem('onedrive_config');
   if (!configStr) {
-    return { accessToken: '', refreshToken: '', isEnabled: false };
+    return { accessToken: '', refreshToken: '', isEnabled: false, clientId: '' };
   }
   
   try {
     return JSON.parse(configStr) as OneDriveConfig;
   } catch (e) {
     console.error('Error parsing OneDrive config:', e);
-    return { accessToken: '', refreshToken: '', isEnabled: false };
+    return { accessToken: '', refreshToken: '', isEnabled: false, clientId: '' };
   }
 };
 
@@ -37,8 +36,7 @@ export const refreshOneDriveToken = async (): Promise<string | null> => {
   }
   
   try {
-    const clientId = 'YOUR_CLIENT_ID'; // Remplacer par votre Client ID
-    const clientSecret = 'YOUR_CLIENT_SECRET'; // Remplacer par votre Client Secret
+    const clientId = config.clientId; // Utiliser le Client ID depuis la configuration
     const redirectUri = window.location.origin + '/onedrive-callback';
     
     const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
@@ -48,7 +46,6 @@ export const refreshOneDriveToken = async (): Promise<string | null> => {
       },
       body: new URLSearchParams({
         client_id: clientId,
-        client_secret: clientSecret,
         grant_type: 'refresh_token',
         refresh_token: config.refreshToken,
         redirect_uri: redirectUri

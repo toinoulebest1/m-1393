@@ -22,6 +22,7 @@ import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
 import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
+import OneDriveCallback from "./pages/OneDriveCallback";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -223,6 +224,18 @@ function App() {
                     <Layout hideNavbar>
                       <SyncedLyricsView />
                     </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
+              {/* OneDrive callback route */}
+              <Route 
+                path="/onedrive-callback" 
+                element={
+                  session ? (
+                    <OneDriveCallback />
                   ) : (
                     <Navigate to="/auth" />
                   )

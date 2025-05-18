@@ -21,14 +21,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 
 // Bouton d'authentification Microsoft
-export const MicrosoftOAuthButton = ({ onTokenReceived }) => {
+export const MicrosoftOAuthButton = ({ clientId, onTokenReceived }) => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const handleAuth = () => {
+    if (!clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID' || clientId.trim() === '') {
+      toast({
+        title: "Erreur",
+        description: "Veuillez saisir un Client ID Microsoft valide avant de vous authentifier",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsAuthenticating(true);
     
     // Microsoft OAuth settings
-    const clientId = 'YOUR_MICROSOFT_CLIENT_ID'; // À remplacer par votre Client ID
     const redirectUri = window.location.origin + '/onedrive-callback';
     const scopes = ['files.readwrite', 'offline_access'];
     
@@ -66,6 +74,9 @@ export const OneDriveSettings = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const navigate = useNavigate();
+  
+  // Ajouter un état pour le Client ID Microsoft
+  const [clientId, setClientId] = useState('');
   
   // États pour la migration des fichiers audio
   const [isMigrating, setIsMigrating] = useState(false);
@@ -117,6 +128,7 @@ export const OneDriveSettings = () => {
         setAccessToken(config.accessToken || '');
         setRefreshToken(config.refreshToken || '');
         setIsEnabled(config.isEnabled || false);
+        setClientId(config.clientId || ''); // Charger le Client ID depuis la configuration
       }
       
       setIsLoading(false);
@@ -131,7 +143,8 @@ export const OneDriveSettings = () => {
       saveOneDriveConfig({
         accessToken,
         refreshToken,
-        isEnabled
+        isEnabled,
+        clientId // Sauvegarder le Client ID dans la configuration
       });
       toast.success('Configuration OneDrive enregistrée');
       setTestResult(null); // Reset test result when saving new token
@@ -391,6 +404,20 @@ export const OneDriveSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Ajouter un champ pour le Client ID Microsoft */}
+        <div className="space-y-2">
+          <Label htmlFor="microsoft-client-id">Client ID Microsoft</Label>
+          <Input
+            id="microsoft-client-id"
+            placeholder="Entrez votre Client ID Microsoft"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Vous devez créer une application dans le portail Azure pour obtenir un Client ID.
+          </p>
+        </div>
+        
         <div className="space-y-2">
           <Label htmlFor="onedrive-token">Jeton d'accès OneDrive</Label>
           <Input
@@ -422,14 +449,14 @@ export const OneDriveSettings = () => {
           <Label htmlFor="enable-onedrive">Utiliser OneDrive pour le stockage de fichiers</Label>
         </div>
 
-        <MicrosoftOAuthButton onTokenReceived={handleTokenReceived} />
+        <MicrosoftOAuthButton clientId={clientId} onTokenReceived={handleTokenReceived} />
         
         <div className="flex items-center gap-2 mt-2">
           <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
             Info
           </Badge>
           <p className="text-xs text-muted-foreground">
-            Pour obtenir vos tokens, cliquez sur le bouton ci-dessus et suivez les étapes d'authentification Microsoft.
+            Pour obtenir un Client ID Microsoft, vous devez créer une application dans le portail Azure et configurer les redirections.
           </p>
         </div>
 
