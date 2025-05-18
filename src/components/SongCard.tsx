@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
@@ -30,7 +29,7 @@ export function SongCard({
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [artistId, setArtistId] = useState<string | null>(null);
   
-  // Vérifier la disponibilité du fichier audio au chargement du composant
+  // Check audio file availability when component loads
   useEffect(() => {
     const checkAvailability = async () => {
       if (isOneDriveEnabled()) {
@@ -42,15 +41,16 @@ export function SongCard({
           setIsAvailable(null);
         }
       } else {
-        setIsAvailable(true); // Supposer que le fichier est disponible si OneDrive n'est pas activé
+        setIsAvailable(true); // Assume file is available if OneDrive isn't enabled
       }
     };
     
     checkAvailability();
     
-    // Si la chanson contient un deezerId pour l'artiste, on le récupère
+    // Get artist ID from song if available
     if (song.deezerArtistId) {
       setArtistId(song.deezerArtistId);
+      console.log("Setting artistId in SongCard:", song.deezerArtistId);
     }
   }, [song.id, song.deezerArtistId]);
   
@@ -64,7 +64,7 @@ export function SongCard({
 
   const handlePlay = () => {
     if (isAvailable === false) {
-      return; // Ne rien faire si le fichier n'est pas disponible
+      return; // Do nothing if file is unavailable
     }
     
     if (isCurrentSong) {
@@ -226,7 +226,7 @@ export function SongCard({
               </button>
             )}
 
-            {/* Artist profile icon - now positioned between favorites and lyrics icons */}
+            {/* Artist profile icon - positioned between favorites and lyrics icons */}
             {!hideArtistLink && artistId && (
               <Link
                 to={`/artist/${artistId}`}
@@ -261,8 +261,6 @@ export function SongCard({
                 <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
               </button>
             )}
-            
-            {/* Remove the duplicate artist profile icon that was at the end */}
           </div>
         </div>
       </div>
