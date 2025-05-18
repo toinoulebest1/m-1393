@@ -4,6 +4,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface SongCardProps {
   song: any;
@@ -141,9 +142,20 @@ export function SongCard({
                 )}
                 onClick={goToArtistProfile}
               >
-                <User size={14} className="mr-1 text-spotify-accent" />
+                <Avatar 
+                  className="h-5 w-5 mr-1.5 hover:scale-110 transition-transform duration-300 bg-spotify-accent/40"
+                  onClick={goToArtistProfile}
+                >
+                  <AvatarImage src={`https://e-cdns-images.dzcdn.net/images/artist/${song.deezerArtistId}/500x500-000000-80-0-0.jpg`} />
+                  <AvatarFallback>
+                    <User className="h-3 w-3" />
+                  </AvatarFallback>
+                </Avatar>
                 <span>{song.artist}</span>
-                <span className="ml-1 text-[10px] bg-spotify-accent/25 px-2 py-0.5 rounded-full">Profil</span>
+                <span className="ml-1.5 text-[10px] bg-spotify-accent/25 px-2 py-0.5 rounded-full flex items-center">
+                  <User className="h-3 w-3 mr-0.5" />
+                  Profil
+                </span>
               </div>
             ) : (
               <p className={cn(
