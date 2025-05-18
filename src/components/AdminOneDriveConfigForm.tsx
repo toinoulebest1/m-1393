@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2, Save, CheckCircle, KeyRound, Clock, InfoIcon, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import MicrosoftOAuthButton from './MicrosoftOAuthButton';
 
 const AdminOneDriveConfigForm: React.FC = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -78,6 +78,17 @@ const AdminOneDriveConfigForm: React.FC = () => {
     
     checkAdminStatus();
   }, []);
+  
+  // Ajouter gestionnaire pour les tokens reçus depuis l'authentification OAuth
+  const handleTokensReceived = ({ accessToken, refreshToken, expiresAt }: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+  }) => {
+    setAccessToken(accessToken);
+    setRefreshToken(refreshToken);
+    setExpiresAt(expiresAt);
+  };
   
   const handleSave = async () => {
     setIsSaving(true);
@@ -168,13 +179,48 @@ const AdminOneDriveConfigForm: React.FC = () => {
               <li>Dans "Inscriptions d'applications", créez une nouvelle application</li>
               <li>Ajoutez les autorisations Microsoft Graph: <strong>Files.ReadWrite.All</strong></li>
               <li>Créez un secret client dans <strong>Certificats et secrets</strong></li>
-              <li>Configurez les URI de redirection dans <strong>Authentification</strong></li>
+              <li>Configurez les URI de redirection dans <strong>Authentification</strong> à: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-xs">{window.location.origin + window.location.pathname}</code></li>
               <li>Notez l'ID de l'application et le secret pour les utiliser ci-dessous</li>
             </ol>
           </AlertDescription>
         </Alert>
 
         <div className="space-y-2">
+          <Label htmlFor="clientId">Application (client) ID</Label>
+          <Input 
+            id="clientId" 
+            value={clientId} 
+            onChange={(e) => setClientId(e.target.value)} 
+            placeholder="Client ID de l'application Microsoft"
+            className="font-mono text-xs"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="clientSecret">Client Secret</Label>
+          <Input 
+            id="clientSecret" 
+            value={clientSecret} 
+            onChange={(e) => setClientSecret(e.target.value)} 
+            placeholder="Client Secret de l'application Microsoft"
+            type="password"
+            className="font-mono text-xs"
+          />
+        </div>
+        
+        <div className="mt-4 pt-2 border-t flex flex-col gap-2">
+          <p className="text-sm font-medium">Authentification Microsoft</p>
+          <MicrosoftOAuthButton
+            clientId={clientId}
+            clientSecret={clientSecret}
+            onTokensReceived={handleTokensReceived}
+          />
+          <p className="text-xs text-muted-foreground">
+            Obtenir automatiquement un Access Token et un Refresh Token en vous connectant avec Microsoft
+          </p>
+        </div>
+
+        <div className="space-y-2 mt-4 border-t pt-4">
           <Label htmlFor="accessToken">Access Token</Label>
           <Input 
             id="accessToken" 
@@ -206,38 +252,10 @@ const AdminOneDriveConfigForm: React.FC = () => {
               className="font-mono text-xs border-2 border-blue-300 dark:border-blue-700 focus-visible:ring-blue-500"
               type="password"
             />
-            <div className="absolute right-2 top-2 animate-pulse">
-              <Badge className="bg-blue-500">
-                Entrez le token ici
-              </Badge>
-            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             Utilisé pour rafraîchir automatiquement le token d'accès. <strong>Important pour un fonctionnement continu.</strong>
           </p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="clientId">Application (client) ID</Label>
-          <Input 
-            id="clientId" 
-            value={clientId} 
-            onChange={(e) => setClientId(e.target.value)} 
-            placeholder="Client ID de l'application Microsoft"
-            className="font-mono text-xs"
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="clientSecret">Client Secret</Label>
-          <Input 
-            id="clientSecret" 
-            value={clientSecret} 
-            onChange={(e) => setClientSecret(e.target.value)} 
-            placeholder="Client Secret de l'application Microsoft"
-            type="password"
-            className="font-mono text-xs"
-          />
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">

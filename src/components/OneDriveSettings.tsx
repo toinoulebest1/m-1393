@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import MicrosoftOAuthButton from './MicrosoftOAuthButton';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -51,6 +52,18 @@ export const OneDriveSettings = () => {
 
     loadConfig();
   }, []);
+
+  // Ajouter une fonction pour gérer les tokens reçus du processus OAuth
+  const handleTokensReceived = ({ accessToken, refreshToken, expiresAt }: { 
+    accessToken: string, 
+    refreshToken: string, 
+    expiresAt: number 
+  }) => {
+    setAccessToken(accessToken);
+    setRefreshToken(refreshToken);
+    setExpiresAt(expiresAt);
+    setIsEnabled(true);
+  };
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
@@ -194,6 +207,7 @@ export const OneDriveSettings = () => {
               <li>Créez une application dans le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">Portail Azure</a></li>
               <li>Ajoutez les permissions Microsoft Graph: <strong>Files.ReadWrite.All</strong></li>
               <li>Créez un secret client dans <strong>Certificats & secrets</strong></li>
+              <li>Définissez l'URI de redirection à: <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-xs">{window.location.origin + window.location.pathname}</code></li>
               <li>Copiez l'ID de l'application et le Secret pour les utiliser ci-dessous</li>
             </ol>
           </AlertDescription>
@@ -226,7 +240,29 @@ export const OneDriveSettings = () => {
           </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="mt-2 pt-2 border-t flex flex-col gap-2">
+          <p className="text-sm font-medium">Connexion Microsoft</p>
+          <div className="flex gap-2">
+            <MicrosoftOAuthButton
+              clientId={clientId}
+              clientSecret={clientSecret}
+              onTokensReceived={handleTokensReceived}
+            />
+            <Button 
+              variant="outline"
+              onClick={handleRefreshToken}
+              disabled={isSaving || !clientId || !clientSecret || !refreshToken}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Rafraîchir Token
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Obtenez automatiquement un Access Token et un Refresh Token en vous connectant avec Microsoft
+          </p>
+        </div>
+
+        <div className="space-y-2 mt-4 border-t pt-4">
           <Label htmlFor="access-token">Token d'accès</Label>
           <Input
             id="access-token"
@@ -236,7 +272,7 @@ export const OneDriveSettings = () => {
             placeholder="Token d'accès Microsoft Graph"
           />
           <p className="text-xs text-muted-foreground">
-            Obtenez un token depuis <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" rel="noopener noreferrer" className="underline">Graph Explorer</a> si vous n'utilisez pas le refresh token.
+            {accessToken ? "Token obtenu via l'authentification Microsoft" : "Sera obtenu automatiquement via l'authentification Microsoft"}
           </p>
         </div>
 
@@ -250,7 +286,7 @@ export const OneDriveSettings = () => {
             placeholder="Refresh Token pour renouveler automatiquement"
           />
           <p className="text-xs text-muted-foreground">
-            Recommandé pour éviter l'expiration de l'accès
+            {refreshToken ? "Token de rafraîchissement obtenu via l'authentification" : "Sera obtenu automatiquement via l'authentification Microsoft"}
           </p>
         </div>
 
@@ -272,33 +308,22 @@ export const OneDriveSettings = () => {
           <ExternalLink className="ml-2 h-4 w-4" />
         </Button>
         
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={handleRefreshToken}
-            disabled={isSaving || !clientId || !clientSecret || !refreshToken}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Rafraîchir Token
-          </Button>
-          
-          <Button 
-            onClick={handleSaveConfig} 
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Enregistrer
-              </>
-            )}
-          </Button>
-        </div>
+        <Button 
+          onClick={handleSaveConfig} 
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enregistrement...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Enregistrer
+            </>
+          )}
+        </Button>
       </CardFooter>
     </Card>
   );
