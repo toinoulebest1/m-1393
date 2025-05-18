@@ -3,7 +3,8 @@ export interface OneDriveConfig {
   accessToken: string;
   refreshToken: string;
   isEnabled: boolean;
-  clientId: string; // Ajouté pour stocker le Client ID Microsoft
+  clientId: string;
+  isShared?: boolean; // Added to indicate if the config is shared with all users
 }
 
 export interface OneDriveFileReference {

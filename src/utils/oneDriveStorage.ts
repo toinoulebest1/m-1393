@@ -1,10 +1,48 @@
-
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { fetchSharedOneDriveConfig } from './sharedOneDriveConfig';
 
 // Add a simple local storage helper for OneDrive configuration
-export const getOneDriveConfig = (): OneDriveConfig => {
+export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
+  // Try to get user's personal configuration first
+  const configStr = localStorage.getItem('onedrive_config');
+  if (configStr) {
+    try {
+      const userConfig = JSON.parse(configStr) as OneDriveConfig;
+      if (userConfig.accessToken && userConfig.isEnabled) {
+        return userConfig;
+      }
+    } catch (e) {
+      console.error('Error parsing OneDrive config:', e);
+    }
+  }
+  
+  // If no personal config or it's not valid, try to get the shared config
+  try {
+    const sharedConfig = await fetchSharedOneDriveConfig();
+    if (sharedConfig && sharedConfig.accessToken) {
+      console.log('Using shared OneDrive configuration');
+      return {
+        ...sharedConfig,
+        isEnabled: true, // Enable it automatically for the user
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching shared OneDrive config:', error);
+  }
+  
+  // Return empty config if nothing else is available
+  return { 
+    accessToken: '', 
+    refreshToken: '', 
+    isEnabled: false, 
+    clientId: '' 
+  };
+};
+
+// Synchronous version for backward compatibility
+export const getOneDriveConfigSync = (): OneDriveConfig => {
   const configStr = localStorage.getItem('onedrive_config');
   if (!configStr) {
     return { accessToken: '', refreshToken: '', isEnabled: false, clientId: '' };
@@ -22,14 +60,20 @@ export const saveOneDriveConfig = (config: OneDriveConfig): void => {
   localStorage.setItem('onedrive_config', JSON.stringify(config));
 };
 
-export const isOneDriveEnabled = (): boolean => {
-  const config = getOneDriveConfig();
+export const isOneDriveEnabled = async (): Promise<boolean> => {
+  const config = await getOneDriveConfig();
+  return config.isEnabled && !!config.accessToken;
+};
+
+// Synchronous version for backward compatibility
+export const isOneDriveEnabledSync = (): boolean => {
+  const config = getOneDriveConfigSync();
   return config.isEnabled && !!config.accessToken;
 };
 
 // Function to check if a file exists on OneDrive
 export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -88,7 +132,7 @@ export const uploadFileToOneDrive = async (
   file: File,
   path: string
 ): Promise<string> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -234,7 +278,7 @@ export const uploadFileToOneDrive = async (
 // Updated function to get a download URL for a file on OneDrive
 // This version uses the Graph API to get a direct download URL instead of a shared link
 export const getOneDriveSharedLink = async (path: string): Promise<string> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -343,7 +387,7 @@ export const migrateFilesToOneDrive = async (
     onError?: (fileId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -456,7 +500,7 @@ export const migrateLyricsToOneDrive = async (
     onError?: (songId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -560,7 +604,7 @@ export const migrateLyricsToOneDrive = async (
 
 // Function to upload lyrics to OneDrive
 export const uploadLyricsToOneDrive = async (songId: string, lyricsContent: string): Promise<string> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");
@@ -591,7 +635,7 @@ export const uploadLyricsToOneDrive = async (songId: string, lyricsContent: stri
 
 // Function to get lyrics from OneDrive
 export const getLyricsFromOneDrive = async (songId: string): Promise<string | null> => {
-  const config = getOneDriveConfig();
+  const config = await getOneDriveConfig();
   
   if (!config.accessToken) {
     console.error("OneDrive access token not configured");

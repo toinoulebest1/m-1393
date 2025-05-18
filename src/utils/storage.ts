@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -7,7 +6,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
   // Check if we should use OneDrive instead of Supabase
-  const useOneDrive = isOneDriveEnabled();
+  const useOneDrive = await isOneDriveEnabled();
   console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
   
   let fileToUpload: File;
@@ -66,7 +65,7 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // Vérifie d'abord si le fichier est en cache pour une récupération rapide
+    // Check cache first for quick retrieval
     if (await isInCache(path)) {
       console.log(`Fichier audio trouvé dans le cache: ${path}`);
       const cachedUrl = await getFromCache(path);
@@ -75,14 +74,14 @@ export const getAudioFile = async (path: string) => {
       }
     }
 
-    // Si le fichier n'est pas en cache, procède normalement
-    const useOneDrive = isOneDriveEnabled();
+    // If not in cache, proceed normally
+    const useOneDrive = await isOneDriveEnabled();
     console.log("Using storage provider for retrieval:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
     if (useOneDrive) {
-      // Récupération de l'URL de téléchargement direct depuis OneDrive
+      // Get direct download URL from OneDrive
       audioUrl = await getOneDriveSharedLink(`audio/${path}`);
       console.log("OneDrive direct download URL retrieved:", audioUrl);
     } else {
@@ -112,7 +111,7 @@ export const getAudioFile = async (path: string) => {
       audioUrl = data.signedUrl;
     }
 
-    // Mise en cache pour les futures récupérations
+    // Try to cache for future retrievals
     try {
       console.log("Fetching audio for cache:", audioUrl);
       const response = await fetch(audioUrl);
@@ -124,7 +123,7 @@ export const getAudioFile = async (path: string) => {
       console.log(`Audio file cached successfully: ${path}, size: ${blob.size} bytes`);
     } catch (cacheError) {
       console.warn("Impossible de mettre en cache le fichier:", cacheError);
-      // Continue même en cas d'échec de mise en cache
+      // Continue even if caching fails
     }
 
     return audioUrl;

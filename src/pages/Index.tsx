@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { useState, useEffect } from "react";
@@ -9,8 +8,7 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { updateMediaSessionMetadata } from "@/utils/mediaSession";
 import { AudioCacheManager } from "@/components/AudioCacheManager";
-import { checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
-import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
+import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
 import { Music } from "lucide-react";
@@ -50,10 +48,10 @@ const Index = () => {
     }
   }, [isPlaying]);
 
-  // Vérifier si le fichier audio de la chanson actuelle est disponible
+  // Check if the current song's audio file is available
   useEffect(() => {
     const checkCurrentSongAvailability = async () => {
-      if (currentSong && isOneDriveEnabled() && !isCheckingAvailability) {
+      if (currentSong && await isOneDriveEnabled() && !isCheckingAvailability) {
         setIsCheckingAvailability(true);
         try {
           const exists = await checkFileExistsOnOneDrive(`audio/${currentSong.id}`);
