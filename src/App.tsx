@@ -20,6 +20,7 @@ import './App.css';
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
+import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 function App() {
@@ -160,6 +161,20 @@ function App() {
                 } 
               />
 
+              {/* New OneDrive settings route */}
+              <Route 
+                path="/onedrive-settings" 
+                element={
+                  session ? (
+                    <Layout>
+                      <OneDriveSettings />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
               {/* New playlist routes */}
               <Route 
                 path="/playlists" 
@@ -186,7 +201,7 @@ function App() {
                 } 
               />
               
-              {/* New dropbox settings route */}
+              {/* Dropbox settings route */}
               <Route 
                 path="/dropbox-settings" 
                 element={
@@ -200,7 +215,7 @@ function App() {
                 } 
               />
               
-              {/* New synced lyrics route */}
+              {/* Synced lyrics route */}
               <Route 
                 path="/synced-lyrics" 
                 element={
