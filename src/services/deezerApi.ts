@@ -52,7 +52,7 @@ export interface DeezerTrack {
 export interface DeezerAlbum {
   id: number;
   title: string;
-  link: string;
+  link: string;  // Added the missing link property
   cover: string;
   cover_small: string;
   cover_medium: string;

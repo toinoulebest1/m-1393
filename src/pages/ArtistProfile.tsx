@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { searchArtist, getArtistById, ArtistProfileResponse } from "@/services/deezerApi";
@@ -398,7 +397,7 @@ const ArtistProfile = () => {
                               </div>
                             </div>
                             <CardContent className="p-3 flex flex-col flex-1">
-                              <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{album.title}</h3>
+                              <h3 className="font-medium truncate w-full">{album.title}</h3>
                               <div className="mt-auto pt-2">
                                 <p className="text-xs text-white/60 flex items-center gap-1.5 mt-1">
                                   <Calendar className="h-3 w-3" />
