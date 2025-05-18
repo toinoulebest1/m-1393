@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
@@ -151,8 +150,8 @@ export function SongCard({
                     e.stopPropagation(); // Stop propagation before anything else
                     
                     if (artistId) {
-                      // Navigate programmatically to prevent parent click handling
-                      window.location.href = `/artist/${artistId}`;
+                      // Use absolute URL to navigate to the artist page
+                      window.location.href = `${window.location.origin}/artist/${artistId}`;
                     }
                   }}
                 >
@@ -260,4 +259,3 @@ export function SongCard({
     </div>
   );
 }
-
