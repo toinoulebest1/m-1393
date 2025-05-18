@@ -9,51 +9,24 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      app_settings: {
-        Row: {
-          created_at: string
-          id: string
-          key: string
-          updated_at: string
-          value: Json
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          key: string
-          updated_at?: string
-          value?: Json
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          key?: string
-          updated_at?: string
-          value?: Json
-        }
-        Relationships: []
-      }
       dropbox_files: {
         Row: {
           created_at: string
           dropbox_path: string
           id: string
           local_id: string
-          storage_provider: string | null
         }
         Insert: {
           created_at?: string
           dropbox_path: string
           id?: string
           local_id: string
-          storage_provider?: string | null
         }
         Update: {
           created_at?: string
           dropbox_path?: string
           id?: string
           local_id?: string
-          storage_provider?: string | null
         }
         Relationships: []
       }
@@ -82,35 +55,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "favorite_stats_song_id_fkey"
-            columns: ["song_id"]
-            isOneToOne: false
-            referencedRelation: "songs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      gofile_references: {
-        Row: {
-          created_at: string
-          gofile_url: string
-          id: string
-          song_id: string
-        }
-        Insert: {
-          created_at?: string
-          gofile_url: string
-          id?: string
-          song_id: string
-        }
-        Update: {
-          created_at?: string
-          gofile_url?: string
-          id?: string
-          song_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gofile_references_song_id_fkey"
             columns: ["song_id"]
             isOneToOne: false
             referencedRelation: "songs"
@@ -260,30 +204,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      oauth_states: {
-        Row: {
-          created_at: string
-          expires_at: string
-          id: string
-          provider: string
-          state: string
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string
-          id?: string
-          provider: string
-          state: string
-        }
-        Update: {
-          created_at?: string
-          expires_at?: string
-          id?: string
-          provider?: string
-          state?: string
-        }
-        Relationships: []
       }
       offline_songs: {
         Row: {
@@ -553,33 +473,6 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["user_role"] | null
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      user_settings: {
-        Row: {
-          created_at: string
-          id: string
-          key: string
-          settings: Json
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          key: string
-          settings?: Json
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          key?: string
-          settings?: Json
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }

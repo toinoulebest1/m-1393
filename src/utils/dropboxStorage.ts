@@ -1,440 +1,39 @@
-import { DropboxConfig, DropboxFileReference, DropboxTokenResponse } from '@/types/dropbox';
+
+import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { UserSettingInsert } from '@/types/userSettings';
 
-// Type pour Json compatible avec DropboxConfig
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-// Fonction modifiée pour récupérer la configuration depuis Supabase
-export const getDropboxConfig = async (): Promise<DropboxConfig> => {
-  // Vérifier si l'utilisateur est connecté
-  const { data: { session } } = await supabase.auth.getSession();
+// Add a simple local storage helper for Dropbox configuration
+export const getDropboxConfig = (): DropboxConfig => {
+  const configStr = localStorage.getItem('dropbox_config');
+  if (!configStr) {
+    return { accessToken: '', isEnabled: false };
+  }
   
   try {
-    // D'abord, essayer d'obtenir la configuration par défaut depuis app_settings
-    const { data: defaultConfig, error: defaultError } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'default_dropbox_config')
-      .maybeSingle();
-    
-    // Si une configuration par défaut est disponible, nous l'utiliserons comme base
-    const baseConfig = defaultConfig?.value ? defaultConfig.value as any : null;
-    
-    if (baseConfig) {
-      console.log('Configuration Dropbox par défaut trouvée dans app_settings');
-    } else {
-      console.log('Pas de configuration Dropbox par défaut dans app_settings');
-    }
-    
-    // Si l'utilisateur n'est pas connecté, utiliser la configuration locale ou par défaut
-    if (!session?.user) {
-      console.log('Utilisateur non connecté, utilisation de la configuration locale ou par défaut');
-      const configStr = localStorage.getItem('dropbox_config');
-      
-      if (configStr) {
-        try {
-          const localConfig = JSON.parse(configStr) as DropboxConfig;
-          // S'assurer que Dropbox est activé
-          localConfig.isEnabled = true;
-          return localConfig;
-        } catch (e) {
-          console.error('Error parsing Dropbox config:', e);
-        }
-      }
-      
-      // Si pas de config locale, mais une config par défaut existe, l'utiliser
-      if (baseConfig) {
-        const defaultDropboxConfig: DropboxConfig = {
-          accessToken: baseConfig.accessToken || '',
-          refreshToken: baseConfig.refreshToken,
-          clientId: baseConfig.clientId,
-          clientSecret: baseConfig.clientSecret,
-          expiresAt: baseConfig.expiresAt,
-          isEnabled: true // Forcer l'activation
-        };
-        
-        // Sauvegarder en local pour les utilisations futures
-        localStorage.setItem('dropbox_config', JSON.stringify(defaultDropboxConfig));
-        return defaultDropboxConfig;
-      }
-      
-      return { accessToken: '', isEnabled: true }; // Par défaut activé mais vide
-    }
-    
-    // Récupérer la configuration de l'utilisateur depuis Supabase
-    const { data: userData, error: userError } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .eq('key', 'dropbox_config')
-      .maybeSingle();
-    
-    if (userError) {
-      console.error('Erreur lors de la récupération de la configuration Dropbox:', userError);
-      
-      // Si erreur, utiliser la config locale ou la config par défaut
-      const configStr = localStorage.getItem('dropbox_config');
-      if (configStr) {
-        try {
-          const localConfig = JSON.parse(configStr) as DropboxConfig;
-          localConfig.isEnabled = true; // Forcer l'activation
-          return localConfig;
-        } catch (e) {
-          console.error('Error parsing Dropbox config from localStorage:', e);
-        }
-      }
-      
-      // Si pas de config locale mais config par défaut disponible
-      if (baseConfig) {
-        const defaultDropboxConfig: DropboxConfig = {
-          accessToken: baseConfig.accessToken || '',
-          refreshToken: baseConfig.refreshToken,
-          clientId: baseConfig.clientId,
-          clientSecret: baseConfig.clientSecret,
-          expiresAt: baseConfig.expiresAt,
-          isEnabled: true // Forcer l'activation
-        };
-        
-        // Sauvegarder pour cet utilisateur
-        await saveDropboxConfig(defaultDropboxConfig);
-        return defaultDropboxConfig;
-      }
-    }
-    
-    // Si pas de configuration utilisateur mais config par défaut disponible
-    if (!userData && baseConfig) {
-      console.log('Pas de configuration utilisateur, application de la configuration par défaut');
-      const defaultDropboxConfig: DropboxConfig = {
-        accessToken: baseConfig.accessToken || '',
-        refreshToken: baseConfig.refreshToken,
-        clientId: baseConfig.clientId,
-        clientSecret: baseConfig.clientSecret,
-        expiresAt: baseConfig.expiresAt,
-        isEnabled: true // Forcer l'activation
-      };
-      
-      // Sauvegarder pour cet utilisateur
-      await saveDropboxConfig(defaultDropboxConfig);
-      return defaultDropboxConfig;
-    }
-    
-    // Si configuration utilisateur disponible, l'utiliser
-    if (userData) {
-      // Conversion sûre de settings en DropboxConfig
-      const settings = userData.settings as Record<string, any>;
-      const config: DropboxConfig = {
-        accessToken: settings.accessToken || '',
-        refreshToken: settings.refreshToken,
-        clientId: settings.clientId,
-        clientSecret: settings.clientSecret,
-        expiresAt: settings.expiresAt,
-        isEnabled: true // Forcer l'activation ici aussi
-      };
-      
-      // Si pas de token utilisateur mais config par défaut disponible avec token
-      if (!config.accessToken && baseConfig && baseConfig.accessToken) {
-        console.log('Pas de token utilisateur, utilisation du token par défaut');
-        config.accessToken = baseConfig.accessToken;
-        config.refreshToken = baseConfig.refreshToken;
-        config.clientId = baseConfig.clientId;
-        config.clientSecret = baseConfig.clientSecret;
-        config.expiresAt = baseConfig.expiresAt;
-        
-        // Mettre à jour la configuration de l'utilisateur
-        await saveDropboxConfig(config);
-      }
-      
-      console.log('Dropbox config from database:', config.isEnabled ? 'enabled' : 'disabled');
-      return config;
-    }
-    
-    // Si aucune configuration n'est disponible, créer une configuration vide mais activée
-    console.log('Aucune configuration Dropbox trouvée, création d\'une configuration vide');
-    const emptyConfig: DropboxConfig = {
-      accessToken: baseConfig?.accessToken || '',
-      refreshToken: baseConfig?.refreshToken,
-      clientId: baseConfig?.clientId,
-      clientSecret: baseConfig?.clientSecret,
-      expiresAt: baseConfig?.expiresAt,
-      isEnabled: true // Toujours activé
-    };
-    
-    // Sauvegarder pour cet utilisateur
-    if (session?.user) {
-      await saveDropboxConfig(emptyConfig);
-    } else {
-      localStorage.setItem('dropbox_config', JSON.stringify(emptyConfig));
-    }
-    
-    return emptyConfig;
+    return JSON.parse(configStr) as DropboxConfig;
   } catch (e) {
-    console.error('Error fetching Dropbox config:', e);
-    
-    // En cas d'erreur complète, essayer la config locale
-    const configStr = localStorage.getItem('dropbox_config');
-    if (configStr) {
-      try {
-        const localConfig = JSON.parse(configStr) as DropboxConfig;
-        localConfig.isEnabled = true; // Forcer l'activation
-        return localConfig;
-      } catch (parseError) {
-        console.error('Error parsing Dropbox config from localStorage:', parseError);
-      }
-    }
-    
-    return { accessToken: '', isEnabled: true };
+    console.error('Error parsing Dropbox config:', e);
+    return { accessToken: '', isEnabled: false };
   }
 };
 
-export const saveDropboxConfig = async (config: DropboxConfig): Promise<void> => {
-  // Vérifier si l'utilisateur est connecté
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.user) {
-    console.log('Utilisateur non connecté, sauvegarde locale seulement');
-    // Fallback vers localStorage si l'utilisateur n'est pas connecté
-    localStorage.setItem('dropbox_config', JSON.stringify(config));
-    return;
-  }
-  
-  try {
-    // D'abord vérifier si l'entrée existe déjà
-    const { data, error: fetchError } = await supabase
-      .from('user_settings')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('key', 'dropbox_config')
-      .maybeSingle();
-    
-    if (fetchError) {
-      console.error('Erreur lors de la vérification de la configuration existante:', fetchError);
-      // Fallback vers localStorage en cas d'erreur
-      localStorage.setItem('dropbox_config', JSON.stringify(config));
-      return;
-    }
-    
-    // Préparer l'objet settings pour stockage dans la base
-    const settingsObject = {
-      accessToken: config.accessToken,
-      refreshToken: config.refreshToken,
-      clientId: config.clientId,
-      clientSecret: config.clientSecret,
-      expiresAt: config.expiresAt,
-      isEnabled: config.isEnabled
-    };
-    
-    if (data) {
-      // Mise à jour de la configuration existante
-      const { error: updateError } = await supabase
-        .from('user_settings')
-        .update({ settings: settingsObject })
-        .eq('id', data.id);
-      
-      if (updateError) {
-        console.error('Erreur lors de la mise à jour de la configuration Dropbox:', updateError);
-        // Fallback vers localStorage en cas d'erreur
-        localStorage.setItem('dropbox_config', JSON.stringify(config));
-      } else {
-        console.log('Configuration Dropbox mise à jour dans Supabase');
-      }
-    } else {
-      // Création d'une nouvelle entrée de configuration
-      const newSettings: UserSettingInsert = {
-        user_id: session.user.id,
-        key: 'dropbox_config',
-        settings: settingsObject
-      };
-      
-      const { error: insertError } = await supabase
-        .from('user_settings')
-        .insert(newSettings);
-      
-      if (insertError) {
-        console.error('Erreur lors de la création de la configuration Dropbox:', insertError);
-        // Fallback vers localStorage en cas d'erreur
-        localStorage.setItem('dropbox_config', JSON.stringify(config));
-      } else {
-        console.log('Configuration Dropbox créée dans Supabase');
-      }
-    }
-  } catch (e) {
-    console.error('Error saving Dropbox config to Supabase:', e);
-    // Fallback vers localStorage en cas d'erreur
-    localStorage.setItem('dropbox_config', JSON.stringify(config));
-  }
+export const saveDropboxConfig = (config: DropboxConfig): void => {
+  localStorage.setItem('dropbox_config', JSON.stringify(config));
 };
 
-// Fonction simplifiée pour isDropboxEnabled - toujours retourne true
-export const isDropboxEnabled = async (): Promise<boolean> => {
-  console.log('isDropboxEnabled - Vérification du statut Dropbox');
-  
-  try {
-    // Récupérer la configuration
-    const config = await getDropboxConfig();
-    
-    // Journaliser l'état
-    console.log('isDropboxEnabled - Statut:', config.accessToken ? 'Token OK' : 'Pas de token', 'Dropbox activé:', true);
-    
-    // On retourne toujours true pour forcer l'utilisation de Dropbox
-    return true;
-  } catch (error) {
-    console.error('isDropboxEnabled - Erreur vérification statut Dropbox:', error);
-    
-    // Même en cas d'erreur, on active Dropbox
-    return true;
-  }
+export const isDropboxEnabled = (): boolean => {
+  const config = getDropboxConfig();
+  return config.isEnabled && !!config.accessToken;
 };
 
-// Nouvelle fonction pour vérifier si le token d'accès est expiré
-export const isAccessTokenExpired = async (): Promise<boolean> => {
-  const config = await getDropboxConfig();
-  if (!config.expiresAt) return true;
-  
-  // Ajouter une marge de 5 minutes avant l'expiration réelle
-  const safetyMarginMs = 5 * 60 * 1000;
-  return Date.now() >= (config.expiresAt - safetyMarginMs);
-};
-
-// Fonction pour créer une configuration par défaut vide mais activée
-const createDefaultConfig = (): DropboxConfig => {
-  return {
-    accessToken: '',
-    isEnabled: true
-  };
-};
-
-// Nouvelle fonction pour rafraîchir le token d'accès si nécessaire
-export const refreshAccessTokenIfNeeded = async (): Promise<boolean> => {
-  const config = await getDropboxConfig();
-  
-  // Si pas de refresh token ou pas d'identifiants client, impossible de rafraîchir
-  if (!config.refreshToken || !config.clientId || !config.clientSecret) {
-    return false;
-  }
-  
-  // Si le token n'est pas expiré, pas besoin de rafraîchir
-  if (config.expiresAt && Date.now() < config.expiresAt) {
-    return true;
-  }
-  
-  try {
-    console.log('Rafraîchissement du token Dropbox...');
-    
-    const formData = new URLSearchParams();
-    formData.append('grant_type', 'refresh_token');
-    formData.append('refresh_token', config.refreshToken);
-    formData.append('client_id', config.clientId);
-    formData.append('client_secret', config.clientSecret);
-    
-    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: formData.toString()
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Échec du rafraîchissement du token:', response.status, errorText);
-      return false;
-    }
-    
-    const data = await response.json() as DropboxTokenResponse;
-    
-    // Mettre à jour le token et sa date d'expiration
-    const updatedConfig: DropboxConfig = {
-      ...config,
-      accessToken: data.access_token,
-      // Le nouveau token est valide pour data.expires_in secondes
-      expiresAt: Date.now() + ((data.expires_in || 14400) * 1000) // 4h par défaut
-    };
-    
-    await saveDropboxConfig(updatedConfig);
-    console.log('Token Dropbox rafraîchi avec succès');
-    return true;
-  } catch (error) {
-    console.error('Erreur lors du rafraîchissement du token Dropbox:', error);
-    return false;
-  }
-};
-
-// Fonction pour échanger un code d'autorisation contre des tokens
-export const exchangeCodeForTokens = async (
-  code: string,
-  clientId: string,
-  clientSecret: string,
-  redirectUri: string
-): Promise<DropboxTokenResponse | null> => {
-  try {
-    const formData = new URLSearchParams();
-    formData.append('code', code);
-    formData.append('grant_type', 'authorization_code');
-    formData.append('client_id', clientId);
-    formData.append('client_secret', clientSecret);
-    formData.append('redirect_uri', redirectUri);
-    
-    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: formData.toString()
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Échec de l\'échange de code:', response.status, errorText);
-      return null;
-    }
-    
-    return await response.json() as DropboxTokenResponse;
-  } catch (error) {
-    console.error('Erreur lors de l\'échange de code:', error);
-    return null;
-  }
-};
-
-// Fonction pour générer l'URL d'autorisation avec des paramètres améliorés
-export const getAuthorizationUrl = (clientId: string, redirectUri: string): string => {
-  console.log("Génération d'URL d'autorisation avec:", { clientId, redirectUri });
-  
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: 'code',
-    token_access_type: 'offline',
-    redirect_uri: redirectUri
-  });
-  
-  const url = `https://www.dropbox.com/oauth2/authorize?${params.toString()}`;
-  console.log("URL d'autorisation générée:", url);
-  return url;
-};
-
-// Version modifiée de la fonction existante pour vérifier/rafraîchir le token avant utilisation
+// Function to check if a file exists on Dropbox
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
     return false;
-  }
-  
-  // Rafraîchir le token si nécessaire
-  if (await isAccessTokenExpired()) {
-    const refreshed = await refreshAccessTokenIfNeeded();
-    if (!refreshed) {
-      console.error("Failed to refresh access token");
-      return false;
-    }
-    // Récupérer la config mise à jour
-    const updatedConfig = await getDropboxConfig();
-    if (!updatedConfig.accessToken) {
-      console.error("No access token available after refresh");
-      return false;
-    }
   }
   
   try {
@@ -458,14 +57,11 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
       console.error('Database error when fetching reference:', dbError);
     }
     
-    // Get the current config to use the most recent token
-    const currentConfig = await getDropboxConfig();
-    
     // Check if the file exists on Dropbox using the get_metadata API
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${currentConfig.accessToken}`,
+        'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -480,13 +76,12 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   }
 };
 
-// Mettre à jour toutes les autres fonctions pour vérifier/rafraîchir le token avant utilisation
-// Par exemple, pour uploadFileToDropbox:
+// Function to upload a file to Dropbox
 export const uploadFileToDropbox = async (
   file: File,
   path: string
 ): Promise<string> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
@@ -494,28 +89,15 @@ export const uploadFileToDropbox = async (
     throw new Error('Dropbox access token not configured');
   }
   
-  // Rafraîchir le token si nécessaire
-  if (await isAccessTokenExpired()) {
-    const refreshed = await refreshAccessTokenIfNeeded();
-    if (!refreshed) {
-      console.error("Failed to refresh access token");
-      toast.error("Impossible de rafraîchir le token Dropbox");
-      throw new Error('Failed to refresh access token');
-    }
-  }
-  
   console.log(`Uploading file to Dropbox: ${path}`, file);
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Get the current config to use the most recent token
-    const currentConfig = await getDropboxConfig();
-    
     // Using Dropbox API v2 with fetch
     const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${currentConfig.accessToken}`,
+        'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': JSON.stringify({
           path: `/${path}`,
@@ -580,16 +162,14 @@ export const uploadFileToDropbox = async (
   }
 };
 
-// De même, nous mettrions à jour getDropboxSharedLink et toutes les autres fonctions qui utilisent l'API Dropbox
-// en ajoutant la logique de rafraîchissement du token
-
-// Fonction pour récupérer un lien partagé pour un fichier sur Dropbox
+// Function to get a shared link for a file on Dropbox
 export const getDropboxSharedLink = async (path: string): Promise<string> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
-  if (!config.accessToken || !config.isEnabled) {
-    console.error("Dropbox access token not configured or Dropbox is not enabled");
-    throw new Error('Dropbox configuration non valide ou désactivée');
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
   }
   
   try {
@@ -694,7 +274,7 @@ export const migrateFilesToDropbox = async (
     onError?: (fileId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedFiles: Array<{ id: string; error: string }> }> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
@@ -832,7 +412,7 @@ export const migrateFilesToDropbox = async (
  * @returns Chemin Dropbox des paroles
  */
 export const uploadLyricsToDropbox = async (songId: string, lyricsContent: string): Promise<string> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
@@ -883,7 +463,7 @@ export const uploadLyricsToDropbox = async (songId: string, lyricsContent: strin
  * @returns Contenu des paroles
  */
 export const getLyricsFromDropbox = async (songId: string): Promise<string | null> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
@@ -941,7 +521,7 @@ export const migrateLyricsToDropbox = async (
     onError?: (songId: string, error: string) => void;
   }
 ): Promise<{ success: number; failed: number; failedItems: Array<{ id: string; error: string }> }> => {
-  const config = await getDropboxConfig();
+  const config = getDropboxConfig();
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");

@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
+import { isDropboxEnabled } from "@/utils/dropboxStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
-import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
-import { ensureStorageProviderColumn } from "@/utils/databaseSetup";
+import { Button } from "@/components/ui/button";
 
 interface Song {
   id: string;
@@ -25,40 +25,31 @@ export const MusicUploader = () => {
   const { addToQueue } = usePlayer();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadToastId, setUploadToastId] = useState<string | number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
+  const [storageProvider, setStorageProvider] = useState<string>("Supabase");
   // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
-  const [storageProvider, setStorageProvider] = useState<string>("supabase");
 
-  // Use effect to check and ensure database structure on component mount
   useEffect(() => {
-    const setupDatabase = async () => {
-      // Ensure the storage_provider column exists
-      await ensureStorageProviderColumn();
-      
-      // Check OneDrive status
-      await checkOneDriveStatus();
+    // Check which storage provider is active
+    const checkStorageProvider = () => {
+      const useDropbox = isDropboxEnabled();
+      setStorageProvider(useDropbox ? "Dropbox" : "Supabase");
     };
     
-    setupDatabase();
-  }, []);
-
-  // Replace the useState hook with useEffect for OneDrive check
-  const checkOneDriveStatus = async () => {
-    const oneDriveAvailable = await isOneDriveEnabled();
-    if (oneDriveAvailable) {
-      setStorageProvider("onedrive");
-      console.log("OneDrive est disponible et sera utilisé pour le stockage");
-    } else {
-      setStorageProvider("supabase");
-      console.log("OneDrive n'est pas disponible, utilisation de Supabase par défaut");
-    }
-  };
-  
-  // Check OneDrive status on component mount
-  useEffect(() => {
-    checkOneDriveStatus();
+    checkStorageProvider();
+    
+    // Re-check when the window gets focus
+    const handleFocus = () => {
+      checkStorageProvider();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const formatDuration = (seconds: number) => {
@@ -89,6 +80,10 @@ export const MusicUploader = () => {
       artist: "Unknown Artist",
       title: nameWithoutExt.trim()
     };
+  };
+
+  const generateUUID = () => {
+    return crypto.randomUUID();
   };
 
   const extractMetadata = async (file: File) => {
@@ -226,15 +221,14 @@ export const MusicUploader = () => {
   };
 
   const processAudioFile = async (file: File) => {
-    console.log("Beginning processing for:", file.name);
+    console.log("Début du traitement pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
-      toast.error("Unsupported file type");
+      toast.error("Type de fichier non supporté");
       return null;
     }
 
-    // Generate a UUID with proper typing for TypeScript
-    const fileId = crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`;
+    const fileId = generateUUID();
 
     try {
       let { artist, title } = parseFileName(file.name);
@@ -247,17 +241,15 @@ export const MusicUploader = () => {
 
       const songExists = await checkIfSongExists(artist, title);
       if (songExists) {
-        toast.error(`"${title}" by ${artist} already exists in the library`);
+        toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
         return null;
       }
 
-      console.log("Storing audio file:", fileId);
+      console.log("Stockage du fichier audio:", fileId);
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Store file using the current storage provider
       await storeAudioFile(fileId, file);
-      toast.success(`Upload réussi vers ${storageProvider === "onedrive" ? "OneDrive" : "Supabase"}`);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -305,7 +297,6 @@ export const MusicUploader = () => {
           file_path: fileId,
           duration: formattedDuration,
           image_url: imageUrl,
-          storage_provider: storageProvider  // Utiliser le fournisseur sélectionné
         })
         .select()
         .single();
@@ -368,8 +359,8 @@ export const MusicUploader = () => {
       };
 
     } catch (error) {
-      console.error("Error processing file:", error);
-      toast.error("Error uploading file");
+      console.error("Erreur lors du traitement du fichier:", error);
+      toast.error("Erreur lors de l'upload du fichier");
       setIsUploading(false);
       setUploadProgress(0);
       return null;
@@ -486,7 +477,7 @@ export const MusicUploader = () => {
     setIsDragging(true);
   };
 
-  const handleLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragCounter(prev => prev - 1);
@@ -518,14 +509,14 @@ export const MusicUploader = () => {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
-      onDragLeave={handleLeave}
+      onDragLeave={handleDragLeave}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex gap-2">
           {/* Single file upload button */}
           <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
             <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un fichier {storageProvider === "onedrive" ? "vers OneDrive" : ""}</span>
+            <span>{t('common.upload')} un fichier</span>
             <input
               type="file"
               accept="audio/*,.lrc"
@@ -538,7 +529,7 @@ export const MusicUploader = () => {
           {/* Directory upload button */}
           <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
             <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un dossier {storageProvider === "onedrive" ? "vers OneDrive" : ""}</span>
+            <span>{t('common.upload')} un dossier</span>
             <input
               type="file"
               accept="audio/*,.lrc"
@@ -550,17 +541,20 @@ export const MusicUploader = () => {
             />
           </label>
         </div>
+        <div className="text-xs text-spotify-neutral">
+          Using: {storageProvider}
+        </div>
       </div>
       {isDragging && (
         <div 
           className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
           onDragOver={handleDragOver}
           onDragEnter={handleDragEnter}
-          onDragLeave={handleLeave}
+          onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           <p className="text-white text-lg font-medium">
-            Déposez vos fichiers ici pour les téléverser{storageProvider === "onedrive" ? " vers OneDrive" : ""}
+            Déposez vos fichiers ici
           </p>
         </div>
       )}

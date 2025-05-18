@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,36 +9,25 @@ import {
   getDropboxConfig, 
   saveDropboxConfig, 
   migrateFilesToDropbox,
-  migrateLyricsToDropbox,
-  exchangeCodeForTokens,
-  getAuthorizationUrl,
-  isAccessTokenExpired,
-  refreshAccessTokenIfNeeded
+  migrateLyricsToDropbox
 } from '@/utils/dropboxStorage';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, RefreshCw, Key } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 
 export const DropboxSettings = () => {
   const [accessToken, setAccessToken] = useState('');
-  const [refreshToken, setRefreshToken] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [redirectUri, setRedirectUri] = useState('https://preview--m-1393.lovable.app/dropbox-auth');
   const [isEnabled, setIsEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
-  const [authCode, setAuthCode] = useState('');
-  const [expiresAt, setExpiresAt] = useState<number | undefined>(undefined);
   const navigate = useNavigate();
   
   // États pour la migration des fichiers audio
@@ -61,19 +51,6 @@ export const DropboxSettings = () => {
     failed: number;
     failedItems: Array<{ id: string; error: string }>;
   }>({ success: 0, failed: 0, failedItems: [] });
-
-  // Détecter le code d'autorisation dans l'URL
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get('code');
-    
-    if (code) {
-      console.log("Code d'autorisation Dropbox détecté dans l'URL");
-      setAuthCode(code);
-      // Effacer le code de l'URL pour éviter les réutilisations accidentelles
-      window.history.replaceState({}, document.title, '/dropbox-settings');
-    }
-  }, []);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -99,18 +76,9 @@ export const DropboxSettings = () => {
         toast.error('Accès non autorisé');
       } else {
         // Load config only if admin
-        try {
-          const config = await getDropboxConfig();
-          setAccessToken(config.accessToken || '');
-          setRefreshToken(config.refreshToken || '');
-          setClientId(config.clientId || '');
-          setClientSecret(config.clientSecret || '');
-          setIsEnabled(config.isEnabled || false);
-          setExpiresAt(config.expiresAt);
-        } catch (error) {
-          console.error('Erreur lors du chargement de la configuration Dropbox:', error);
-          toast.error('Erreur lors du chargement de la configuration Dropbox');
-        }
+        const config = getDropboxConfig();
+        setAccessToken(config.accessToken || '');
+        setIsEnabled(config.isEnabled || false);
       }
       
       setIsLoading(false);
@@ -119,72 +87,11 @@ export const DropboxSettings = () => {
     checkAdminStatus();
   }, [navigate]);
 
-  // Effet pour traiter automatiquement le code d'autorisation lorsqu'il est disponible
-  useEffect(() => {
-    const processAuthCode = async () => {
-      if (!authCode || !clientId || !clientSecret) return;
-      
-      setIsSaving(true);
-      try {
-        console.log("Traitement du code d'autorisation Dropbox:", authCode.substring(0, 5) + "...");
-        console.log("URL de redirection utilisée:", redirectUri);
-        
-        const tokenResponse = await exchangeCodeForTokens(
-          authCode,
-          clientId,
-          clientSecret,
-          redirectUri
-        );
-        
-        if (tokenResponse) {
-          console.log("Réponse de token reçue:", tokenResponse);
-          const expiresAt = Date.now() + ((tokenResponse.expires_in || 14400) * 1000);
-          
-          // Sauvegarder la nouvelle configuration
-          await saveDropboxConfig({
-            accessToken: tokenResponse.access_token,
-            refreshToken: tokenResponse.refresh_token || refreshToken, // Garder l'ancien refresh token si pas de nouveau
-            clientId,
-            clientSecret,
-            expiresAt,
-            isEnabled: true
-          });
-          
-          // Mettre à jour l'état
-          setAccessToken(tokenResponse.access_token);
-          if (tokenResponse.refresh_token) setRefreshToken(tokenResponse.refresh_token);
-          setIsEnabled(true);
-          setExpiresAt(expiresAt);
-          setAuthCode('');
-          setTestResult('success');
-          
-          toast.success('Authentification Dropbox réussie');
-        } else {
-          console.error("Échec de l'échange du code d'autorisation, réponse vide");
-          toast.error('Échec de l\'échange du code d\'autorisation');
-          setTestResult('error');
-        }
-      } catch (error) {
-        console.error('Erreur lors du traitement du code d\'autorisation:', error);
-        toast.error('Erreur lors du traitement du code d\'autorisation');
-        setTestResult('error');
-      } finally {
-        setIsSaving(false);
-      }
-    };
-    
-    processAuthCode();
-  }, [authCode, clientId, clientSecret, redirectUri, refreshToken]);
-
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      await saveDropboxConfig({
+      saveDropboxConfig({
         accessToken,
-        refreshToken,
-        clientId,
-        clientSecret,
-        expiresAt,
         isEnabled
       });
       toast.success('Configuration Dropbox enregistrée');
@@ -202,23 +109,6 @@ export const DropboxSettings = () => {
     setTestResult(null);
     
     try {
-      // Si le token est expiré, tentative de rafraîchissement
-      if (await isAccessTokenExpired()) {
-        const refreshed = await refreshAccessTokenIfNeeded();
-        if (!refreshed) {
-          setTestResult('error');
-          toast.error('Impossible de rafraîchir le token. Vérifiez vos identifiants et le refresh token.');
-          setIsTesting(false);
-          return;
-        }
-        
-        // Mettre à jour l'interface avec le nouveau token
-        const updatedConfig = await getDropboxConfig();
-        setAccessToken(updatedConfig.accessToken || '');
-        setExpiresAt(updatedConfig.expiresAt);
-        toast.success('Token rafraîchi avec succès');
-      }
-      
       // Use Dropbox API to test the token by getting account information
       const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
         method: 'POST',
@@ -246,40 +136,6 @@ export const DropboxSettings = () => {
     } finally {
       setIsTesting(false);
     }
-  };
-
-  const handleRefreshToken = async () => {
-    setIsSaving(true);
-    
-    try {
-      const refreshed = await refreshAccessTokenIfNeeded();
-      if (refreshed) {
-        const updatedConfig = await getDropboxConfig();
-        setAccessToken(updatedConfig.accessToken || '');
-        setExpiresAt(updatedConfig.expiresAt);
-        toast.success('Token rafraîchi avec succès');
-        setTestResult('success');
-      } else {
-        toast.error('Impossible de rafraîchir le token. Vérifiez vos identifiants et le refresh token.');
-        setTestResult('error');
-      }
-    } catch (error) {
-      console.error('Erreur lors du rafraîchissement du token:', error);
-      toast.error('Erreur lors du rafraîchissement du token');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleGenerateAuthUrl = () => {
-    if (!clientId) {
-      toast.error('Veuillez d\'abord saisir votre Client ID');
-      return;
-    }
-    
-    const authUrl = getAuthorizationUrl(clientId, redirectUri);
-    console.log("URL d'autorisation générée:", authUrl);
-    window.open(authUrl, '_blank');
   };
 
   // Fonction pour la migration des fichiers audio
@@ -469,35 +325,6 @@ export const DropboxSettings = () => {
     }
   };
 
-  // Status de l'expiration du token
-  const getTokenStatus = () => {
-    if (!accessToken) return "Non configuré";
-    if (!expiresAt) return "Expiration inconnue";
-    
-    const now = Date.now();
-    if (now >= expiresAt) return "Expiré";
-    
-    // Calculer le temps restant
-    const remainingMs = expiresAt - now;
-    const remainingMin = Math.floor(remainingMs / 60000);
-    const remainingHours = Math.floor(remainingMin / 60);
-    const remainingMinutes = remainingMin % 60;
-    
-    if (remainingHours > 0) {
-      return `Valide pour ${remainingHours}h ${remainingMinutes}m`;
-    }
-    return `Valide pour ${remainingMinutes} minutes`;
-  };
-
-  const tokenStatusColor = () => {
-    if (!accessToken) return "text-gray-500";
-    if (!expiresAt || Date.now() >= expiresAt) return "text-red-500";
-    
-    const remainingHours = (expiresAt - Date.now()) / 3600000;
-    if (remainingHours < 1) return "text-yellow-500";
-    return "text-green-500";
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -518,141 +345,20 @@ export const DropboxSettings = () => {
           Configurer Dropbox pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <Tabs defaultValue="oauth">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="oauth">OAuth (Recommandé)</TabsTrigger>
-            <TabsTrigger value="direct">Token Direct</TabsTrigger>
-          </TabsList>
-          
-          {/* Tab OAuth - Nouvelle méthode recommandée */}
-          <TabsContent value="oauth" className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="client-id">Client ID de l'application</Label>
-              <Input
-                id="client-id"
-                placeholder="Entrez le Client ID de votre app Dropbox"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="client-secret">Client Secret de l'application</Label>
-              <Input
-                id="client-secret"
-                type="password"
-                placeholder="Entrez le Client Secret de votre app Dropbox"
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="redirect-uri">URI de redirection</Label>
-              <Input
-                id="redirect-uri"
-                placeholder="URL de redirection après authentification"
-                value={redirectUri}
-                onChange={(e) => setRedirectUri(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Cette URL doit être configurée dans les redirections autorisées de votre app Dropbox.
-              </p>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <Button 
-                onClick={handleGenerateAuthUrl}
-                disabled={!clientId || isSaving}
-                className="w-full"
-              >
-                <Key className="mr-2 h-4 w-4" />
-                Générer un lien d'autorisation
-              </Button>
-              
-              <div className="text-xs text-center text-muted-foreground mt-1">
-                Cliquez pour ouvrir la page d'autorisation Dropbox dans un nouvel onglet
-              </div>
-            </div>
-            
-            <div className="space-y-2 mt-4">
-              <Label htmlFor="auth-code">Code d'autorisation</Label>
-              <Input
-                id="auth-code"
-                placeholder="Collez le code d'autorisation obtenu"
-                value={authCode}
-                onChange={(e) => setAuthCode(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Après avoir autorisé l'application, copiez le code de l'URL (après "?code=") et collez-le ici.
-              </p>
-            </div>
-            
-            <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-              <AlertDescription className="text-sm">
-                <strong>État du token d'accès :</strong> <span className={tokenStatusColor()}>{getTokenStatus()}</span>
-                {refreshToken && (
-                  <div className="mt-1">
-                    <span className="text-green-600">✓</span> Refresh Token configuré et utilisable pour un accès permanent
-                  </div>
-                )}
-              </AlertDescription>
-            </Alert>
-            
-            <div className="mt-4">
-              <Button 
-                onClick={handleRefreshToken}
-                disabled={!refreshToken || !clientId || !clientSecret || isSaving}
-                variant="outline"
-                className="w-full"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Rafraîchir le token d'accès manuellement
-              </Button>
-            </div>
-            
-            {testResult === 'success' && (
-              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription className="text-green-800 dark:text-green-400">
-                  Le jeton Dropbox est valide et fonctionne correctement.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {testResult === 'error' && (
-              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-800 dark:text-red-400">
-                  Le jeton Dropbox est invalide ou n'a pas les permissions requises.
-                </AlertDescription>
-              </Alert>
-            )}
-          </TabsContent>
-          
-          {/* Tab Direct Token - Méthode précédente */}
-          <TabsContent value="direct" className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="dropbox-token">Jeton d'accès Dropbox</Label>
-              <Input
-                id="dropbox-token"
-                type="password"
-                placeholder="Entrez votre jeton d'accès Dropbox"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Générez un jeton d'accès depuis la <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="underline">Console d'applications Dropbox</a>.
-              </p>
-              <p className="text-xs text-red-500 mt-2">
-                Attention : cette méthode utilise un token qui expirera au bout de 4 heures. Utilisez de préférence l'onglet OAuth.
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
-        
-        <Separator />
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="dropbox-token">Jeton d'accès Dropbox</Label>
+          <Input
+            id="dropbox-token"
+            type="password"
+            placeholder="Entrez votre jeton d'accès Dropbox"
+            value={accessToken}
+            onChange={(e) => setAccessToken(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Générez un jeton d'accès depuis la <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer" className="underline">Console d'applications Dropbox</a>.
+          </p>
+        </div>
         
         <div className="flex items-center space-x-2">
           <Switch
@@ -662,6 +368,24 @@ export const DropboxSettings = () => {
           />
           <Label htmlFor="enable-dropbox">Utiliser Dropbox pour le stockage de fichiers</Label>
         </div>
+
+        {testResult === 'success' && (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="text-green-800 dark:text-green-400">
+              Le jeton Dropbox est valide et fonctionne correctement.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {testResult === 'error' && (
+          <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-400">
+              Le jeton Dropbox est invalide ou n'a pas les permissions requises.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Section des migrations avec onglets */}
         <div className="border-t border-border pt-4 mt-4">
@@ -783,7 +507,7 @@ export const DropboxSettings = () => {
         <Button 
           variant="outline" 
           onClick={testDropboxToken} 
-          disabled={isTesting || !accessToken || isSaving}
+          disabled={isTesting || !accessToken || isSaving || isMigrating || isMigratingLyrics}
         >
           {isTesting ? (
             <>
@@ -796,7 +520,7 @@ export const DropboxSettings = () => {
         </Button>
         <Button 
           onClick={handleSaveConfig} 
-          disabled={isSaving}
+          disabled={isSaving || isMigrating || isMigratingLyrics}
         >
           {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
         </Button>

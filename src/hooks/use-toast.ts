@@ -156,11 +156,6 @@ interface ToastWithMethods {
     dismiss: () => void
     update: (props: ToasterToast) => void
   }
-  warning: (props: Toast | string) => {
-    id: string
-    dismiss: () => void
-    update: (props: ToasterToast) => void
-  }
 }
 
 const toast = (function(props: Toast) {
@@ -215,20 +210,6 @@ toast.error = (props: Toast | string) => {
   return toast({
     ...toastProps,
     variant: "destructive",
-  });
-};
-
-// Add warning method
-toast.warning = (props: Toast | string) => {
-  // If props is a string, convert it to a Toast object
-  const toastProps: Toast = typeof props === 'string' 
-    ? { description: props } 
-    : props;
-    
-  return toast({
-    ...toastProps,
-    variant: "default",
-    className: "bg-amber-100 border-amber-500 text-amber-800 dark:bg-amber-900/50 dark:border-amber-800 dark:text-amber-300",
   });
 };
 

@@ -1,161 +1,231 @@
 
-import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from '@/hooks/use-toast';
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Song } from '@/types/song';
-import { Loader2 } from 'lucide-react';
-import { getLyricsFromDropbox, isDropboxEnabled, uploadLyricsToDropbox } from '@/utils/dropboxStorage';
+import { Loader2, Music, Edit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useTranslation } from "react-i18next";
+import { isDropboxEnabled, getLyricsFromDropbox, uploadLyricsToDropbox } from '@/utils/dropboxStorage';
 
 interface LyricsModalProps {
-  song?: Song | null;
-  songId?: string;
-  songTitle?: string;
-  artist?: string;
   isOpen: boolean;
   onClose: () => void;
+  songId: string;
+  songTitle: string;
+  artist?: string;
   onEditRequest?: () => void;
 }
 
-export const LyricsModal = ({ song, songId, songTitle, artist, isOpen, onClose, onEditRequest }: LyricsModalProps) => {
-  const [lyrics, setLyrics] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+export const LyricsModal: React.FC<LyricsModalProps> = ({
+  isOpen,
+  onClose,
+  songId,
+  songTitle,
+  artist,
+  onEditRequest
+}) => {
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [useDropbox, setUseDropbox] = useState(false);
 
-  // Récupérer l'ID de la chanson, soit directement, soit à partir de l'objet song
-  const effectiveSongId = song?.id || songId;
-  const effectiveTitle = song?.title || songTitle;
-
+  // Vérifier si Dropbox est activé
   useEffect(() => {
-    const fetchLyrics = async () => {
-      if (!effectiveSongId) return;
-      
-      setIsLoading(true);
-      
-      try {
-        // Vérifier d'abord dans Dropbox si activé
-        if (await isDropboxEnabled()) {
-          const dropboxLyrics = await getLyricsFromDropbox(effectiveSongId);
-          if (dropboxLyrics) {
-            setLyrics(dropboxLyrics);
-            setIsLoading(false);
-            return;
-          }
-        }
-        
-        // Sinon récupérer depuis Supabase
-        const { data, error } = await supabase
-          .from('lyrics')
-          .select('content')
-          .eq('song_id', effectiveSongId)
-          .maybeSingle();
-          
-        if (error) {
-          console.error('Erreur lors de la récupération des paroles:', error);
-        } else if (data) {
-          setLyrics(data.content);
-        } else {
-          setLyrics('');
-        }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des paroles:', error);
-        toast.error('Erreur lors de la récupération des paroles');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setUseDropbox(isDropboxEnabled());
+  }, []);
 
-    if (isOpen && effectiveSongId) {
-      fetchLyrics();
-    } else {
-      setLyrics('');
-    }
-  }, [isOpen, effectiveSongId]);
-
-  const handleSave = async () => {
-    if (!effectiveSongId) return;
-    
-    setIsSaving(true);
-    
-    try {
-      // Sauvegarder dans Dropbox si activé
-      if (await isDropboxEnabled()) {
+  const { data: lyrics, isLoading, refetch } = useQuery({
+    queryKey: ['lyrics', songId, useDropbox],
+    queryFn: async () => {
+      console.log('Fetching lyrics for song:', songId);
+      
+      // Si Dropbox est activé, essayer de récupérer les paroles depuis Dropbox
+      if (useDropbox) {
         try {
-          await uploadLyricsToDropbox(effectiveSongId, lyrics);
+          console.log('Attempting to fetch lyrics from Dropbox');
+          const dropboxLyrics = await getLyricsFromDropbox(songId);
+          
+          if (dropboxLyrics) {
+            console.log('Lyrics fetched from Dropbox successfully');
+            return dropboxLyrics;
+          }
+          
+          console.log('No lyrics found in Dropbox, falling back to database');
         } catch (error) {
-          console.error('Erreur lors de l\'upload des paroles vers Dropbox:', error);
-          // Continuer avec Supabase en cas d'erreur Dropbox
+          console.error('Error fetching lyrics from Dropbox:', error);
+          // En cas d'erreur, continuer avec la base de données
         }
       }
       
-      // Sauvegarder dans Supabase (de toute façon)
-      const { error } = await supabase
+      // Si Dropbox n'est pas activé ou si la récupération a échoué, utiliser la base de données
+      const { data, error } = await supabase
+        .from('lyrics')
+        .select('content')
+        .eq('song_id', songId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching lyrics:', error);
+        throw error;
+      }
+
+      return data?.content || null;
+    },
+    enabled: isOpen && !!songId,
+  });
+
+  const generateLyrics = async () => {
+    if (!artist) {
+      setError("Impossible de récupérer les paroles sans le nom de l'artiste.");
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de récupérer les paroles sans le nom de l'artiste.",
+      });
+      return;
+    }
+    
+    setIsGenerating(true);
+    setError(null);
+    try {
+      console.log('Generating lyrics for:', songTitle, 'by', artist);
+      const response = await supabase.functions.invoke('generate-lyrics', {
+        body: { songTitle, artist },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      console.log('Generated lyrics response:', response.data);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      const lyricsContent = response.data.lyrics;
+      
+      // Enregistrer les paroles dans la base de données
+      const { error: insertError } = await supabase
         .from('lyrics')
         .upsert({
-          song_id: effectiveSongId,
-          content: lyrics
-        }, {
-          onConflict: 'song_id'
+          song_id: songId,
+          content: lyricsContent,
         });
-        
-      if (error) {
-        console.error('Erreur lors de la sauvegarde des paroles:', error);
-        toast.error('Erreur lors de la sauvegarde des paroles');
-      } else {
-        toast.success('Paroles sauvegardées avec succès');
-        if (onEditRequest) {
-          onEditRequest();
-        }
-        onClose();
+
+      if (insertError) {
+        throw insertError;
       }
+      
+      // Si Dropbox est activé, également enregistrer les paroles dans Dropbox
+      if (useDropbox) {
+        try {
+          await uploadLyricsToDropbox(songId, lyricsContent);
+          console.log('Lyrics uploaded to Dropbox successfully');
+        } catch (dropboxError) {
+          console.error('Failed to upload lyrics to Dropbox:', dropboxError);
+          // Ne pas faire échouer l'opération si le téléchargement Dropbox échoue
+        }
+      }
+
+      await refetch();
+      toast({
+        title: "Succès",
+        description: "Les paroles ont été récupérées avec succès",
+      });
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde des paroles:', error);
-      toast.error('Erreur lors de la sauvegarde des paroles');
+      console.error('Error generating lyrics:', error);
+      setError(error.message || "Impossible de récupérer les paroles");
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de récupérer les paroles",
+      });
     } finally {
-      setIsSaving(false);
+      setIsGenerating(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Paroles - {effectiveTitle}</DialogTitle>
-          <DialogDescription>
-            Ajoutez ou modifiez les paroles de cette chanson.
+          <DialogTitle className="text-xl font-bold flex items-center justify-between">
+            <span className="break-words">{songTitle || "Titre inconnu"}</span>
+            <div className="flex space-x-2">
+              {lyrics && onEditRequest && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEditRequest}
+                  className="ml-2 shrink-0"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {t("common.edit")}
+                </Button>
+              )}
+              
+              {!lyrics && !isLoading && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={generateLyrics}
+                  disabled={isGenerating || !artist}
+                  className="ml-2 shrink-0"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Music className="h-4 w-4 mr-2" />
+                  )}
+                  {t("common.fetchLyrics")}
+                </Button>
+              )}
+            </div>
+          </DialogTitle>
+          <DialogDescription className="break-words">
+            {artist ? `Par ${artist}` : "Artiste inconnu"}
           </DialogDescription>
         </DialogHeader>
-        
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <Textarea
-            value={lyrics}
-            onChange={(e) => setLyrics(e.target.value)}
-            placeholder="Entrez les paroles ici..."
-            className="min-h-[300px] font-mono text-sm"
-          />
-        )}
-        
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
-            Annuler
-          </Button>
-          <Button onClick={handleSave} disabled={isLoading || isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              'Enregistrer'
-            )}
-          </Button>
-        </DialogFooter>
+        <ScrollArea className="h-[60vh] w-full rounded-md border p-4">
+          {isLoading || isGenerating ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-spotify-accent" />
+              <span className="ml-2">{t("common.loadingLyrics")}</span>
+            </div>
+          ) : lyrics ? (
+            <div className="whitespace-pre-line text-spotify-neutral">
+              {lyrics}
+            </div>
+          ) : error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>{t("common.error")}</AlertTitle>
+              <AlertDescription>
+                <p>{error}</p>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="text-center text-spotify-neutral">
+              <p>{t("common.noLyricsAvailable")}</p>
+              <p className="text-sm mt-2">
+                {artist 
+                  ? t("common.clickFetchLyrics")
+                  : t("common.cannotFetchWithoutArtist")}
+              </p>
+            </div>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
