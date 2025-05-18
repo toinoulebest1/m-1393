@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
@@ -199,6 +198,7 @@ const Search = () => {
     // Remplacer le queue pour inclure toute la liste des résultats
     setQueue(results);
 
+    // Jouer la chanson sélectionnée
     play(song);
   };
 
@@ -455,6 +455,7 @@ const Search = () => {
                               animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
                               opacity: 0,
                             }}
+                            onClick={() => handlePlay(song)}
                           >
                             <SongCard
                               song={song}
