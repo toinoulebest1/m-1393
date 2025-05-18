@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { searchArtist, getArtistById, ArtistProfileResponse } from "@/services/deezerApi";
@@ -18,6 +19,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { extractDominantColor, rgbToHex } from "@/utils/colorExtractor";
 
 const ArtistProfile = () => {
   const { artistId, artistName } = useParams();
@@ -28,6 +30,7 @@ const ArtistProfile = () => {
   const { play } = usePlayer();
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
 
   useEffect(() => {
     const fetchArtistData = async () => {
@@ -44,6 +47,10 @@ const ArtistProfile = () => {
         if (data) {
           setProfileData(data);
           document.title = `${data.artist.name} | Profil d'artiste`;
+          
+          // Extraire la couleur dominante de l'image de l'artiste
+          const color = await extractDominantColor(data.artist.picture_xl);
+          setDominantColor(color);
         } else {
           toast.error("Impossible de trouver les informations de l'artiste");
         }
@@ -109,6 +116,17 @@ const ArtistProfile = () => {
         toast.success("Lien copié dans le presse-papier !");
       }
     }
+  };
+
+  // Génère un style CSS pour le glow en fonction de la couleur dominante
+  const getGlowStyle = () => {
+    if (!dominantColor) return {};
+    
+    const [r, g, b] = dominantColor;
+    return {
+      boxShadow: `0 0 20px 5px rgba(${r}, ${g}, ${b}, 0.5)`,
+      transition: 'box-shadow 0.3s ease-in-out'
+    };
   };
 
   const gradientOpacity = 0.3 + (scrollRatio * 0.7);
@@ -178,9 +196,9 @@ const ArtistProfile = () => {
                   backgroundPosition: 'center',
                 }}
               >
-                {/* Gradient overlay with shimmer effect */}
+                {/* Gradient overlay sans effet de scintillement */}
                 <div 
-                  className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent animate-theme-transition"
+                  className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"
                   style={{ opacity: gradientOpacity }}
                 />
                 
@@ -194,9 +212,12 @@ const ArtistProfile = () => {
                 {/* Artist info container */}
                 <div className="relative z-10 w-full px-6 md:px-12 py-8 md:py-12">
                   <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-end gap-8">
-                    {/* Artist image with animation */}
+                    {/* Artist image avec effet de glow basé sur la couleur dominante */}
                     <div className="relative group">
-                      <div className="absolute -inset-4 bg-gradient-to-r from-spotify-accent to-purple-600 rounded-xl opacity-40 group-hover:opacity-70 transition duration-300 blur animate-pulse"></div>
+                      <div 
+                        className={`absolute -inset-4 bg-gradient-to-r ${dominantColor ? `from-[rgb(${dominantColor[0]},${dominantColor[1]},${dominantColor[2]})]` : 'from-spotify-accent'} to-purple-600 rounded-xl opacity-40 group-hover:opacity-70 transition duration-300 blur`}
+                        style={getGlowStyle()}
+                      ></div>
                       <img 
                         src={profileData.artist.picture_xl || '/placeholder.svg'} 
                         alt={profileData.artist.name}
@@ -301,7 +322,7 @@ const ArtistProfile = () => {
                                     alt={track.title}
                                     className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
                                   />
-                                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-700 animate-gradient"></div>
+                                  {/* Suppression de l'effet de scintillement */}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <Button 
                                       size="icon" 
@@ -377,7 +398,7 @@ const ArtistProfile = () => {
                     )}
                   </TabsContent>
                   
-                  {/* Albums section with improved shimmer effect */}
+                  {/* Albums section sans effet de scintillement */}
                   <TabsContent value="albums" className="mt-0">
                     {profileData.albums.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
@@ -397,8 +418,7 @@ const ArtistProfile = () => {
                                   alt={album.title}
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
-                                {/* Shimmer effect */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-700 animate-gradient"></div>
+                                {/* Suppression de l'effet de scintillement */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <a 
                                     href={album.link}
