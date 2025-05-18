@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -20,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 import { LyricsModal } from "@/components/LyricsModal"; 
 import { LyricsEditDialog } from "@/components/LyricsEditDialog";
-import { isDropboxEnabled, checkFileExistsOnDropbox } from "@/utils/dropboxStorage";
+import { isOneDriveEnabled, checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
 
 const SongMetadataUpdate = () => {
   const { t } = useTranslation();
@@ -335,9 +336,9 @@ const SongMetadataUpdate = () => {
     try {
       setSyncingLibrary(true);
       
-      // Vérifie si Dropbox est activé
-      if (!isDropboxEnabled()) {
-        toast.error(t("common.dropboxNotEnabled"));
+      // Vérifie si OneDrive est activé
+      if (!isOneDriveEnabled()) {
+        toast.error(t("common.oneDriveNotEnabled"));
         setSyncingLibrary(false);
         return;
       }
@@ -372,17 +373,17 @@ const SongMetadataUpdate = () => {
         const song = allSongs[i];
         setSyncProgress({ current: i + 1, total: allSongs.length });
         
-        // Vérifie si le fichier existe sur Dropbox
+        // Vérifie si le fichier existe sur OneDrive
         const filePath = `audio/${song.id}`;
-        const exists = await checkFileExistsOnDropbox(filePath);
+        const exists = await checkFileExistsOnOneDrive(filePath);
         
         if (!exists) {
-          console.log(`Le fichier ${filePath} n'existe pas sur Dropbox, marqué pour suppression`);
+          console.log(`Le fichier ${filePath} n'existe pas sur OneDrive, marqué pour suppression`);
           songsToDelete.push(song.id);
         }
       }
       
-      // Supprime les chansons qui n'existent plus sur Dropbox
+      // Supprime les chansons qui n'existent plus sur OneDrive
       if (songsToDelete.length > 0) {
         // Supprime d'abord les références dans les tables associées
         for (const songId of songsToDelete) {
