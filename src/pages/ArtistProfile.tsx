@@ -1,11 +1,13 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { searchArtist, getArtistById, ArtistProfileResponse } from "@/services/deezerApi";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Player } from "@/components/Player";
 import { 
@@ -16,12 +18,13 @@ import {
 import { usePlayer } from "@/contexts/PlayerContext";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const ArtistProfile = () => {
   const { artistId, artistName } = useParams();
   const [profileData, setProfileData] = useState<ArtistProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'top' | 'albums'>('top');
+  const [activeTab, setActiveTab] = useState('top'); // Utilisation des Tabs de Shadcn UI
   const navigate = useNavigate();
   const { play } = usePlayer();
   const headerRef = useRef<HTMLDivElement>(null);
@@ -246,172 +249,188 @@ const ArtistProfile = () => {
               </div>
               
               {/* Navigation tabs */}
-              <div className="sticky top-0 z-20 backdrop-blur-md bg-background/70 border-b border-white/10">
-                <div className="max-w-6xl mx-auto px-6 md:px-12">
-                  <div className="flex space-x-4 overflow-x-auto scrollbar-none">
-                    <button
-                      onClick={() => setActiveTab('top')}
-                      className={`py-4 px-4 font-medium transition-colors flex items-center gap-2 ${
-                        activeTab === 'top' 
-                          ? 'text-white border-b-2 border-spotify-accent' 
-                          : 'text-white/60 hover:text-white'
-                      }`}
-                    >
-                      <Award className="h-4 w-4" />
-                      Top Titres
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('albums')}
-                      className={`py-4 px-4 font-medium transition-colors flex items-center gap-2 ${
-                        activeTab === 'albums'
-                          ? 'text-white border-b-2 border-spotify-accent' 
-                          : 'text-white/60 hover:text-white'
-                      }`}
-                    >
-                      <Disc className="h-4 w-4" />
-                      Albums
-                    </button>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'top' | 'albums')}>
+                <div className="sticky top-0 z-20 backdrop-blur-md bg-background/70 border-b border-white/10">
+                  <div className="max-w-6xl mx-auto px-6 md:px-12">
+                    <TabsList className="bg-transparent flex space-x-4 overflow-x-auto scrollbar-none border-b border-white/10 w-full justify-start h-auto p-0 rounded-none">
+                      <TabsTrigger 
+                        value="top"
+                        className={`py-4 px-4 font-medium transition-colors flex items-center gap-2 rounded-none ${
+                          activeTab === 'top' 
+                            ? 'text-white border-b-2 border-spotify-accent' 
+                            : 'text-white/60 hover:text-white border-b-2 border-transparent'
+                        }`}
+                      >
+                        <Award className="h-4 w-4" />
+                        Top Titres
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="albums"
+                        className={`py-4 px-4 font-medium transition-colors flex items-center gap-2 rounded-none ${
+                          activeTab === 'albums'
+                            ? 'text-white border-b-2 border-spotify-accent' 
+                            : 'text-white/60 hover:text-white border-b-2 border-transparent'
+                        }`}
+                      >
+                        <Disc className="h-4 w-4" />
+                        Albums
+                      </TabsTrigger>
+                    </TabsList>
                   </div>
                 </div>
-              </div>
               
-              {/* Main content */}
-              <div className="max-w-6xl mx-auto px-6 md:px-12 py-8">
-                {/* Top Tracks Section */}
-                {activeTab === 'top' && profileData.topTracks.length > 0 && (
-                  <div className="space-y-4 animate-fade-in">
-                    {profileData.topTracks.map((track, index) => (
-                      <Card 
-                        key={track.id} 
-                        className="hover:bg-white/5 transition-colors bg-black/40 border-white/10 overflow-hidden group"
-                      >
-                        <CardContent className="p-0">
-                          <div className="flex items-center gap-3 p-3">
-                            <div className="text-sm font-mono text-muted-foreground w-6 text-center">
-                              {index + 1}
-                            </div>
-                            
-                            <div className="relative overflow-hidden rounded-md">
-                              <img 
-                                src={track.album.cover_medium} 
-                                alt={track.title}
-                                className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost"
-                                  className="h-8 w-8 rounded-full bg-spotify-accent/90 text-white hover:bg-spotify-accent hover:scale-105 transition-transform"
-                                  onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
-                                >
-                                  <Play className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{track.title}</h3>
-                              <HoverCard>
-                                <HoverCardTrigger>
-                                  <p className="text-sm text-white/60 truncate flex items-center gap-2">
-                                    <Disc className="h-3 w-3 inline" />
-                                    {track.album.title}
-                                  </p>
-                                </HoverCardTrigger>
-                                <HoverCardContent className="w-80 bg-background/95 backdrop-blur-lg border-white/20">
-                                  <div className="flex space-x-4">
-                                    <img 
-                                      src={track.album.cover_medium} 
-                                      alt={track.album.title}
-                                      className="h-24 w-24 object-cover rounded-md"
-                                    />
-                                    <div>
-                                      <h4 className="text-sm font-semibold">{track.album.title}</h4>
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        Album de {profileData.artist.name}
-                                      </p>
-                                      <a 
-                                        href={track.album.link}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-spotify-accent mt-2 inline-flex items-center gap-1 hover:underline"
-                                      >
-                                        <ExternalLink className="h-3 w-3" />
-                                        Voir sur Deezer
-                                      </a>
-                                    </div>
+                {/* Main content */}
+                <div className="max-w-6xl mx-auto px-6 md:px-12 py-8">
+                  {/* Top Tracks Section */}
+                  <TabsContent value="top" className="mt-0">
+                    {profileData.topTracks.length > 0 ? (
+                      <div className="space-y-4 animate-fade-in">
+                        {profileData.topTracks.map((track, index) => (
+                          <Card 
+                            key={track.id} 
+                            className="hover:bg-white/5 transition-colors bg-black/40 border-white/10 overflow-hidden group"
+                          >
+                            <CardContent className="p-0">
+                              <div className="flex items-center gap-3 p-3">
+                                <div className="text-sm font-mono text-muted-foreground w-6 text-center">
+                                  {index + 1}
+                                </div>
+                                
+                                <div className="relative overflow-hidden rounded-md">
+                                  <img 
+                                    src={track.album.cover_medium} 
+                                    alt={track.title}
+                                    className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost"
+                                      className="h-8 w-8 rounded-full bg-spotify-accent/90 text-white hover:bg-spotify-accent hover:scale-105 transition-transform"
+                                      onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
+                                    >
+                                      <Play className="h-4 w-4" />
+                                    </Button>
                                   </div>
-                                </HoverCardContent>
-                              </HoverCard>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-white/40 hidden md:block">
-                                {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
-                              </span>
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                className="rounded-full hover:bg-white/10 text-white/80 hover:text-white"
-                                onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
-                              >
-                                <PlayCircle className="h-5 w-5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Albums section */}
-                {activeTab === 'albums' && (
-                  <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-                      {profileData.albums.map((album, index) => (
-                        <div 
-                          key={album.id}
-                          className="opacity-0 animate-fade-in"
-                          style={{
-                            animationDelay: `${index * 50}ms`,
-                            animationFillMode: "forwards"
-                          }}
-                        >
-                          <Card className="overflow-hidden hover:bg-white/5 transition-colors bg-black/40 border-white/10 group h-full flex flex-col">
-                            <div className="aspect-square overflow-hidden relative">
-                              <img 
-                                src={album.cover_medium} 
-                                alt={album.title}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <a 
-                                  href={album.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-spotify-accent/90 rounded-full p-3 text-white hover:bg-spotify-accent transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300"
-                                >
-                                  <ExternalLink className="h-5 w-5" />
-                                </a>
-                              </div>
-                            </div>
-                            <CardContent className="p-3 flex flex-col flex-1">
-                              <h3 className="font-medium truncate w-full">{album.title}</h3>
-                              <div className="mt-auto pt-2">
-                                <p className="text-xs text-white/60 flex items-center gap-1.5 mt-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {album.release_date ? new Date(album.release_date).getFullYear() : "N/A"}
-                                </p>
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{track.title}</h3>
+                                  <HoverCard>
+                                    <HoverCardTrigger>
+                                      <p className="text-sm text-white/60 truncate flex items-center gap-2">
+                                        <Disc className="h-3 w-3 inline" />
+                                        {track.album.title}
+                                      </p>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent className="w-80 bg-background/95 backdrop-blur-lg border-white/20">
+                                      <div className="flex space-x-4">
+                                        <img 
+                                          src={track.album.cover_medium} 
+                                          alt={track.album.title}
+                                          className="h-24 w-24 object-cover rounded-md"
+                                        />
+                                        <div>
+                                          <h4 className="text-sm font-semibold">{track.album.title}</h4>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Album de {profileData.artist.name}
+                                          </p>
+                                          <a 
+                                            href={track.album.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-spotify-accent mt-2 inline-flex items-center gap-1 hover:underline"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                            Voir sur Deezer
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </HoverCardContent>
+                                  </HoverCard>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-white/40 hidden md:block">
+                                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+                                  </span>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    className="rounded-full hover:bg-white/10 text-white/80 hover:text-white"
+                                    onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
+                                  >
+                                    <PlayCircle className="h-5 w-5" />
+                                  </Button>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <Music className="h-16 w-16 mx-auto opacity-30 mb-4" />
+                        <h3 className="text-xl font-medium">Aucun top titre disponible</h3>
+                        <p className="text-muted-foreground mt-2">Aucun top titre n'a été trouvé pour cet artiste.</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  {/* Albums section */}
+                  <TabsContent value="albums" className="mt-0">
+                    {profileData.albums.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                        {profileData.albums.map((album, index) => (
+                          <div 
+                            key={album.id}
+                            className="opacity-0 animate-fade-in"
+                            style={{
+                              animationDelay: `${index * 50}ms`,
+                              animationFillMode: "forwards"
+                            }}
+                          >
+                            <Card className="overflow-hidden hover:bg-white/5 transition-colors bg-black/40 border-white/10 group h-full flex flex-col">
+                              <div className="aspect-square overflow-hidden relative">
+                                <img 
+                                  src={album.cover_medium} 
+                                  alt={album.title}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <a 
+                                    href={album.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-spotify-accent/90 rounded-full p-3 text-white hover:bg-spotify-accent transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300"
+                                  >
+                                    <ExternalLink className="h-5 w-5" />
+                                  </a>
+                                </div>
+                              </div>
+                              <CardContent className="p-3 flex flex-col flex-1">
+                                <h3 className="font-medium truncate w-full">{album.title}</h3>
+                                <div className="mt-auto pt-2">
+                                  <p className="text-xs text-white/60 flex items-center gap-1.5 mt-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {album.release_date ? new Date(album.release_date).getFullYear() : "N/A"}
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <Disc className="h-16 w-16 mx-auto opacity-30 mb-4" />
+                        <h3 className="text-xl font-medium">Aucun album disponible</h3>
+                        <p className="text-muted-foreground mt-2">Aucun album n'a été trouvé pour cet artiste.</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                </div>
+              </Tabs>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground p-4">
