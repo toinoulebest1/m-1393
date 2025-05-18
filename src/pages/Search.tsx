@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,7 @@ const Search = () => {
           throw error;
         }
 
-        const formattedResults = data.map((song: SongWithDeezer) => ({
+        const formattedResults = data.map((song: any) => ({
           id: song.id,
           title: song.title,
           artist: song.artist || '',
@@ -140,8 +141,13 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          deezerArtistId: song.deezer_artist_id ? String(song.deezer_artist_id) : undefined
+          deezerArtistId: song.deezer_artist_id || undefined
         }));
+        
+        console.log("Formatted results:", formattedResults.map(song => ({
+          title: song.title,
+          deezerArtistId: song.deezerArtistId
+        })));
 
         setResults(formattedResults);
         

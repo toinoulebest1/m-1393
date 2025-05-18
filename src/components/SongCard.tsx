@@ -141,30 +141,18 @@ export function SongCard({
                   className={cn(
                     "text-sm transition-all duration-300 hover:text-spotify-accent",
                     isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80",
-                    !artistId && "pointer-events-none"
+                    !artistId && "cursor-default"
                   )}
                   onClick={(e) => {
                     if (!artistId) {
                       e.preventDefault();
                     } else {
-                      e.stopPropagation();  // Éviter de déclencher le onClick du parent
+                      e.stopPropagation(); // Prevent triggering the parent's onClick
                     }
                   }}
                 >
                   {song.artist}
                 </Link>
-              )}
-              {!hideArtistLink && song.artist && artistId && (
-                <div className="flex items-center">
-                  <Link
-                    to={`/artist/${artistId}`}
-                    className="ml-2 inline-flex items-center justify-center p-1 bg-spotify-accent/20 hover:bg-spotify-accent/40 rounded-full transition-all duration-300"
-                    onClick={(e) => e.stopPropagation()}
-                    title={`Voir le profil de ${song.artist}`}
-                  >
-                    <User className="w-3 h-3 text-spotify-accent" />
-                  </Link>
-                </div>
               )}
               {hideArtistLink && song.artist && (
                 <span className={cn(
