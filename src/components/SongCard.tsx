@@ -226,6 +226,18 @@ export function SongCard({
               </button>
             )}
 
+            {/* Artist profile icon - now positioned between favorites and lyrics icons */}
+            {!hideArtistLink && artistId && (
+              <Link
+                to={`/artist/${artistId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 hover:bg-spotify-accent/20 rounded-full transition-all duration-300"
+                title={`Voir le profil de ${song.artist}`}
+              >
+                <User className="w-5 h-5 text-spotify-neutral hover:text-spotify-accent transition-all duration-300 hover:scale-110" />
+              </Link>
+            )}
+
             {onLyricsClick && isAvailable !== false && (
               <button
                 onClick={(e) => {
@@ -250,16 +262,7 @@ export function SongCard({
               </button>
             )}
             
-            {!hideArtistLink && artistId && (
-              <Link
-                to={`/artist/${artistId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 hover:bg-spotify-accent/20 rounded-full transition-all duration-300"
-                title={`Voir le profil de ${song.artist}`}
-              >
-                <User className="w-5 h-5 text-spotify-neutral hover:text-spotify-accent transition-all duration-300 hover:scale-110" />
-              </Link>
-            )}
+            {/* Remove the duplicate artist profile icon that was at the end */}
           </div>
         </div>
       </div>
