@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Song } from "@/types/player";
 import { rgbToClass } from "@/utils/colorExtractor";
+import { useNavigate } from "react-router-dom";
 
 interface ContextMenuItem {
   label: string;
@@ -47,6 +48,7 @@ export const SongCard = ({
   contextMenuItems = [],
 }: SongCardProps) => {
   const { toggleFavorite, isPlaying, pause, play } = usePlayerContext();
+  const navigate = useNavigate();
 
   const handlePlay = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -63,6 +65,16 @@ export const SongCard = ({
         imageUrl: song.imageUrl,
       };
       play(fullSong);
+    }
+  };
+
+  const handleLyricsClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    // Navigate to synced lyrics page instead of using modal
+    navigate("/synced-lyrics");
+    // If the onLyricsClick prop is provided, call it as well (for backward compatibility)
+    if (onLyricsClick) {
+      onLyricsClick();
     }
   };
 
@@ -150,19 +162,15 @@ export const SongCard = ({
           />
         </Button>
 
-        {onLyricsClick && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              onLyricsClick();
-            }}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <FileText size={18} />
-          </Button>
-        )}
+        {/* Lyrics button now navigates to synced lyrics page */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleLyricsClick}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <FileText size={18} />
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { Search as SearchIcon, SlidersHorizontal, Music, User } from "lucide-rea
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
-import { LyricsModal } from "@/components/LyricsModal";
 import { SongCard } from "@/components/SongCard";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
@@ -46,7 +45,6 @@ const Search = () => {
     return localStorage.getItem('lastSelectedGenre') || "";
   });
   const [songToReport, setSongToReport] = useState<any>(null);
-  const [songToShowLyrics, setSongToShowLyrics] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
@@ -178,6 +176,12 @@ const Search = () => {
       toast.error("Erreur lors de la recherche de l'artiste");
     }
   };
+
+  // Handle navigation to synced lyrics page
+  const handleLyricsNavigation = useCallback(() => {
+    // Just navigate to the synced lyrics page
+    navigate("/synced-lyrics");
+  }, [navigate]);
 
   const songCardContextMenu = (song: any) => [
     {
@@ -353,7 +357,7 @@ const Search = () => {
                         isCurrentSong={isCurrentSong}
                         isFavorite={isFavorite}
                         dominantColor={dominantColor}
-                        onLyricsClick={() => setSongToShowLyrics(song)}
+                        onLyricsClick={handleLyricsNavigation}
                         onReportClick={() => setSongToReport(song)}
                         contextMenuItems={songCardContextMenu(song)}
                       />
@@ -378,15 +382,6 @@ const Search = () => {
         song={songToReport}
         onClose={() => setSongToReport(null)}
       />
-      {songToShowLyrics && (
-        <LyricsModal
-          isOpen={!!songToShowLyrics}
-          onClose={() => setSongToShowLyrics(null)}
-          songId={songToShowLyrics.id}
-          songTitle={songToShowLyrics.title}
-          artist={songToShowLyrics.artist}
-        />
-      )}
     </div>
   );
 };
