@@ -315,7 +315,9 @@ export const SyncedLyricsView: React.FC = () => {
   const handleClose = () => {
     setAnimationStage("exit");
     setTimeout(() => {
-      navigate(-1);
+      // Instead of navigate(-1), navigate to a specific route
+      // This ensures we always have a valid route to go back to
+      navigate("/search");
     }, 150);
   };
 
@@ -424,7 +426,7 @@ export const SyncedLyricsView: React.FC = () => {
           <Mic className="w-12 h-12 text-spotify-accent mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Pas de chanson en cours</h2>
           <p className="text-spotify-neutral mb-6">Lancez une chanson pour voir les paroles synchronisées</p>
-          <Button onClick={() => navigate(-1)} variant="outline" className="gap-2">
+          <Button onClick={() => navigate("/search")} variant="outline" className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Retour
           </Button>
