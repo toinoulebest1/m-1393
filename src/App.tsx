@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -229,9 +228,21 @@ function App() {
                 } 
               />
               
-              {/* Artist profile route */}
+              {/* New route for artist profiles */}
               <Route 
                 path="/artist/:artistId" 
+                element={
+                  session ? (
+                    <Layout>
+                      <ArtistProfile />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/artist/name/:artistName" 
                 element={
                   session ? (
                     <Layout>

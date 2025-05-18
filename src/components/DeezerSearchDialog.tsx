@@ -1,11 +1,11 @@
-
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LoaderIcon, Search, Music } from "lucide-react";
+import { LoaderIcon, Search, Music, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 
@@ -18,6 +18,7 @@ interface DeezerSearchDialogProps {
 
 const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSearchDialogProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { refreshCurrentSong } = usePlayerContext();
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -132,6 +133,11 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
     }
   };
 
+  const viewArtistProfile = (artistId: number, artistName: string) => {
+    onClose();
+    navigate(`/artist/${artistId}`);
+  };
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md md:max-w-xl bg-spotify-dark text-foreground border-border">
@@ -204,17 +210,33 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
                         {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
                       </p>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleApplyMetadata(track);
-                      }}
-                      className="shrink-0"
-                    >
-                      {t("common.apply")}
-                    </Button>
+                    <div className="flex gap-2">
+                      {track.artist && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewArtistProfile(track.artist.id, track.artist.name);
+                          }}
+                          className="shrink-0"
+                          title={`Voir le profil de ${track.artist.name}`}
+                        >
+                          <User className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApplyMetadata(track);
+                        }}
+                        className="shrink-0"
+                      >
+                        {t("common.apply")}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

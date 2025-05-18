@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, SlidersHorizontal, Music } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Music, User } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -19,6 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { searchArtist } from "@/services/deezerApi";
 
 const GENRES = [
   "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
@@ -47,6 +49,7 @@ const Search = () => {
   const [songToShowLyrics, setSongToShowLyrics] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -101,32 +104,6 @@ const Search = () => {
         throw error;
       }
 
-      // Recherche également sur Deezer pour obtenir les IDs d'artistes
-      let deezerArtistIds: Record<string, number> = {};
-      
-      // Si nous avons des résultats, recherchons les artistes sur Deezer
-      if (data && data.length > 0) {
-        // Récupérer les noms d'artistes uniques
-        const uniqueArtists = [...new Set(data.map(song => song.artist))];
-        
-        // Pour chaque artiste, rechercher sur Deezer
-        for (const artist of uniqueArtists) {
-          if (artist) {
-            try {
-              const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deezer-search?query=${encodeURIComponent(artist)}&type=artist&limit=1`);
-              if (response.ok) {
-                const result = await response.json();
-                if (result.data && result.data.length > 0) {
-                  deezerArtistIds[artist] = result.data[0].id;
-                }
-              }
-            } catch (err) {
-              console.error(`Erreur lors de la recherche de l'artiste ${artist} sur Deezer:`, err);
-            }
-          }
-        }
-      }
-
       const formattedResults = data.map(song => ({
         id: song.id,
         title: song.title,
@@ -134,8 +111,7 @@ const Search = () => {
         duration: song.duration || '0:00',
         url: song.file_path,
         imageUrl: song.image_url,
-        bitrate: '320 kbps',
-        deezerArtistId: song.artist ? deezerArtistIds[song.artist] : undefined
+        bitrate: '320 kbps'
       }));
 
       setResults(formattedResults);
@@ -178,6 +154,40 @@ const Search = () => {
     handleSearch(text);
   };
 
+  const viewArtistProfile = async (artistName: string) => {
+    if (!artistName || artistName === "Unknown Artist") {
+      toast.error("Nom d'artiste invalide");
+      return;
+    }
+
+    try {
+      toast.info(`Recherche du profil de ${artistName}...`);
+      
+      // Try to find the artist directly in Deezer
+      const artistData = await searchArtist(artistName);
+      
+      if (artistData && artistData.artist) {
+        // Navigate to artist page with the Deezer artist ID
+        navigate(`/artist/${artistData.artist.id}`);
+      } else {
+        // If not found by ID, use the name in the URL
+        navigate(`/artist/name/${encodeURIComponent(artistName)}`);
+      }
+    } catch (error) {
+      console.error("Error searching artist:", error);
+      toast.error("Erreur lors de la recherche de l'artiste");
+    }
+  };
+
+  const songCardContextMenu = (song: any) => [
+    {
+      label: "Voir le profil de l'artiste",
+      icon: <User className="h-4 w-4" />,
+      action: () => viewArtistProfile(song.artist),
+      show: !!song.artist && song.artist !== "Unknown Artist"
+    }
+  ];
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto w-full">
@@ -199,17 +209,6 @@ const Search = () => {
               0% { background-position: 0% 50%; }
               50% { background-position: 100% 50%; }
               100% { background-position: 0% 50%; }
-            }
-
-            @keyframes fadeIn {
-              from {
-                opacity: 0;
-                transform: translateY(10px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
             }
 
             .animate-gradient {
@@ -356,6 +355,7 @@ const Search = () => {
                         dominantColor={dominantColor}
                         onLyricsClick={() => setSongToShowLyrics(song)}
                         onReportClick={() => setSongToReport(song)}
+                        contextMenuItems={songCardContextMenu(song)}
                       />
                     </div>
                   );
