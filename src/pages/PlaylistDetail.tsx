@@ -734,14 +734,8 @@ const PlaylistDetail = () => {
                 isCurrentSong={isCurrentSong(song.songs)}
                 isFavorite={isFavoriteSong(song.songs)}
                 dominantColor={dominantColors[song.songs.id] || null}
-                onLyricsClick={() => handleLyricsClick(song.songs)}
-                onReportClick={() => handleReportClick(song.songs)}
-                contextMenuItems={[
-                  {
-                    label: t('common.removeFromPlaylist'),
-                    action: () => handleRemoveSong(song.id)
-                  }
-                ]}
+                onLyricsClick={handleLyricsClick}
+                onReportClick={handleReportClick}
               />
             </div>
           ))}
