@@ -13,6 +13,7 @@ import { checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
 import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
+import { Music } from "lucide-react";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -237,6 +238,16 @@ const Index = () => {
           </div>
         </div>
       )}
+      
+      {/* En-tête indiquant l'état de lecture */}
+      <div className="w-full text-center pt-6 pb-2">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full backdrop-blur-sm">
+          <Music className="w-5 h-5 text-spotify-accent animate-pulse" />
+          <h1 className="text-lg font-medium text-white">
+            {currentSong ? "Actuellement en cours de lecture" : "Aucune lecture en cours"}
+          </h1>
+        </div>
+      </div>
       
       {/* Affichage de la musique en cours uniquement */}
       <div className="flex-1 w-full flex items-center justify-center">
