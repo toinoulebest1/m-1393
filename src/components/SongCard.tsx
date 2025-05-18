@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Song } from "@/types/player";
+import { rgbToClass } from "@/utils/colorExtractor";
 
 interface ContextMenuItem {
   label: string;
@@ -65,13 +66,24 @@ export const SongCard = ({
     }
   };
 
+  // Generate dynamic background style based on dominantColor if provided and song is current
+  const bgStyle = isCurrentSong && dominantColor ? {
+    background: `linear-gradient(to bottom right, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2), rgba(0, 0, 0, 0.05))`,
+    borderColor: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)`,
+  } : {};
+
+  // Get color class for gradient if available
+  const colorClass = isCurrentSong && dominantColor ? rgbToClass(dominantColor) : '';
+
   return (
     <div
       className={cn(
         "flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer hover:bg-white/5 border border-transparent",
         isCurrentSong && "border-muted bg-white/5",
-        isCurrentSong && isPlaying && "animate-subtle-pulse"
+        isCurrentSong && isPlaying && "animate-subtle-pulse",
+        isCurrentSong && colorClass ? "bg-gradient-to-br" : ""
       )}
+      style={bgStyle}
       onClick={handlePlay}
     >
       <div className="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative group">
