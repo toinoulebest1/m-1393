@@ -14,6 +14,8 @@ export default function OneDriveCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log("Traitement du callback OneDrive...");
+        
         // Récupérer le code d'autorisation depuis l'URL
         const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
@@ -23,31 +25,46 @@ export default function OneDriveCallback() {
           console.error('Error from Microsoft OAuth:', error);
           const errorDescription = urlParams.get('error_description');
           setError(`Erreur Microsoft: ${errorDescription || error}`);
-          toast.error(`Erreur d'authentification: ${errorDescription || error}`);
+          toast({
+            title: "Erreur d'authentification", 
+            description: errorDescription || error,
+            variant: "destructive"
+          });
           setTimeout(() => navigate('/onedrive-settings'), 3000);
           return;
         }
 
         if (!code) {
           setError('Code d\'autorisation manquant dans la réponse');
-          toast.error('Code d\'autorisation manquant dans la réponse');
+          toast({
+            title: "Erreur",
+            description: 'Code d\'autorisation manquant dans la réponse',
+            variant: "destructive"
+          });
           setTimeout(() => navigate('/onedrive-settings'), 3000);
           return;
         }
 
         // Récupérer la configuration OneDrive
         const config = getOneDriveConfig();
+        console.log("Configuration OneDrive récupérée:", { ...config, accessToken: "***", refreshToken: "***" });
         
         if (!config.clientId) {
           setError('Client ID Microsoft non configuré');
-          toast.error('Client ID Microsoft non configuré');
+          toast({
+            title: "Erreur",
+            description: 'Client ID Microsoft non configuré',
+            variant: "destructive"
+          });
           setTimeout(() => navigate('/onedrive-settings'), 3000);
           return;
         }
 
         // Échanger le code contre des tokens
         const redirectUri = window.location.origin + '/onedrive-callback';
+        console.log("URL de redirection:", redirectUri);
         
+        console.log("Échange du code d'autorisation contre des tokens...");
         const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
           method: 'POST',
           headers: {
@@ -65,7 +82,11 @@ export default function OneDriveCallback() {
           const errorData = await response.text();
           console.error('Error exchanging code for tokens:', errorData);
           setError(`Erreur lors de l'échange du code : ${errorData}`);
-          toast.error('Échec de l\'authentification Microsoft');
+          toast({
+            title: "Échec de l'authentification",
+            description: 'Erreur lors de l\'échange du code d\'autorisation',
+            variant: "destructive"
+          });
           setTimeout(() => navigate('/onedrive-settings'), 3000);
           return;
         }
@@ -81,12 +102,21 @@ export default function OneDriveCallback() {
           isEnabled: true
         });
 
-        toast.success('Connexion à Microsoft réussie');
+        toast({
+          title: "Succès",
+          description: 'Connexion à Microsoft réussie',
+          variant: "default"
+        });
+        
         navigate('/onedrive-settings');
       } catch (err) {
         console.error('Error processing OAuth callback:', err);
         setError('Une erreur est survenue lors du traitement de l\'authentification');
-        toast.error('Erreur lors du traitement de l\'authentification');
+        toast({
+          title: "Erreur", 
+          description: 'Une erreur est survenue lors du traitement de l\'authentification',
+          variant: "destructive"
+        });
         setTimeout(() => navigate('/onedrive-settings'), 3000);
       } finally {
         setIsProcessing(false);

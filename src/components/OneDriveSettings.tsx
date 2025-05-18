@@ -13,12 +13,13 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle, XCircle, Loader2, AlertCircle, ArrowRight, ExternalLink, Info } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
+import { Steps, Step } from "@/components/ui/steps";
 
 // Bouton d'authentification Microsoft
 export const MicrosoftOAuthButton = ({ clientId, onTokenReceived }) => {
@@ -100,6 +101,25 @@ export const OneDriveSettings = () => {
     failedItems: Array<{ id: string; error: string }>;
   }>({ success: 0, failed: 0, failedItems: [] });
 
+  // Guide étape par étape pour la configuration
+  const [currentStep, setCurrentStep] = useState(1);
+  
+  useEffect(() => {
+    const checkConfigStatus = () => {
+      const config = getOneDriveConfig();
+      if (config.clientId && config.clientId.trim() !== '' && config.clientId !== 'YOUR_MICROSOFT_CLIENT_ID') {
+        setCurrentStep(2);
+        if (config.accessToken && config.accessToken.trim() !== '') {
+          setCurrentStep(3);
+        }
+      } else {
+        setCurrentStep(1);
+      }
+    };
+
+    checkConfigStatus();
+  }, [clientId, accessToken]);
+  
   useEffect(() => {
     const checkAdminStatus = async () => {
       setIsLoading(true);
@@ -140,14 +160,26 @@ export const OneDriveSettings = () => {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
+      // Validation supplémentaire pour le client ID
+      if (!clientId || clientId.trim() === '' || clientId === 'YOUR_MICROSOFT_CLIENT_ID') {
+        toast({
+          title: "Erreur",
+          description: "Veuillez saisir un Client ID Microsoft valide avant d'enregistrer",
+          variant: "destructive"
+        });
+        setIsSaving(false);
+        return;
+      }
+      
       saveOneDriveConfig({
         accessToken,
         refreshToken,
         isEnabled,
-        clientId // Sauvegarder le Client ID dans la configuration
+        clientId
       });
       toast.success('Configuration OneDrive enregistrée');
       setTestResult(null); // Reset test result when saving new token
+      setCurrentStep(prev => prev < 2 ? 2 : prev);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration OneDrive:', error);
       toast.error('Échec de l\'enregistrement de la configuration OneDrive');
@@ -403,196 +435,283 @@ export const OneDriveSettings = () => {
           Configurer OneDrive pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Ajouter un champ pour le Client ID Microsoft */}
+      <CardContent className="space-y-6">
+        {/* Guide d'installation étape par étape */}
+        <div className="border rounded-md p-4 bg-muted/30">
+          <h3 className="font-medium text-lg mb-3">Configuration de l'intégration OneDrive</h3>
+          <Steps 
+            currentStep={currentStep} 
+            className="pb-4"
+          >
+            <Step title="Créer une application Azure">
+              <p className="text-sm text-muted-foreground mt-2">
+                Créez une application dans le portail Azure pour obtenir un Client ID et configurez les redirections.
+              </p>
+              <Alert className="mt-4 bg-muted/50">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Instructions</AlertTitle>
+                <AlertDescription>
+                  <ol className="list-decimal ml-5 space-y-2 text-sm mt-2">
+                    <li>Connectez-vous au <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">portail Azure</a></li>
+                    <li>Accédez à "Azure Active Directory" &gt; "Inscriptions d'applications" &gt; "Nouvelle inscription"</li>
+                    <li>Donnez un nom à votre application</li>
+                    <li>Sélectionnez "Comptes dans n'importe quel annuaire organisationnel et comptes Microsoft personnels"</li>
+                    <li>Dans URI de redirection, ajoutez <code className="px-1 py-0.5 bg-muted">{window.location.origin}/onedrive-callback</code></li>
+                    <li>Notez l'ID d'application (client) affiché après la création</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+            </Step>
+            <Step title="Authentification Microsoft">
+              <p className="text-sm text-muted-foreground mt-2">
+                Utilisez votre Client ID pour vous authentifier avec Microsoft OneDrive.
+              </p>
+            </Step>
+            <Step title="Configuration terminée">
+              <p className="text-sm text-muted-foreground mt-2">
+                Vous pouvez maintenant utiliser OneDrive pour stocker vos fichiers et migrer votre contenu existant.
+              </p>
+            </Step>
+          </Steps>
+        </div>
+        
+        {/* Champ pour le Client ID Microsoft */}
         <div className="space-y-2">
-          <Label htmlFor="microsoft-client-id">Client ID Microsoft</Label>
+          <Label htmlFor="microsoft-client-id" className="flex items-center space-x-1">
+            <span>Client ID Microsoft</span>
+            {currentStep === 1 && (
+              <Badge variant="outline" className="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
+                Étape actuelle
+              </Badge>
+            )}
+          </Label>
           <Input
             id="microsoft-client-id"
             placeholder="Entrez votre Client ID Microsoft"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
+            className={clientId === 'YOUR_MICROSOFT_CLIENT_ID' || !clientId ? "border-amber-500" : ""}
           />
           <p className="text-xs text-muted-foreground">
             Vous devez créer une application dans le portail Azure pour obtenir un Client ID.
           </p>
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="onedrive-token">Jeton d'accès OneDrive</Label>
-          <Input
-            id="onedrive-token"
-            type="password"
-            placeholder="Entrez votre jeton d'accès OneDrive"
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-          />
-        </div>
+        {/* Bouton pour sauvegarder uniquement le Client ID */}
+        <Button 
+          onClick={handleSaveConfig} 
+          disabled={isSaving || !clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID'}
+          className="w-full"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enregistrement...
+            </>
+          ) : 'Enregistrer le Client ID'}
+        </Button>
         
+        {/* Bouton d'authentification avec indication de l'étape */}
         <div className="space-y-2">
-          <Label htmlFor="refresh-token">Refresh Token</Label>
-          <Input
-            id="refresh-token"
-            type="password"
-            placeholder="Entrez votre refresh token OneDrive"
-            value={refreshToken}
-            onChange={(e) => setRefreshToken(e.target.value)}
-          />
+          <Label className="flex items-center space-x-1">
+            <span>Authentification Microsoft</span>
+            {currentStep === 2 && (
+              <Badge variant="outline" className="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
+                Étape actuelle
+              </Badge>
+            )}
+          </Label>
+          <MicrosoftOAuthButton clientId={clientId} onTokenReceived={handleTokenReceived} />
         </div>
-
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="enable-onedrive"
-            checked={isEnabled}
-            onCheckedChange={setIsEnabled}
-          />
-          <Label htmlFor="enable-onedrive">Utiliser OneDrive pour le stockage de fichiers</Label>
-        </div>
-
-        <MicrosoftOAuthButton clientId={clientId} onTokenReceived={handleTokenReceived} />
         
         <div className="flex items-center gap-2 mt-2">
           <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-none">
             Info
           </Badge>
           <p className="text-xs text-muted-foreground">
-            Pour obtenir un Client ID Microsoft, vous devez créer une application dans le portail Azure et configurer les redirections.
+            Si vous rencontrez des problèmes d'authentification, vérifiez que l'URL de redirection est correcte dans votre application Azure.
           </p>
         </div>
+        
+        {/* Jeton d'accès et configuration avancée - affichée uniquement si le Client ID est configuré */}
+        {currentStep >= 2 && (
+          <>
+            <div className="pt-4 border-t border-border">
+              <h3 className="text-lg font-semibold mb-4">Configuration avancée</h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="onedrive-token">Jeton d'accès OneDrive</Label>
+                <Input
+                  id="onedrive-token"
+                  type="password"
+                  placeholder="Jeton obtenu après authentification Microsoft"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  readOnly={currentStep > 1}
+                  className={currentStep === 3 ? "bg-muted" : ""}
+                />
+              </div>
+              
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="refresh-token">Refresh Token</Label>
+                <Input
+                  id="refresh-token"
+                  type="password"
+                  placeholder="Refresh token obtenu après authentification"
+                  value={refreshToken}
+                  onChange={(e) => setRefreshToken(e.target.value)}
+                  readOnly={currentStep > 1}
+                  className={currentStep === 3 ? "bg-muted" : ""}
+                />
+              </div>
 
-        {testResult === 'success' && (
-          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-400">
-              Le jeton OneDrive est valide et fonctionne correctement.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {testResult === 'error' && (
-          <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
-            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <AlertDescription className="text-red-800 dark:text-red-400">
-              Le jeton OneDrive est invalide ou n'a pas les permissions requises.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Section des migrations avec onglets */}
-        <div className="border-t border-border pt-4 mt-4">
-          <Tabs defaultValue="audio">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="audio">Fichiers Audio</TabsTrigger>
-              <TabsTrigger value="lyrics">Paroles</TabsTrigger>
-            </TabsList>
+              <div className="flex items-center space-x-2 mt-4">
+                <Switch
+                  id="enable-onedrive"
+                  checked={isEnabled}
+                  onCheckedChange={setIsEnabled}
+                />
+                <Label htmlFor="enable-onedrive">Utiliser OneDrive pour le stockage de fichiers</Label>
+              </div>
+            </div>
             
-            {/* Onglet migration audio */}
-            <TabsContent value="audio" className="pt-4">
-              <h3 className="text-lg font-semibold mb-2">Migration des fichiers audio</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Transférez tous les fichiers audio de Supabase vers OneDrive. Cette opération peut prendre du temps selon le nombre de fichiers.
-              </p>
+            {testResult === 'success' && (
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-800 dark:text-green-400">
+                  Le jeton OneDrive est valide et fonctionne correctement.
+                </AlertDescription>
+              </Alert>
+            )}
 
-              {isMigrating ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
-                    <span>{migrationProgress}%</span>
-                  </div>
-                  <Progress value={migrationProgress} className="h-2" />
-                  
-                  <div className="flex justify-between text-sm mt-2">
-                    <span className="text-green-500">Succès: {migrationResults.success}</span>
-                    <span className="text-red-500">Échecs: {migrationResults.failed}</span>
-                  </div>
-                </div>
-              ) : (
-                <Button 
-                  onClick={handleMigrateFiles} 
-                  disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
-                  className="w-full mt-2"
-                >
-                  <ArrowRight className="mr-2 h-4 w-4" />
-                  Démarrer la migration des fichiers audio
-                </Button>
-              )}
+            {testResult === 'error' && (
+              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertDescription className="text-red-800 dark:text-red-400">
+                  Le jeton OneDrive est invalide ou n'a pas les permissions requises.
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
+        )}
+        
+        {/* Section des migrations - affiché uniquement si tout est configuré */}
+        {currentStep >= 3 && (
+          <div className="border-t border-border pt-4 mt-4">
+            <Tabs defaultValue="audio">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="audio">Fichiers Audio</TabsTrigger>
+                <TabsTrigger value="lyrics">Paroles</TabsTrigger>
+              </TabsList>
+              
+              {/* Onglet migration audio */}
+              <TabsContent value="audio" className="pt-4">
+                <h3 className="text-lg font-semibold mb-2">Migration des fichiers audio</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Transférez tous les fichiers audio de Supabase vers OneDrive. Cette opération peut prendre du temps selon le nombre de fichiers.
+                </p>
 
-              {/* Afficher les erreurs de migration audio s'il y en a */}
-              {migrationResults.failedFiles.length > 0 && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <details>
-                      <summary className="cursor-pointer font-medium">
-                        {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
-                      </summary>
-                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
-                        {migrationResults.failedFiles.map((file, index) => (
-                          <li key={index} className="break-all">
-                            ID: {file.id} - <span className="text-red-400">{file.error}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </TabsContent>
-            
-            {/* Onglet migration paroles */}
-            <TabsContent value="lyrics" className="pt-4">
-              <h3 className="text-lg font-semibold mb-2">Migration des paroles</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Transférez toutes les paroles de Supabase vers OneDrive pour permettre leur synchronisation.
-              </p>
-
-              {isMigratingLyrics ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span>Progression: {processedLyrics}/{totalLyrics} paroles</span>
-                    <span>{lyricsProgress}%</span>
+                {isMigrating ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span>Progression: {processedFiles}/{totalFiles} fichiers</span>
+                      <span>{migrationProgress}%</span>
+                    </div>
+                    <Progress value={migrationProgress} className="h-2" />
+                    
+                    <div className="flex justify-between text-sm mt-2">
+                      <span className="text-green-500">Succès: {migrationResults.success}</span>
+                      <span className="text-red-500">Échecs: {migrationResults.failed}</span>
+                    </div>
                   </div>
-                  <Progress value={lyricsProgress} className="h-2" />
-                  
-                  <div className="flex justify-between text-sm mt-2">
-                    <span className="text-green-500">Succès: {lyricsResults.success}</span>
-                    <span className="text-red-500">Échecs: {lyricsResults.failed}</span>
-                  </div>
-                </div>
-              ) : (
-                <Button 
-                  onClick={handleMigrateLyrics} 
-                  disabled={!accessToken || isSaving || isTesting || isMigrating} 
-                  className="w-full mt-2"
-                >
-                  <ArrowRight className="mr-2 h-4 w-4" />
-                  Démarrer la migration des paroles
-                </Button>
-              )}
+                ) : (
+                  <Button 
+                    onClick={handleMigrateFiles} 
+                    disabled={!accessToken || isSaving || isTesting || isMigratingLyrics} 
+                    className="w-full mt-2"
+                  >
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Démarrer la migration des fichiers audio
+                  </Button>
+                )}
 
-              {/* Afficher les erreurs de migration des paroles s'il y en a */}
-              {lyricsResults.failedItems.length > 0 && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <details>
-                      <summary className="cursor-pointer font-medium">
-                        {lyricsResults.failedItems.length} paroles ont échoué lors de la migration
-                      </summary>
-                      <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
-                        {lyricsResults.failedItems.map((item, index) => (
-                          <li key={index} className="break-all">
-                            ID: {item.id} - <span className="text-red-400">{item.error}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+                {/* Afficher les erreurs de migration audio s'il y en a */}
+                {migrationResults.failedFiles.length > 0 && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <details>
+                        <summary className="cursor-pointer font-medium">
+                          {migrationResults.failedFiles.length} fichiers ont échoué lors de la migration
+                        </summary>
+                        <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                          {migrationResults.failedFiles.map((file, index) => (
+                            <li key={index} className="break-all">
+                              ID: {file.id} - <span className="text-red-400">{file.error}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+              
+              {/* Onglet migration paroles */}
+              <TabsContent value="lyrics" className="pt-4">
+                <h3 className="text-lg font-semibold mb-2">Migration des paroles</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Transférez toutes les paroles de Supabase vers OneDrive pour permettre leur synchronisation.
+                </p>
+
+                {isMigratingLyrics ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span>Progression: {processedLyrics}/{totalLyrics} paroles</span>
+                      <span>{lyricsProgress}%</span>
+                    </div>
+                    <Progress value={lyricsProgress} className="h-2" />
+                    
+                    <div className="flex justify-between text-sm mt-2">
+                      <span className="text-green-500">Succès: {lyricsResults.success}</span>
+                      <span className="text-red-500">Échecs: {lyricsResults.failed}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleMigrateLyrics} 
+                    disabled={!accessToken || isSaving || isTesting || isMigrating} 
+                    className="w-full mt-2"
+                  >
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Démarrer la migration des paroles
+                  </Button>
+                )}
+
+                {/* Afficher les erreurs de migration des paroles s'il y en a */}
+                {lyricsResults.failedItems.length > 0 && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <details>
+                        <summary className="cursor-pointer font-medium">
+                          {lyricsResults.failedItems.length} paroles ont échoué lors de la migration
+                        </summary>
+                        <ul className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                          {lyricsResults.failedItems.map((item, index) => (
+                            <li key={index} className="break-all">
+                              ID: {item.id} - <span className="text-red-400">{item.error}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex space-x-2">
         <Button 
@@ -611,9 +730,9 @@ export const OneDriveSettings = () => {
         </Button>
         <Button 
           onClick={handleSaveConfig} 
-          disabled={isSaving || isMigrating || isMigratingLyrics}
+          disabled={isSaving || isMigrating || isMigratingLyrics || !clientId || clientId === 'YOUR_MICROSOFT_CLIENT_ID'}
         >
-          {isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+          {isSaving ? 'Enregistrement...' : 'Enregistrer tous les paramètres'}
         </Button>
       </CardFooter>
     </Card>
