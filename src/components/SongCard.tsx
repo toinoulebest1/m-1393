@@ -5,6 +5,7 @@ import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react
 import { cn } from "@/lib/utils";
 import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { Link } from "react-router-dom";
+import { Button } from "./ui/button";
 
 interface SongCardProps {
   song: any;
@@ -154,7 +155,16 @@ export function SongCard({
                 </Link>
               )}
               {!hideArtistLink && song.artist && artistId && (
-                <User className="ml-1 w-3 h-3 text-spotify-accent/70" />
+                <div className="flex items-center">
+                  <Link
+                    to={`/artist/${artistId}`}
+                    className="ml-2 inline-flex items-center justify-center p-1 bg-spotify-accent/20 hover:bg-spotify-accent/40 rounded-full transition-all duration-300"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Voir le profil de ${song.artist}`}
+                  >
+                    <User className="w-3 h-3 text-spotify-accent" />
+                  </Link>
+                </div>
               )}
               {hideArtistLink && song.artist && (
                 <span className={cn(
@@ -238,6 +248,17 @@ export function SongCard({
               >
                 <Flag className="w-5 h-5 text-spotify-neutral hover:text-white transition-all duration-300 hover:scale-110" />
               </button>
+            )}
+            
+            {!hideArtistLink && artistId && (
+              <Link
+                to={`/artist/${artistId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 hover:bg-spotify-accent/20 rounded-full transition-all duration-300"
+                title={`Voir le profil de ${song.artist}`}
+              >
+                <User className="w-5 h-5 text-spotify-neutral hover:text-spotify-accent transition-all duration-300 hover:scale-110" />
+              </Link>
             )}
           </div>
         </div>
