@@ -1,8 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getDropboxSharedLink as getDropboxAudioUrl, isDropboxEnabled, uploadFileToDropbox as storeDropboxAudioFile } from './dropboxStorage';
 import { ensureAudioBucketExists } from './audioBucketSetup';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink, checkFileExistsOnOneDrive } from './oneDriveStorage';
+import { StorageProvider } from '@/types/onedrive';
 
 export const storeAudioFile = async (id: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
   // Vérifier si OneDrive est activé
@@ -13,19 +13,6 @@ export const storeAudioFile = async (id: string, file: File, onProgress?: (progr
       if (onProgress) onProgress(100);
     } catch (error) {
       console.error('Erreur lors du stockage du fichier sur OneDrive:', error);
-      throw error;
-    }
-    return;
-  }
-  
-  // Vérifier si Dropbox est activé
-  if (isDropboxEnabled()) {
-    console.log("Utilisation de Dropbox pour stocker le fichier audio");
-    try {
-      await storeDropboxAudioFile(file, `audio/${id}`);
-      if (onProgress) onProgress(100);
-    } catch (error) {
-      console.error('Erreur lors du stockage du fichier sur Dropbox:', error);
       throw error;
     }
     return;
@@ -86,12 +73,6 @@ export const getAudioFile = async (fileId: string): Promise<string | null> => {
         return null;
       }
     }
-    
-    // Vérifier si Dropbox est activé
-    if (isDropboxEnabled()) {
-      console.log("Récupération du fichier audio depuis Dropbox:", fileId);
-      return getDropboxAudioUrl(`audio/${fileId}`);
-    }
 
     // Fallback à Supabase
     console.log("Récupération du fichier audio depuis Supabase:", fileId);
@@ -137,13 +118,29 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
   }
 };
 
-// Ajout des fonctions manquantes pour PlaylistDetail.tsx
+// Fonctions pour la gestion des playlists
 export const storePlaylistCover = async (playlistId: string, file: File): Promise<string | null> => {
   try {
+    // Vérifier si OneDrive est activé
+    if (isOneDriveEnabled()) {
+      console.log("Utilisation de OneDrive pour stocker la couverture de playlist");
+      try {
+        await uploadFileToOneDrive(file, `playlists/cover_${playlistId}`);
+        const sharedLink = await getOneDriveSharedLink(`playlists/cover_${playlistId}`);
+        return sharedLink;
+      } catch (error) {
+        console.error('Erreur lors du stockage de la couverture sur OneDrive:', error);
+        // Fallback to Supabase
+      }
+    }
+    
+    // Fallback à Supabase
+    console.log("Utilisation de Supabase pour stocker la couverture de playlist");
+    
     // Vérifier et créer le bucket si nécessaire
     try {
       const { data, error } = await supabase.storage.getBucket('playlists');
-      if (error && error.code === '404') {
+      if (error && (error as any).code === '404') {
         // Le bucket n'existe pas, le créer
         await supabase.storage.createBucket('playlists', {
           public: true
@@ -203,4 +200,12 @@ export const generateImageFromSongs = async (songs: Array<any>): Promise<string 
     console.error('Erreur lors de la génération de l\'image de playlist:', error);
     return null;
   }
+};
+
+// Fonction pour obtenir le provider de stockage actuellement utilisé
+export const getCurrentStorageProvider = (): StorageProvider => {
+  if (isOneDriveEnabled()) {
+    return 'onedrive';
+  }
+  return 'supabase';
 };

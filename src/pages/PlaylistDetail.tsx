@@ -1,294 +1,144 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "react-i18next";
-import { Clock, MoreHorizontal, Music2, Plus, Play, Image as ImageIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { SongPicker } from "@/components/SongPicker";
-import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
-import { SongCard } from "@/components/SongCard";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
+import { usePlayerStore } from '@/stores/playerStore';
+import { Song } from '@/types/player';
+import { SongList } from '@/components/SongList';
+import { Skeleton } from '@/components/ui/skeleton';
+import { storePlaylistCover, generateImageFromSongs } from '@/utils/storage';
+import { useDropzone } from 'react-dropzone';
+import { Pencil, Save, X, Music, Image, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useUserStore } from '@/stores/userStore';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
 
-interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  duration: string;
-  url: string;
-  imageUrl?: string;
-  genre?: string;
-}
-
-interface PlaylistSong {
-  id: string;
-  position: number;
-  added_at: string;
-  songs: Song;
-}
-
-interface Playlist {
-  id: string;
-  name: string;
-  description: string | null;
-  cover_image_url: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Create a canvas with the song images in a grid layout
-const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | null> => {
-  try {
-    // Filter songs that have images
-    const songsWithImages = songs.filter(song => song.songs.imageUrl);
-    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
-    
-    if (songsWithImages.length === 0) {
-      console.log("No songs with images found for cover generation");
-      return null;
+export const PlaylistDetail = () => {
+  const { playlistId } = useParams<{ playlistId: string }>();
+  const navigate = useNavigate();
+  const { theme } = useTheme();
+  const { user } = useUserStore();
+  const { setQueue, setCurrentSong, play } = usePlayerStore();
+  
+  const [playlist, setPlaylist] = useState<any>(null);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  
+  const { getRootProps, getInputProps } = useDropzone({
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+    },
+    maxFiles: 1,
+    onDrop: async (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        handleCoverUpload(acceptedFiles[0]);
+      }
     }
-    
-    // Create a canvas element
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 400;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error("Failed to get canvas context");
-      return null;
+  });
+
+  useEffect(() => {
+    if (playlistId) {
+      fetchPlaylist();
+      fetchPlaylistSongs();
     }
+  }, [playlistId]);
 
-    // Fill with dark background
-    ctx.fillStyle = '#121212';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const fetchPlaylist = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('playlists')
+        .select('*, profiles(username, avatar_url)')
+        .eq('id', playlistId)
+        .single();
 
-    // Determine grid size based on number of images (up to 4)
-    const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
-    const imageSize = canvas.width / gridSize;
+      if (error) {
+        throw error;
+      }
 
-    // Load images
-    const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
-      return new Promise<void>((resolve, reject) => {
-        if (!song.songs.imageUrl) {
-          resolve();
-          return;
+      if (data) {
+        setPlaylist(data);
+        setEditedName(data.name);
+        setEditedDescription(data.description || '');
+        setIsPublic(data.is_public);
+        
+        // Check if current user is the owner
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          setIsOwner(session.user.id === data.user_id);
         }
         
-        console.log(`Loading image for song ${index + 1}:`, song.songs.imageUrl);
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          // Calculate position in the grid
-          const row = Math.floor(index / gridSize);
-          const col = index % gridSize;
-          ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
-          console.log(`Image ${index + 1} drawn successfully`);
-          resolve();
-        };
-        img.onerror = (e) => {
-          console.error(`Error loading image ${index + 1}:`, e);
-          resolve(); // Still resolve to not block other images
-        };
-        img.src = song.songs.imageUrl;
-      });
-    });
-
-    try {
-      // Wait for all images to be drawn
-      await Promise.all(imagePromises);
-      console.log("All images drawn to canvas");
-
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      console.log("Canvas converted to data URL successfully");
-      return dataUrl;
-    } catch (err) {
-      console.error("Error during image processing:", err);
-      return null;
-    }
-  } catch (error) {
-    console.error('Error generating playlist cover:', error);
-    return null;
-  }
-};
-
-// Convert data URL to File object
-const dataURLtoFile = (dataurl: string, filename: string): File => {
-  const arr = dataurl.split(',');
-  const mime = arr[0].match(/:(.*?);/)![1];
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new File([u8arr], filename, { type: mime });
-};
-
-const PlaylistDetail = () => {
-  const { playlistId } = useParams<{ playlistId: string }>();
-  const [playlist, setPlaylist] = useState<Playlist | null>(null);
-  const [songs, setSongs] = useState<PlaylistSong[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState('');
-  const { toast } = useToast();
-  const { t } = useTranslation();
-  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
-  const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
-
-  // Create or update playlist cover based on song images
-  const updatePlaylistCover = async () => {
-    if (!playlistId || songs.length === 0) return;
-    
-    try {
-      setUploading(true);
-      console.log("Starting playlist cover update for", playlistId);
-      
-      // First check if we can use the enhanced generation function
-      const coverDataUrl = await generateImageFromSongs(songs);
-      if (!coverDataUrl) {
-        console.log("No cover data URL generated via enhanced method, trying legacy method");
-        // Fallback to older method
-        const legacyCoverDataUrl = await generatePlaylistCover(songs);
-        if (!legacyCoverDataUrl) {
-          console.log("No cover could be generated");
-          setUploading(false);
-          return;
-        }
+        // Generate share URL
+        const baseUrl = window.location.origin;
+        setShareUrl(`${baseUrl}/playlist/${playlistId}`);
       }
-      
-      // Use whichever data URL we got
-      const finalCoverDataUrl = coverDataUrl || await generatePlaylistCover(songs);
-      console.log("Cover data URL generated, uploading to storage");
-      
-      // Upload using the storage function
-      const publicUrl = await storePlaylistCover(playlistId, finalCoverDataUrl);
-      
-      // Update playlist record
-      console.log("Updating playlist record with new cover URL:", publicUrl);
-      const { error: updateError } = await supabase
-        .from('playlists')
-        .update({ cover_image_url: publicUrl })
-        .eq('id', playlistId);
-      
-      if (updateError) throw updateError;
-      
-      // Update local state
-      setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
-      
-      console.log("Playlist cover updated successfully");
-      toast({
-        description: t('playlists.coverGenerated')
-      });
     } catch (error) {
-      console.error("Error updating playlist cover:", error);
+      console.error('Error fetching playlist:', error);
       toast({
-        title: t('common.error'),
-        description: t('playlists.errorUploadingCover'),
+        title: "Erreur",
+        description: "Impossible de charger la playlist",
         variant: "destructive"
       });
-    } finally {
-      setUploading(false);
     }
   };
 
-  const fetchPlaylistDetails = async () => {
-    if (!playlistId) return;
-    
+  const fetchPlaylistSongs = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Fetch playlist details
-      const { data: playlistData, error: playlistError } = await supabase
-        .from('playlists')
-        .select('*')
-        .eq('id', playlistId)
-        .single();
-      
-      if (playlistError) throw playlistError;
-      if (!playlistData) {
-        toast({
-          title: t('common.error'),
-          description: t('playlists.notFound'),
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setPlaylist(playlistData);
-      setEditedName(playlistData.name);
-      
-      // Fetch songs in the playlist
-      const { data: songsData, error: songsError } = await supabase
+      const { data, error } = await supabase
         .from('playlist_songs')
-        .select(`
-          id,
-          position,
-          added_at,
-          songs:song_id (
-            id,
-            title,
-            artist,
-            duration,
-            file_path,
-            image_url,
-            genre
-          )
-        `)
+        .select('songs(*)')
         .eq('playlist_id', playlistId)
         .order('position', { ascending: true });
-      
-      if (songsError) throw songsError;
-      
-      // Map the data to our Song interface
-      const formattedSongs = songsData.map((item) => ({
-        id: item.id,
-        position: item.position,
-        added_at: item.added_at,
-        songs: {
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const formattedSongs: Song[] = data.map((item: any) => ({
           id: item.songs.id,
           title: item.songs.title,
-          artist: item.songs.artist || '',
-          duration: item.songs.duration || '0:00',
-          url: item.songs.file_path,
-          imageUrl: item.songs.image_url,
-          genre: item.songs.genre
+          artist: item.songs.artist,
+          url: item.songs.file_path || item.songs.id,
+          duration: item.songs.duration,
+          imageUrl: item.songs.image_url || 'https://picsum.photos/240/240',
+          genre: item.songs.genre || 'Unknown',
+        }));
+        setSongs(formattedSongs);
+        
+        // If playlist has no cover, generate one from songs
+        if (playlist && (!playlist.cover_url || playlist.cover_url.includes('placehold.co'))) {
+          generateCoverFromSongs(formattedSongs);
         }
-      }));
-      
-      setSongs(formattedSongs);
-      console.log(`Fetched ${formattedSongs.length} songs for playlist`);
-      
-      // Generate cover if songs are present but playlist has no cover
-      if (formattedSongs.length > 0 && !playlistData.cover_image_url) {
-        console.log("Playlist has songs but no cover, generating cover");
-        setTimeout(() => updatePlaylistCover(), 500);
       }
     } catch (error) {
-      console.error("Error fetching playlist details:", error);
+      console.error('Error fetching playlist songs:', error);
       toast({
-        title: t('common.error'),
-        description: t('playlists.errorFetching'),
+        title: "Erreur",
+        description: "Impossible de charger les chansons de la playlist",
         variant: "destructive"
       });
     } finally {
@@ -296,307 +146,166 @@ const PlaylistDetail = () => {
     }
   };
 
-  const handleUpdateName = async () => {
-    if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
-      setIsEditingName(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('playlists')
-        .update({ name: editedName })
-        .eq('id', playlistId);
-
-      if (error) throw error;
-      
-      setIsEditingName(false);
-      setPlaylist(prev => prev ? { ...prev, name: editedName } : null);
-      
-      toast({
-        description: t('playlists.nameUpdated')
-      });
-    } catch (error) {
-      console.error("Error updating playlist name:", error);
-      toast({
-        title: t('common.error'),
-        description: t('playlists.errorUpdating'),
-        variant: "destructive"
-      });
+  const generateCoverFromSongs = async (songsList: Song[]) => {
+    if (songsList.length > 0 && isOwner) {
+      try {
+        const coverUrl = await generateImageFromSongs(songsList);
+        if (coverUrl) {
+          await updateCoverUrl(coverUrl);
+        }
+      } catch (error) {
+        console.error('Error generating cover:', error);
+      }
     }
   };
 
-  const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !playlistId) return;
-    
-    const file = e.target.files[0];
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `playlist-covers/${playlistId}.${fileExtension}`;
-    
-    setUploading(true);
-    
+  const updateCoverUrl = async (coverUrl: string) => {
     try {
-      // Upload image to Storage
-      const { error: uploadError, data: uploadData } = await supabase.storage
-        .from('media')
-        .upload(fileName, file, {
-          upsert: true,
-          contentType: file.type
-        });
-      
-      if (uploadError) throw uploadError;
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
-      
-      // Update playlist record
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('playlists')
-        .update({ cover_image_url: publicUrl })
+        .update({ cover_url: coverUrl })
         .eq('id', playlistId);
-      
-      if (updateError) throw updateError;
-      
-      setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
-      
-      toast({
-        description: t('playlists.coverUpdated')
-      });
+
+      if (error) {
+        throw error;
+      }
+
+      setPlaylist(prev => ({ ...prev, cover_url: coverUrl }));
     } catch (error) {
-      console.error("Error uploading playlist cover:", error);
+      console.error('Error updating cover URL:', error);
+    }
+  };
+
+  const handleCoverUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const coverUrl = await storePlaylistCover(playlistId!, file);
+      if (coverUrl) {
+        await updateCoverUrl(coverUrl);
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'upload de la couverture:", error);
       toast({
-        title: t('common.error'),
-        description: t('playlists.errorUploadingCover'),
+        title: "Erreur",
+        description: "Impossible d'uploader l'image de couverture",
         variant: "destructive"
       });
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
 
-  const handleRemoveSong = async (playlistSongId: string) => {
-    if (!playlistId) return;
-    
+  const handleSaveChanges = async () => {
     try {
       const { error } = await supabase
+        .from('playlists')
+        .update({
+          name: editedName,
+          description: editedDescription,
+          is_public: isPublic
+        })
+        .eq('id', playlistId);
+
+      if (error) {
+        throw error;
+      }
+
+      setPlaylist(prev => ({
+        ...prev,
+        name: editedName,
+        description: editedDescription,
+        is_public: isPublic
+      }));
+      
+      setIsEditing(false);
+      toast({
+        title: "Succès",
+        description: "Playlist mise à jour"
+      });
+    } catch (error) {
+      console.error('Error updating playlist:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la playlist",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeletePlaylist = async () => {
+    if (!playlistId) return;
+    
+    setIsDeleting(true);
+    try {
+      // First delete all playlist_songs entries
+      const { error: songsError } = await supabase
         .from('playlist_songs')
         .delete()
-        .eq('id', playlistSongId);
-      
-      if (error) throw error;
-      
-      // Remove from local state
-      setSongs(songs.filter(song => song.id !== playlistSongId));
-      
-      // Recalculate positions for remaining songs
-      const remainingSongs = songs
-        .filter(song => song.id !== playlistSongId)
-        .sort((a, b) => a.position - b.position);
-      
-      // Update positions in database
-      const updates = remainingSongs.map((song, index) => ({
-        id: song.id,
-        playlist_id: playlistId,
-        song_id: song.songs.id,
-        position: index + 1
-      }));
-      
-      if (updates.length > 0) {
-        const { error: updateError } = await supabase
-          .from('playlist_songs')
-          .upsert(updates);
+        .eq('playlist_id', playlistId);
         
-        if (updateError) {
-          console.error("Error updating positions:", updateError);
-        }
+      if (songsError) {
+        throw songsError;
+      }
+      
+      // Then delete the playlist itself
+      const { error: playlistError } = await supabase
+        .from('playlists')
+        .delete()
+        .eq('id', playlistId);
+        
+      if (playlistError) {
+        throw playlistError;
       }
       
       toast({
-        description: t('playlists.songRemoved')
+        title: "Succès",
+        description: "Playlist supprimée"
       });
       
-      // Update the cover if needed when songs are removed
-      if (remainingSongs.length > 0 && remainingSongs.length < songs.length) {
-        updatePlaylistCover();
-      }
+      // Navigate back to playlists page
+      navigate('/playlists');
     } catch (error) {
-      console.error("Error removing song:", error);
+      console.error('Error deleting playlist:', error);
       toast({
-        title: t('common.error'),
-        description: t('playlists.errorRemovingSong'),
+        title: "Erreur",
+        description: "Impossible de supprimer la playlist",
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
-  const handleAddSongs = async (selectedSongs: Song[]) => {
-    if (!playlistId || selectedSongs.length === 0) return;
-    
-    try {
-      const nextPosition = songs.length > 0 
-        ? Math.max(...songs.map(s => s.position)) + 1 
-        : 1;
-      
-      // Prepare song data to insert
-      const songsToAdd = selectedSongs.map((song, index) => ({
-        playlist_id: playlistId,
-        song_id: song.id,
-        position: nextPosition + index
-      }));
-      
-      const { error } = await supabase
-        .from('playlist_songs')
-        .insert(songsToAdd);
-      
-      if (error) throw error;
-      
-      // Refresh playlist songs
-      await fetchPlaylistDetails();
-      
-      console.log("Songs added, triggering cover update");
-      // Force trigger the cover update with a longer delay to ensure songs are loaded
-      setTimeout(() => {
-        updatePlaylistCover();
-      }, 1000); // Increased delay to ensure data is ready
-      
-      toast({
-        description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
-      });
-    } catch (error) {
-      console.error("Error adding songs to playlist:", error);
-      toast({
-        title: t('common.error'),
-        description: t('playlists.errorAddingSongs'),
-        variant: "destructive"
-      });
+  const handlePlayAll = () => {
+    if (songs.length > 0) {
+      setQueue(songs);
+      setCurrentSong(songs[0]);
+      play(songs[0]);
     }
   };
 
-  const playPlaylist = () => {
-    if (songs.length === 0) return;
-    
-    const playlistSongs = songs.map(item => ({
-      id: item.songs.id,
-      title: item.songs.title,
-      artist: item.songs.artist,
-      duration: item.songs.duration,
-      url: item.songs.url,
-      imageUrl: item.songs.imageUrl,
-      genre: item.songs.genre
-    }));
-    
-    setQueue(playlistSongs);
-    play(playlistSongs[0]);
-    
-    // Fix: Replace sonner toast.success with shadcn toast
-    toast({
-      description: t('player.playingPlaylist')
-    });
-  };
-  
-  // Improved function to play a specific song
-  const playSong = (song: Song) => {
-    // First, create queue from the entire playlist
-    const playlistSongs = songs.map(item => ({
-      id: item.songs.id,
-      title: item.songs.title,
-      artist: item.songs.artist,
-      duration: item.songs.duration,
-      url: item.songs.url,
-      imageUrl: item.songs.imageUrl,
-      genre: item.songs.genre
-    }));
-    
-    // Update the queue with all songs
-    setQueue(playlistSongs);
-    
-    // Then start playing the selected song
-    play(song);
-    
-    // Fix: Replace sonner toast.success with shadcn toast
-    toast({
-      description: `${t('player.playing')}: ${song.title}`
-    });
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const isCurrentSong = (song: Song) => {
-    return currentSong && currentSong.id === song.id;
-  };
-
-  const isFavoriteSong = (song: Song) => {
-    return favorites.some(fav => fav.id === song.id);
-  };
-  
-  // Function to handle showing song lyrics
-  const handleLyricsClick = (song: Song) => {
-    console.log("Show lyrics for:", song.title);
-    // Here we could implement opening lyrics modal, similar to how it's done in other pages
-  };
-
-  // Function to handle reporting a song
-  const handleReportClick = (song: Song) => {
-    console.log("Report song:", song.title);
-    // Here we could implement report functionality, similar to how it's done in other pages
-  };
-
-  useEffect(() => {
-    fetchPlaylistDetails();
-    
-    // Set up realtime subscriptions
-    if (!playlistId) return;
-    
-    const playlistChannel = supabase
-      .channel('playlist-detail-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'playlists',
-          filter: `id=eq.${playlistId}`
-        },
-        (payload) => {
-          setPlaylist(payload.new as Playlist);
-        }
-      )
-      .subscribe();
-    
-    const songsChannel = supabase
-      .channel('playlist-songs-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'playlist_songs',
-          filter: `playlist_id=eq.${playlistId}`
-        },
-        () => fetchPlaylistDetails()
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(playlistChannel);
-      supabase.removeChannel(songsChannel);
-    };
-  }, [playlistId]);
-
-  if (loading) {
+  if (loading && !playlist) {
     return (
-      <div className="container p-6">
-        <div className="flex items-start gap-6 mb-8">
-          <Skeleton className="w-48 h-48" />
-          <div className="flex-1">
-            <Skeleton className="h-10 w-3/4 mb-4" />
-            <Skeleton className="h-6 w-1/2 mb-6" />
-            <Skeleton className="h-9 w-20" />
+      <div className="container mx-auto p-4 space-y-4">
+        <div className="flex items-center space-x-4">
+          <Skeleton className="h-32 w-32 rounded-md" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-32" />
           </div>
         </div>
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          {[...Array(5)].map((_, i) => (
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
@@ -606,162 +315,275 @@ const PlaylistDetail = () => {
 
   if (!playlist) {
     return (
-      <div className="container p-6">
-        <div className="text-center py-12">
-          <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-          <p className="text-spotify-neutral text-lg">{t('playlists.notFound')}</p>
+      <div className="container mx-auto p-4">
+        <div className="text-center py-8">
+          <h2 className="text-2xl font-bold">Playlist introuvable</h2>
+          <p className="text-muted-foreground mt-2">Cette playlist n'existe pas ou a été supprimée.</p>
+          <Button className="mt-4" onClick={() => navigate('/playlists')}>
+            Retour aux playlists
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container p-6">
-      <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
-        <div className="relative group w-48 h-48 min-w-48 bg-spotify-card rounded-md overflow-hidden flex items-center justify-center">
-          {playlist.cover_image_url ? (
-            <img 
-              src={playlist.cover_image_url} 
-              alt={playlist.name} 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
-          )}
-          
-          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <label htmlFor="cover-upload" className="cursor-pointer">
-              <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
-                <ImageIcon className="h-5 w-5" />
+    <div className="container mx-auto p-4">
+      <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+        {/* Playlist Info Section */}
+        <div className="space-y-4">
+          <div className="relative group">
+            {isUploading ? (
+              <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
               </div>
-              <input 
-                id="cover-upload" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleUploadCover}
-                disabled={uploading}
-              />
-            </label>
+            ) : (
+              <>
+                <img 
+                  src={playlist.cover_url || 'https://placehold.co/400x400/1f1f1f/ffffff?text=Playlist'} 
+                  alt={playlist.name} 
+                  className="w-full aspect-square object-cover rounded-md shadow-md"
+                />
+                {isOwner && (
+                  <div 
+                    {...getRootProps()} 
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md cursor-pointer"
+                  >
+                    <input {...getInputProps()} />
+                    <div className="text-white text-center">
+                      <Image className="h-8 w-8 mx-auto mb-2" />
+                      <p>Changer la couverture</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        </div>
-        
-        <div className="flex-1">
-          <div className="text-xs uppercase text-spotify-neutral font-semibold mb-2">
-            {t('playlists.playlist')}
-          </div>
-          
-          {isEditingName ? (
-            <div className="flex items-center gap-2 mb-4">
-              <Input 
+
+          {isEditing ? (
+            <div className="space-y-3">
+              <Input
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
-                className="text-3xl font-bold h-auto py-2 bg-spotify-input"
-                autoFocus
+                placeholder="Nom de la playlist"
+                className="font-bold text-lg"
               />
-              <Button 
-                onClick={handleUpdateName}
-                className="bg-spotify-accent hover:bg-spotify-accent-hover"
-              >
-                {t('common.save')}
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  setIsEditingName(false);
-                  setEditedName(playlist.name);
-                }}
-              >
-                {t('common.cancel')}
-              </Button>
+              <Textarea
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                placeholder="Description (optionnelle)"
+                className="min-h-[100px]"
+              />
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is-public"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor="is-public" className="text-sm">Playlist publique</label>
+              </div>
+              <div className="flex space-x-2">
+                <Button onClick={handleSaveChanges} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Enregistrer
+                </Button>
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Annuler
+                </Button>
+              </div>
             </div>
           ) : (
-            <h1 
-              className="text-3xl font-bold text-white mb-2 cursor-pointer hover:underline"
-              onClick={() => setIsEditingName(true)}
-            >
-              {playlist.name}
-            </h1>
-          )}
-          
-          {playlist.description && (
-            <p className="text-spotify-neutral mb-4">{playlist.description}</p>
-          )}
-          
-          <p className="text-sm text-spotify-neutral">
-            {songs.length} {songs.length === 1 ? t('common.track') : t('common.tracks')}
-          </p>
-          
-          <div className="flex gap-2 mt-4">
-            {songs.length > 0 && (
-              <Button 
-                onClick={playPlaylist}
-                className="bg-spotify-accent hover:bg-spotify-accent-hover rounded-full"
-              >
-                <Play className="h-5 w-5 mr-2" />
-                {t('common.play')}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">{playlist.name}</h1>
+                {isOwner && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowShareDialog(true)}>
+                        <Image className="h-4 w-4 mr-2" />
+                        Partager
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="text-red-500 focus:text-red-500"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              
+              {playlist.description && (
+                <p className="text-muted-foreground">{playlist.description}</p>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <Badge variant={isPublic ? "default" : "outline"}>
+                  {isPublic ? "Publique" : "Privée"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {songs.length} {songs.length > 1 ? 'titres' : 'titre'}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={playlist.profiles?.avatar_url} />
+                  <AvatarFallback>{playlist.profiles?.username?.charAt(0) || 'U'}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm">{playlist.profiles?.username || 'Utilisateur inconnu'}</span>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Créée {formatDistanceToNow(new Date(playlist.created_at), { addSuffix: true, locale: fr })}
+              </p>
+              
+              <Button onClick={handlePlayAll} disabled={songs.length === 0} className="w-full">
+                <Music className="h-4 w-4 mr-2" />
+                Lire la playlist
               </Button>
-            )}
-            
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="ghost" className="border border-spotify-neutral">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('playlists.addSongs')}
+            </div>
+          )}
+        </div>
+
+        {/* Songs List Section */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Titres</h2>
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : songs.length > 0 ? (
+            <SongList 
+              songs={songs} 
+              currentPlaylist={playlistId}
+              isPlaylistOwner={isOwner}
+              onSongsChange={fetchPlaylistSongs}
+            />
+          ) : (
+            <div className="text-center py-8 border border-dashed rounded-md">
+              <Music className="h-12 w-12 mx-auto text-muted-foreground" />
+              <h3 className="mt-2 font-medium">Aucun titre dans cette playlist</h3>
+              <p className="text-muted-foreground mt-1">
+                {isOwner 
+                  ? "Ajoutez des titres depuis la bibliothèque musicale" 
+                  : "Cette playlist est vide pour le moment"}
+              </p>
+              {isOwner && (
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => navigate('/library')}
+                >
+                  Parcourir la bibliothèque
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-                </DialogHeader>
-                <SongPicker onSelectionConfirmed={handleAddSongs} />
-              </DialogContent>
-            </Dialog>
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-      
-      {songs.length > 0 ? (
-        <div className="space-y-2">
-          {songs.map((song) => (
-            <div 
-              key={song.id} 
-              className="cursor-pointer"
-              onClick={() => playSong(song.songs)}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer cette playlist ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La playlist sera définitivement supprimée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeletePlaylist}
+              disabled={isDeleting}
+              className="bg-red-500 hover:bg-red-600"
             >
-              <SongCard
-                song={song.songs}
-                isCurrentSong={isCurrentSong(song.songs)}
-                isFavorite={isFavoriteSong(song.songs)}
-                dominantColor={dominantColors[song.songs.id] || null}
-                onLyricsClick={handleLyricsClick}
-                onReportClick={handleReportClick}
-              />
+              {isDeleting ? 'Suppression...' : 'Supprimer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Share Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Partager la playlist</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!isPublic && (
+              <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-md text-sm">
+                <p className="text-amber-800 dark:text-amber-300">
+                  Cette playlist est privée. Rendez-la publique pour la partager.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={async () => {
+                    try {
+                      await supabase
+                        .from('playlists')
+                        .update({ is_public: true })
+                        .eq('id', playlistId);
+                      
+                      setIsPublic(true);
+                      setPlaylist(prev => ({ ...prev, is_public: true }));
+                      
+                      toast({
+                        title: "Succès",
+                        description: "La playlist est maintenant publique"
+                      });
+                    } catch (error) {
+                      console.error('Error updating playlist visibility:', error);
+                      toast({
+                        title: "Erreur",
+                        description: "Impossible de mettre à jour la visibilité",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  Rendre publique
+                </Button>
+              </div>
+            )}
+            
+            <div className="flex space-x-2">
+              <Input value={shareUrl} readOnly />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={copyShareLink}>
+                      {copied ? 'Copié !' : 'Copier'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Copier le lien de partage</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
-          <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-          <p className="text-spotify-neutral text-lg mb-4">{t('playlists.noSongs')}</p>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-spotify-accent hover:bg-spotify-accent-hover">
-                <Plus className="h-4 w-4 mr-2" />
-                {t('playlists.addSongs')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-              </DialogHeader>
-              <SongPicker onSelectionConfirmed={handleAddSongs} />
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
-
-export default PlaylistDetail;
