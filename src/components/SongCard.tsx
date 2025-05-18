@@ -10,6 +10,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Song } from "@/types/player";
 
 interface ContextMenuItem {
   label: string;
@@ -25,6 +26,7 @@ interface SongCardProps {
     artist?: string;
     duration?: string;
     imageUrl?: string;
+    url?: string; // Make url optional in the component interface
   };
   isCurrentSong?: boolean;
   isFavorite?: boolean;
@@ -50,7 +52,16 @@ export const SongCard = ({
     if (isCurrentSong) {
       isPlaying ? pause() : play();
     } else {
-      play(song);
+      // Convert the songCard song format to the required Song format
+      const fullSong: Song = {
+        id: song.id,
+        title: song.title,
+        artist: song.artist || "",
+        duration: song.duration || "0:00",
+        url: song.url || "", // Provide a default empty string for url if not present
+        imageUrl: song.imageUrl,
+      };
+      play(fullSong);
     }
   };
 
@@ -102,7 +113,16 @@ export const SongCard = ({
           size="icon"
           onClick={(e) => {
             e.stopPropagation();
-            toggleFavorite(song);
+            // Create a properly formatted song object for toggleFavorite
+            const fullSong: Song = {
+              id: song.id,
+              title: song.title,
+              artist: song.artist || "",
+              duration: song.duration || "0:00",
+              url: song.url || "",
+              imageUrl: song.imageUrl,
+            };
+            toggleFavorite(fullSong);
           }}
           className={cn(
             "text-muted-foreground hover:text-foreground",

@@ -734,8 +734,8 @@ const PlaylistDetail = () => {
                 isCurrentSong={isCurrentSong(song.songs)}
                 isFavorite={isFavoriteSong(song.songs)}
                 dominantColor={dominantColors[song.songs.id] || null}
-                onLyricsClick={handleLyricsClick}
-                onReportClick={handleReportClick}
+                onLyricsClick={() => handleLyricsClick(song.songs)}
+                onReportClick={() => handleReportClick(song.songs)}
               />
             </div>
           ))}
