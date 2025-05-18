@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Clock, Signal, Heart, Flag, FileText, Trash2 } from "lucide-react";
+import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
 
@@ -134,15 +134,17 @@ export function SongCard({
               {song.title}
             </h3>
             {song.deezerArtistId ? (
-              <p 
+              <div 
                 className={cn(
-                  "text-sm transition-all duration-300 cursor-pointer hover:underline",
+                  "flex items-center text-sm transition-all duration-300 cursor-pointer hover:underline",
                   isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
                 )}
                 onClick={goToArtistProfile}
               >
-                {song.artist}
-              </p>
+                <User size={14} className="mr-1 text-spotify-accent" />
+                <span>{song.artist}</span>
+                <span className="ml-1 text-[10px] bg-spotify-accent/25 px-2 py-0.5 rounded-full">Profil</span>
+              </div>
             ) : (
               <p className={cn(
                 "text-sm transition-all duration-300",

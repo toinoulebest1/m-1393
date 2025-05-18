@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Player } from "@/components/Player";
 import { Spinner } from "@/components/ui/spinner";
 import { SongCard } from "@/components/SongCard";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { toast } from "sonner";
+import { Music, Disc, Users } from "lucide-react";
 
 interface DeezerArtist {
   id: number;
@@ -153,26 +154,48 @@ const ArtistProfile = () => {
             }}
           >
             <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
-              <img 
-                src={artist.picture_xl} 
-                alt={artist.name} 
-                className="w-48 h-48 rounded-full object-cover shadow-xl"
-              />
+              <div className="relative group">
+                <img 
+                  src={artist.picture_xl} 
+                  alt={artist.name} 
+                  className="w-48 h-48 rounded-full object-cover shadow-xl group-hover:scale-105 transition-all duration-300"
+                />
+                <div className="absolute top-0 right-0 bg-spotify-accent text-white p-2 rounded-full shadow-lg transform translate-x-1/4 -translate-y-1/4 rotate-12 transition-transform group-hover:rotate-0">
+                  <Music size={16} />
+                </div>
+              </div>
               <div className="text-center md:text-left">
                 <h1 className="text-4xl font-bold mb-2">{artist.name}</h1>
-                <div className="flex flex-wrap gap-4 items-center justify-center md:justify-start">
-                  <span className="text-sm text-spotify-neutral">{artist.nb_album} albums</span>
-                  <span className="text-sm text-spotify-neutral">{artist.nb_fan.toLocaleString()} fans</span>
+                <div className="flex flex-wrap gap-6 items-center justify-center md:justify-start mt-3">
+                  <div className="flex items-center gap-2">
+                    <Disc className="h-5 w-5 text-spotify-accent" />
+                    <span className="text-sm">{artist.nb_album} albums</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-spotify-accent" />
+                    <span className="text-sm">{artist.nb_fan.toLocaleString()} fans</span>
+                  </div>
                 </div>
               </div>
             </div>
             <button
               onClick={handlePlayAll}
               disabled={topTracks.length === 0}
-              className="absolute bottom-8 right-8 px-6 py-3 bg-spotify-accent hover:bg-spotify-accent/80 rounded-full transition-all disabled:bg-gray-600 disabled:cursor-not-allowed"
+              className="absolute bottom-8 right-8 px-6 py-3 bg-spotify-accent hover:bg-spotify-accent/80 rounded-full transition-all disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-2"
             >
+              <Music className="h-5 w-5" />
               Écouter
             </button>
+          </div>
+
+          {/* Back button */}
+          <div className="mb-6">
+            <Link
+              to="/search"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full transition-all text-sm"
+            >
+              ← Retour à la recherche
+            </Link>
           </div>
 
           {/* Titles list */}
