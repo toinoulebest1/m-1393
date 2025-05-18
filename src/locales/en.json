@@ -1,3 +1,4 @@
+
 {
   "common": {
     "appName": "Spotify Clone",
@@ -88,7 +89,7 @@
     "syncLibrary": "Sync Library",
     "syncingLibrary": "Syncing Library...",
     "syncingProgress": "Checking {{current}}/{{total}} files",
-    "dropboxNotEnabled": "Dropbox is not enabled. Please configure Dropbox in settings.",
+    "oneDriveNotEnabled": "OneDrive is not enabled. Please configure OneDrive in settings.",
     "errorFetchingSongs": "Error fetching songs",
     "noSongsToSync": "No songs to sync",
     "songsDeletedSuccess": "{{count}} song(s) deleted because files not found",

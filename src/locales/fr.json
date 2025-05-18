@@ -1,3 +1,4 @@
+
 {
   "common": {
     "appName": "Spotify Clone",
@@ -95,7 +96,7 @@
     "syncLibrary": "Synchroniser la médiathèque",
     "syncingLibrary": "Synchronisation en cours...",
     "syncingProgress": "Vérification {{current}}/{{total}} fichiers",
-    "dropboxNotEnabled": "Dropbox n'est pas activé. Veuillez configurer Dropbox dans les paramètres.",
+    "oneDriveNotEnabled": "OneDrive n'est pas activé. Veuillez configurer OneDrive dans les paramètres.",
     "errorFetchingSongs": "Erreur lors de la récupération des chansons",
     "noSongsToSync": "Aucune chanson à synchroniser",
     "songsDeletedSuccess": "{{count}} chanson(s) supprimée(s) car fichiers introuvables",
