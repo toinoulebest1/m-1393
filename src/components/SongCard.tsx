@@ -1,6 +1,5 @@
-
 import React from "react";
-import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
+import { Heart, MoreHorizontal, Lyrics, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -160,7 +159,7 @@ export const SongCard = ({
             }}
             className="text-muted-foreground hover:text-foreground"
           >
-            <Mic size={18} />
+            <Lyrics size={18} />
           </Button>
         )}
 
