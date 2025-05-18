@@ -1,7 +1,7 @@
+
 import { Player } from "@/components/Player";
-import { NowPlaying } from "@/components/NowPlaying";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
@@ -238,17 +238,39 @@ const Index = () => {
         </div>
       )}
       
-      {/* Pass forceUpdate to force re-render when metadata changes */}
-      <div className="flex-1 w-full">
-        <NowPlaying key={`now-playing-${forceUpdate}`} />
-        
-        {/* Gestionnaire de cache audio */}
-        {showCacheManager && (
-          <div className="absolute right-4 top-14 z-50 w-80">
-            <AudioCacheManager />
+      {/* Affichage de la musique en cours uniquement */}
+      <div className="flex-1 w-full flex items-center justify-center">
+        {currentSong ? (
+          <div className="text-center p-6 max-w-md mx-auto">
+            <div className="w-64 h-64 mx-auto mb-8">
+              <img 
+                src={currentSong.imageUrl || "https://picsum.photos/300/300"} 
+                alt="Album art" 
+                className="w-full h-full object-cover rounded-lg shadow-lg" 
+              />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
+            <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
+            {currentSong.genre && (
+              <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+                {currentSong.genre}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="text-center p-6">
+            <p className="text-gray-400">Aucune musique en cours de lecture</p>
           </div>
         )}
       </div>
+      
+      {/* Gestionnaire de cache audio */}
+      {showCacheManager && (
+        <div className="absolute right-4 top-14 z-50 w-80">
+          <AudioCacheManager />
+        </div>
+      )}
+      
       <Player />
       <Toaster />
     </div>
