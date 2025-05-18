@@ -447,6 +447,7 @@ const Search = () => {
                       {results.map((song, index) => {
                         const isFavorite = favorites.some(s => s.id === song.id);
                         const isCurrentSong = currentSong?.id === song.id;
+                        console.log("Song deezerArtistId:", song.deezerArtistId);
                         
                         return (
                           <div
