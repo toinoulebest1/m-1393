@@ -127,7 +127,9 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          deezerArtistId: song.deezer_artist_id
+          // Use optional chaining to safely access the deezer_artist_id property
+          // if it exists in the database record
+          deezerArtistId: song.deezer_artist_id ? String(song.deezer_artist_id) : undefined
         }));
 
         setResults(formattedResults);
