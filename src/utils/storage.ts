@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { getAudioUrl as getDropboxAudioUrl, isDropboxEnabled, storeAudioFile as storeDropboxAudioFile } from './dropboxStorage';
+import { getDropboxSharedLink as getDropboxAudioUrl, isDropboxEnabled, uploadFileToDropbox as storeDropboxAudioFile } from './dropboxStorage';
 import { ensureAudioBucketExists } from './audioBucketSetup';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink, checkFileExistsOnOneDrive } from './oneDriveStorage';
 
@@ -21,7 +22,7 @@ export const storeAudioFile = async (id: string, file: File, onProgress?: (progr
   if (isDropboxEnabled()) {
     console.log("Utilisation de Dropbox pour stocker le fichier audio");
     try {
-      await storeDropboxAudioFile(id, file);
+      await storeDropboxAudioFile(file, `audio/${id}`);
       if (onProgress) onProgress(100);
     } catch (error) {
       console.error('Erreur lors du stockage du fichier sur Dropbox:', error);
@@ -89,17 +90,17 @@ export const getAudioFile = async (fileId: string): Promise<string | null> => {
     // Vérifier si Dropbox est activé
     if (isDropboxEnabled()) {
       console.log("Récupération du fichier audio depuis Dropbox:", fileId);
-      return getDropboxAudioUrl(fileId);
+      return getDropboxAudioUrl(`audio/${fileId}`);
     }
 
     // Fallback à Supabase
     console.log("Récupération du fichier audio depuis Supabase:", fileId);
-    const { data, error } = await supabase.storage
+    const { data } = await supabase.storage
       .from('audio')
       .getPublicUrl(fileId);
 
-    if (error) {
-      console.error('Erreur lors de la récupération du fichier depuis Supabase:', error);
+    if (!data) {
+      console.error('Erreur lors de la récupération du fichier depuis Supabase: Aucune donnée renvoyée');
       return null;
     }
 
@@ -132,6 +133,74 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
     }
   } catch (error) {
     console.error('Erreur lors de la recherche sur Deezer:', error);
+    return null;
+  }
+};
+
+// Ajout des fonctions manquantes pour PlaylistDetail.tsx
+export const storePlaylistCover = async (playlistId: string, file: File): Promise<string | null> => {
+  try {
+    // Vérifier et créer le bucket si nécessaire
+    try {
+      const { data, error } = await supabase.storage.getBucket('playlists');
+      if (error && error.code === '404') {
+        // Le bucket n'existe pas, le créer
+        await supabase.storage.createBucket('playlists', {
+          public: true
+        });
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du bucket playlists:', error);
+    }
+
+    const filePath = `cover_${playlistId}`;
+    
+    // Upload de l'image
+    const { error } = await supabase.storage
+      .from('playlists')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error('Erreur lors du stockage de la couverture de playlist:', error);
+      return null;
+    }
+
+    // Récupérer l'URL
+    const { data } = await supabase.storage
+      .from('playlists')
+      .getPublicUrl(filePath);
+
+    if (!data) {
+      return null;
+    }
+    
+    return data.publicUrl;
+  } catch (error) {
+    console.error('Erreur lors du stockage de la couverture de playlist:', error);
+    return null;
+  }
+};
+
+export const generateImageFromSongs = async (songs: Array<any>): Promise<string | null> => {
+  try {
+    // Utiliser la première chanson ayant une image, sinon générer une image par défaut
+    for (const song of songs) {
+      if (song.imageUrl && song.imageUrl !== "https://picsum.photos/240/240") {
+        return song.imageUrl;
+      }
+    }
+    
+    // Si aucune image n'est trouvée, générer une couleur aléatoire
+    const randomColor = () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    const color = `#${randomColor()}${randomColor()}${randomColor()}`;
+    
+    // Créer une image avec cette couleur
+    return `https://placehold.co/400x400/${color.substring(1)}/ffffff?text=Playlist`;
+  } catch (error) {
+    console.error('Erreur lors de la génération de l\'image de playlist:', error);
     return null;
   }
 };
