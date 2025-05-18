@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { getAuthorizationUrl, exchangeCodeForTokens } from "@/utils/oneDriveStorage";
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2, ExternalLink, Microsoft } from "lucide-react";
 
 interface MicrosoftOAuthButtonProps {
   clientId: string;
@@ -38,8 +38,9 @@ const MicrosoftOAuthButton = ({
     // Construire l'URL d'autorisation
     const authUrl = getAuthorizationUrl(clientId, redirectUri);
     
-    // Ouvrir la fenêtre d'autorisation
-    window.location.href = authUrl;
+    // Ouvrir la fenêtre d'autorisation dans le même onglet
+    console.log("Redirection vers l'URL d'authentification Microsoft:", authUrl);
+    window.open(authUrl, "_self");
   };
 
   // Vérifier et traiter le code d'autorisation au chargement
@@ -56,11 +57,13 @@ const MicrosoftOAuthButton = ({
         // Nettoyer l'URL
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, document.title, cleanUrl);
+        setIsAuthenticating(false);
         return;
       }
       
       if (code && clientId && clientSecret) {
         setIsProcessingCallback(true);
+        console.log("Code d'autorisation reçu, échange en cours...");
         
         try {
           // Échanger le code contre des tokens
@@ -77,12 +80,14 @@ const MicrosoftOAuthButton = ({
             toast.success('Authentification Microsoft réussie');
           } else {
             toast.error('Tokens incomplets reçus de Microsoft');
+            console.error('Tokens incomplets:', tokenData);
           }
         } catch (error) {
           console.error("Erreur lors de l'échange du code:", error);
           toast.error(`Erreur lors de l'authentification: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
         } finally {
           setIsProcessingCallback(false);
+          setIsAuthenticating(false);
           
           // Nettoyer l'URL
           const cleanUrl = window.location.pathname;
@@ -92,7 +97,7 @@ const MicrosoftOAuthButton = ({
     };
     
     processAuthCode();
-  }, [clientId, clientSecret, onTokensReceived]);
+  }, [clientId, clientSecret, onTokensReceived, redirectUri]);
 
   return (
     <Button 
@@ -109,7 +114,7 @@ const MicrosoftOAuthButton = ({
         </>
       ) : (
         <>
-          <ExternalLink className="mr-2 h-4 w-4" />
+          <Microsoft className="mr-2 h-4 w-4" />
           Authentifier avec Microsoft
         </>
       )}
