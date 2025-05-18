@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Player } from "@/components/Player";
 import { MusicUploader } from "@/components/MusicUploader";
 import { supabase } from '@/integrations/supabase/client';
@@ -10,10 +10,15 @@ import { Music2, Disc3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { SongCard } from "@/components/SongCard";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { extractDominantColor } from "@/utils/colorExtractor";
+import { Song } from "@/types/player";
 
 const Index = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { currentSong, favorites } = usePlayer();
+  const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
   
   // Récupérer les chansons récentes
   const { data: recentSongs, isLoading: loadingRecentSongs } = useQuery({
@@ -69,6 +74,44 @@ const Index = () => {
     updateSongsTable();
   }, []);
 
+  // Extract dominant colors for song images
+  useEffect(() => {
+    if (recentSongs && recentSongs.length > 0) {
+      recentSongs.forEach(async (song) => {
+        if (song.image_url && !dominantColors[song.id]) {
+          try {
+            const color = await extractDominantColor(song.image_url);
+            setDominantColors(prev => ({
+              ...prev,
+              [song.id]: color
+            }));
+          } catch (error) {
+            console.error('Error extracting color:', error);
+          }
+        }
+      });
+    }
+  }, [recentSongs, dominantColors]);
+
+  // Convert database song to Player Song type
+  const convertToPlayerSong = (dbSong: any): Song => {
+    return {
+      id: dbSong.id,
+      title: dbSong.title,
+      artist: dbSong.artist,
+      duration: dbSong.duration || "0:00",
+      url: dbSong.file_path,
+      imageUrl: dbSong.image_url,
+      bitrate: dbSong.bitrate || "320 kbps",
+      genre: dbSong.genre
+    };
+  };
+
+  // Check if song is favorite
+  const isSongFavorite = (songId: string): boolean => {
+    return favorites.some(fav => fav.id === songId);
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto w-full pb-32">
@@ -112,7 +155,13 @@ const Index = () => {
                 ))
               ) : recentSongs && recentSongs.length > 0 ? (
                 recentSongs.map((song) => (
-                  <SongCard key={song.id} song={song} />
+                  <SongCard 
+                    key={song.id} 
+                    song={convertToPlayerSong(song)}
+                    isCurrentSong={currentSong?.id === song.id}
+                    isFavorite={isSongFavorite(song.id)}
+                    dominantColor={dominantColors[song.id] || null}
+                  />
                 ))
               ) : (
                 <div className="col-span-full flex flex-col items-center justify-center p-8 bg-spotify-card rounded-lg">
