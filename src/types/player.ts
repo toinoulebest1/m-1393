@@ -32,7 +32,7 @@ export interface PlayerContextType {
   history: Song[];
   isChangingSong: boolean;
   stopCurrentSong: () => void;
-  removeSong: (songId: string) => void;  // Nouvelle fonction de suppression
+  removeSong: (songId: string) => void;
   setQueue: (songs: Song[] | ((prevSongs: Song[]) => Song[])) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;

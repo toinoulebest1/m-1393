@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -119,7 +118,7 @@ export const MusicUploader = () => {
     }
   };
 
-  // Fonction pour traiter un fichier LRC
+  // Fonction modifiée pour traiter un fichier LRC et l'associer correctement à un fichier audio
   const processLrcFile = async (lrcFile: File, songId: string, title: string, artist: string): Promise<boolean> => {
     try {
       console.log(`Traitement du fichier LRC pour la chanson ${title}:`, lrcFile.name);
@@ -150,6 +149,18 @@ export const MusicUploader = () => {
       if (error) {
         console.error("Erreur lors de l'enregistrement des paroles:", error);
         return false;
+      }
+      
+      // Si OneDrive est activé, sauvegarder également les paroles brutes sur OneDrive
+      if (isOneDriveEnabled()) {
+        try {
+          const { uploadLyricsToOneDrive } = await import('@/utils/oneDriveStorage');
+          await uploadLyricsToOneDrive(songId, lrcContent);
+          console.log("Contenu LRC brut téléchargé vers OneDrive");
+        } catch (oneDriveError) {
+          console.error("Erreur lors de l'upload du fichier LRC vers OneDrive:", oneDriveError);
+          // Ne pas échouer complètement si l'upload OneDrive échoue
+        }
       }
       
       console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
@@ -308,23 +319,45 @@ export const MusicUploader = () => {
         return null;
       }
       
-      // Vérifier si un fichier LRC correspondant a été trouvé
+      // Recherche améliorée des fichiers LRC correspondants
       const baseFileName = file.name.replace(/\.[^/.]+$/, "");
-      const lrcFileName = `${baseFileName}.lrc`;
+      console.log("Recherche de fichiers LRC pour le nom de base:", baseFileName);
       
-      console.log("Recherche d'un fichier LRC correspondant:", lrcFileName);
+      // Vérifier différents formats possibles de noms de fichiers LRC
+      const possibleLrcNames = [
+        `${baseFileName}.lrc`,                       // même nom que l'audio
+        `${title}.lrc`,                             // titre uniquement
+        `${artist} - ${title}.lrc`,                 // artiste - titre
+        `${title} - ${artist}.lrc`,                 // titre - artiste
+        baseFileName.toLowerCase() + ".lrc",        // nom de base en minuscules
+        title.toLowerCase() + ".lrc",               // titre en minuscules
+        `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`  // artiste - titre en minuscules
+      ];
+      
+      console.log("Recherche parmi les noms de fichiers LRC possibles:", possibleLrcNames);
       
       let lyricsFound = false;
+      let lrcFile: File | undefined;
       
-      // Vérifier si nous avons un fichier LRC correspondant dans notre cache temporaire
-      if (lrcFilesRef.current.has(lrcFileName)) {
-        console.log("Fichier LRC correspondant trouvé dans le cache:", lrcFileName);
-        const lrcFile = lrcFilesRef.current.get(lrcFileName)!;
+      // Rechercher parmi tous les noms possibles
+      for (const lrcName of possibleLrcNames) {
+        if (lrcFilesRef.current.has(lrcName)) {
+          console.log(`Fichier LRC correspondant trouvé: ${lrcName}`);
+          lrcFile = lrcFilesRef.current.get(lrcName);
+          break;
+        }
+      }
+      
+      // Si on a trouvé un fichier LRC, le traiter
+      if (lrcFile) {
         lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
         
         if (lyricsFound) {
-          toast.success(`Paroles importées depuis le fichier ${lrcFileName}`);
+          toast.success(`Paroles synchronisées importées depuis le fichier LRC`);
         }
+      } else {
+        console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
+        console.log("Noms de fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
       }
       
       // Si aucun fichier LRC n'a été trouvé, essayer de récupérer les paroles en ligne
@@ -380,9 +413,12 @@ export const MusicUploader = () => {
       const fileName = file.name.toLowerCase();
       
       if (fileName.endsWith('.lrc')) {
-        // Stocker temporairement les fichiers LRC par nom
+        // Stocker les fichiers LRC par nom complet et aussi par nom sans extension
         lrcFilesRef.current.set(file.name, file);
         console.log("Fichier LRC détecté et mis en cache:", file.name);
+        
+        // Afficher un toast pour informer l'utilisateur que des fichiers LRC ont été détectés
+        toast.info(`Fichier de paroles détecté: ${file.name}`);
       } else if (file.type.startsWith('audio/')) {
         audioFiles.push(file);
       }
@@ -395,6 +431,11 @@ export const MusicUploader = () => {
 
     console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
     console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
+    
+    // Afficher les noms des fichiers LRC pour le débogage
+    if (lrcFilesRef.current.size > 0) {
+      console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
+    }
 
     const processedSongs = await Promise.all(
       audioFiles.map(processAudioFile)
