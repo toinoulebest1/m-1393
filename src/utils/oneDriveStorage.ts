@@ -1,4 +1,3 @@
-
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -83,7 +82,7 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
   }
 };
 
-// Function to upload a file to OneDrive
+// Updated function to upload a file to OneDrive
 export const uploadFileToOneDrive = async (
   file: File,
   path: string
@@ -100,7 +99,47 @@ export const uploadFileToOneDrive = async (
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Create upload session for large files
+    // For small files (< 4MB), use simple upload
+    if (file.size < 4 * 1024 * 1024) {
+      console.log('Using simple upload for small file');
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/content`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OneDrive simple upload error status:', response.status, response.statusText);
+        console.error('OneDrive simple upload error details:', errorText);
+        throw new Error(`Failed to upload to OneDrive: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('OneDrive upload successful:', data);
+      
+      // Store the reference in Supabase
+      try {
+        await supabase
+          .from('onedrive_files')
+          .upsert({
+            local_id: path,
+            onedrive_path: path,
+            file_id: data.id,
+            file_name: data.name
+          });
+      } catch (dbError) {
+        console.error('Database error when saving reference:', dbError);
+      }
+      
+      return path;
+    }
+    
+    // For larger files, use upload session with proper chunking
+    console.log('Creating upload session for large file');
     const sessionResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/createUploadSession`, {
       method: 'POST',
       headers: {
@@ -109,7 +148,8 @@ export const uploadFileToOneDrive = async (
       },
       body: JSON.stringify({
         item: {
-          "@microsoft.graph.conflictBehavior": "replace"
+          "@microsoft.graph.conflictBehavior": "replace",
+          name: path.split('/').pop()
         }
       })
     });
@@ -124,47 +164,62 @@ export const uploadFileToOneDrive = async (
     const sessionData = await sessionResponse.json();
     const uploadUrl = sessionData.uploadUrl;
     
-    // Read file content
-    const fileContent = await file.arrayBuffer();
+    // Calculate optimal chunk size: 5MB for good balance of performance/reliability
+    const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+    const fileSize = file.size;
+    const totalChunks = Math.ceil(fileSize / chunkSize);
     
-    // Upload file to the session
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Length': `${file.size}`
-      },
-      body: fileContent
-    });
+    console.log(`Uploading file in ${totalChunks} chunks of ${chunkSize} bytes each`);
     
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('OneDrive upload error status:', uploadResponse.status, uploadResponse.statusText);
-      console.error('OneDrive upload error details:', errorText);
-      throw new Error(`Failed to upload to OneDrive: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
-    }
+    let uploadedBytes = 0;
+    const fileBuffer = await file.arrayBuffer();
     
-    const uploadData = await uploadResponse.json();
-    console.log('OneDrive upload successful:', uploadData);
-    toast.success("Fichier téléchargé avec succès vers OneDrive");
-    
-    // Store the reference in Supabase
-    try {
-      const { error } = await supabase
-        .from('onedrive_files')
-        .insert({
-          local_id: path,
-          onedrive_path: path,
-          file_id: uploadData.id,
-          file_name: uploadData.name
-        });
-        
-      if (error) {
-        console.error('Error saving OneDrive reference:', error);
-        // Continue anyway since the upload succeeded
+    // Upload each chunk with proper Content-Range header
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * chunkSize;
+      const end = Math.min(fileSize, start + chunkSize) - 1;
+      
+      const chunk = new Uint8Array(fileBuffer.slice(start, end + 1));
+      
+      console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}. Bytes ${start}-${end}/${fileSize}`);
+      
+      const chunkResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Length': `${chunk.length}`,
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`
+        },
+        body: chunk
+      });
+      
+      if (!chunkResponse.ok) {
+        const errorText = await chunkResponse.text();
+        console.error(`Chunk upload error (${chunkIndex + 1}/${totalChunks}):`, chunkResponse.status, errorText);
+        throw new Error(`Failed to upload chunk ${chunkIndex + 1}: ${chunkResponse.status} ${chunkResponse.statusText} - ${errorText}`);
       }
-    } catch (dbError) {
-      console.error('Database error when saving reference:', dbError);
-      // Continue anyway since the upload succeeded
+      
+      uploadedBytes += chunk.length;
+      
+      // If it's the last chunk, parse the response to get file data
+      if (chunkIndex === totalChunks - 1) {
+        const uploadData = await chunkResponse.json();
+        console.log('OneDrive chunked upload successful:', uploadData);
+        toast.success("Fichier téléchargé avec succès vers OneDrive");
+        
+        // Store the reference in Supabase
+        try {
+          await supabase
+            .from('onedrive_files')
+            .upsert({
+              local_id: path,
+              onedrive_path: path,
+              file_id: uploadData.id,
+              file_name: uploadData.name
+            });
+        } catch (dbError) {
+          console.error('Database error when saving reference:', dbError);
+        }
+      }
     }
     
     return path;
