@@ -66,6 +66,15 @@ export function SongCard({
     }
   };
   
+  const goToArtistProfile = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Empêche la propagation de l'événement (évite de déclencher handlePlay)
+    
+    if (song.deezerArtistId) {
+      // Utilisation de window.location pour une navigation complète
+      window.location.href = `${window.location.origin}/artist/${song.deezerArtistId}`;
+    }
+  };
+  
   return (
     <div
       className={cn(
@@ -124,12 +133,24 @@ export function SongCard({
             )}>
               {song.title}
             </h3>
-            <p className={cn(
-              "text-sm transition-all duration-300",
-              isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
-            )}>
-              {song.artist}
-            </p>
+            {song.deezerArtistId ? (
+              <p 
+                className={cn(
+                  "text-sm transition-all duration-300 cursor-pointer hover:underline",
+                  isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+                )}
+                onClick={goToArtistProfile}
+              >
+                {song.artist}
+              </p>
+            ) : (
+              <p className={cn(
+                "text-sm transition-all duration-300",
+                isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+              )}>
+                {song.artist}
+              </p>
+            )}
           </div>
         </div>
 

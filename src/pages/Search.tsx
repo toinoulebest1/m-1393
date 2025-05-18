@@ -101,6 +101,32 @@ const Search = () => {
         throw error;
       }
 
+      // Recherche également sur Deezer pour obtenir les IDs d'artistes
+      let deezerArtistIds: Record<string, number> = {};
+      
+      // Si nous avons des résultats, recherchons les artistes sur Deezer
+      if (data && data.length > 0) {
+        // Récupérer les noms d'artistes uniques
+        const uniqueArtists = [...new Set(data.map(song => song.artist))];
+        
+        // Pour chaque artiste, rechercher sur Deezer
+        for (const artist of uniqueArtists) {
+          if (artist) {
+            try {
+              const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/deezer-search?query=${encodeURIComponent(artist)}&type=artist&limit=1`);
+              if (response.ok) {
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                  deezerArtistIds[artist] = result.data[0].id;
+                }
+              }
+            } catch (err) {
+              console.error(`Erreur lors de la recherche de l'artiste ${artist} sur Deezer:`, err);
+            }
+          }
+        }
+      }
+
       const formattedResults = data.map(song => ({
         id: song.id,
         title: song.title,
@@ -108,7 +134,8 @@ const Search = () => {
         duration: song.duration || '0:00',
         url: song.file_path,
         imageUrl: song.image_url,
-        bitrate: '320 kbps'
+        bitrate: '320 kbps',
+        deezerArtistId: song.artist ? deezerArtistIds[song.artist] : undefined
       }));
 
       setResults(formattedResults);
@@ -172,6 +199,17 @@ const Search = () => {
               0% { background-position: 0% 50%; }
               50% { background-position: 100% 50%; }
               100% { background-position: 0% 50%; }
+            }
+
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
             }
 
             .animate-gradient {
