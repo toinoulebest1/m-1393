@@ -1,10 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Clock, Signal, Heart, Flag, FileText, Trash2, User } from "lucide-react";
+import { Clock, Signal, Heart, Flag, FileText, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
-import { Link } from "react-router-dom";
-import { Button } from "./ui/button";
 
 interface SongCardProps {
   song: any;
@@ -13,7 +12,6 @@ interface SongCardProps {
   dominantColor: [number, number, number] | null;
   onLyricsClick?: (song: any) => void;
   onReportClick?: (song: any) => void;
-  hideArtistLink?: boolean;
 }
 
 export function SongCard({
@@ -22,14 +20,12 @@ export function SongCard({
   isFavorite,
   dominantColor,
   onLyricsClick,
-  onReportClick,
-  hideArtistLink = false
+  onReportClick
 }: SongCardProps) {
   const { toggleFavorite, play, pause, isPlaying, removeSong } = usePlayer();
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const [artistId, setArtistId] = useState<string | null>(null);
   
-  // Check audio file availability when component loads
+  // Vérifier la disponibilité du fichier audio au chargement du composant
   useEffect(() => {
     const checkAvailability = async () => {
       if (isOneDriveEnabled()) {
@@ -41,18 +37,12 @@ export function SongCard({
           setIsAvailable(null);
         }
       } else {
-        setIsAvailable(true); // Assume file is available if OneDrive isn't enabled
+        setIsAvailable(true); // Supposer que le fichier est disponible si OneDrive n'est pas activé
       }
     };
     
     checkAvailability();
-    
-    // Get artist ID from song if available
-    if (song.deezerArtistId) {
-      setArtistId(song.deezerArtistId);
-      console.log("Setting artistId in SongCard:", song.deezerArtistId);
-    }
-  }, [song.id, song.deezerArtistId]);
+  }, [song.id]);
   
   const glowStyle = isCurrentSong && dominantColor ? {
     "--glow-shadow": `
@@ -64,7 +54,7 @@ export function SongCard({
 
   const handlePlay = () => {
     if (isAvailable === false) {
-      return; // Do nothing if file is unavailable
+      return; // Ne rien faire si le fichier n'est pas disponible
     }
     
     if (isCurrentSong) {
@@ -73,8 +63,6 @@ export function SongCard({
       } else {
         play();
       }
-    } else {
-      play(song);
     }
   };
   
@@ -136,37 +124,12 @@ export function SongCard({
             )}>
               {song.title}
             </h3>
-            <div className="flex items-center">
-              {!hideArtistLink && song.artist && (
-                <Link 
-                  to={artistId ? `/artist/${artistId}` : "#"} 
-                  className={cn(
-                    "text-sm transition-all duration-300 hover:text-spotify-accent",
-                    isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80",
-                    !artistId && "cursor-default"
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault(); // Prevent default behavior first
-                    e.stopPropagation(); // Stop propagation before anything else
-                    
-                    if (artistId) {
-                      // Use absolute URL to navigate to the artist page
-                      window.location.href = `${window.location.origin}/artist/${artistId}`;
-                    }
-                  }}
-                >
-                  {song.artist}
-                </Link>
-              )}
-              {hideArtistLink && song.artist && (
-                <span className={cn(
-                  "text-sm transition-all duration-300",
-                  isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
-                )}>
-                  {song.artist}
-                </span>
-              )}
-            </div>
+            <p className={cn(
+              "text-sm transition-all duration-300",
+              isCurrentSong ? "text-white/80" : "text-spotify-neutral group-hover:text-white/80"
+            )}>
+              {song.artist}
+            </p>
           </div>
         </div>
 
@@ -216,18 +179,6 @@ export function SongCard({
                   )}
                 />
               </button>
-            )}
-
-            {/* Artist profile icon - positioned between favorites and lyrics icons */}
-            {!hideArtistLink && artistId && (
-              <Link
-                to={`/artist/${artistId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 hover:bg-spotify-accent/20 rounded-full transition-all duration-300"
-                title={`Voir le profil de ${song.artist}`}
-              >
-                <User className="w-5 h-5 text-spotify-neutral hover:text-spotify-accent transition-all duration-300 hover:scale-110" />
-              </Link>
             )}
 
             {onLyricsClick && isAvailable !== false && (
