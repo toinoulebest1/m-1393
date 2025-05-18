@@ -22,6 +22,7 @@ import PlaylistDetail from "./pages/PlaylistDetail";
 import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import OneDriveCallback from "./pages/OneDriveCallback";
+import ArtistProfile from "./pages/ArtistProfile";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -221,6 +222,32 @@ function App() {
                 element={
                   session ? (
                     <OneDriveCallback />
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
+              {/* New route for artist profiles */}
+              <Route 
+                path="/artist/:artistId" 
+                element={
+                  session ? (
+                    <Layout>
+                      <ArtistProfile />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/auth" />
+                  )
+                } 
+              />
+              <Route 
+                path="/artist/name/:artistName" 
+                element={
+                  session ? (
+                    <Layout>
+                      <ArtistProfile />
+                    </Layout>
                   ) : (
                     <Navigate to="/auth" />
                   )

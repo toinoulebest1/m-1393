@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, SlidersHorizontal, Music } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Music, User } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -19,6 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { searchArtist } from "@/services/deezerApi";
 
 const GENRES = [
   "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
@@ -47,6 +49,7 @@ const Search = () => {
   const [songToShowLyrics, setSongToShowLyrics] = useState<any>(null);
   const { play, setQueue, queue, currentSong, favorites, toggleFavorite, isPlaying, pause } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
@@ -150,6 +153,40 @@ const Search = () => {
     setSearchQuery(text);
     handleSearch(text);
   };
+
+  const viewArtistProfile = async (artistName: string) => {
+    if (!artistName || artistName === "Unknown Artist") {
+      toast.error("Nom d'artiste invalide");
+      return;
+    }
+
+    try {
+      toast.info(`Recherche du profil de ${artistName}...`);
+      
+      // Try to find the artist directly in Deezer
+      const artistData = await searchArtist(artistName);
+      
+      if (artistData && artistData.artist) {
+        // Navigate to artist page with the Deezer artist ID
+        navigate(`/artist/${artistData.artist.id}`);
+      } else {
+        // If not found by ID, use the name in the URL
+        navigate(`/artist/name/${encodeURIComponent(artistName)}`);
+      }
+    } catch (error) {
+      console.error("Error searching artist:", error);
+      toast.error("Erreur lors de la recherche de l'artiste");
+    }
+  };
+
+  const songCardContextMenu = (song: any) => [
+    {
+      label: "Voir le profil de l'artiste",
+      icon: <User className="h-4 w-4" />,
+      action: () => viewArtistProfile(song.artist),
+      show: !!song.artist && song.artist !== "Unknown Artist"
+    }
+  ];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -318,6 +355,7 @@ const Search = () => {
                         dominantColor={dominantColor}
                         onLyricsClick={() => setSongToShowLyrics(song)}
                         onReportClick={() => setSongToReport(song)}
+                        contextMenuItems={songCardContextMenu(song)}
                       />
                     </div>
                   );
