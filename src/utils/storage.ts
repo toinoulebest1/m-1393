@@ -1,212 +1,381 @@
 import { supabase } from '@/integrations/supabase/client';
-import { ensureAudioBucketExists } from './audioBucketSetup';
-import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink, checkFileExistsOnOneDrive } from './oneDriveStorage';
-import { StorageProvider } from '@/types/onedrive';
+import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
+import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
-export const storeAudioFile = async (id: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
-  // Vérifier si OneDrive est activé
-  if (isOneDriveEnabled()) {
-    console.log("Utilisation de OneDrive pour stocker le fichier audio");
+export const storeAudioFile = async (id: string, file: File | string) => {
+  console.log("Stockage du fichier audio:", id);
+  
+  // Check if we should use Dropbox instead of Supabase
+  const useDropbox = isDropboxEnabled();
+  console.log("Using storage provider:", useDropbox ? "Dropbox" : "Supabase");
+  
+  let fileToUpload: File;
+  if (typeof file === 'string') {
     try {
-      await uploadFileToOneDrive(file, `audio/${id}`, onProgress);
+      console.log("Fetching file from URL:", file);
+      const response = await fetch(file);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      fileToUpload = new File([blob], id, { type: blob.type || 'audio/mpeg' });
     } catch (error) {
-      console.error('Erreur lors du stockage du fichier sur OneDrive:', error);
+      console.error("Erreur lors de la conversion de l'URL en fichier:", error);
       throw error;
     }
-    return;
+  } else {
+    fileToUpload = file;
   }
 
-  // Fallback à Supabase
-  console.log("Utilisation de Supabase pour stocker le fichier audio");
   try {
-    // Vérifier et créer le bucket si nécessaire
-    await ensureAudioBucketExists();
+    if (useDropbox) {
+      console.log("Uploading file to Dropbox storage:", id);
+      await uploadFileToDropbox(fileToUpload, `audio/${id}`);
+      return `audio/${id}`;
+    } else {
+      console.log("Uploading file to Supabase storage:", id);
+      const { data, error } = await supabase.storage
+        .from('audio')
+        .upload(id, fileToUpload, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: fileToUpload.type || 'audio/mpeg'
+        });
 
-    // Upload du fichier avec progress tracking
-    const options = onProgress ? {
-      onUploadProgress: (progress: number) => {
-        const percentage = Math.round(progress * 100);
-        onProgress(percentage);
+      if (error) {
+        console.error("Erreur lors du stockage du fichier:", error);
+        throw error;
       }
-    } : undefined;
 
-    const { error } = await supabase.storage
-      .from('audio')
-      .upload(id, file, {
-        cacheControl: '3600',
-        upsert: true,
-        ...options
-      });
-
-    if (error) {
-      console.error('Erreur lors du stockage du fichier sur Supabase:', error);
-      throw error;
+      console.log("File uploaded successfully:", data);
+      return data.path;
     }
   } catch (error) {
-    console.error('Erreur lors du stockage du fichier sur Supabase:', error);
+    console.error("Erreur lors du stockage du fichier:", error);
     throw error;
   }
 };
 
-export const getAudioFile = async (fileId: string): Promise<string | null> => {
+export const getAudioFile = async (path: string) => {
+  console.log("Récupération du fichier audio:", path);
+  
+  if (!path) {
+    console.error("Chemin du fichier non fourni");
+    throw new Error("Chemin du fichier non fourni");
+  }
+
   try {
-    // Vérifier si OneDrive est activé
-    if (isOneDriveEnabled()) {
-      console.log("Récupération du fichier audio depuis OneDrive:", fileId);
-      try {
-        // Vérifier si le fichier existe sur OneDrive
-        const fileExists = await checkFileExistsOnOneDrive(`audio/${fileId}`);
-        
-        if (!fileExists) {
-          console.error("Fichier non trouvé sur OneDrive:", fileId);
-          return null;
-        }
-        
-        // Obtenir un lien partagé
-        const sharedLink = await getOneDriveSharedLink(`audio/${fileId}`);
-        console.log("Lien OneDrive obtenu:", sharedLink);
-        return sharedLink;
-      } catch (error) {
-        console.error("Erreur lors de la récupération du fichier depuis OneDrive:", error);
-        return null;
+    // Vérifie d'abord si le fichier est en cache pour une récupération rapide
+    if (await isInCache(path)) {
+      console.log(`Fichier audio trouvé dans le cache: ${path}`);
+      const cachedUrl = await getFromCache(path);
+      if (cachedUrl) {
+        return cachedUrl;
       }
     }
 
-    // Fallback à Supabase
-    console.log("Récupération du fichier audio depuis Supabase:", fileId);
-    const { data } = await supabase.storage
-      .from('audio')
-      .getPublicUrl(fileId);
+    // Si le fichier n'est pas en cache, procède normalement
+    const useDropbox = isDropboxEnabled();
+    console.log("Using storage provider for retrieval:", useDropbox ? "Dropbox" : "Supabase");
 
-    if (!data) {
-      console.error('Erreur lors de la récupération du fichier depuis Supabase: Aucune donnée renvoyée');
-      return null;
+    let audioUrl: string;
+    
+    if (useDropbox) {
+      audioUrl = await getDropboxSharedLink(`audio/${path}`);
+    } else {
+      // Vérifie si le fichier existe
+      const { data: fileExists } = await supabase.storage
+        .from('audio')
+        .list('', { search: path });
+
+      if (!fileExists || fileExists.length === 0) {
+        console.error("Fichier non trouvé dans le stockage:", path);
+        throw new Error("Fichier audio non trouvé");
+      }
+
+      const { data, error } = await supabase.storage
+        .from('audio')
+        .createSignedUrl(path, 3600);
+
+      if (error) {
+        console.error("Erreur lors de la récupération du fichier:", error);
+        throw error;
+      }
+
+      if (!data?.signedUrl) {
+        throw new Error("URL signée non générée");
+      }
+
+      audioUrl = data.signedUrl;
     }
 
-    return data.publicUrl;
+    // Mise en cache pour les futures récupérations
+    try {
+      const response = await fetch(audioUrl);
+      const blob = await response.blob();
+      await addToCache(path, blob);
+    } catch (cacheError) {
+      console.warn("Impossible de mettre en cache le fichier:", cacheError);
+      // Continue même en cas d'échec de mise en cache
+    }
+
+    return audioUrl;
   } catch (error) {
-    console.error("Erreur lors de la récupération du fichier audio:", error);
-    return null;
+    console.error("Erreur lors de la récupération du fichier:", error);
+    throw error;
   }
 };
 
 export const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
   try {
-    const searchTerm = `${artist} ${title}`;
+    const query = `${artist} ${title}`;
+    console.log("Recherche Deezer pour:", { artist, title });
     
-    // Utiliser notre fonction Edge Deezer au lieu d'appeler directement l'API Deezer
-    const { data, error } = await supabase.functions.invoke("deezer-search", {
-      body: { query: searchTerm }
+    const { data: supabaseData, error } = await supabase.functions.invoke('deezer-search', {
+      body: { query }
     });
     
     if (error) {
-      console.error('Erreur lors de la recherche sur Deezer:', error);
+      console.error("Erreur lors de l'appel à l'edge function Deezer:", error);
       return null;
+    }
+
+    console.log("Résultat de la recherche Deezer:", supabaseData);
+    
+    if (supabaseData?.data && supabaseData.data.length > 0) {
+      const track = supabaseData.data[0];
+      if (track.album?.cover_xl) {
+        console.log("Pochette trouvée:", track.album.cover_xl);
+        return track.album.cover_xl;
+      }
     }
     
-    if (data && data.data && data.data.length > 0) {
-      const track = data.data[0];
-      return track.album.cover_xl;
-    } else {
-      console.log('Aucun résultat trouvé sur Deezer pour:', searchTerm);
-      return null;
-    }
-  } catch (error) {
-    console.error('Erreur lors de la recherche sur Deezer:', error);
     return null;
+  } catch (error) {
+    console.error("Erreur lors de la recherche Deezer:", error);
+    return "https://picsum.photos/240/240";
   }
 };
 
-// Fonctions pour la gestion des playlists
-export const storePlaylistCover = async (playlistId: string, file: File): Promise<string | null> => {
+// Enhanced function to store playlist cover images
+export const storePlaylistCover = async (playlistId: string, file: File | string | Blob) => {
+  console.log("Storing playlist cover for:", playlistId, typeof file);
+  
   try {
-    // Vérifier si OneDrive est activé
-    if (isOneDriveEnabled()) {
-      console.log("Utilisation de OneDrive pour stocker la couverture de playlist");
-      try {
-        await uploadFileToOneDrive(file, `playlists/cover_${playlistId}`);
-        const sharedLink = await getOneDriveSharedLink(`playlists/cover_${playlistId}`);
-        return sharedLink;
-      } catch (error) {
-        console.error('Erreur lors du stockage de la couverture sur OneDrive:', error);
-        // Fallback to Supabase
-      }
+    // First, check if the 'media' bucket exists, and create it if it doesn't
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
+      throw bucketsError;
     }
     
-    // Fallback à Supabase
-    console.log("Utilisation de Supabase pour stocker la couverture de playlist");
+    const mediaBucketExists = buckets?.some(bucket => bucket.name === 'media');
     
-    // Vérifier et créer le bucket si nécessaire
-    try {
-      const { data, error } = await supabase.storage.getBucket('playlists');
-      
-      // Fix: StorageError doesn't have a code property, check error message instead
-      if (error && error.message && error.message.includes('not found')) {
-        // Le bucket n'existe pas, le créer
-        await supabase.storage.createBucket('playlists', {
-          public: true
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors de la vérification du bucket playlists:', error);
-    }
-
-    const filePath = `cover_${playlistId}`;
-    
-    // Upload de l'image
-    const { error } = await supabase.storage
-      .from('playlists')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true
+    if (!mediaBucketExists) {
+      console.log("Media bucket doesn't exist. Creating now...");
+      // We need to create the bucket first since it doesn't exist
+      const { error: createBucketError } = await supabase.storage.createBucket('media', {
+        public: true,
+        fileSizeLimit: 5242880 // 5MB
       });
-
-    if (error) {
-      console.error('Erreur lors du stockage de la couverture de playlist:', error);
-      return null;
-    }
-
-    // Récupérer l'URL
-    const { data } = await supabase.storage
-      .from('playlists')
-      .getPublicUrl(filePath);
-
-    if (!data) {
-      return null;
-    }
-    
-    return data.publicUrl;
-  } catch (error) {
-    console.error('Erreur lors du stockage de la couverture de playlist:', error);
-    return null;
-  }
-};
-
-export const generateImageFromSongs = async (songs: Array<any>): Promise<string | null> => {
-  try {
-    // Utiliser la première chanson ayant une image, sinon générer une image par défaut
-    for (const song of songs) {
-      if (song.imageUrl && song.imageUrl !== "https://picsum.photos/240/240") {
-        return song.imageUrl;
+      
+      if (createBucketError) {
+        console.error("Error creating media bucket:", createBucketError);
+        throw createBucketError;
       }
+      console.log("Media bucket created successfully");
     }
     
-    // Si aucune image n'est trouvée, générer une couleur aléatoire
-    const randomColor = () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
-    const color = `#${randomColor()}${randomColor()}${randomColor()}`;
+    let fileToUpload: File;
     
-    // Créer une image avec cette couleur
-    return `https://placehold.co/400x400/${color.substring(1)}/ffffff?text=Playlist`;
+    if (file instanceof Blob) {
+      fileToUpload = new File([file], `playlist-${playlistId}.jpg`, { 
+        type: 'image/jpeg' 
+      });
+      console.log("Converted Blob to File object");
+    } else if (typeof file === 'string') {
+      // Handle data URL or remote URL
+      if (file.startsWith('data:')) {
+        console.log("Processing data URL");
+        // Convert data URL to Blob
+        const response = await fetch(file);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
+          type: 'image/jpeg' 
+        });
+        console.log("Converted data URL to File object", blob.size, "bytes");
+      } else {
+        console.log("Fetching remote URL:", file);
+        // Fetch remote URL
+        const response = await fetch(file);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
+          type: blob.type || 'image/jpeg' 
+        });
+        console.log("Converted remote URL to File object", blob.size, "bytes");
+      }
+    } else {
+      fileToUpload = file;
+      console.log("Using provided File object");
+    }
+    
+    // Make sure we have a valid image file before proceeding
+    if (!fileToUpload || fileToUpload.size === 0) {
+      console.error("Invalid file or empty file");
+      throw new Error("Invalid or empty file");
+    }
+    
+    const fileName = `playlist-covers/${playlistId}.jpg`;
+    console.log(`Uploading playlist cover to storage: ${fileName}, size: ${fileToUpload.size} bytes`);
+    
+    // Upload the file
+    const { data, error } = await supabase.storage
+      .from('media')
+      .upload(fileName, fileToUpload, {
+        upsert: true,
+        contentType: fileToUpload.type || 'image/jpeg',
+        cacheControl: '3600'
+      });
+    
+    if (error) {
+      console.error("Error during storage upload:", error);
+      throw error;
+    }
+    
+    console.log("Upload succeeded, path:", data.path);
+    
+    // Get public URL with cache-busting parameter
+    const timestamp = new Date().getTime();
+    const { data: { publicUrl } } = supabase.storage
+      .from('media')
+      .getPublicUrl(`${fileName}?t=${timestamp}`);
+    
+    console.log("Public URL generated:", publicUrl);
+    return publicUrl;
   } catch (error) {
-    console.error('Erreur lors de la génération de l\'image de playlist:', error);
+    console.error("Error storing playlist cover:", error);
+    throw error;
+  }
+};
+
+// New function to fetch an existing playlist cover
+export const getPlaylistCover = async (playlistId: string): Promise<string | null> => {
+  try {
+    const fileName = `playlist-covers/${playlistId}.jpg`;
+    
+    // Check if the file exists
+    const { data: fileExists } = await supabase.storage
+      .from('media')
+      .list('playlist-covers', {
+        search: `${playlistId}.jpg`,
+        limit: 1
+      });
+      
+    if (!fileExists || fileExists.length === 0) {
+      console.log("No existing cover found for playlist:", playlistId);
+      return null;
+    }
+    
+    // Get public URL with cache-busting parameter
+    const timestamp = new Date().getTime();
+    const { data: { publicUrl } } = supabase.storage
+      .from('media')
+      .getPublicUrl(`${fileName}?t=${timestamp}`);
+    
+    console.log("Existing cover found:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("Error checking for playlist cover:", error);
     return null;
   }
 };
 
-// Fonction pour obtenir le provider de stockage actuellement utilisé
-export const getCurrentStorageProvider = (): StorageProvider => {
-  if (isOneDriveEnabled()) {
-    return 'onedrive';
+// Better image generation with error handling and higher quality
+export const generateImageFromSongs = async (songs: any[]): Promise<string | null> => {
+  try {
+    // Filter songs that have images
+    const songsWithImages = songs.filter(song => 
+      song.songs?.imageUrl && song.songs.imageUrl.startsWith('http')
+    );
+    
+    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
+    
+    if (songsWithImages.length === 0) {
+      console.log("No songs with valid image URLs found");
+      return null;
+    }
+    
+    // Create canvas with higher resolution
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;  // Higher resolution
+    canvas.height = 600; // Higher resolution
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return null;
+    }
+
+    // Fill with dark background
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Determine grid size based on number of images (up to 4)
+    const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
+    const imageSize = canvas.width / gridSize;
+    
+    console.log(`Using grid size: ${gridSize}x${gridSize}, image size: ${imageSize}px`);
+
+    // Load images with proper error handling
+    const loadImage = (url: string): Promise<HTMLImageElement | null> => {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+          console.error(`Error loading image ${url}:`, e);
+          resolve(null);
+        };
+        // Add cache-busting parameter
+        const cacheBuster = `?t=${new Date().getTime()}`;
+        img.src = url.includes('?') ? `${url}&cb=${cacheBuster}` : `${url}${cacheBuster}`;
+      });
+    };
+
+    // Process images in parallel with proper error handling
+    const imagePromises = await Promise.all(
+      songsWithImages.slice(0, 4).map(song => loadImage(song.songs.imageUrl))
+    );
+    
+    // Filter out any failed images
+    const validImages = imagePromises.filter(img => img !== null) as HTMLImageElement[];
+    
+    console.log(`Successfully loaded ${validImages.length} images out of ${songsWithImages.length} attempted`);
+    
+    if (validImages.length === 0) {
+      console.log("No images could be loaded successfully");
+      return null;
+    }
+
+    // Draw valid images to the canvas
+    validImages.forEach((img, index) => {
+      const row = Math.floor(index / gridSize);
+      const col = index % gridSize;
+      ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
+      console.log(`Drew image ${index + 1} at position [${row},${col}]`);
+    });
+
+    // Convert to high-quality data URL
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    console.log(`Generated data URL of length ${dataUrl.length}`);
+    
+    return dataUrl;
+  } catch (error) {
+    console.error('Error generating playlist cover:', error);
+    return null;
   }
-  return 'supabase';
 };

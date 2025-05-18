@@ -16,9 +16,9 @@ import { ThemeProvider } from "next-themes";
 import { CastProvider } from "./contexts/CastContext";
 import './App.css';
 
-// Use proper import for PlaylistDetail (importing as named export, not default)
-import { PlaylistDetail } from "./pages/PlaylistDetail";
+// Add new imports
 import Playlists from "./pages/Playlists";
+import PlaylistDetail from "./pages/PlaylistDetail";
 import { DropboxSettings } from "./components/DropboxSettings";
 import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";

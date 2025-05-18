@@ -5,7 +5,6 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
 import { isDropboxEnabled } from "@/utils/dropboxStorage";
-import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -37,15 +36,7 @@ export const MusicUploader = () => {
     // Check which storage provider is active
     const checkStorageProvider = () => {
       const useDropbox = isDropboxEnabled();
-      const useOneDrive = isOneDriveEnabled();
-      
-      if (useOneDrive) {
-        setStorageProvider("OneDrive");
-      } else if (useDropbox) {
-        setStorageProvider("Dropbox");
-      } else {
-        setStorageProvider("Supabase");
-      }
+      setStorageProvider(useDropbox ? "Dropbox" : "Supabase");
     };
     
     checkStorageProvider();
@@ -258,17 +249,7 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Stocker le fichier avec le storage provider actif
-      const uploadToastId = toast.loading(`Upload en cours vers ${storageProvider}...`);
-      setUploadToastId(uploadToastId);
-      
-      await storeAudioFile(fileId, file, (progress) => {
-        setUploadProgress(progress);
-        toast.loading(`Upload en cours: ${progress}%`, { id: uploadToastId });
-      });
-      
-      toast.success(`Fichier audio uploadé avec succès vers ${storageProvider}`, { id: uploadToastId });
-      setUploadToastId(null);
+      await storeAudioFile(fileId, file);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -316,7 +297,6 @@ export const MusicUploader = () => {
           file_path: fileId,
           duration: formattedDuration,
           image_url: imageUrl,
-          storage_provider: storageProvider.toLowerCase() // Ajouter le storage provider utilisé
         })
         .select()
         .single();
@@ -383,10 +363,6 @@ export const MusicUploader = () => {
       toast.error("Erreur lors de l'upload du fichier");
       setIsUploading(false);
       setUploadProgress(0);
-      if (uploadToastId) {
-        toast.error("Échec de l'upload", { id: uploadToastId });
-        setUploadToastId(null);
-      }
       return null;
     }
   };
@@ -580,21 +556,6 @@ export const MusicUploader = () => {
           <p className="text-white text-lg font-medium">
             Déposez vos fichiers ici
           </p>
-        </div>
-      )}
-      
-      {isUploading && (
-        <div className="mt-2">
-          <div className="flex justify-between text-xs mb-1">
-            <span>Uploading to {storageProvider}</span>
-            <span>{uploadProgress}%</span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-1.5">
-            <div 
-              className="bg-spotify-accent h-1.5 rounded-full" 
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
-          </div>
         </div>
       )}
     </div>

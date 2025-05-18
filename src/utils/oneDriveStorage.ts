@@ -1,6 +1,6 @@
-import { OneDriveConfig, OneDriveFileReference, StorageProvider } from '@/types/onedrive';
+import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 // Helper pour la configuration OneDrive
 export const getOneDriveConfig = (): OneDriveConfig => {
@@ -163,121 +163,10 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
   }
 };
 
-// Nouvelle fonction pour créer une session d'upload en plusieurs parties
-const createUploadSession = async (filePath: string, fileSize: number): Promise<string | null> => {
-  const config = getOneDriveConfig();
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    throw new Error("OneDrive access token not configured");
-  }
-  
-  // Créer le chemin complet pour le fichier
-  const onedrivePath = `/app/${filePath}`;
-  
-  try {
-    // Créer les dossiers parents si nécessaires
-    const folderPath = onedrivePath.substring(0, onedrivePath.lastIndexOf('/'));
-    await createFolderPath(folderPath);
-    
-    // Encoder le chemin pour l'URL
-    const encodedPath = encodeURIComponent(onedrivePath);
-    
-    // Créer la session d'upload
-    const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}:/createUploadSession`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        item: {
-          "@microsoft.graph.conflictBehavior": "replace",
-          name: onedrivePath.split('/').pop()
-        }
-      })
-    });
-    
-    if (response.status === 401) {
-      // Token expiré, essayer de le rafraîchir
-      const newToken = await refreshOneDriveToken();
-      if (newToken) {
-        // Réessayer avec le nouveau token
-        return createUploadSession(filePath, fileSize);
-      }
-      throw new Error('Failed to refresh OneDrive token');
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create upload session: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    return data.uploadUrl;
-  } catch (error) {
-    console.error('Error creating upload session:', error);
-    throw error;
-  }
-};
-
-// Fonction pour télécharger un fichier vers OneDrive en plusieurs parties
-const uploadLargeFile = async (
-  file: File,
-  uploadUrl: string,
-  onProgress?: (progress: number) => void
-): Promise<any> => {
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
-  const fileSize = file.size;
-  let start = 0;
-  
-  console.log(`Uploading file in chunks of ${CHUNK_SIZE / (1024 * 1024)}MB. Total size: ${fileSize / (1024 * 1024)}MB`);
-  
-  while (start < fileSize) {
-    const end = Math.min(fileSize, start + CHUNK_SIZE);
-    const chunk = file.slice(start, end);
-    const contentLength = end - start;
-    
-    const contentRange = `bytes ${start}-${end - 1}/${fileSize}`;
-    console.log(`Uploading chunk: ${contentRange}`);
-    
-    try {
-      const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Length': `${contentLength}`,
-          'Content-Range': contentRange
-        },
-        body: chunk
-      });
-      
-      // Si c'est le dernier chunk ou s'il y a une erreur
-      if ((start + CHUNK_SIZE >= fileSize) || !response.ok) {
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to upload chunk: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-        
-        // Dernier chunk réussi, retourner la réponse
-        return await response.json();
-      }
-      
-      // Mettre à jour la progression
-      start += CHUNK_SIZE;
-      if (onProgress) {
-        onProgress(Math.min(100, Math.round((start / fileSize) * 100)));
-      }
-    } catch (error) {
-      console.error('Error uploading chunk:', error);
-      throw error;
-    }
-  }
-};
-
 // Fonction pour télécharger un fichier vers OneDrive
 export const uploadFileToOneDrive = async (
   file: File,
-  path: string,
-  onProgress?: (progress: number) => void
+  path: string
 ): Promise<string> => {
   const config = getOneDriveConfig();
   
@@ -291,11 +180,11 @@ export const uploadFileToOneDrive = async (
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
+    // Chemin complet du fichier sur OneDrive
+    const onedrivePath = `/app/${path}`;
+    
     // Pour les fichiers de moins de 4 Mo, utiliser l'upload simple
     if (file.size < 4 * 1024 * 1024) {
-      // Chemin complet du fichier sur OneDrive
-      const onedrivePath = `/app/${path}`;
-      
       // Première étape : créer le dossier parent si nécessaire
       const folderPath = onedrivePath.substring(0, onedrivePath.lastIndexOf('/'));
       
@@ -341,7 +230,6 @@ export const uploadFileToOneDrive = async (
           // Stocker la référence dans Supabase
           await storeFileReference(path, data.id, data.name);
           
-          if (onProgress) onProgress(100);
           return data.webUrl || onedrivePath;
         }
         
@@ -358,26 +246,11 @@ export const uploadFileToOneDrive = async (
       // Stocker la référence dans Supabase
       await storeFileReference(path, data.id, data.name);
       
-      if (onProgress) onProgress(100);
       return data.webUrl || onedrivePath;
     } else {
-      // Pour les fichiers plus grands, utiliser l'upload en plusieurs parties
-      console.log("Large file detected, using chunked upload");
-      
-      // Créer une session d'upload
-      const uploadUrl = await createUploadSession(path, file.size);
-      
-      if (!uploadUrl) {
-        throw new Error("Couldn't create upload session");
-      }
-      
-      // Upload du fichier en plusieurs parties
-      const result = await uploadLargeFile(file, uploadUrl, onProgress);
-      
-      // Stocker la référence dans Supabase
-      await storeFileReference(path, result.id, result.name);
-      
-      return result.webUrl || `/app/${path}`;
+      // Pour les fichiers plus grands, implémenter l'upload en plusieurs parties ici
+      // Cette partie est plus complexe et nécessite la création d'une session d'upload
+      throw new Error('Large file upload not implemented yet');
     }
   } catch (error) {
     console.error('Error uploading to OneDrive:', error);
@@ -418,7 +291,7 @@ const createFolderPath = async (path: string): Promise<void> => {
         body: JSON.stringify({
           name: folder,
           folder: {},
-          "@microsoft.graph.conflictBehavior": 'fail'
+          '@microsoft.graph.conflictBehavior': 'fail'
         })
       });
       
@@ -927,12 +800,4 @@ export const migrateLyricsToOneDrive = async (
     console.error('Error migrating lyrics to OneDrive:', error);
     throw error;
   }
-};
-
-// Fonction pour obtenir le provider de stockage actuellement utilisé
-export const getCurrentStorageProvider = (): StorageProvider => {
-  if (isOneDriveEnabled()) {
-    return 'onedrive';
-  }
-  return 'supabase';
 };

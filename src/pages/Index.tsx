@@ -1,227 +1,213 @@
 
-import React, { useEffect, useState } from 'react';
 import { Player } from "@/components/Player";
-import { MusicUploader } from "@/components/MusicUploader";
-import { supabase } from '@/integrations/supabase/client';
+import { NowPlaying } from "@/components/NowPlaying";
+import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Toaster } from "@/components/ui/sonner";
+import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Music2, Disc3 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { SongCard } from "@/components/SongCard";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { extractDominantColor } from "@/utils/colorExtractor";
-import { Song } from "@/types/player";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { updateMediaSessionMetadata } from "@/utils/mediaSession";
+import { AudioCacheManager } from "@/components/AudioCacheManager";
 
 const Index = () => {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { currentSong, favorites } = usePlayer();
-  const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
-  
-  // Récupérer les chansons récentes
-  const { data: recentSongs, isLoading: loadingRecentSongs } = useQuery({
-    queryKey: ['recent-songs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('songs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+  const [username, setUsername] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
+  const isMobile = useIsMobile();
+  const [showCacheManager, setShowCacheManager] = useState(false);
 
-      if (error) {
-        console.error('Erreur lors du chargement des chansons récentes:', error);
-        return [];
+  // Force re-render when currentSong changes
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+
+  // Set up MediaSession API for mobile device notifications
+  useEffect(() => {
+    if (currentSong) {
+      updateMediaSessionMetadata(currentSong);
+      
+      // Set up media session action handlers
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => play());
+        navigator.mediaSession.setActionHandler('pause', () => pause());
+        navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+        navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
       }
-      return data;
     }
-  });
+  }, [currentSong, play, pause, nextSong, previousSong, isPlaying]);
 
-  // Récupérer les playlists populaires
-  const { data: playlists, isLoading: loadingPlaylists } = useQuery({
-    queryKey: ['playlists'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('playlists')
-        .select('*')
-        .limit(4);
-
-      if (error) {
-        console.error('Erreur lors du chargement des playlists:', error);
-        return [];
-      }
-      return data;
+  // Update MediaSession playback state when isPlaying changes
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
-  });
+  }, [isPlaying]);
 
   useEffect(() => {
-    // Exécuter la fonction pour mettre à jour la structure de la table
-    const updateSongsTable = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('update-songs-table');
+    if (currentSong) {
+      // This will trigger a re-render when the current song changes
+      setForceUpdate(prev => prev + 1);
+      
+      // Show mobile notification when song changes
+      if (isMobile && currentSong.id !== previousSongId) {
+        const formatDuration = (duration: string | undefined) => {
+          if (!duration) return "0:00";
+          
+          try {
+            if (duration.includes(':')) {
+              const [minutes, seconds] = duration.split(':').map(Number);
+              if (isNaN(minutes) || isNaN(seconds)) return "0:00";
+              return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            const durationInSeconds = parseFloat(duration);
+            if (isNaN(durationInSeconds)) return "0:00";
+            
+            const minutes = Math.floor(durationInSeconds / 60);
+            const seconds = Math.floor(durationInSeconds % 60);
+            
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          } catch (error) {
+            console.error("Error formatting duration:", error);
+            return "0:00";
+          }
+        };
+
+        toast(
+          <div className="flex items-center gap-3">
+            <img 
+              src={currentSong.imageUrl || "https://picsum.photos/56/56"} 
+              alt="Album art" 
+              className="w-12 h-12 rounded-md" 
+            />
+            <div>
+              <h3 className="font-medium text-sm">{currentSong.title}</h3>
+              <div className="flex items-center justify-between w-full">
+                <p className="text-xs text-muted-foreground">{currentSong.artist}</p>
+                <p className="text-xs text-muted-foreground ml-2">{formatDuration(currentSong.duration)}</p>
+              </div>
+            </div>
+          </div>,
+          {
+            duration: 3000,
+            position: "top-center",
+            className: "bg-spotify-dark border border-white/10"
+          }
+        );
         
-        if (error) {
-          console.error('Erreur lors de la mise à jour de la table songs:', error);
-        } else {
-          console.log('Résultat de la mise à jour de la table:', data);
-        }
-      } catch (err) {
-        console.error('Erreur lors de l\'appel à la fonction de mise à jour:', err);
+        setPreviousSongId(currentSong.id);
+      }
+    }
+  }, [currentSong, isMobile, previousSongId]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      setUserId(session.user.id);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        setUsername(profile.username);
       }
     };
-    
-    updateSongsTable();
-  }, []);
 
-  // Extract dominant colors for song images
-  useEffect(() => {
-    if (recentSongs && recentSongs.length > 0) {
-      recentSongs.forEach(async (song) => {
-        if (song.image_url && !dominantColors[song.id]) {
-          try {
-            const color = await extractDominantColor(song.image_url);
-            setDominantColors(prev => ({
-              ...prev,
-              [song.id]: color
-            }));
-          } catch (error) {
-            console.error('Error extracting color:', error);
+    fetchProfile();
+
+    // Abonnement aux changements en temps réel pour le profil
+    const profileChannel = supabase
+      .channel('profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload: any) => {
+          // Ne mettre à jour que si le changement concerne l'utilisateur actuel
+          if (payload.new.id === userId && payload.new.username !== username) {
+            setUsername(payload.new.username);
           }
         }
-      });
-    }
-  }, [recentSongs, dominantColors]);
+      )
+      .subscribe();
 
-  // Convert database song to Player Song type
-  const convertToPlayerSong = (dbSong: any): Song => {
-    return {
-      id: dbSong.id,
-      title: dbSong.title,
-      artist: dbSong.artist,
-      duration: dbSong.duration || "0:00",
-      url: dbSong.file_path,
-      imageUrl: dbSong.image_url,
-      bitrate: dbSong.bitrate || "320 kbps",
-      genre: dbSong.genre
+    // Abonnement aux changements en temps réel pour les chansons
+    const songsChannel = supabase
+      .channel('songs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'songs',
+        },
+        (payload: any) => {
+          console.log("Song change detected:", payload);
+          // Actualiser la chanson courante si ses métadonnées ont été mises à jour
+          if (refreshCurrentSong) {
+            console.log("Refreshing current song from Index.tsx");
+            refreshCurrentSong();
+            // Force re-render after metadata update
+            setTimeout(() => {
+              setForceUpdate(prev => prev + 1);
+              toast.info("Métadonnées mises à jour", {
+                duration: 2000,
+                position: "top-center"
+              });
+            }, 500);
+          }
+        }
+      )
+      .subscribe();
+
+    // Nettoyage des abonnements
+    return () => {
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(songsChannel);
     };
-  };
-
-  // Check if song is favorite
-  const isSongFavorite = (songId: string): boolean => {
-    return favorites.some(fav => fav.id === songId);
-  };
+  }, [userId, username, refreshCurrentSong]);
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto w-full pb-32">
-        <div className="max-w-6xl mx-auto p-8">
-          {/* Bannière de bienvenue */}
-          <div className="relative w-full rounded-xl bg-gradient-to-r from-spotify-accent/80 to-purple-600 p-8 mb-8 overflow-hidden">
-            <div className="absolute inset-0 bg-black/10" />
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('welcome')}</h1>
-                <p className="text-white/80">{t('discoverMusic')}</p>
-              </div>
-              <div className="mt-4 md:mt-0">
-                <Button 
-                  onClick={() => navigate('/search')} 
-                  size="lg" 
-                  className="bg-white text-spotify-accent hover:bg-white/90"
-                >
-                  {t('exploreNow')}
-                </Button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Music Uploader */}
-          <MusicUploader />
-          
-          {/* Chansons récentes */}
-          <div className="mt-12">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">{t('recentSongs')}</h2>
-              <Button variant="ghost" onClick={() => navigate('/search')}>
-                {t('viewAll')}
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {loadingRecentSongs ? (
-                Array(5).fill(0).map((_, i) => (
-                  <div key={i} className="bg-spotify-card rounded-md h-[220px] animate-pulse" />
-                ))
-              ) : recentSongs && recentSongs.length > 0 ? (
-                recentSongs.map((song) => (
-                  <SongCard 
-                    key={song.id} 
-                    song={convertToPlayerSong(song)}
-                    isCurrentSong={currentSong?.id === song.id}
-                    isFavorite={isSongFavorite(song.id)}
-                    dominantColor={dominantColors[song.id] || null}
-                  />
-                ))
-              ) : (
-                <div className="col-span-full flex flex-col items-center justify-center p-8 bg-spotify-card rounded-lg">
-                  <Music2 className="w-12 h-12 text-spotify-neutral mb-4" />
-                  <p className="text-lg font-medium text-white mb-2">{t('noSongsYet')}</p>
-                  <p className="text-sm text-spotify-neutral mb-4">{t('uploadMusicPrompt')}</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Playlists */}
-          <div className="mt-12">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">{t('playlists')}</h2>
-              <Button variant="ghost" onClick={() => navigate('/playlists')}>
-                {t('viewAll')}
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {loadingPlaylists ? (
-                Array(4).fill(0).map((_, i) => (
-                  <div key={i} className="bg-spotify-card rounded-md h-[220px] animate-pulse" />
-                ))
-              ) : playlists && playlists.length > 0 ? (
-                playlists.map((playlist) => (
-                  <div 
-                    key={playlist.id} 
-                    className="bg-spotify-card p-4 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/playlists/${playlist.id}`)}
-                  >
-                    <div className="aspect-square rounded-md bg-spotify-dark flex items-center justify-center mb-4 overflow-hidden">
-                      {playlist.cover_image_url ? (
-                        <img 
-                          src={playlist.cover_image_url} 
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Disc3 className="w-16 h-16 text-spotify-neutral" />
-                      )}
-                    </div>
-                    <h3 className="font-bold truncate">{playlist.name}</h3>
-                    <p className="text-spotify-neutral text-sm truncate">{playlist.description || t('noDescription')}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full flex flex-col items-center justify-center p-8 bg-spotify-card rounded-lg">
-                  <Disc3 className="w-12 h-12 text-spotify-neutral mb-4" />
-                  <p className="text-lg font-medium text-white mb-2">{t('noPlaylistsYet')}</p>
-                  <p className="text-sm text-spotify-neutral mb-4">{t('createPlaylistPrompt')}</p>
-                  <Button onClick={() => navigate('/playlists')}>{t('createPlaylist')}</Button>
-                </div>
-              )}
-            </div>
-          </div>
+      {!isMobile && (
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+          {username && (
+            <span className="text-spotify-neutral hover:text-white transition-colors">
+              {username}
+            </span>
+          )}
+          <button 
+            onClick={() => setShowCacheManager(!showCacheManager)}
+            className="text-spotify-neutral hover:text-white transition-colors text-sm px-2 py-1 rounded-md bg-spotify-dark/50 hover:bg-spotify-dark"
+          >
+            Cache Audio
+          </button>
+          <AccountSettingsDialog />
         </div>
+      )}
+      
+      {/* Pass forceUpdate to force re-render when metadata changes */}
+      <div className="flex-1 w-full">
+        <NowPlaying key={`now-playing-${forceUpdate}`} />
+        
+        {/* Gestionnaire de cache audio */}
+        {showCacheManager && (
+          <div className="absolute right-4 top-14 z-50 w-80">
+            <AudioCacheManager />
+          </div>
+        )}
       </div>
       <Player />
+      <Toaster />
     </div>
   );
 };

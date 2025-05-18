@@ -3,7 +3,7 @@ export interface OneDriveConfig {
   accessToken: string;
   refreshToken: string;
   isEnabled: boolean;
-  clientId: string;
+  clientId: string; // Ajouté pour stocker le Client ID Microsoft
 }
 
 export interface OneDriveFileReference {
@@ -14,6 +14,3 @@ export interface OneDriveFileReference {
   file_name?: string;
   created_at?: string;
 }
-
-// Ajouter un type pour le provider de stockage
-export type StorageProvider = 'supabase' | 'dropbox' | 'onedrive';
