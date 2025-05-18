@@ -37,12 +37,12 @@ export const MicrosoftOAuthButton = ({ clientId, onTokenReceived }) => {
     
     setIsAuthenticating(true);
     
-    // Microsoft OAuth settings
+    // Microsoft OAuth settings pour SPA
     const redirectUri = window.location.origin + '/onedrive-callback';
     const scopes = ['files.readwrite', 'offline_access'];
     
-    // Créer l'URL d'authentification
-    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}`;
+    // Créer l'URL d'authentification avec responseMode=fragment pour SPA
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes.join(' '))}&response_mode=fragment`;
     
     // Rediriger vers la page d'authentification Microsoft
     window.open(authUrl, "_self");

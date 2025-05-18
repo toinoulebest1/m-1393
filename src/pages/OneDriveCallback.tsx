@@ -60,18 +60,22 @@ export default function OneDriveCallback() {
           return;
         }
 
-        // Échanger le code contre des tokens
+        // Échanger le code contre des tokens en utilisant l'approche PKCE adaptée aux SPA
         const redirectUri = window.location.origin + '/onedrive-callback';
         console.log("URL de redirection:", redirectUri);
         
-        console.log("Échange du code d'autorisation contre des tokens...");
+        console.log("Échange du code d'autorisation contre des tokens avec type d'application SPA...");
+        
+        // Utiliser MSAL pour les SPA ou adapter la requête pour qu'elle fonctionne avec SPA
         const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': window.location.origin
           },
           body: new URLSearchParams({
             client_id: config.clientId,
+            scope: 'files.readwrite offline_access',
             code: code,
             redirect_uri: redirectUri,
             grant_type: 'authorization_code'
