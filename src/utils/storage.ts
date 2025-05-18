@@ -9,8 +9,7 @@ export const storeAudioFile = async (id: string, file: File, onProgress?: (progr
   if (isOneDriveEnabled()) {
     console.log("Utilisation de OneDrive pour stocker le fichier audio");
     try {
-      await uploadFileToOneDrive(file, `audio/${id}`);
-      if (onProgress) onProgress(100);
+      await uploadFileToOneDrive(file, `audio/${id}`, onProgress);
     } catch (error) {
       console.error('Erreur lors du stockage du fichier sur OneDrive:', error);
       throw error;
@@ -140,7 +139,7 @@ export const storePlaylistCover = async (playlistId: string, file: File): Promis
     // Vérifier et créer le bucket si nécessaire
     try {
       const { data, error } = await supabase.storage.getBucket('playlists');
-      if (error && (error as any).code === '404') {
+      if (error && error.code === '404') {
         // Le bucket n'existe pas, le créer
         await supabase.storage.createBucket('playlists', {
           public: true
