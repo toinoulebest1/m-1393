@@ -10,13 +10,16 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { updateMediaSessionMetadata } from "@/utils/mediaSession";
 import { AudioCacheManager } from "@/components/AudioCacheManager";
+import { checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
+import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying } = usePlayerContext();
+  const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying, stopCurrentSong } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -43,6 +46,32 @@ const Index = () => {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
+
+  // Vérifier si le fichier audio de la chanson actuelle est disponible
+  useEffect(() => {
+    const checkCurrentSongAvailability = async () => {
+      if (currentSong && isOneDriveEnabled() && !isCheckingAvailability) {
+        setIsCheckingAvailability(true);
+        try {
+          const exists = await checkFileExistsOnOneDrive(`audio/${currentSong.id}`);
+          if (!exists) {
+            toast.error(`La chanson "${currentSong.title}" n'est plus disponible sur OneDrive`, {
+              duration: 5000,
+              position: "top-center"
+            });
+            stopCurrentSong();
+            refreshCurrentSong();
+          }
+        } catch (error) {
+          console.error("Erreur lors de la vérification de disponibilité:", error);
+        } finally {
+          setIsCheckingAvailability(false);
+        }
+      }
+    };
+
+    checkCurrentSongAvailability();
+  }, [currentSong, stopCurrentSong, refreshCurrentSong]);
 
   useEffect(() => {
     if (currentSong) {

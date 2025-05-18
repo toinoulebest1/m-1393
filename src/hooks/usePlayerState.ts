@@ -22,6 +22,13 @@ export const usePlayerState = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [playbackRate, setPlaybackRate] = useState(1);
 
+  // Fonction pour arrêter la chanson actuelle en cas d'indisponibilité
+  const stopCurrentSong = () => {
+    setIsPlaying(false);
+    setProgress(0);
+    localStorage.removeItem('audioProgress');
+  };
+
   return {
     currentSong,
     setCurrentSong,
@@ -40,6 +47,7 @@ export const usePlayerState = () => {
     searchQuery,
     setSearchQuery,
     playbackRate,
-    setPlaybackRate
+    setPlaybackRate,
+    stopCurrentSong
   };
 };
