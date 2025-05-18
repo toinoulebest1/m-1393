@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ensureAudioBucketExists } from './audioBucketSetup';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink, checkFileExistsOnOneDrive } from './oneDriveStorage';
@@ -94,17 +93,18 @@ export const getAudioFile = async (fileId: string): Promise<string | null> => {
 export const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
   try {
     const searchTerm = `${artist} ${title}`;
-    const apiUrl = `https://api.deezer.com/search?q=${encodeURIComponent(searchTerm)}&limit=1`;
-    const response = await fetch(apiUrl);
     
-    if (!response.ok) {
-      console.error('Erreur lors de la recherche sur Deezer:', response.status, response.statusText);
+    // Utiliser notre fonction Edge Deezer au lieu d'appeler directement l'API Deezer
+    const { data, error } = await supabase.functions.invoke("deezer-search", {
+      body: { query: searchTerm }
+    });
+    
+    if (error) {
+      console.error('Erreur lors de la recherche sur Deezer:', error);
       return null;
     }
     
-    const data = await response.json();
-    
-    if (data.data && data.data.length > 0) {
+    if (data && data.data && data.data.length > 0) {
       const track = data.data[0];
       return track.album.cover_xl;
     } else {
