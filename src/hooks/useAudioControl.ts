@@ -1,10 +1,10 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
+import { isOneDriveEnabled } from '@/utils/oneDriveStorage';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -64,6 +64,18 @@ export const useAudioControl = ({
         audioRef.current.preload = "auto";
         audioRef.current.load();
         
+        // Ajout d'un gestionnaire d'erreur spécifique pour OneDrive
+        if (isOneDriveEnabled()) {
+          const onErrorHandler = () => {
+            console.error("Erreur lors du chargement du fichier audio depuis OneDrive");
+            toast.error("Erreur d'accès au fichier sur OneDrive. Vérifiez votre connexion ou les permissions.");
+            setIsPlaying(false);
+            setIsChangingSong(false);
+          };
+          
+          audioRef.current.addEventListener('error', onErrorHandler, { once: true });
+        }
+        
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
@@ -81,6 +93,11 @@ export const useAudioControl = ({
             console.error("Error starting playback:", error);
             setIsPlaying(false);
             setIsChangingSong(false);
+            
+            // Erreur spécifique pour les problèmes d'autoplay
+            if (error.name === "NotAllowedError") {
+              toast.error("L'autoplay est bloqué par votre navigateur. Cliquez pour lancer la lecture.");
+            }
           });
         }
       } catch (error) {
