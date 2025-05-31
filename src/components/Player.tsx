@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -10,6 +9,7 @@ import { toast } from "sonner";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { CastButton } from "@/components/CastButton";
 
 export const Player = () => {
   const { t } = useTranslation();
@@ -235,6 +235,8 @@ export const Player = () => {
         </div>
 
         <div className="flex items-center space-x-4 w-48">
+          <CastButton />
+          
           <Button
             variant="ghost"
             size="icon"
