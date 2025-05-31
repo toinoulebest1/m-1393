@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
 import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
+import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 
 interface Song {
@@ -616,150 +618,155 @@ const PlaylistDetail = () => {
   }
 
   return (
-    <div className="container p-6">
-      <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
-        <div className="relative group w-48 h-48 min-w-48 bg-spotify-card rounded-md overflow-hidden flex items-center justify-center">
-          {playlist.cover_image_url ? (
-            <img 
-              src={playlist.cover_image_url} 
-              alt={playlist.name} 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
-          )}
-          
-          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <label htmlFor="cover-upload" className="cursor-pointer">
-              <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
-                <ImageIcon className="h-5 w-5" />
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="container p-6 pb-32">
+          <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
+            <div className="relative group w-48 h-48 min-w-48 bg-spotify-card rounded-md overflow-hidden flex items-center justify-center">
+              {playlist?.cover_image_url ? (
+                <img 
+                  src={playlist.cover_image_url} 
+                  alt={playlist?.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
+              )}
+              
+              <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <label htmlFor="cover-upload" className="cursor-pointer">
+                  <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  <input 
+                    id="cover-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleUploadCover}
+                    disabled={uploading}
+                  />
+                </label>
               </div>
-              <input 
-                id="cover-upload" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleUploadCover}
-                disabled={uploading}
-              />
-            </label>
-          </div>
-        </div>
-        
-        <div className="flex-1">
-          <div className="text-xs uppercase text-spotify-neutral font-semibold mb-2">
-            {t('playlists.playlist')}
+            </div>
+            
+            <div className="flex-1">
+              <div className="text-xs uppercase text-spotify-neutral font-semibold mb-2">
+                {t('playlists.playlist')}
+              </div>
+              
+              {isEditingName ? (
+                <div className="flex items-center gap-2 mb-4">
+                  <Input 
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    className="text-3xl font-bold h-auto py-2 bg-spotify-input"
+                    autoFocus
+                  />
+                  <Button 
+                    onClick={handleUpdateName}
+                    className="bg-spotify-accent hover:bg-spotify-accent-hover"
+                  >
+                    {t('common.save')}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setIsEditingName(false);
+                      setEditedName(playlist?.name || '');
+                    }}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                </div>
+              ) : (
+                <h1 
+                  className="text-3xl font-bold text-white mb-2 cursor-pointer hover:underline"
+                  onClick={() => setIsEditingName(true)}
+                >
+                  {playlist?.name}
+                </h1>
+              )}
+              
+              {playlist?.description && (
+                <p className="text-spotify-neutral mb-4">{playlist.description}</p>
+              )}
+              
+              <p className="text-sm text-spotify-neutral">
+                {songs.length} {songs.length === 1 ? t('common.track') : t('common.tracks')}
+              </p>
+              
+              <div className="flex gap-2 mt-4">
+                {songs.length > 0 && (
+                  <Button 
+                    onClick={playPlaylist}
+                    className="bg-spotify-accent hover:bg-spotify-accent-hover rounded-full"
+                  >
+                    <Play className="h-5 w-5 mr-2" />
+                    {t('common.play')}
+                  </Button>
+                )}
+                
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" className="border border-spotify-neutral">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('playlists.addSongs')}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
+                    </DialogHeader>
+                    <SongPicker onSelectionConfirmed={handleAddSongs} />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
           </div>
           
-          {isEditingName ? (
-            <div className="flex items-center gap-2 mb-4">
-              <Input 
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                className="text-3xl font-bold h-auto py-2 bg-spotify-input"
-                autoFocus
-              />
-              <Button 
-                onClick={handleUpdateName}
-                className="bg-spotify-accent hover:bg-spotify-accent-hover"
-              >
-                {t('common.save')}
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  setIsEditingName(false);
-                  setEditedName(playlist.name);
-                }}
-              >
-                {t('common.cancel')}
-              </Button>
+          {songs.length > 0 ? (
+            <div className="space-y-2">
+              {songs.map((song) => (
+                <div 
+                  key={song.id} 
+                  className="cursor-pointer"
+                  onClick={() => playSong(song.songs)}
+                >
+                  <SongCard
+                    song={song.songs}
+                    isCurrentSong={isCurrentSong(song.songs)}
+                    isFavorite={isFavoriteSong(song.songs)}
+                    dominantColor={dominantColors[song.songs.id] || null}
+                    onLyricsClick={() => handleLyricsClick(song.songs)}
+                    onReportClick={() => handleReportClick(song.songs)}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
-            <h1 
-              className="text-3xl font-bold text-white mb-2 cursor-pointer hover:underline"
-              onClick={() => setIsEditingName(true)}
-            >
-              {playlist.name}
-            </h1>
+            <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
+              <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
+              <p className="text-spotify-neutral text-lg mb-4">{t('playlists.noSongs')}</p>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="bg-spotify-accent hover:bg-spotify-accent-hover">
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('playlists.addSongs')}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
+                  </DialogHeader>
+                  <SongPicker onSelectionConfirmed={handleAddSongs} />
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
-          
-          {playlist.description && (
-            <p className="text-spotify-neutral mb-4">{playlist.description}</p>
-          )}
-          
-          <p className="text-sm text-spotify-neutral">
-            {songs.length} {songs.length === 1 ? t('common.track') : t('common.tracks')}
-          </p>
-          
-          <div className="flex gap-2 mt-4">
-            {songs.length > 0 && (
-              <Button 
-                onClick={playPlaylist}
-                className="bg-spotify-accent hover:bg-spotify-accent-hover rounded-full"
-              >
-                <Play className="h-5 w-5 mr-2" />
-                {t('common.play')}
-              </Button>
-            )}
-            
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="ghost" className="border border-spotify-neutral">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('playlists.addSongs')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-                </DialogHeader>
-                <SongPicker onSelectionConfirmed={handleAddSongs} />
-              </DialogContent>
-            </Dialog>
-          </div>
         </div>
       </div>
-      
-      {songs.length > 0 ? (
-        <div className="space-y-2">
-          {songs.map((song) => (
-            <div 
-              key={song.id} 
-              className="cursor-pointer"
-              onClick={() => playSong(song.songs)}
-            >
-              <SongCard
-                song={song.songs}
-                isCurrentSong={isCurrentSong(song.songs)}
-                isFavorite={isFavoriteSong(song.songs)}
-                dominantColor={dominantColors[song.songs.id] || null}
-                onLyricsClick={() => handleLyricsClick(song.songs)}
-                onReportClick={() => handleReportClick(song.songs)}
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
-          <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-          <p className="text-spotify-neutral text-lg mb-4">{t('playlists.noSongs')}</p>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-spotify-accent hover:bg-spotify-accent-hover">
-                <Plus className="h-4 w-4 mr-2" />
-                {t('playlists.addSongs')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-              </DialogHeader>
-              <SongPicker onSelectionConfirmed={handleAddSongs} />
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
+      <Player />
     </div>
   );
 };
