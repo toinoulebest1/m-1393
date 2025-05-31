@@ -1,10 +1,11 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, SlidersHorizontal, Music, User } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Music, User, List } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -37,9 +38,10 @@ const Search = () => {
   });
   
   const [results, setResults] = useState<any[]>([]);
+  const [playlistResults, setPlaylistResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre">(() => {
-    return (localStorage.getItem('lastSearchFilter') as "all" | "title" | "artist" | "genre") || "all";
+  const [searchFilter, setSearchFilter] = useState<"all" | "title" | "artist" | "genre" | "playlist">(() => {
+    return (localStorage.getItem('lastSearchFilter') as "all" | "title" | "artist" | "genre" | "playlist") || "all";
   });
   const [selectedGenre, setSelectedGenre] = useState(() => {
     return localStorage.getItem('lastSelectedGenre') || "";
@@ -73,49 +75,76 @@ const Search = () => {
     
     if (!isWildcardSearch && query.length < 2 && searchFilter !== "genre") {
       setResults([]);
+      setPlaylistResults([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      let queryBuilder = supabase
-        .from('songs')
-        .select('*');
+      if (searchFilter === "playlist") {
+        // Search in playlists
+        let playlistQuery = supabase
+          .from('playlists')
+          .select('*');
 
-      if (!isWildcardSearch) {
-        if (searchFilter === "title") {
-          queryBuilder = queryBuilder.ilike('title', `%${query}%`);
-        } else if (searchFilter === "artist") {
-          queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
-        } else if (searchFilter === "genre") {
-          if (selectedGenre) {
-            queryBuilder = queryBuilder.eq('genre', selectedGenre);
-          }
-        } else {
-          queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
+        if (!isWildcardSearch) {
+          playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
         }
-      }
-      
-      const { data, error } = await queryBuilder;
 
-      if (error) {
-        throw error;
-      }
+        const { data: playlistData, error: playlistError } = await playlistQuery;
 
-      const formattedResults = data.map(song => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist || '',
-        duration: song.duration || '0:00',
-        url: song.file_path,
-        imageUrl: song.image_url,
-        bitrate: '320 kbps'
-      }));
+        if (playlistError) {
+          throw playlistError;
+        }
 
-      setResults(formattedResults);
-      
-      if (isWildcardSearch) {
-        toast.success(`Tous les morceaux listés (${formattedResults.length})`);
+        setPlaylistResults(playlistData || []);
+        setResults([]);
+        
+        if (isWildcardSearch) {
+          toast.success(`Toutes les playlists listées (${playlistData?.length || 0})`);
+        }
+      } else {
+        // Search in songs
+        let queryBuilder = supabase
+          .from('songs')
+          .select('*');
+
+        if (!isWildcardSearch) {
+          if (searchFilter === "title") {
+            queryBuilder = queryBuilder.ilike('title', `%${query}%`);
+          } else if (searchFilter === "artist") {
+            queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
+          } else if (searchFilter === "genre") {
+            if (selectedGenre) {
+              queryBuilder = queryBuilder.eq('genre', selectedGenre);
+            }
+          } else {
+            queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
+          }
+        }
+        
+        const { data, error } = await queryBuilder;
+
+        if (error) {
+          throw error;
+        }
+
+        const formattedResults = data.map(song => ({
+          id: song.id,
+          title: song.title,
+          artist: song.artist || '',
+          duration: song.duration || '0:00',
+          url: song.file_path,
+          imageUrl: song.image_url,
+          bitrate: '320 kbps'
+        }));
+
+        setResults(formattedResults);
+        setPlaylistResults([]);
+        
+        if (isWildcardSearch) {
+          toast.success(`Tous les morceaux listés (${formattedResults.length})`);
+        }
       }
     } catch (error) {
       console.error('Erreur de recherche:', error);
@@ -154,6 +183,10 @@ const Search = () => {
     console.log("==================");
     
     play(song);
+  };
+
+  const handlePlaylistClick = (playlist: any) => {
+    navigate(`/playlist/${playlist.id}`);
   };
 
   useEffect(() => {
@@ -251,7 +284,11 @@ const Search = () => {
                 )} />
                 <Input
                   type="text"
-                  placeholder={searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste (ou * pour tout afficher)"}
+                  placeholder={
+                    searchFilter === "playlist" ? "Rechercher une playlist..." :
+                    searchFilter === "genre" ? "Sélectionnez un genre..." : 
+                    "Rechercher une chanson ou un artiste (ou * pour tout afficher)"
+                  }
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   className={cn(
@@ -296,7 +333,8 @@ const Search = () => {
                   <span className="text-sm">
                     {searchFilter === "all" ? "Tout" : 
                      searchFilter === "title" ? "Titre" : 
-                     searchFilter === "artist" ? "Artiste" : "Genre"}
+                     searchFilter === "artist" ? "Artiste" : 
+                     searchFilter === "playlist" ? "Playlist" : "Genre"}
                   </span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -319,6 +357,10 @@ const Search = () => {
                     Artiste
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setSearchFilter("playlist")}>
+                    <List className="h-4 w-4 mr-2" />
+                    Playlist
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
                     <Music className="h-4 w-4 mr-2" />
                     Genre musical
@@ -351,6 +393,48 @@ const Search = () => {
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              </div>
+            ) : searchFilter === "playlist" && playlistResults.length > 0 ? (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Playlists</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {playlistResults.map((playlist, index) => (
+                    <div
+                      key={playlist.id}
+                      style={{ 
+                        animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                        opacity: 0,
+                      }}
+                      onClick={() => handlePlaylistClick(playlist)}
+                      className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        {playlist.cover_image_url ? (
+                          <img 
+                            src={playlist.cover_image_url} 
+                            alt={playlist.name}
+                            className="w-16 h-16 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
+                            <List className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{playlist.name}</h4>
+                          {playlist.description && (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {playlist.description}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Créée le {new Date(playlist.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : results.length > 0 ? (
               <div className="space-y-2">
