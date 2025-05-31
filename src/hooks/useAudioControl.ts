@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -59,10 +58,18 @@ export const useAudioControl = ({
           throw new Error('Fichier audio non trouvé');
         }
 
+        // Configure CORS for audio elements
+        audioRef.current.crossOrigin = "anonymous";
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
         audioRef.current.preload = "auto";
         audioRef.current.load();
+        
+        console.log("=== AUDIO SETUP DEBUG ===");
+        console.log("Audio URL:", audioUrl);
+        console.log("CrossOrigin set to:", audioRef.current.crossOrigin);
+        console.log("Audio element ready state:", audioRef.current.readyState);
+        console.log("========================");
         
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
@@ -79,8 +86,33 @@ export const useAudioControl = ({
             }, 1200);
           }).catch(error => {
             console.error("Error starting playback:", error);
-            setIsPlaying(false);
-            setIsChangingSong(false);
+            
+            // Handle CORS errors specifically
+            if (error.name === 'NotAllowedError' || error.message.includes('CORS')) {
+              console.log("CORS error detected, trying without crossOrigin");
+              audioRef.current.crossOrigin = null;
+              audioRef.current.load();
+              
+              audioRef.current.play().then(() => {
+                setIsPlaying(true);
+                audioRef.current.volume = volume / 100;
+                console.log("Lecture démarrée sans CORS:", song.title);
+                
+                changeTimeoutRef.current = window.setTimeout(() => {
+                  setIsChangingSong(false);
+                  changeTimeoutRef.current = null;
+                }, 1200);
+              }).catch(fallbackError => {
+                console.error("Fallback playback also failed:", fallbackError);
+                setIsPlaying(false);
+                setIsChangingSong(false);
+                toast.error("Impossible de lire ce titre - problème CORS");
+              });
+            } else {
+              setIsPlaying(false);
+              setIsChangingSong(false);
+              toast.error("Impossible de lire ce titre");
+            }
           });
         }
       } catch (error) {

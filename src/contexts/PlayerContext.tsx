@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
 const globalAudio = new Audio();
+globalAudio.crossOrigin = "anonymous";
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Hooks personnalisés qui encapsulent la logique
@@ -50,7 +51,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Refs audio
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
-  const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
+  const nextAudioRef = useRef<HTMLAudioElement>(() => {
+    const nextAudio = new Audio();
+    nextAudio.crossOrigin = "anonymous";
+    return nextAudio;
+  }());
   const changeTimeoutRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
 
