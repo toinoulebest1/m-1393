@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -41,8 +42,26 @@ export const Player = () => {
   const updateVolumeDirectly = (newVolume: number) => {
     const audioElement = getCurrentAudioElement();
     if (audioElement) {
+      console.log("=== VOLUME DEBUG ===");
+      console.log("Setting volume to:", newVolume / 100);
+      console.log("Audio element muted:", audioElement.muted);
+      console.log("Audio element readyState:", audioElement.readyState);
+      console.log("Audio element paused:", audioElement.paused);
+      console.log("Audio element current time:", audioElement.currentTime);
+      console.log("Audio element duration:", audioElement.duration);
+      
       audioElement.volume = newVolume / 100;
-      console.log("Audio element volume set to:", audioElement.volume);
+      
+      // Force unmute if needed
+      if (audioElement.muted) {
+        console.log("Audio was muted, unmuting...");
+        audioElement.muted = false;
+      }
+      
+      console.log("New audio element volume:", audioElement.volume);
+      console.log("===================");
+    } else {
+      console.error("No audio element found when trying to update volume");
     }
   };
   
@@ -72,6 +91,28 @@ export const Player = () => {
     };
   }, [getCurrentAudioElement, setProgress]);
 
+  // Debug audio state when playing state changes
+  useEffect(() => {
+    const audioElement = getCurrentAudioElement();
+    if (audioElement && currentSong) {
+      console.log("=== AUDIO STATE DEBUG ===");
+      console.log("isPlaying:", isPlaying);
+      console.log("currentSong:", currentSong.title);
+      console.log("audio paused:", audioElement.paused);
+      console.log("audio volume:", audioElement.volume);
+      console.log("audio muted:", audioElement.muted);
+      console.log("audio src:", audioElement.src ? "loaded" : "empty");
+      console.log("audio readyState:", audioElement.readyState);
+      console.log("========================");
+      
+      // Force volume check when song changes
+      if (audioElement.volume === 0 && volume > 0) {
+        console.log("Detected volume mismatch, fixing...");
+        updateVolumeDirectly(volume);
+      }
+    }
+  }, [isPlaying, currentSong, getCurrentAudioElement, volume]);
+
   useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
       extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
@@ -84,11 +125,14 @@ export const Player = () => {
     const audioElement = getCurrentAudioElement();
     if (audioElement) {
       audioElement.muted = isMuted;
+      console.log("Mute state changed to:", isMuted);
     }
   }, [isMuted, getCurrentAudioElement]);
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    console.log("Toggling mute to:", newMutedState);
   };
 
   const toggleEqualizerVisibility = () => {
@@ -105,16 +149,61 @@ export const Player = () => {
     }
   };
 
-  // Fixed volume change handler
+  // Enhanced volume change handler with better debugging
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
+    console.log("=== VOLUME CHANGE ===");
     console.log("Volume change requested:", newVolume);
+    console.log("Current context volume:", volume);
     
     // Update the context volume
     setVolume(newVolume);
     
     // Also update the actual audio element volume directly
     updateVolumeDirectly(newVolume);
+    
+    // Verify the change took effect
+    setTimeout(() => {
+      const audioElement = getCurrentAudioElement();
+      if (audioElement) {
+        console.log("Volume verification - expected:", newVolume / 100, "actual:", audioElement.volume);
+        if (Math.abs(audioElement.volume - (newVolume / 100)) > 0.01) {
+          console.warn("Volume mismatch detected, retrying...");
+          audioElement.volume = newVolume / 100;
+        }
+      }
+      console.log("====================");
+    }, 100);
+  };
+
+  // Enhanced play/pause with audio verification
+  const handlePlayPause = () => {
+    if (currentSong) {
+      console.log("=== PLAY/PAUSE DEBUG ===");
+      const audioElement = getCurrentAudioElement();
+      if (audioElement) {
+        console.log("Audio element state before action:");
+        console.log("- paused:", audioElement.paused);
+        console.log("- volume:", audioElement.volume);
+        console.log("- muted:", audioElement.muted);
+        console.log("- src:", audioElement.src ? "loaded" : "empty");
+        console.log("- readyState:", audioElement.readyState);
+        
+        // Force volume check before playing
+        if (audioElement.volume === 0 && volume > 0) {
+          console.log("Fixing zero volume before play");
+          audioElement.volume = volume / 100;
+        }
+        
+        if (audioElement.muted && !isMuted) {
+          console.log("Fixing muted state before play");
+          audioElement.muted = false;
+        }
+      }
+      console.log("========================");
+      
+      isPlaying ? pause() : play();
+    }
   };
 
   // Format time helper function
@@ -184,11 +273,7 @@ export const Player = () => {
               variant="ghost"
               size="icon"
               className="h-10 w-10 p-0 rounded-full bg-white hover:bg-white/10"
-              onClick={() => {
-                if (currentSong) {
-                  isPlaying ? pause() : play();
-                }
-              }}
+              onClick={handlePlayPause}
               disabled={!currentSong}
             >
               {isPlaying ? (
@@ -279,9 +364,16 @@ export const Player = () => {
           </Button>
           
           <div className="flex items-center space-x-2">
-            <Volume2 className="w-4 h-4 text-spotify-neutral" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMute}
+              className="p-0 h-auto w-auto"
+            >
+              <Volume2 className={cn("w-4 h-4", isMuted ? "text-red-500" : "text-spotify-neutral")} />
+            </Button>
             <Slider
-              value={[volume]}
+              value={[isMuted ? 0 : volume]}
               max={100}
               step={1}
               className="w-24"
