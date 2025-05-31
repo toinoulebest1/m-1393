@@ -441,49 +441,141 @@ const Search = () => {
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
               </div>
-            ) : searchFilter === "playlist" && playlistResults.length > 0 ? (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Playlists</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {playlistResults.map((playlist, index) => (
-                    <div
-                      key={playlist.id}
-                      style={{ 
-                        animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                        opacity: 0,
-                      }}
-                      onClick={() => handlePlaylistClick(playlist)}
-                      className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        {playlist.cover_image_url ? (
-                          <img 
-                            src={playlist.cover_image_url} 
-                            alt={playlist.name}
-                            className="w-16 h-16 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
-                            <List className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium truncate">{playlist.name}</h4>
-                          {playlist.description && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {playlist.description}
-                            </p>
+            ) : searchFilter === "playlist" ? (
+              // Show only playlists for playlist filter
+              playlistResults.length > 0 ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Playlists</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {playlistResults.map((playlist, index) => (
+                      <div
+                        key={playlist.id}
+                        style={{ 
+                          animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                          opacity: 0,
+                        }}
+                        onClick={() => handlePlaylistClick(playlist)}
+                        className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          {playlist.cover_image_url ? (
+                            <img 
+                              src={playlist.cover_image_url} 
+                              alt={playlist.name}
+                              className="w-16 h-16 rounded object-cover"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
+                              <List className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           )}
-                          <p className="text-xs text-muted-foreground">
-                            Créée le {new Date(playlist.created_at).toLocaleDateString()}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium truncate">{playlist.name}</h4>
+                            {playlist.description && (
+                              <p className="text-sm text-muted-foreground truncate">
+                                {playlist.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Créée le {new Date(playlist.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+              ) : searchQuery ? (
+                <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  Aucune playlist trouvée pour "{searchQuery}"
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  Commencez à taper pour rechercher des playlists...
+                </div>
+              )
+            ) : searchFilter === "all" && (results.length > 0 || playlistResults.length > 0) ? (
+              // Show both songs and playlists for "all" filter
+              <div className="space-y-6">
+                {results.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Chansons</h3>
+                    <div className="space-y-2">
+                      {results.map((song, index) => {
+                        const isFavorite = favorites.some(s => s.id === song.id);
+                        const isCurrentSong = currentSong?.id === song.id;
+                        
+                        return (
+                          <div
+                            key={song.id}
+                            style={{ 
+                              animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                              opacity: 0,
+                            }}
+                            onClick={() => handlePlay(song)}
+                          >
+                            <SongCard
+                              song={song}
+                              isCurrentSong={isCurrentSong}
+                              isFavorite={isFavorite}
+                              dominantColor={dominantColor}
+                              onLyricsClick={handleLyricsNavigation}
+                              onReportClick={() => setSongToReport(song)}
+                              contextMenuItems={songCardContextMenu(song)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {playlistResults.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Playlists</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {playlistResults.map((playlist, index) => (
+                        <div
+                          key={playlist.id}
+                          style={{ 
+                            animation: `fadeIn 0.3s ease-out forwards ${(results.length + index) * 50}ms`,
+                            opacity: 0,
+                          }}
+                          onClick={() => handlePlaylistClick(playlist)}
+                          className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            {playlist.cover_image_url ? (
+                              <img 
+                                src={playlist.cover_image_url} 
+                                alt={playlist.name}
+                                className="w-16 h-16 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
+                                <List className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium truncate">{playlist.name}</h4>
+                              {playlist.description && (
+                                <p className="text-sm text-muted-foreground truncate">
+                                  {playlist.description}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                Créée le {new Date(playlist.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : results.length > 0 ? (
+              // Show only songs for other filters
               <div className="space-y-2">
                 {results.map((song, index) => {
                   const isFavorite = favorites.some(s => s.id === song.id);
