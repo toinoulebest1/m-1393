@@ -5,19 +5,19 @@ import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Search as SearchIcon, SlidersHorizontal, Music, User, List } from "lucide-react";
+import { Search as SearchIcon, Music, User, List, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
 import { SongCard } from "@/components/SongCard";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { searchArtist } from "@/services/deezerApi";
@@ -275,7 +275,7 @@ const Search = () => {
           </style>
 
           <div className="mb-8">
-            <div className="flex gap-4 mb-8">
+            <div className="flex gap-4 mb-6">
               <div className="relative flex-1 group">
                 <SearchIcon className={cn(
                   "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 transition-all duration-300",
@@ -327,54 +327,15 @@ const Search = () => {
 
               <VoiceSearchButton onVoiceResult={handleVoiceResult} />
 
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
-                  <SlidersHorizontal className="h-5 w-5" />
-                  <span className="text-sm">
-                    {searchFilter === "all" ? "Tout" : 
-                     searchFilter === "title" ? "Titre" : 
-                     searchFilter === "artist" ? "Artiste" : 
-                     searchFilter === "playlist" ? "Playlist" : "Genre"}
-                  </span>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => {
-                    setSearchFilter("all");
-                    setSelectedGenre("");
-                  }}>
-                    Tout
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    setSearchFilter("title");
-                    setSelectedGenre("");
-                  }}>
-                    Titre
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    setSearchFilter("artist");
-                    setSelectedGenre("");
-                  }}>
-                    Artiste
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setSearchFilter("playlist")}>
-                    <List className="h-4 w-4 mr-2" />
-                    Playlist
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSearchFilter("genre")}>
-                    <Music className="h-4 w-4 mr-2" />
-                    Genre musical
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               {searchFilter === "genre" && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-white/5 transition-colors">
-                    <Music className="h-5 w-5" />
-                    <span className="text-sm">
-                      {selectedGenre || "Sélectionner un genre"}
-                    </span>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Music className="h-4 w-4" />
+                      <span className="text-sm">
+                        {selectedGenre || "Sélectionner un genre"}
+                      </span>
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     {GENRES.map((genre) => (
@@ -389,6 +350,39 @@ const Search = () => {
                 </DropdownMenu>
               )}
             </div>
+
+            {/* New Tab Filter System */}
+            <Tabs 
+              value={searchFilter} 
+              onValueChange={(value) => {
+                setSearchFilter(value as typeof searchFilter);
+                setSelectedGenre("");
+              }}
+              className="w-full mb-6"
+            >
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="all" className="flex items-center gap-2">
+                  <SearchIcon className="h-4 w-4" />
+                  Tout
+                </TabsTrigger>
+                <TabsTrigger value="title" className="flex items-center gap-2">
+                  <Music className="h-4 w-4" />
+                  Titre
+                </TabsTrigger>
+                <TabsTrigger value="artist" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Artiste
+                </TabsTrigger>
+                <TabsTrigger value="playlist" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
+                  Playlist
+                </TabsTrigger>
+                <TabsTrigger value="genre" className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Genre
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
