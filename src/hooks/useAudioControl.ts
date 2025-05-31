@@ -74,92 +74,8 @@ export const useAudioControl = ({
         
         console.log("⚙️ Configuration audio element terminée");
         console.log("🔊 Volume initial:", volume / 100);
-        
-        // Événements de debugging pour comprendre pourquoi ça reste à 0
-        const debugEvents = () => {
-          console.log("📊 === ÉTAT AUDIO ELEMENT ===");
-          console.log("🔄 ReadyState:", audioRef.current.readyState);
-          console.log("⏰ CurrentTime:", audioRef.current.currentTime);
-          console.log("⏱️ Duration:", audioRef.current.duration);
-          console.log("⏸️ Paused:", audioRef.current.paused);
-          console.log("🔇 Muted:", audioRef.current.muted);
-          console.log("🔊 Volume:", audioRef.current.volume);
-          console.log("🌐 NetworkState:", audioRef.current.networkState);
-          console.log("❌ Error:", audioRef.current.error);
-          console.log("===============================");
-        };
-
-        // Ajouter des listeners temporaires pour le debug
-        const onLoadStart = () => console.log("🚀 loadstart: Début du chargement");
-        const onLoadedMetadata = () => {
-          console.log("📋 loadedmetadata: Métadonnées chargées");
-          debugEvents();
-        };
-        const onCanPlay = () => {
-          console.log("▶️ canplay: Prêt à jouer");
-          debugEvents();
-        };
-        const onCanPlayThrough = () => {
-          console.log("🎯 canplaythrough: Peut jouer complètement");
-          debugEvents();
-        };
-        const onTimeUpdate = () => {
-          console.log("⏰ timeupdate: Temps actuel:", audioRef.current.currentTime);
-        };
-        const onError = (e: any) => {
-          console.error("💥 Erreur audio:", e);
-          console.error("💥 Détails erreur:", audioRef.current.error);
-          debugEvents();
-        };
-        const onStalled = () => {
-          console.warn("⚠️ stalled: Téléchargement bloqué");
-          debugEvents();
-        };
-        const onSuspend = () => {
-          console.warn("⏸️ suspend: Téléchargement suspendu");
-          debugEvents();
-        };
-        const onProgress = () => {
-          console.log("📈 progress: Chargement en cours");
-          if (audioRef.current.buffered.length > 0) {
-            console.log("📊 Buffered:", audioRef.current.buffered.end(0), "secondes");
-          }
-        };
-
-        // Ajouter tous les listeners
-        audioRef.current.addEventListener('loadstart', onLoadStart);
-        audioRef.current.addEventListener('loadedmetadata', onLoadedMetadata);
-        audioRef.current.addEventListener('canplay', onCanPlay);
-        audioRef.current.addEventListener('canplaythrough', onCanPlayThrough);
-        audioRef.current.addEventListener('timeupdate', onTimeUpdate);
-        audioRef.current.addEventListener('error', onError);
-        audioRef.current.addEventListener('stalled', onStalled);
-        audioRef.current.addEventListener('suspend', onSuspend);
-        audioRef.current.addEventListener('progress', onProgress);
-
-        // Fonction de nettoyage des listeners
-        const cleanup = () => {
-          audioRef.current?.removeEventListener('loadstart', onLoadStart);
-          audioRef.current?.removeEventListener('loadedmetadata', onLoadedMetadata);
-          audioRef.current?.removeEventListener('canplay', onCanPlay);
-          audioRef.current?.removeEventListener('canplaythrough', onCanPlayThrough);
-          audioRef.current?.removeEventListener('timeupdate', onTimeUpdate);
-          audioRef.current?.removeEventListener('error', onError);
-          audioRef.current?.removeEventListener('stalled', onStalled);
-          audioRef.current?.removeEventListener('suspend', onSuspend);
-          audioRef.current?.removeEventListener('progress', onProgress);
-        };
 
         audioRef.current.load();
-        
-        console.log("🔄 Load() appelé, état initial:");
-        debugEvents();
-        
-        // Attendre un peu pour voir l'état après load
-        setTimeout(() => {
-          console.log("🕐 État après 1 seconde:");
-          debugEvents();
-        }, 1000);
         
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
@@ -171,10 +87,46 @@ export const useAudioControl = ({
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
             
-            debugEvents();
-            
-            // Nettoyer les listeners après succès
-            setTimeout(cleanup, 5000);
+            // 🔥 NOUVELLE VÉRIFICATION : Si le temps ne progresse pas après 2 secondes
+            const timeCheckTimeout = setTimeout(() => {
+              console.log("🕐 === VÉRIFICATION PROGRESSION TEMPS ===");
+              console.log("⏰ Temps actuel après 2 secondes:", audioRef.current.currentTime);
+              console.log("⏸️ État pause:", audioRef.current.paused);
+              console.log("🔇 État muet:", audioRef.current.muted);
+              console.log("🔊 Volume:", audioRef.current.volume);
+              
+              if (audioRef.current.currentTime === 0 && !audioRef.current.paused) {
+                console.log("🚨 PROBLÈME DÉTECTÉ: Temps bloqué à 0 malgré lecture");
+                console.log("🔧 Tentative de solution: interaction utilisateur requise");
+                
+                // Force une nouvelle tentative de lecture
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+                
+                // Afficher un message à l'utilisateur
+                toast.error("Cliquez n'importe où sur la page puis réessayez la lecture", {
+                  duration: 5000,
+                  action: {
+                    label: "Réessayer",
+                    onClick: () => {
+                      console.log("🔄 Nouvelle tentative de lecture après interaction");
+                      audioRef.current.play().then(() => {
+                        console.log("✅ Lecture réussie après interaction utilisateur");
+                        setIsPlaying(true);
+                      }).catch(err => {
+                        console.error("❌ Échec même après interaction:", err);
+                        setIsPlaying(false);
+                      });
+                    }
+                  }
+                });
+                
+                setIsPlaying(false);
+              } else if (audioRef.current.currentTime > 0) {
+                console.log("✅ Temps progresse normalement:", audioRef.current.currentTime, "secondes");
+              }
+              console.log("=======================================");
+            }, 2000);
             
             setTimeout(() => preloadNextTracks(), 1000);
             
@@ -188,13 +140,23 @@ export const useAudioControl = ({
             console.error("💬 Message:", error.message);
             console.error("🔍 Détails:", error);
             
-            debugEvents();
-            cleanup();
-            
             // Gestion spécifique des erreurs
             if (error.name === 'NotAllowedError') {
               console.log("🔒 Erreur de permission - tentative sans interaction utilisateur");
-              toast.error("Cliquez d'abord sur la page puis réessayez");
+              toast.error("Veuillez cliquer sur la page puis réessayer la lecture", {
+                duration: 5000,
+                action: {
+                  label: "Réessayer",
+                  onClick: () => {
+                    audioRef.current.play().then(() => {
+                      setIsPlaying(true);
+                    }).catch(err => {
+                      console.error("Échec après interaction:", err);
+                      setIsPlaying(false);
+                    });
+                  }
+                }
+              });
             } else if (error.name === 'NotSupportedError') {
               console.log("🚫 Format non supporté");
               toast.error("Format audio non supporté");
@@ -241,6 +203,16 @@ export const useAudioControl = ({
             setIsPlaying(true);
           }).catch(error => {
             console.error("❌ Erreur reprise:", error);
+            if (error.name === 'NotAllowedError') {
+              toast.error("Veuillez cliquer sur la page puis réessayer", {
+                action: {
+                  label: "Réessayer",
+                  onClick: () => {
+                    audioRef.current.play().then(() => setIsPlaying(true));
+                  }
+                }
+              });
+            }
             setIsPlaying(false);
           });
         }
