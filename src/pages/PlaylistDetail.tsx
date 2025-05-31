@@ -28,6 +28,7 @@ import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
 import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
+import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 
 interface Song {
   id: string;
@@ -53,6 +54,7 @@ interface Playlist {
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+  visibility?: string;
 }
 
 // Simplified function to generate playlist cover
@@ -297,7 +299,7 @@ const PlaylistDetail = () => {
     try {
       setLoading(true);
       
-      // Fetch playlist details
+      // Fetch playlist details with visibility
       const { data: playlistData, error: playlistError } = await supabase
         .from('playlists')
         .select('*')
@@ -658,6 +660,10 @@ const PlaylistDetail = () => {
     }
   ];
 
+  const handleVisibilityChanged = (newVisibility: string) => {
+    setPlaylist(prev => prev ? { ...prev, visibility: newVisibility } : null);
+  };
+
   useEffect(() => {
     fetchPlaylistDetails();
     
@@ -860,6 +866,12 @@ const PlaylistDetail = () => {
                     <SongPicker onSelectionConfirmed={handleAddSongs} />
                   </DialogContent>
                 </Dialog>
+
+                <PlaylistVisibilitySettings
+                  playlistId={playlistId!}
+                  currentVisibility={playlist?.visibility || 'private'}
+                  onVisibilityChanged={handleVisibilityChanged}
+                />
               </div>
             </div>
           </div>
