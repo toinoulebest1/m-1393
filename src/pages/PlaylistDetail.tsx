@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -227,20 +228,25 @@ const PlaylistDetail = () => {
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
 
   // Create or update playlist cover based on song images
-  const updatePlaylistCover = async () => {
-    if (!playlistId || songs.length === 0) {
-      console.log("Cannot update cover: missing playlistId or no songs");
-      return;
-    }
+  const updatePlaylistCover = async (currentPlaylistId?: string, currentSongs?: PlaylistSong[]) => {
+    // Use provided parameters or fall back to state
+    const pid = currentPlaylistId || playlistId;
+    const songList = currentSongs || songs;
     
     console.log("=== STARTING PLAYLIST COVER UPDATE ===");
-    console.log(`Playlist ID: ${playlistId}`);
-    console.log(`Songs count: ${songs.length}`);
+    console.log(`Playlist ID: ${pid}`);
+    console.log(`Songs count: ${songList.length}`);
+    console.log(`Songs data:`, songList);
+    
+    if (!pid || songList.length === 0) {
+      console.log("Cannot update cover: missing playlistId or no songs", songList.length);
+      return;
+    }
     
     try {
       setUploading(true);
       
-      const coverDataUrl = await generatePlaylistCover(songs);
+      const coverDataUrl = await generatePlaylistCover(songList);
       
       if (!coverDataUrl) {
         console.log("No cover data URL generated");
@@ -251,14 +257,14 @@ const PlaylistDetail = () => {
       console.log("Cover generated, uploading to storage...");
       
       // Upload using the storage function
-      const publicUrl = await storePlaylistCover(playlistId, coverDataUrl);
+      const publicUrl = await storePlaylistCover(pid, coverDataUrl);
       console.log("Cover uploaded, public URL:", publicUrl);
       
       // Update playlist record
       const { error: updateError } = await supabase
         .from('playlists')
         .update({ cover_image_url: publicUrl })
-        .eq('id', playlistId);
+        .eq('id', pid);
       
       if (updateError) {
         console.error("Error updating playlist record:", updateError);
@@ -535,10 +541,48 @@ const PlaylistDetail = () => {
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
       });
       
-      // Force update the cover after a delay to ensure all data is loaded
-      setTimeout(() => {
+      // Force update the cover after a delay with the new data
+      setTimeout(async () => {
         console.log("Triggering cover update after adding songs...");
-        updatePlaylistCover();
+        // Fetch fresh data for cover generation
+        const { data: freshSongsData } = await supabase
+          .from('playlist_songs')
+          .select(`
+            id,
+            position,
+            added_at,
+            songs:song_id (
+              id,
+              title,
+              artist,
+              duration,
+              file_path,
+              image_url,
+              genre
+            )
+          `)
+          .eq('playlist_id', playlistId)
+          .order('position', { ascending: true });
+        
+        if (freshSongsData) {
+          const formattedFreshSongs = freshSongsData.map((item) => ({
+            id: item.id,
+            position: item.position,
+            added_at: item.added_at,
+            songs: {
+              id: item.songs.id,
+              title: item.songs.title,
+              artist: item.songs.artist || '',
+              duration: item.songs.duration || '0:00',
+              url: item.songs.file_path,
+              imageUrl: item.songs.image_url,
+              genre: item.songs.genre
+            }
+          }));
+          
+          console.log("Fresh songs data for cover generation:", formattedFreshSongs);
+          updatePlaylistCover(playlistId, formattedFreshSongs);
+        }
       }, 1000);
       
     } catch (error) {
@@ -716,7 +760,10 @@ const PlaylistDetail = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        updatePlaylistCover();
+                        console.log("Manual cover generation button clicked");
+                        console.log("Current playlistId:", playlistId);
+                        console.log("Current songs:", songs);
+                        updatePlaylistCover(playlistId, songs);
                       }}
                       disabled={uploading}
                       className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full"
