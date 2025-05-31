@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
@@ -8,6 +9,7 @@ import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
+import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -264,6 +266,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setNextSongPreloaded(false);
                 fadingRef.current = false;
                 
+                // Mettre à jour les métadonnées MediaSession lors du crossfade
+                if ('mediaSession' in navigator) {
+                  updateMediaSessionMetadata(nextTrack);
+                  console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
+                }
+                
                 setTimeout(() => preloadNextTracks(), 1000);
               }
             }
@@ -293,9 +301,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           if (nextTrack) {
             console.log("Passage à la chanson suivante:", nextTrack.title);
+            
+            // Mettre à jour les métadonnées MediaSession avant de jouer la prochaine chanson
+            if ('mediaSession' in navigator) {
+              updateMediaSessionMetadata(nextTrack);
+              console.log("Métadonnées MediaSession mises à jour lors du passage automatique:", nextTrack.title);
+            }
+            
             play(nextTrack);
           } else if (repeatMode === 'all' && queue.length > 0) {
             console.log("Répétition de la playlist depuis le début");
+            
+            // Mettre à jour les métadonnées MediaSession pour la première chanson
+            if ('mediaSession' in navigator) {
+              updateMediaSessionMetadata(queue[0]);
+              console.log("Métadonnées MediaSession mises à jour lors de la répétition de playlist:", queue[0].title);
+            }
+            
             play(queue[0]);
           } else {
             console.log("Fin de la playlist");
