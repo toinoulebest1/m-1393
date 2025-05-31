@@ -53,6 +53,10 @@ const Search = () => {
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
+    // Trigger search when filter changes and there's a query
+    if (searchQuery) {
+      handleSearch(searchQuery);
+    }
   }, [searchFilter]);
 
   useEffect(() => {
