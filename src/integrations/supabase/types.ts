@@ -647,6 +647,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_playlist: {
+        Args: { playlist_id: string; viewer_user_id: string }
+        Returns: boolean
+      }
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { PlusCircle, MoreHorizontal, Music2, Play, Shuffle } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Music2, Play, Shuffle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -37,18 +37,26 @@ interface Playlist {
   created_at: string;
   song_count?: number;
   updated_at: string;
+  user_id: string;
+  is_shared?: boolean;
 }
 
-const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: () => void }) => {
+const PlaylistCard = ({ playlist, onDeleted, currentUserId }: { 
+  playlist: Playlist; 
+  onDeleted: () => void; 
+  currentUserId: string;
+}) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  const isOwner = playlist.user_id === currentUserId;
+  
   // Use useCallback to prevent recreating this function on every render
   const handleDelete = useCallback(async () => {
-    if (isDeleting) return; // Prevent multiple clicks
+    if (isDeleting || !isOwner) return; // Prevent multiple clicks and only allow owner to delete
     
     setIsDeleting(true);
     
@@ -95,7 +103,7 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
     } finally {
       setIsDeleting(false);
     }
-  }, [isDeleting, playlist.id, toast, t, onDeleted]);
+  }, [isDeleting, playlist.id, toast, t, onDeleted, isOwner]);
   
   const handleCardClick = useCallback((e: React.MouseEvent) => {
     // Only navigate if the click wasn't on the dropdown
@@ -109,6 +117,15 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
       className="bg-spotify-card p-6 rounded-xl hover:bg-spotify-card-hover transition-all duration-300 cursor-pointer group relative shadow-lg hover:shadow-xl transform hover:scale-105"
       onClick={handleCardClick}
     >
+      {playlist.is_shared && (
+        <div className="absolute top-3 left-3 z-10">
+          <div className="bg-spotify-accent/80 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            Partagée
+          </div>
+        </div>
+      )}
+      
       <div className="aspect-square bg-gradient-to-br from-spotify-accent/20 to-spotify-dark rounded-xl mb-6 flex items-center justify-center overflow-hidden shadow-md">
         {playlist.cover_image_url ? (
           <img 
@@ -136,56 +153,59 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         </p>
       </div>
       
-      <div 
-        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 bg-spotify-dark border-spotify-border">
-            <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-              {t('playlists.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {/* Only show dropdown for owned playlists */}
+      {isOwner && (
+        <div 
+          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-spotify-dark border-spotify-border">
+              <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                {t('playlists.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
-          if (!isDeleting) {
-            setShowDeleteDialog(open);
-          }
-        }}>
-          <AlertDialogContent className="bg-spotify-dark text-white border-spotify-card">
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('common.delete')} {playlist.name}?</AlertDialogTitle>
-              <AlertDialogDescription className="text-spotify-neutral">
-                {t('common.confirmDeleteMessage')}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel 
-                disabled={isDeleting}
-                className="bg-transparent border-spotify-border text-white hover:bg-spotify-card"
-              >
-                {t('common.cancel')}
-              </AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDelete();
-                }} 
-                disabled={isDeleting}
-                className="bg-red-500 hover:bg-red-600"
-              >
-                {isDeleting ? t('common.loading') : t('common.delete')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+          <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
+            if (!isDeleting) {
+              setShowDeleteDialog(open);
+            }
+          }}>
+            <AlertDialogContent className="bg-spotify-dark text-white border-spotify-card">
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('common.delete')} {playlist.name}?</AlertDialogTitle>
+                <AlertDialogDescription className="text-spotify-neutral">
+                  {t('common.confirmDeleteMessage')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel 
+                  disabled={isDeleting}
+                  className="bg-transparent border-spotify-border text-white hover:bg-spotify-card"
+                >
+                  {t('common.cancel')}
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDelete();
+                  }} 
+                  disabled={isDeleting}
+                  className="bg-red-500 hover:bg-red-600"
+                >
+                  {isDeleting ? t('common.loading') : t('common.delete')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </div>
   );
 };
@@ -354,6 +374,7 @@ const CreatePlaylistDialog = ({ onCreated }: { onCreated: () => void }) => {
 const PlaylistsPage = () => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const { t } = useTranslation();
   const { toast } = useToast();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -362,7 +383,16 @@ const PlaylistsPage = () => {
     try {
       setLoading(true);
       
-      // First get all playlists
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      setCurrentUserId(user.id);
+      
+      // Fetch all playlists that the user can see (including shared ones)
       const { data: playlistsData, error: playlistsError } = await supabase
         .from('playlists')
         .select('*')
@@ -380,10 +410,18 @@ const PlaylistsPage = () => {
             
           if (countError) {
             console.error("Error fetching song count:", countError);
-            return { ...playlist, song_count: 0 };
+            return { 
+              ...playlist, 
+              song_count: 0,
+              is_shared: playlist.user_id !== user.id
+            };
           }
           
-          return { ...playlist, song_count: count };
+          return { 
+            ...playlist, 
+            song_count: count,
+            is_shared: playlist.user_id !== user.id
+          };
         })
       );
       
@@ -447,6 +485,10 @@ const PlaylistsPage = () => {
     }, 500);
   }, [fetchPlaylists]);
 
+  // Separate owned and shared playlists
+  const ownedPlaylists = playlists.filter(p => p.user_id === currentUserId);
+  const sharedPlaylists = playlists.filter(p => p.user_id !== currentUserId);
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto">
@@ -483,8 +525,14 @@ const PlaylistsPage = () => {
               <div className="flex items-center gap-6 text-sm text-spotify-neutral bg-spotify-card/30 p-4 rounded-lg backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <Music2 className="w-4 h-4" />
-                  <span>{playlists.length} {playlists.length > 1 ? 'playlists' : 'playlist'}</span>
+                  <span>{ownedPlaylists.length} {ownedPlaylists.length > 1 ? 'playlists créées' : 'playlist créée'}</span>
                 </div>
+                {sharedPlaylists.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    <span>{sharedPlaylists.length} {sharedPlaylists.length > 1 ? 'playlists partagées' : 'playlist partagée'}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <Play className="w-4 h-4" />
                   <span>{playlists.reduce((total, playlist) => total + (playlist.song_count || 0), 0)} titres au total</span>
@@ -503,37 +551,73 @@ const PlaylistsPage = () => {
                 </div>
               ))}
             </div>
-          ) : playlists.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {playlists.map((playlist, index) => (
-                <div
-                  key={playlist.id}
-                  style={{ 
-                    animation: `fadeIn 0.3s ease-out forwards ${index * 100}ms`,
-                    opacity: 0,
-                  }}
-                >
-                  <PlaylistCard 
-                    playlist={playlist} 
-                    onDeleted={handlePlaylistDeleted} 
-                  />
-                </div>
-              ))}
-            </div>
           ) : (
-            <div className="text-center py-20">
-              <div className="space-y-6 animate-fade-in p-8 rounded-2xl bg-gradient-to-br from-spotify-card/30 to-transparent backdrop-blur-sm border border-spotify-border/20">
-                <div className="w-20 h-20 bg-gradient-to-br from-spotify-accent/20 to-spotify-accent/5 rounded-2xl flex items-center justify-center mx-auto">
-                  <Music2 className="w-10 h-10 text-spotify-accent" />
+            <div className="space-y-8">
+              {/* Mes Playlists */}
+              {ownedPlaylists.length > 0 && (
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-6">Mes playlists</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {ownedPlaylists.map((playlist, index) => (
+                      <div
+                        key={playlist.id}
+                        style={{ 
+                          animation: `fadeIn 0.3s ease-out forwards ${index * 100}ms`,
+                          opacity: 0,
+                        }}
+                      >
+                        <PlaylistCard 
+                          playlist={playlist} 
+                          onDeleted={handlePlaylistDeleted}
+                          currentUserId={currentUserId}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-semibold text-white">{t('playlists.empty')}</h3>
-                  <p className="text-spotify-neutral max-w-md mx-auto">
-                    {t('playlists.createFirst')}
-                  </p>
+              )}
+
+              {/* Playlists Partagées */}
+              {sharedPlaylists.length > 0 && (
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-6">Playlists partagées avec moi</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {sharedPlaylists.map((playlist, index) => (
+                      <div
+                        key={playlist.id}
+                        style={{ 
+                          animation: `fadeIn 0.3s ease-out forwards ${(ownedPlaylists.length + index) * 100}ms`,
+                          opacity: 0,
+                        }}
+                      >
+                        <PlaylistCard 
+                          playlist={playlist} 
+                          onDeleted={handlePlaylistDeleted}
+                          currentUserId={currentUserId}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <CreatePlaylistDialog onCreated={fetchPlaylists} />
-              </div>
+              )}
+
+              {/* Empty State */}
+              {ownedPlaylists.length === 0 && sharedPlaylists.length === 0 && (
+                <div className="text-center py-20">
+                  <div className="space-y-6 animate-fade-in p-8 rounded-2xl bg-gradient-to-br from-spotify-card/30 to-transparent backdrop-blur-sm border border-spotify-border/20">
+                    <div className="w-20 h-20 bg-gradient-to-br from-spotify-accent/20 to-spotify-accent/5 rounded-2xl flex items-center justify-center mx-auto">
+                      <Music2 className="w-10 h-10 text-spotify-accent" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-semibold text-white">{t('playlists.empty')}</h3>
+                      <p className="text-spotify-neutral max-w-md mx-auto">
+                        {t('playlists.createFirst')}
+                      </p>
+                    </div>
+                    <CreatePlaylistDialog onCreated={fetchPlaylists} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
