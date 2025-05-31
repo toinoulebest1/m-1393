@@ -2,12 +2,12 @@
 import { Player } from "@/components/Player";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTranslation } from "react-i18next";
-import { Play, Heart, Trash2, Shuffle, Clock, Signal } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Heart, Shuffle, Play } from "lucide-react";
 import { toast } from "sonner";
-import ColorThief from 'colorthief';
 import React from 'react';
 import { Button } from "@/components/ui/button";
+import { SongCard } from "@/components/SongCard";
+import { extractDominantColor } from "@/utils/colorExtractor";
 
 const Favorites = () => {
   const { t } = useTranslation();
@@ -17,42 +17,14 @@ const Favorites = () => {
     currentSong, 
     isPlaying, 
     removeFavorite,
-    queue,
     pause,
     setQueue 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
-  const [isChanging, setIsChanging] = React.useState(false);
-  const debounceTimeout = React.useRef<number | null>(null);
-
-  const extractDominantColor = async (imageUrl: string) => {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const colorThief = new ColorThief();
-      const color = colorThief.getColor(img);
-      const saturatedColor: [number, number, number] = [
-        Math.min(255, color[0] * 1.2),
-        Math.min(255, color[1] * 1.2),
-        Math.min(255, color[2] * 1.2)
-      ];
-      setDominantColor(saturatedColor);
-    } catch (error) {
-      console.error('Erreur lors de l\'extraction de la couleur:', error);
-      setDominantColor(null);
-    }
-  };
 
   React.useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
-      extractDominantColor(currentSong.imageUrl);
+      extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
     } else {
       setDominantColor(null);
     }
@@ -69,20 +41,12 @@ const Favorites = () => {
         return;
       }
 
-      if (debounceTimeout.current) {
-        window.clearTimeout(debounceTimeout.current);
-      }
-
       const newQueue = [...favorites];
       setQueue(newQueue);
       
       const songIndex = favorites.findIndex(fav => fav.id === song.id);
-      
-      debounceTimeout.current = window.setTimeout(async () => {
-        await play(newQueue[songIndex]);
-        toast.success(`Lecture de ${song.title}`);
-      }, 100);
-
+      await play(newQueue[songIndex]);
+      toast.success(`Lecture de ${song.title}`);
     } catch (error) {
       console.error("Error playing song:", error);
       toast.error("Erreur lors de la lecture de la musique");
@@ -90,13 +54,13 @@ const Favorites = () => {
   };
 
   const handlePlayAll = () => {
-    if (favorites.length === 0 || isChanging) return;
+    if (favorites.length === 0) return;
     setQueue(favorites);
     play(favorites[0]);
   };
 
   const handleShufflePlay = () => {
-    if (favorites.length === 0 || isChanging) return;
+    if (favorites.length === 0) return;
     const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
     setQueue(shuffledFavorites);
     play(shuffledFavorites[0]);
@@ -112,13 +76,14 @@ const Favorites = () => {
     }
   };
 
-  React.useEffect(() => {
-    return () => {
-      if (debounceTimeout.current) {
-        window.clearTimeout(debounceTimeout.current);
-      }
-    };
-  }, []);
+  const songCardContextMenu = (song: any) => [
+    {
+      label: "Retirer des favoris",
+      icon: <Heart className="h-4 w-4" />,
+      action: () => handleRemoveFavorite(song),
+      show: true
+    }
+  ];
 
   if (favorites.length === 0) {
     return (
@@ -137,150 +102,64 @@ const Favorites = () => {
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="p-6 animate-fade-in">
-          <div className="flex items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
-                <Heart className="w-10 h-10 text-white animate-scale-in" />
-              </div>
-              <div className="space-y-2 flex-1">
-                <h1 className="text-4xl font-bold text-white tracking-tight">{t('favorites')}</h1>
-                <p className="text-spotify-neutral">{favorites.length} {favorites.length > 1 ? 'morceaux' : 'morceau'}</p>
-              </div>
-            </div>
-            <div className="flex space-x-4">
-              <Button
-                onClick={handlePlayAll}
-                className="bg-spotify-accent hover:bg-spotify-light text-white"
-                size="lg"
-              >
-                <Play className="w-5 h-5 mr-2" />
-                Tout lire
-              </Button>
-              <Button
-                onClick={handleShufflePlay}
-                variant="outline"
-                size="lg"
-                className="border-white/10 hover:bg-white/10"
-              >
-                <Shuffle className="w-5 h-5 mr-2" />
-                Lecture aléatoire
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {favorites.map((song, index) => {
-              const isCurrentSong = currentSong?.id === song.id;
-              const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
-              
-              const glowStyle = isCurrentSong && dominantColor ? {
-                boxShadow: `
-                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                `,
-                transition: 'box-shadow 0.3s ease-in-out',
-                transform: 'scale(1.02)',
-              } : {};
-
-              const rankNumber = index + 1;
-              const isTop3 = rankNumber <= 3;
-
-              return (
-                <div
-                  key={song.id}
-                  className={cn(
-                    "group p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
-                    isCurrentSong 
-                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                      : "bg-transparent"
-                  )}
-                  onClick={() => handlePlay(song)}
-                >
-                  {isCurrentSong && (
-                    <div className="absolute inset-0 z-0 overflow-hidden">
-                      <div 
-                        className="absolute inset-0 animate-gradient opacity-20" 
-                        style={{
-                          backgroundSize: '200% 200%',
-                          animation: 'gradient 3s linear infinite',
-                          background: dominantColor 
-                            ? `linear-gradient(45deg, 
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
-                              )`
-                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className={cn(
-                        "w-8 h-8 flex items-center justify-center rounded-lg font-bold",
-                        isTop3 ? "bg-gradient-to-br" : "bg-white/5",
-                        rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
-                        rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
-                        rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
-                        !isTop3 && "text-spotify-neutral"
-                      )}>
-                        #{rankNumber}
-                      </div>
-                      <img
-                        src={imageSource}
-                        alt={`Pochette de ${song.title}`}
-                        className={cn(
-                          "w-14 h-14 rounded-lg shadow-lg object-cover",
-                          isCurrentSong && "animate-pulse"
-                        )}
-                        style={glowStyle}
-                        loading="lazy"
-                      />
-                      <div>
-                        <h3 className={cn(
-                          "font-medium transition-colors",
-                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
-                        )}>
-                          {song.title}
-                        </h3>
-                        <p className="text-sm text-spotify-neutral">{song.artist}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-6">
-                      <div className="flex items-center space-x-1 text-spotify-neutral">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">{song.duration || "0:00"}</span>
-                      </div>
-
-                      <div className="flex items-center space-x-1 text-spotify-neutral">
-                        <Signal className="w-4 h-4" />
-                        <span className="text-sm">{song.bitrate || "320 kbps"}</span>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Heart className={`w-4 h-4 text-spotify-accent fill-spotify-accent ${
-                          isCurrentSong ? 'scale-110' : ''
-                        } transition-transform duration-300`} />
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveFavorite(song);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/5 rounded-full transition-all duration-300 hover:scale-110 hover:bg-destructive/10 text-destructive hover:text-destructive"
-                        title="Retirer des favoris"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
+        <div className="max-w-6xl mx-auto p-8 pb-32">
+          <div className="mb-8">
+            <div className="flex items-center justify-between gap-4 mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
+                  <Heart className="w-10 h-10 text-white animate-scale-in" />
                 </div>
-              );
-            })}
+                <div className="space-y-2 flex-1">
+                  <h1 className="text-4xl font-bold text-white tracking-tight">{t('favorites')}</h1>
+                  <p className="text-muted-foreground">{favorites.length} {favorites.length > 1 ? 'morceaux' : 'morceau'}</p>
+                </div>
+              </div>
+              <div className="flex space-x-4">
+                <Button
+                  onClick={handlePlayAll}
+                  className="bg-spotify-accent hover:bg-spotify-light text-white"
+                  size="lg"
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Tout lire
+                </Button>
+                <Button
+                  onClick={handleShufflePlay}
+                  variant="outline"
+                  size="lg"
+                  className="border-white/10 hover:bg-white/10"
+                >
+                  <Shuffle className="w-5 h-5 mr-2" />
+                  Lecture aléatoire
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {favorites.map((song, index) => {
+                const isFavorite = favorites.some(s => s.id === song.id);
+                const isCurrentSong = currentSong?.id === song.id;
+                
+                return (
+                  <div
+                    key={song.id}
+                    style={{ 
+                      animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                      opacity: 0,
+                    }}
+                    onClick={() => handlePlay(song)}
+                  >
+                    <SongCard
+                      song={song}
+                      isCurrentSong={isCurrentSong}
+                      isFavorite={isFavorite}
+                      dominantColor={dominantColor}
+                      contextMenuItems={songCardContextMenu(song)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
