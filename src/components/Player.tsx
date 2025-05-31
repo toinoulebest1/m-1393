@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -5,7 +6,7 @@ import { useAudioControl } from "@/hooks/useAudioControl";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { AudioEqualizer } from "@/components/AudioEqualizer";
+import { EqualizerWrapper } from "@/components/EqualizerWrapper";
 import { toast } from "sonner";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
@@ -34,7 +35,15 @@ export const Player = () => {
     getCurrentAudioElement
   } = usePlayer();
 
-  const { updateVolume } = useAudioControl();
+  // We need to get the required parameters for useAudioControl from the PlayerContext
+  // For now, let's create a simplified version that just handles volume updates
+  const updateVolumeDirectly = (newVolume: number) => {
+    const audioElement = getCurrentAudioElement();
+    if (audioElement) {
+      audioElement.volume = newVolume / 100;
+      console.log("Audio element volume set to:", audioElement.volume);
+    }
+  };
   
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [showEqualizer, setShowEqualizer] = useState(false);
@@ -68,7 +77,7 @@ export const Player = () => {
     setProgress(value[0]);
   };
 
-  // Fonction corrigée pour gérer le changement de volume
+  // Fixed volume change handler
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
     console.log("Volume change requested:", newVolume);
@@ -77,17 +86,13 @@ export const Player = () => {
     setVolume(newVolume);
     
     // Also update the actual audio element volume directly
-    const audioElement = getCurrentAudioElement();
-    if (audioElement) {
-      audioElement.volume = newVolume / 100;
-      console.log("Audio element volume set to:", audioElement.volume);
-    }
+    updateVolumeDirectly(newVolume);
   };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
       {currentSong && showEqualizer && (
-        <AudioEqualizer onClose={toggleEqualizerVisibility} />
+        <EqualizerWrapper onClose={toggleEqualizerVisibility} />
       )}
       
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
@@ -116,9 +121,13 @@ export const Player = () => {
               onClick={toggleShuffle}
             />
             <SkipBack
-              className="w-6 h-6 text-spotify-neutral hover:text-white transition-colors cursor-pointer"
-              onClick={previousSong}
-              disabled={isChangingSong}
+              className={cn(
+                "w-6 h-6 transition-colors cursor-pointer",
+                isChangingSong 
+                  ? "text-spotify-neutral/50 cursor-not-allowed" 
+                  : "text-spotify-neutral hover:text-white"
+              )}
+              onClick={isChangingSong ? undefined : previousSong}
             />
             <Button
               variant="ghost"
@@ -138,9 +147,13 @@ export const Player = () => {
               )}
             </Button>
             <SkipForward
-              className="w-6 h-6 text-spotify-neutral hover:text-white transition-colors cursor-pointer"
-              onClick={nextSong}
-              disabled={isChangingSong}
+              className={cn(
+                "w-6 h-6 transition-colors cursor-pointer",
+                isChangingSong 
+                  ? "text-spotify-neutral/50 cursor-not-allowed" 
+                  : "text-spotify-neutral hover:text-white"
+              )}
+              onClick={isChangingSong ? undefined : nextSong}
             />
             {repeatMode === 'none' && (
               <Repeat
