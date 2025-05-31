@@ -22,20 +22,13 @@ interface User {
   username: string;
 }
 
-interface PlaylistFriend {
-  id: string;
-  friend_user_id: string;
-  added_at: string;
-  friend_username?: string;
-}
-
 export const PlaylistVisibilitySettings = ({ 
   playlistId, 
   currentVisibility, 
   onVisibilityChanged 
 }: PlaylistVisibilitySettingsProps) => {
   const [visibility, setVisibility] = useState(currentVisibility);
-  const [friends, setFriends] = useState<PlaylistFriend[]>([]);
+  const [friends, setFriends] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,54 +36,30 @@ export const PlaylistVisibilitySettings = ({
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const fetchPlaylistVisibility = async () => {
+  const fetchPlaylistSettings = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
-        .from('playlists')
-        .select('visibility')
-        .eq('id', playlistId)
+        .from('user_settings')
+        .select('settings')
+        .eq('user_id', user.id)
+        .eq('key', `playlist_visibility_${playlistId}`)
         .single();
 
-      if (error) {
-        console.error("Error fetching playlist visibility:", error);
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching playlist settings:", error);
         return;
       }
 
-      if (data?.visibility) {
-        setVisibility(data.visibility);
+      if (data?.settings) {
+        const settings = data.settings as any;
+        setVisibility(settings.visibility || 'private');
+        setFriends(settings.friends || []);
       }
     } catch (error) {
-      console.error("Error fetching playlist visibility:", error);
-    }
-  };
-
-  const fetchPlaylistFriends = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('playlist_friends')
-        .select(`
-          id,
-          friend_user_id,
-          added_at,
-          profiles!playlist_friends_friend_user_id_fkey(username)
-        `)
-        .eq('playlist_id', playlistId);
-
-      if (error) {
-        console.error("Error fetching playlist friends:", error);
-        return;
-      }
-
-      const friendsWithUsernames = data?.map(friend => ({
-        id: friend.id,
-        friend_user_id: friend.friend_user_id,
-        added_at: friend.added_at,
-        friend_username: friend.profiles?.username || 'Utilisateur inconnu'
-      })) || [];
-
-      setFriends(friendsWithUsernames);
-    } catch (error) {
-      console.error("Error fetching playlist friends:", error);
+      console.error("Error fetching playlist settings:", error);
     }
   };
 
@@ -109,15 +78,35 @@ export const PlaylistVisibilitySettings = ({
     }
   };
 
+  const savePlaylistSettings = async (newVisibility: string, newFriends: string[] = friends) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const settings = {
+        visibility: newVisibility,
+        friends: newFriends
+      };
+
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: user.id,
+          key: `playlist_visibility_${playlistId}`,
+          settings: settings
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error saving playlist settings:", error);
+      throw error;
+    }
+  };
+
   const handleVisibilityChange = async (newVisibility: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('playlists')
-        .update({ visibility: newVisibility })
-        .eq('id', playlistId);
-
-      if (error) throw error;
+      await savePlaylistSettings(newVisibility);
       
       setVisibility(newVisibility);
       onVisibilityChanged(newVisibility);
@@ -139,17 +128,10 @@ export const PlaylistVisibilitySettings = ({
 
   const addFriend = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('playlist_friends')
-        .insert({
-          playlist_id: playlistId,
-          friend_user_id: userId
-        });
-
-      if (error) throw error;
+      const newFriends = [...friends, userId];
+      await savePlaylistSettings(visibility, newFriends);
       
-      // Refresh friends list
-      await fetchPlaylistFriends();
+      setFriends(newFriends);
       setSearchQuery("");
       setAllUsers([]);
       
@@ -166,17 +148,12 @@ export const PlaylistVisibilitySettings = ({
     }
   };
 
-  const removeFriend = async (friendId: string) => {
+  const removeFriend = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('playlist_friends')
-        .delete()
-        .eq('id', friendId);
-
-      if (error) throw error;
+      const newFriends = friends.filter(id => id !== userId);
+      await savePlaylistSettings(visibility, newFriends);
       
-      // Update local state
-      setFriends(friends.filter(friend => friend.id !== friendId));
+      setFriends(newFriends);
       
       toast({
         description: "Ami retiré avec succès"
@@ -193,8 +170,7 @@ export const PlaylistVisibilitySettings = ({
 
   useEffect(() => {
     if (open) {
-      fetchPlaylistVisibility();
-      fetchPlaylistFriends();
+      fetchPlaylistSettings();
     }
   }, [open, playlistId]);
 
@@ -303,7 +279,7 @@ export const PlaylistVisibilitySettings = ({
                     {allUsers.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-spotify-card border border-spotify-border rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
                         {allUsers
-                          .filter(user => !friends.some(friend => friend.friend_user_id === user.id))
+                          .filter(user => !friends.includes(user.id))
                           .map((user) => (
                             <div
                               key={user.id}
@@ -322,15 +298,15 @@ export const PlaylistVisibilitySettings = ({
                     <div className="space-y-2">
                       <p className="text-sm text-spotify-neutral">Amis autorisés :</p>
                       <div className="flex flex-wrap gap-2">
-                        {friends.map((friend) => (
+                        {friends.map((friendId) => (
                           <Badge
-                            key={friend.id}
+                            key={friendId}
                             variant="secondary"
                             className="bg-spotify-accent/20 text-spotify-accent hover:bg-spotify-accent/30 flex items-center gap-1"
                           >
-                            {friend.friend_username}
+                            Ami {friendId.slice(0, 8)}...
                             <button
-                              onClick={() => removeFriend(friend.id)}
+                              onClick={() => removeFriend(friendId)}
                               className="ml-1 hover:text-red-400"
                             >
                               <X className="h-3 w-3" />

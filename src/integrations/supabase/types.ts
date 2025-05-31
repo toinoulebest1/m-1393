@@ -373,35 +373,6 @@ export type Database = {
           },
         ]
       }
-      playlist_friends: {
-        Row: {
-          added_at: string
-          friend_user_id: string
-          id: string
-          playlist_id: string
-        }
-        Insert: {
-          added_at?: string
-          friend_user_id: string
-          id?: string
-          playlist_id: string
-        }
-        Update: {
-          added_at?: string
-          friend_user_id?: string
-          id?: string
-          playlist_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playlist_friends_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       playlist_songs: {
         Row: {
           added_at: string
@@ -450,7 +421,6 @@ export type Database = {
           name: string
           updated_at: string
           user_id: string
-          visibility: string
         }
         Insert: {
           cover_image_url?: string | null
@@ -460,7 +430,6 @@ export type Database = {
           name: string
           updated_at?: string
           user_id: string
-          visibility?: string
         }
         Update: {
           cover_image_url?: string | null
@@ -470,7 +439,6 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
-          visibility?: string
         }
         Relationships: []
       }
