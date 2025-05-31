@@ -468,12 +468,11 @@ const PlaylistDetail = () => {
       if (error) throw error;
       
       // Remove from local state
-      setSongs(songs.filter(song => song.id !== playlistSongId));
+      const updatedSongs = songs.filter(song => song.id !== playlistSongId);
+      setSongs(updatedSongs);
       
       // Recalculate positions for remaining songs
-      const remainingSongs = songs
-        .filter(song => song.id !== playlistSongId)
-        .sort((a, b) => a.position - b.position);
+      const remainingSongs = updatedSongs.sort((a, b) => a.position - b.position);
       
       // Update positions in database
       const updates = remainingSongs.map((song, index) => ({
@@ -862,17 +861,48 @@ const PlaylistDetail = () => {
               {songs.map((song) => (
                 <div 
                   key={song.id} 
-                  className="cursor-pointer"
-                  onClick={() => playSong(song.songs)}
+                  className="group relative"
                 >
-                  <SongCard
-                    song={song.songs}
-                    isCurrentSong={isCurrentSong(song.songs)}
-                    isFavorite={isFavoriteSong(song.songs)}
-                    dominantColor={dominantColors[song.songs.id] || null}
-                    onLyricsClick={() => handleLyricsClick(song.songs)}
-                    onReportClick={() => handleReportClick(song.songs)}
-                  />
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => playSong(song.songs)}
+                  >
+                    <SongCard
+                      song={song.songs}
+                      isCurrentSong={isCurrentSong(song.songs)}
+                      isFavorite={isFavoriteSong(song.songs)}
+                      dominantColor={dominantColors[song.songs.id] || null}
+                      onLyricsClick={() => handleLyricsClick(song.songs)}
+                      onReportClick={() => handleReportClick(song.songs)}
+                    />
+                  </div>
+                  
+                  {/* Bouton de suppression */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-spotify-dark border-spotify-border">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSong(song.id);
+                          }}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          Retirer de la playlist
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               ))}
             </div>
