@@ -1,5 +1,4 @@
-
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -11,7 +10,13 @@ import { useEffect, useRef, useState } from "react";
 import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 import { Button } from "./ui/button";
 import { LyricsFullscreenView } from "./LyricsFullscreenView";
+import { AudioEqualizer } from "./AudioEqualizer";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export const Player = () => {
   const isMobile = useIsMobile();
@@ -38,7 +43,19 @@ export const Player = () => {
     toggleFavorite,
     isChangingSong,
     stopCurrentSong,
-    getCurrentAudioElement
+    getCurrentAudioElement,
+    // Égaliseur
+    equalizerSettings,
+    equalizerPresets,
+    currentEqualizerPreset,
+    isEqualizerEnabled,
+    isEqualizerInitialized,
+    updateEqualizerBand,
+    applyEqualizerPreset,
+    toggleEqualizer,
+    resetEqualizer,
+    setEqualizerPreAmp,
+    initializeEqualizer
   } = usePlayer();
   
   // Check if the current page is the blind test page
@@ -61,6 +78,7 @@ export const Player = () => {
   }, [getCurrentAudioElement, currentSong]);
 
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
 
   // Intervalle de mise à jour de la position
   useEffect(() => {

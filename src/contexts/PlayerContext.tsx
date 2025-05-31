@@ -5,6 +5,7 @@ import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
+import { useEqualizer } from '@/hooks/useEqualizer';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 
@@ -52,6 +53,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
   const changeTimeoutRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+
+  // Hook d'égaliseur
+  const equalizer = useEqualizer({ audioElement: audioRef.current });
 
   // Fonctions exposées à travers le contexte
   const { 
@@ -331,7 +335,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // L'objet context complet
+  // L'objet context complet avec l'égaliseur
   const playerContext: PlayerContextType = {
     currentSong,
     isPlaying,
@@ -364,7 +368,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSearchQuery,
     setPlaybackRate: updatePlaybackRate,
     refreshCurrentSong,
-    getCurrentAudioElement
+    getCurrentAudioElement,
+    // Égaliseur
+    equalizerSettings: equalizer.settings,
+    equalizerPresets: equalizer.presets,
+    currentEqualizerPreset: equalizer.currentPreset,
+    isEqualizerEnabled: equalizer.isEnabled,
+    isEqualizerInitialized: equalizer.isInitialized,
+    updateEqualizerBand: equalizer.updateBand,
+    applyEqualizerPreset: equalizer.applyPreset,
+    toggleEqualizer: equalizer.toggleEnabled,
+    resetEqualizer: equalizer.resetEqualizer,
+    setEqualizerPreAmp: equalizer.setPreAmp,
+    initializeEqualizer: equalizer.initializeAudioContext
   };
 
   return (

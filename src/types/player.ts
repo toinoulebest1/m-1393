@@ -17,6 +17,17 @@ export interface FavoriteStat {
   song: Song;
 }
 
+export interface EqualizerSettings {
+  bands: Array<{
+    frequency: number;
+    gain: number;
+    type: BiquadFilterType;
+    Q?: number;
+  }>;
+  enabled: boolean;
+  preAmp: number;
+}
+
 export interface PlayerContextType {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -31,6 +42,7 @@ export interface PlayerContextType {
   playbackRate: number;
   history: Song[];
   isChangingSong: boolean;
+  // Fonctions existantes
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (songs: Song[] | ((prevSongs: Song[]) => Song[])) => void;
@@ -50,6 +62,18 @@ export interface PlayerContextType {
   setPlaybackRate: (rate: number) => void;
   refreshCurrentSong: () => void;
   getCurrentAudioElement: () => HTMLAudioElement | null;
+  // Nouvelles fonctions d'égaliseur
+  equalizerSettings: EqualizerSettings;
+  equalizerPresets: Array<{name: string; settings: EqualizerSettings}>;
+  currentEqualizerPreset: string | null;
+  isEqualizerEnabled: boolean;
+  isEqualizerInitialized: boolean;
+  updateEqualizerBand: (index: number, gain: number) => void;
+  applyEqualizerPreset: (presetName: string) => void;
+  toggleEqualizer: () => void;
+  resetEqualizer: () => void;
+  setEqualizerPreAmp: (gain: number) => void;
+  initializeEqualizer: () => void;
 }
 
 export interface PlayerPreferences {
