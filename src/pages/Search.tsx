@@ -102,12 +102,12 @@ const Search = () => {
       console.log("Search query:", query);
 
       if (searchFilter === "playlist") {
-        // Search in playlists only with owner information
+        // Search in playlists only with owner information - using proper join syntax
         let playlistQuery = supabase
           .from('playlists')
           .select(`
             *,
-            profiles:user_id (
+            profiles!playlists_user_id_fkey (
               id,
               username
             )
@@ -194,12 +194,12 @@ const Search = () => {
         
         promises.push(songQuery);
 
-        // Search playlists with owner information
+        // Search playlists with owner information - using proper join syntax
         let playlistQuery = supabase
           .from('playlists')
           .select(`
             *,
-            profiles:user_id (
+            profiles!playlists_user_id_fkey (
               id,
               username
             )
