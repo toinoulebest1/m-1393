@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,11 +82,14 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
     ctx.fillStyle = '#121212';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Determine grid size based on number of images (up to 4)
-    const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
+    // Determine grid size based on number of images
+    const numImages = Math.min(songsWithImages.length, 4);
+    const gridSize = numImages === 1 ? 1 : 2;
     const imageSize = canvas.width / gridSize;
 
-    // Load images
+    console.log(`Creating ${gridSize}x${gridSize} grid for ${numImages} images`);
+
+    // Load and draw images
     const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
       return new Promise<void>((resolve, reject) => {
         if (!song.songs.imageUrl) {
@@ -93,22 +97,39 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
           return;
         }
         
-        console.log(`Loading image for song ${index + 1}:`, song.songs.imageUrl);
+        console.log(`Loading image ${index + 1}:`, song.songs.imageUrl);
         const img = new Image();
         img.crossOrigin = 'anonymous';
+        
         img.onload = () => {
-          // Calculate position in the grid
-          const row = Math.floor(index / gridSize);
-          const col = index % gridSize;
-          ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
-          console.log(`Image ${index + 1} drawn successfully`);
-          resolve();
+          try {
+            // Calculate position in the grid
+            const row = Math.floor(index / gridSize);
+            const col = index % gridSize;
+            const x = col * imageSize;
+            const y = row * imageSize;
+            
+            console.log(`Drawing image ${index + 1} at position (${x}, ${y}) with size ${imageSize}x${imageSize}`);
+            
+            // Draw the image
+            ctx.drawImage(img, x, y, imageSize, imageSize);
+            console.log(`Image ${index + 1} drawn successfully`);
+            resolve();
+          } catch (error) {
+            console.error(`Error drawing image ${index + 1}:`, error);
+            resolve(); // Still resolve to not block other images
+          }
         };
+        
         img.onerror = (e) => {
           console.error(`Error loading image ${index + 1}:`, e);
           resolve(); // Still resolve to not block other images
         };
-        img.src = song.songs.imageUrl;
+        
+        // Add a small delay to help with CORS issues
+        setTimeout(() => {
+          img.src = song.songs.imageUrl;
+        }, index * 100);
       });
     });
 
@@ -201,27 +222,21 @@ const PlaylistDetail = () => {
     
     try {
       setUploading(true);
-      console.log("Starting playlist cover update for", playlistId);
+      console.log(`Starting playlist cover update for playlist ${playlistId} with ${songs.length} songs`);
       
-      // First check if we can use the enhanced generation function
-      const coverDataUrl = await generateImageFromSongs(songs);
+      // Always use our improved generatePlaylistCover function for multiple images
+      const coverDataUrl = await generatePlaylistCover(songs);
+      
       if (!coverDataUrl) {
-        console.log("No cover data URL generated via enhanced method, trying legacy method");
-        // Fallback to older method
-        const legacyCoverDataUrl = await generatePlaylistCover(songs);
-        if (!legacyCoverDataUrl) {
-          console.log("No cover could be generated");
-          setUploading(false);
-          return;
-        }
+        console.log("No cover could be generated");
+        setUploading(false);
+        return;
       }
       
-      // Use whichever data URL we got
-      const finalCoverDataUrl = coverDataUrl || await generatePlaylistCover(songs);
       console.log("Cover data URL generated, uploading to storage");
       
       // Upload using the storage function
-      const publicUrl = await storePlaylistCover(playlistId, finalCoverDataUrl);
+      const publicUrl = await storePlaylistCover(playlistId, coverDataUrl);
       
       // Update playlist record
       console.log("Updating playlist record with new cover URL:", publicUrl);
@@ -504,23 +519,14 @@ const PlaylistDetail = () => {
         firstSongHasImage: selectedSongs[0]?.imageUrl 
       });
       
-      // If this is the first song being added to an empty playlist, set its image as cover
-      if (isEmptyPlaylist && selectedSongs.length > 0 && hasNoCover && selectedSongs[0].imageUrl) {
-        console.log("Setting first song as cover...");
-        await setFirstSongAsCover(selectedSongs[0]);
-      }
-      
-      // Refresh playlist songs first
+      // Refresh playlist songs first to get the updated songs list
       await fetchPlaylistDetails();
       
-      // If we now have multiple songs, generate a composite cover
-      if (willHaveMultipleSongs) {
-        console.log("Playlist will have multiple songs, generating composite cover...");
-        // Delay to ensure the new songs are loaded in the state
-        setTimeout(() => {
-          updatePlaylistCover();
-        }, 1000);
-      }
+      // Always generate a composite cover after adding songs, regardless of count
+      console.log("Generating composite cover after adding songs...");
+      setTimeout(() => {
+        updatePlaylistCover();
+      }, 1500); // Increased delay to ensure the fetchPlaylistDetails is complete
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
