@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -25,6 +24,7 @@ export const Player = () => {
     repeatMode,
     favorites,
     isChangingSong,
+    isEqualizerInitialized,
     play,
     pause,
     setVolume,
@@ -346,8 +346,10 @@ export const Player = () => {
             variant="ghost"
             size="icon"
             onClick={toggleEqualizerVisibility}
+            disabled={!currentSong}
+            className="text-spotify-neutral hover:text-white transition-colors"
           >
-            <Settings2 className="h-5 w-5 text-spotify-neutral hover:text-white transition-colors cursor-pointer" />
+            <Settings2 className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
