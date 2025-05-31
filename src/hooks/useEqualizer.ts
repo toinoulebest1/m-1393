@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { EqualizerSettings, EqualizerPreset, DEFAULT_PRESETS } from '@/types/equalizer';
 
@@ -14,15 +13,16 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const bypassGainNodeRef = useRef<GainNode | null>(null);
 
-  // État de l'égaliseur - maintenant avec enabled: true par défaut
+  // État de l'égaliseur - maintenant avec preAmp par défaut à -15dB
   const [settings, setSettings] = useState<EqualizerSettings>(() => {
     const saved = localStorage.getItem('equalizerSettings');
     if (saved) {
       const parsedSettings = JSON.parse(saved);
-      // S'assurer que enabled est true si pas défini
+      // S'assurer que enabled est true si pas défini et preAmp à -15 si pas défini
       return {
         ...parsedSettings,
-        enabled: parsedSettings.enabled !== false
+        enabled: parsedSettings.enabled !== false,
+        preAmp: parsedSettings.preAmp !== undefined ? parsedSettings.preAmp : -15
       };
     }
     return DEFAULT_PRESETS[0].settings;
