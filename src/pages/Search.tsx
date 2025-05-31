@@ -85,6 +85,22 @@ const Search = () => {
 
     setIsLoading(true);
     try {
+      // Get current user first
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log("No user found, cannot search for playlists");
+        setResults([]);
+        setPlaylistResults([]);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("=== PLAYLIST SEARCH DEBUG ===");
+      console.log("Current user ID:", user.id);
+      console.log("Search filter:", searchFilter);
+      console.log("Search query:", query);
+
       if (searchFilter === "playlist") {
         // Search in playlists only with owner information
         let playlistQuery = supabase
@@ -103,36 +119,65 @@ const Search = () => {
 
         const { data: playlistData, error: playlistError } = await playlistQuery;
 
+        console.log("Raw playlist data:", playlistData);
+        console.log("Playlist error:", playlistError);
+
         if (playlistError) {
           throw playlistError;
         }
 
-        // Filter only playlists that the current user can view
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const visiblePlaylists = [];
-          for (const playlist of playlistData || []) {
-            const { data: canView } = await supabase.rpc('can_view_playlist', {
-              playlist_id: playlist.id,
-              viewer_user_id: user.id
-            });
+        // Filter playlists that the current user can view
+        const visiblePlaylists = [];
+        
+        if (playlistData) {
+          console.log("Checking visibility for", playlistData.length, "playlists");
+          
+          for (const playlist of playlistData) {
+            console.log(`Checking playlist: ${playlist.name} (owner: ${playlist.user_id})`);
             
-            if (canView) {
+            // Check if user is owner
+            if (playlist.user_id === user.id) {
+              console.log("User is owner, adding playlist");
               visiblePlaylists.push({
                 ...playlist,
-                isSharedByFriend: playlist.user_id !== user.id
+                isSharedByFriend: false
               });
+              continue;
+            }
+            
+            // Check if user can view the playlist
+            try {
+              const { data: canView, error: canViewError } = await supabase.rpc('can_view_playlist', {
+                playlist_id: playlist.id,
+                viewer_user_id: user.id
+              });
+              
+              console.log(`Can view playlist ${playlist.name}:`, canView, "Error:", canViewError);
+              
+              if (canViewError) {
+                console.error("Error checking playlist visibility:", canViewError);
+                continue;
+              }
+              
+              if (canView) {
+                console.log("User can view playlist, adding as shared");
+                visiblePlaylists.push({
+                  ...playlist,
+                  isSharedByFriend: true
+                });
+              }
+            } catch (error) {
+              console.error("Error in can_view_playlist RPC:", error);
             }
           }
-          setPlaylistResults(visiblePlaylists);
-        } else {
-          setPlaylistResults([]);
         }
         
+        console.log("Final visible playlists:", visiblePlaylists);
+        setPlaylistResults(visiblePlaylists);
         setResults([]);
         
         if (isWildcardSearch) {
-          toast.success(`Toutes les playlists listées (${playlistData?.length || 0})`);
+          toast.success(`Toutes les playlists listées (${visiblePlaylists.length})`);
         }
       } else if (searchFilter === "all") {
         // Search in both songs and playlists
@@ -186,31 +231,48 @@ const Search = () => {
         }));
 
         // Filter playlists that the current user can view
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const visiblePlaylists = [];
-          for (const playlist of playlistResult.data || []) {
-            const { data: canView } = await supabase.rpc('can_view_playlist', {
-              playlist_id: playlist.id,
-              viewer_user_id: user.id
-            });
-            
-            if (canView) {
+        const visiblePlaylists = [];
+        
+        if (playlistResult.data) {
+          for (const playlist of playlistResult.data) {
+            // Check if user is owner
+            if (playlist.user_id === user.id) {
               visiblePlaylists.push({
                 ...playlist,
-                isSharedByFriend: playlist.user_id !== user.id
+                isSharedByFriend: false
               });
+              continue;
+            }
+            
+            // Check if user can view the playlist
+            try {
+              const { data: canView, error: canViewError } = await supabase.rpc('can_view_playlist', {
+                playlist_id: playlist.id,
+                viewer_user_id: user.id
+              });
+              
+              if (canViewError) {
+                console.error("Error checking playlist visibility:", canViewError);
+                continue;
+              }
+              
+              if (canView) {
+                visiblePlaylists.push({
+                  ...playlist,
+                  isSharedByFriend: true
+                });
+              }
+            } catch (error) {
+              console.error("Error in can_view_playlist RPC:", error);
             }
           }
-          setPlaylistResults(visiblePlaylists);
-        } else {
-          setPlaylistResults([]);
         }
 
         setResults(formattedResults);
+        setPlaylistResults(visiblePlaylists);
         
         if (isWildcardSearch) {
-          toast.success(`Tous les morceaux (${formattedResults.length}) et playlists (${playlistResult.data?.length || 0}) listés`);
+          toast.success(`Tous les morceaux (${formattedResults.length}) et playlists (${visiblePlaylists.length}) listés`);
         }
       } else {
         // ... keep existing code (search in songs only for title, artist, genre filters) the same
@@ -499,7 +561,7 @@ const Search = () => {
               // Show only playlists for playlist filter
               playlistResults.length > 0 ? (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Playlists</h3>
+                  <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {playlistResults.map((playlist, index) => (
                       <div
@@ -591,7 +653,7 @@ const Search = () => {
                 
                 {playlistResults.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Playlists</h3>
+                    <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {playlistResults.map((playlist, index) => (
                         <div
