@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -66,27 +65,44 @@ export const PlaylistVisibilitySettings = ({
 
   const fetchPlaylistFriends = async () => {
     try {
-      const { data, error } = await supabase
+      // First get the playlist friends
+      const { data: friendsData, error: friendsError } = await supabase
         .from('playlist_friends')
-        .select(`
-          id,
-          friend_user_id,
-          added_at,
-          profiles!playlist_friends_friend_user_id_fkey(username)
-        `)
+        .select('id, friend_user_id, added_at')
         .eq('playlist_id', playlistId);
 
-      if (error) {
-        console.error("Error fetching playlist friends:", error);
+      if (friendsError) {
+        console.error("Error fetching playlist friends:", friendsError);
         return;
       }
 
-      const friendsWithUsernames = data?.map(friend => ({
-        id: friend.id,
-        friend_user_id: friend.friend_user_id,
-        added_at: friend.added_at,
-        friend_username: friend.profiles?.username || 'Utilisateur inconnu'
-      })) || [];
+      if (!friendsData || friendsData.length === 0) {
+        setFriends([]);
+        return;
+      }
+
+      // Then get the usernames for each friend
+      const userIds = friendsData.map(friend => friend.friend_user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        return;
+      }
+
+      // Combine the data
+      const friendsWithUsernames = friendsData.map(friend => {
+        const profile = profilesData?.find(p => p.id === friend.friend_user_id);
+        return {
+          id: friend.id,
+          friend_user_id: friend.friend_user_id,
+          added_at: friend.added_at,
+          friend_username: profile?.username || 'Utilisateur inconnu'
+        };
+      });
 
       setFriends(friendsWithUsernames);
     } catch (error) {
