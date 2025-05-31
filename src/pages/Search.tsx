@@ -86,7 +86,7 @@ const Search = () => {
     setIsLoading(true);
     try {
       if (searchFilter === "playlist") {
-        // Search in playlists
+        // Search in playlists only
         let playlistQuery = supabase
           .from('playlists')
           .select('*');
@@ -107,8 +107,59 @@ const Search = () => {
         if (isWildcardSearch) {
           toast.success(`Toutes les playlists listées (${playlistData?.length || 0})`);
         }
+      } else if (searchFilter === "all") {
+        // Search in both songs and playlists
+        const promises = [];
+        
+        // Search songs
+        let songQuery = supabase
+          .from('songs')
+          .select('*');
+
+        if (!isWildcardSearch) {
+          songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
+        }
+        
+        promises.push(songQuery);
+
+        // Search playlists
+        let playlistQuery = supabase
+          .from('playlists')
+          .select('*');
+
+        if (!isWildcardSearch) {
+          playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
+        }
+
+        promises.push(playlistQuery);
+
+        const [songResult, playlistResult] = await Promise.all(promises);
+
+        if (songResult.error) {
+          throw songResult.error;
+        }
+        if (playlistResult.error) {
+          throw playlistResult.error;
+        }
+
+        const formattedResults = songResult.data.map(song => ({
+          id: song.id,
+          title: song.title,
+          artist: song.artist || '',
+          duration: song.duration || '0:00',
+          url: song.file_path,
+          imageUrl: song.image_url,
+          bitrate: '320 kbps'
+        }));
+
+        setResults(formattedResults);
+        setPlaylistResults(playlistResult.data || []);
+        
+        if (isWildcardSearch) {
+          toast.success(`Tous les morceaux (${formattedResults.length}) et playlists (${playlistResult.data?.length || 0}) listés`);
+        }
       } else {
-        // Search in songs
+        // Search in songs only (title, artist, genre filters)
         let queryBuilder = supabase
           .from('songs')
           .select('*');
@@ -122,8 +173,6 @@ const Search = () => {
             if (selectedGenre) {
               queryBuilder = queryBuilder.eq('genre', selectedGenre);
             }
-          } else {
-            queryBuilder = queryBuilder.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
           }
         }
         
