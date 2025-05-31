@@ -29,7 +29,7 @@ export interface EqualizerContextType {
   setPreAmp: (gain: number) => void;
 }
 
-// Presets par défaut - maintenant avec preAmp: -15 pour tous les presets
+// Presets par défaut - maintenant avec enabled: true pour Flat
 export const DEFAULT_PRESETS: EqualizerPreset[] = [
   {
     name: "Flat",
@@ -43,7 +43,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 0, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   },
   {
@@ -58,7 +58,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 6, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   },
   {
@@ -73,7 +73,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 2, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   },
   {
@@ -88,7 +88,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 4, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   },
   {
@@ -103,7 +103,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 4, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   },
   {
@@ -118,7 +118,7 @@ export const DEFAULT_PRESETS: EqualizerPreset[] = [
         { frequency: 10000, gain: 5, type: "peaking" }
       ],
       enabled: true,
-      preAmp: -15
+      preAmp: 0
     }
   }
 ];

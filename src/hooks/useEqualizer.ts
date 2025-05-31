@@ -14,35 +14,29 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const bypassGainNodeRef = useRef<GainNode | null>(null);
 
-  // État de l'égaliseur - DÉSACTIVÉ par défaut pour éviter les problèmes de volume
+  // État de l'égaliseur - maintenant avec enabled: true par défaut
   const [settings, setSettings] = useState<EqualizerSettings>(() => {
     const saved = localStorage.getItem('equalizerSettings');
     if (saved) {
       const parsedSettings = JSON.parse(saved);
+      // S'assurer que enabled est true si pas défini
       return {
         ...parsedSettings,
-        // Force disabled par défaut pour éviter l'initialisation automatique
-        enabled: false
+        enabled: parsedSettings.enabled !== false
       };
     }
-    return {
-      ...DEFAULT_PRESETS[0].settings,
-      enabled: false, // Désactivé par défaut
-      preAmp: -15 // PreAmp par défaut à -15dB
-    };
+    return DEFAULT_PRESETS[0].settings;
   });
 
   const [currentPreset, setCurrentPreset] = useState<string | null>(() => {
     return localStorage.getItem('currentEqualizerPreset') || 'Flat';
   });
 
-  // Initialisation MANUELLE de Web Audio API - uniquement sur demande explicite
+  // Initialisation de Web Audio API
   const initializeAudioContext = useCallback(async () => {
     if (!audioElement || isInitialized) return;
 
     try {
-      console.log('Initialisation manuelle de l\'égaliseur...');
-      
       // Créer le contexte audio avec fallback pour webkit
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) {
@@ -55,21 +49,22 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       // Créer le nœud source
       sourceNodeRef.current = audioContext.createMediaElementSource(audioElement);
 
-      // Créer le gain node pour le préamplificateur - GAIN À 1 (neutre)
+      // Créer le gain node pour le préamplificateur - COMMENCER À 0 pour éviter toute amplification
       gainNodeRef.current = audioContext.createGain();
-      gainNodeRef.current.gain.value = 1; // Neutre
+      gainNodeRef.current.gain.value = 0;
 
-      // Créer un gain node pour le bypass avec gain à 1 (neutre)
+      // Créer un gain node pour le bypass avec gain à 1
       bypassGainNodeRef.current = audioContext.createGain();
-      bypassGainNodeRef.current.gain.value = 1; // Neutre
+      bypassGainNodeRef.current.gain.value = 1;
 
-      // Créer les filtres pour chaque bande - TOUS À 0 (neutre)
+      // Créer les filtres pour chaque bande - TOUS À 0
       filtersRef.current = settings.bands.map((band, index) => {
         const filter = audioContext.createBiquadFilter();
         filter.type = band.type;
         filter.frequency.value = band.frequency;
         filter.Q.value = band.Q || 1;
-        filter.gain.value = 0; // Neutre
+        // ABSOLUMENT tous les filtres à 0
+        filter.gain.value = 0;
         return filter;
       });
 
@@ -94,16 +89,41 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       currentNode.connect(audioContext.destination);
 
       setIsInitialized(true);
-      console.log('Égaliseur initialisé en mode neutre (aucune amplification)');
+      console.log('Égaliseur initialisé avec tous les gains à 0 absolu');
+      
+      // Attendre plus longtemps et appliquer progressivement les réglages
+      setTimeout(() => {
+        console.log('Application progressive des réglages d\'égaliseur...');
+        
+        // D'abord le préampli - calculer la valeur correcte
+        if (gainNodeRef.current) {
+          const preAmpValue = settings.preAmp === 0 ? 1 : Math.pow(10, settings.preAmp / 20);
+          gainNodeRef.current.gain.setValueAtTime(preAmpValue, audioContext.currentTime);
+          console.log(`PreAmp appliqué: ${settings.preAmp}dB = ${preAmpValue}`);
+        }
+        
+        // Ensuite les filtres seulement si activé
+        if (settings.enabled) {
+          filtersRef.current.forEach((filter, index) => {
+            const targetGain = settings.bands[index].gain;
+            filter.gain.setValueAtTime(targetGain, audioContext.currentTime);
+            console.log(`Filtre ${index}: ${targetGain}dB`);
+          });
+        } else {
+          console.log('Égaliseur désactivé, tous les filtres restent à 0');
+        }
+        
+        console.log('Réglages d\'égaliseur appliqués avec succès');
+      }, 500); // Délai plus long pour s'assurer que tout est stable
       
     } catch (error) {
       console.error('Erreur lors de l\'initialisation de l\'égaliseur:', error);
     }
-  }, [audioElement, isInitialized, settings.bands]);
+  }, [audioElement, isInitialized, settings.preAmp, settings.enabled, settings.bands]);
 
   // Mettre à jour une bande de fréquence
   const updateBand = useCallback((index: number, gain: number) => {
-    if (filtersRef.current[index] && settings.enabled && isInitialized) {
+    if (filtersRef.current[index] && settings.enabled) {
       filtersRef.current[index].gain.value = gain;
       console.log(`Bande ${index} mise à jour: ${gain}dB`);
     }
@@ -122,12 +142,12 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
     // Réinitialiser le preset actuel car l'utilisateur a modifié manuellement
     setCurrentPreset(null);
     localStorage.removeItem('currentEqualizerPreset');
-  }, [settings.enabled, isInitialized]);
+  }, [settings.enabled]);
 
   // Appliquer un preset
   const applyPreset = useCallback((presetName: string) => {
     const preset = DEFAULT_PRESETS.find(p => p.name === presetName);
-    if (!preset || !isInitialized) return;
+    if (!preset) return;
 
     console.log(`Application du preset: ${presetName}`);
 
@@ -149,7 +169,7 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
     setCurrentPreset(presetName);
     localStorage.setItem('equalizerSettings', JSON.stringify(preset.settings));
     localStorage.setItem('currentEqualizerPreset', presetName);
-  }, [isInitialized]);
+  }, []);
 
   // Activer/désactiver l'égaliseur
   const toggleEnabled = useCallback(() => {
@@ -157,24 +177,8 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       const newEnabled = !prev.enabled;
       console.log(`Égaliseur ${newEnabled ? 'activé' : 'désactivé'}`);
       
-      // Si on active l'égaliseur et qu'il n'est pas initialisé, l'initialiser d'abord
-      if (newEnabled && !isInitialized) {
-        initializeAudioContext().then(() => {
-          // Appliquer les réglages après initialisation
-          setTimeout(() => {
-            if (filtersRef.current.length > 0 && audioContextRef.current) {
-              filtersRef.current.forEach((filter, index) => {
-                const targetGain = prev.bands[index].gain;
-                filter.gain.setValueAtTime(targetGain, audioContextRef.current!.currentTime);
-                console.log(`Filtre ${index}: gain=${targetGain}dB`);
-              });
-            }
-          }, 100);
-        });
-      }
-      
-      // Appliquer immédiatement les changements aux filtres si déjà initialisé
-      if (isInitialized && filtersRef.current.length > 0 && audioContextRef.current) {
+      // Appliquer immédiatement les changements aux filtres avec transition
+      if (filtersRef.current.length > 0 && audioContextRef.current) {
         filtersRef.current.forEach((filter, index) => {
           const targetGain = newEnabled ? prev.bands[index].gain : 0;
           filter.gain.setValueAtTime(targetGain, audioContextRef.current!.currentTime);
@@ -186,7 +190,7 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       localStorage.setItem('equalizerSettings', JSON.stringify(newSettings));
       return newSettings;
     });
-  }, [isInitialized, initializeAudioContext]);
+  }, []);
 
   // Réinitialiser l'égaliseur
   const resetEqualizer = useCallback(() => {
@@ -196,7 +200,7 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
 
   // Mettre à jour le préamplificateur
   const setPreAmp = useCallback((gain: number) => {
-    if (gainNodeRef.current && audioContextRef.current && isInitialized) {
+    if (gainNodeRef.current && audioContextRef.current) {
       const preAmpValue = gain === 0 ? 1 : Math.pow(10, gain / 20);
       gainNodeRef.current.gain.setValueAtTime(preAmpValue, audioContextRef.current.currentTime);
       console.log(`PreAmp mis à jour: ${gain}dB = ${preAmpValue}`);
@@ -207,10 +211,14 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       localStorage.setItem('equalizerSettings', JSON.stringify(newSettings));
       return newSettings;
     });
-  }, [isInitialized]);
+  }, []);
 
-  // NE PAS initialiser automatiquement - seulement sur demande explicite
-  // useEffect supprimé pour éviter l'initialisation automatique
+  // Initialiser quand l'élément audio change
+  useEffect(() => {
+    if (audioElement) {
+      initializeAudioContext();
+    }
+  }, [audioElement, initializeAudioContext]);
 
   // Nettoyage
   useEffect(() => {
