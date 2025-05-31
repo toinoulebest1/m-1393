@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +26,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
+import { Player } from "@/components/Player";
 
 interface Playlist {
   id: string;
@@ -441,39 +441,44 @@ const PlaylistsPage = () => {
   }, [fetchPlaylists]);
 
   return (
-    <div className="container p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">{t('playlists.title')}</h1>
-        <CreatePlaylistDialog onCreated={fetchPlaylists} />
-      </div>
-      
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="space-y-3">
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="container p-6 pb-32">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-white">{t('playlists.title')}</h1>
+            <CreatePlaylistDialog onCreated={fetchPlaylists} />
+          </div>
+          
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
             </div>
-          ))}
+          ) : playlists.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {playlists.map((playlist) => (
+                <PlaylistCard 
+                  key={playlist.id} 
+                  playlist={playlist} 
+                  onDeleted={handlePlaylistDeleted} 
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
+              <p className="text-spotify-neutral text-lg mb-4">{t('playlists.empty')}</p>
+              <p className="text-spotify-neutral">{t('playlists.createFirst')}</p>
+            </div>
+          )}
         </div>
-      ) : playlists.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {playlists.map((playlist) => (
-            <PlaylistCard 
-              key={playlist.id} 
-              playlist={playlist} 
-              onDeleted={handlePlaylistDeleted} 
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-          <p className="text-spotify-neutral text-lg mb-4">{t('playlists.empty')}</p>
-          <p className="text-spotify-neutral">{t('playlists.createFirst')}</p>
-        </div>
-      )}
+      </div>
+      <Player />
     </div>
   );
 };
