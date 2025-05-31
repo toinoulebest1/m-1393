@@ -1,5 +1,5 @@
+
 import { Player } from "@/components/Player";
-import { Sidebar } from "@/components/Sidebar";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTranslation } from "react-i18next";
 import { Play, Heart, Trash2, Shuffle, Clock, Signal } from "lucide-react";
@@ -137,14 +137,16 @@ const Favorites = () => {
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-6xl mx-auto space-y-8 p-6 animate-fade-in">
-          <div className="flex items-center space-x-6 mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
-              <Heart className="w-10 h-10 text-white animate-scale-in" />
-            </div>
-            <div className="space-y-2 flex-1">
-              <h1 className="text-4xl font-bold text-white tracking-tight">{t('favorites')}</h1>
-              <p className="text-spotify-neutral">{favorites.length} {favorites.length > 1 ? 'morceaux' : 'morceau'}</p>
+        <div className="p-6 animate-fade-in">
+          <div className="flex items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-105 transition-all duration-300">
+                <Heart className="w-10 h-10 text-white animate-scale-in" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <h1 className="text-4xl font-bold text-white tracking-tight">{t('favorites')}</h1>
+                <p className="text-spotify-neutral">{favorites.length} {favorites.length > 1 ? 'morceaux' : 'morceau'}</p>
+              </div>
             </div>
             <div className="flex space-x-4">
               <Button
@@ -168,7 +170,7 @@ const Favorites = () => {
           </div>
 
           <div className="space-y-2">
-            {favorites.map((song) => {
+            {favorites.map((song, index) => {
               const isCurrentSong = currentSong?.id === song.id;
               const imageSource = song.imageUrl || `https://picsum.photos/seed/${song.id}/200/200`;
               
@@ -182,11 +184,14 @@ const Favorites = () => {
                 transform: 'scale(1.02)',
               } : {};
 
+              const rankNumber = index + 1;
+              const isTop3 = rankNumber <= 3;
+
               return (
                 <div
                   key={song.id}
                   className={cn(
-                    "p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
+                    "group p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
                     isCurrentSong 
                       ? "relative bg-white/5 shadow-lg overflow-hidden" 
                       : "bg-transparent"
@@ -213,6 +218,16 @@ const Favorites = () => {
 
                   <div className="relative z-10 flex items-center justify-between">
                     <div className="flex items-center space-x-4">
+                      <div className={cn(
+                        "w-8 h-8 flex items-center justify-center rounded-lg font-bold",
+                        isTop3 ? "bg-gradient-to-br" : "bg-white/5",
+                        rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
+                        rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
+                        rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
+                        !isTop3 && "text-spotify-neutral"
+                      )}>
+                        #{rankNumber}
+                      </div>
                       <img
                         src={imageSource}
                         alt={`Pochette de ${song.title}`}
@@ -245,14 +260,21 @@ const Favorites = () => {
                         <span className="text-sm">{song.bitrate || "320 kbps"}</span>
                       </div>
 
+                      <div className="flex items-center space-x-2">
+                        <Heart className={`w-4 h-4 text-spotify-accent fill-spotify-accent ${
+                          isCurrentSong ? 'scale-110' : ''
+                        } transition-transform duration-300`} />
+                      </div>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveFavorite(song);
                         }}
-                        className="p-2 hover:bg-white/5 rounded-full transition-colors group relative"
+                        className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/5 rounded-full transition-all duration-300 hover:scale-110 hover:bg-destructive/10 text-destructive hover:text-destructive"
+                        title="Retirer des favoris"
                       >
-                        <Trash2 className="w-5 h-5 text-spotify-neutral group-hover:text-red-500 transition-colors" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
