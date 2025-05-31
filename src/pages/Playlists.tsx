@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { PlusCircle, MoreHorizontal, Music2 } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Music2, Play, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -104,10 +105,10 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
   
   return (
     <div 
-      className="bg-spotify-card p-4 rounded-lg hover:bg-spotify-card-hover transition-colors cursor-pointer group relative"
+      className="bg-spotify-card p-6 rounded-xl hover:bg-spotify-card-hover transition-all duration-300 cursor-pointer group relative shadow-lg hover:shadow-xl transform hover:scale-105"
       onClick={handleCardClick}
     >
-      <div className="aspect-square bg-spotify-dark rounded-md mb-4 flex items-center justify-center overflow-hidden">
+      <div className="aspect-square bg-gradient-to-br from-spotify-accent/20 to-spotify-dark rounded-xl mb-6 flex items-center justify-center overflow-hidden shadow-md">
         {playlist.cover_image_url ? (
           <img 
             src={playlist.cover_image_url} 
@@ -115,32 +116,32 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
             className="w-full h-full object-cover"
           />
         ) : (
-          <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
+          <Music2 className="w-1/2 h-1/2 text-spotify-accent/60" />
         )}
       </div>
       
-      <h3 className="font-bold text-white truncate">{playlist.name}</h3>
+      <h3 className="font-bold text-white truncate text-lg mb-2">{playlist.name}</h3>
       
       {playlist.description && (
-        <p className="text-spotify-neutral text-sm line-clamp-2">{playlist.description}</p>
+        <p className="text-spotify-neutral text-sm line-clamp-2 mb-3">{playlist.description}</p>
       )}
       
-      <p className="text-xs text-spotify-neutral mt-2">
+      <p className="text-xs text-spotify-neutral/80 font-medium">
         {playlist.song_count || 0} {playlist.song_count === 1 ? t('common.track') : t('common.tracks')}
       </p>
       
       <div 
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 
+        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 
         onClick={(e) => e.stopPropagation()}
       >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/60">
+            <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-500">
+          <DropdownMenuContent align="end" className="w-48 bg-spotify-dark border-spotify-border">
+            <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
               {t('playlists.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -443,37 +444,90 @@ const PlaylistsPage = () => {
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex-1 overflow-y-auto">
-        <div className="container p-6 pb-32">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-white">{t('playlists.title')}</h1>
-            <CreatePlaylistDialog onCreated={fetchPlaylists} />
+        <div className="max-w-7xl mx-auto p-8 pb-32">
+          {/* Enhanced Header */}
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-8">
+              <div className="space-y-2">
+                <h1 className="text-4xl font-bold text-white tracking-tight bg-gradient-to-r from-white to-spotify-accent bg-clip-text text-transparent">
+                  {t('playlists.title')}
+                </h1>
+                <p className="text-spotify-neutral text-lg">
+                  Organisez votre musique en collections personnalisées
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <CreatePlaylistDialog onCreated={fetchPlaylists} />
+                
+                {playlists.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="border-spotify-border hover:bg-spotify-card text-white"
+                  >
+                    <Shuffle className="w-4 h-4 mr-2" />
+                    Lecture aléatoire
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            {/* Stats Section */}
+            {playlists.length > 0 && (
+              <div className="flex items-center gap-6 text-sm text-spotify-neutral bg-spotify-card/30 p-4 rounded-lg backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <Music2 className="w-4 h-4" />
+                  <span>{playlists.length} {playlists.length > 1 ? 'playlists' : 'playlist'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Play className="w-4 h-4" />
+                  <span>{playlists.reduce((total, playlist) => total + (playlist.song_count || 0), 0)} titres au total</span>
+                </div>
+              </div>
+            )}
           </div>
           
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="space-y-3">
-                  <Skeleton className="h-48 w-full" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="space-y-4 animate-pulse">
+                  <Skeleton className="h-56 w-full rounded-xl" />
                   <Skeleton className="h-6 w-3/4" />
                   <Skeleton className="h-4 w-1/2" />
                 </div>
               ))}
             </div>
           ) : playlists.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {playlists.map((playlist) => (
-                <PlaylistCard 
-                  key={playlist.id} 
-                  playlist={playlist} 
-                  onDeleted={handlePlaylistDeleted} 
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {playlists.map((playlist, index) => (
+                <div
+                  key={playlist.id}
+                  style={{ 
+                    animation: `fadeIn 0.3s ease-out forwards ${index * 100}ms`,
+                    opacity: 0,
+                  }}
+                >
+                  <PlaylistCard 
+                    playlist={playlist} 
+                    onDeleted={handlePlaylistDeleted} 
+                  />
+                </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-              <p className="text-spotify-neutral text-lg mb-4">{t('playlists.empty')}</p>
-              <p className="text-spotify-neutral">{t('playlists.createFirst')}</p>
+            <div className="text-center py-20">
+              <div className="space-y-6 animate-fade-in p-8 rounded-2xl bg-gradient-to-br from-spotify-card/30 to-transparent backdrop-blur-sm border border-spotify-border/20">
+                <div className="w-20 h-20 bg-gradient-to-br from-spotify-accent/20 to-spotify-accent/5 rounded-2xl flex items-center justify-center mx-auto">
+                  <Music2 className="w-10 h-10 text-spotify-accent" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-white">{t('playlists.empty')}</h3>
+                  <p className="text-spotify-neutral max-w-md mx-auto">
+                    {t('playlists.createFirst')}
+                  </p>
+                </div>
+                <CreatePlaylistDialog onCreated={fetchPlaylists} />
+              </div>
             </div>
           )}
         </div>
