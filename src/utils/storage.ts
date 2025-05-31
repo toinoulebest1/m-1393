@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -58,78 +57,128 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 };
 
 export const getAudioFile = async (path: string) => {
-  console.log("Récupération du fichier audio:", path);
+  console.log("=== DÉBUT RÉCUPÉRATION FICHIER AUDIO ===");
+  console.log("Chemin demandé:", path);
   
   if (!path) {
-    console.error("Chemin du fichier non fourni");
+    console.error("=== ERREUR: Chemin vide ===");
     throw new Error("Chemin du fichier non fourni");
   }
 
   try {
     // Check cache first for quick retrieval
+    console.log("=== VÉRIFICATION CACHE ===");
     if (await isInCache(path)) {
-      console.log(`Fichier audio trouvé dans le cache: ${path}`);
+      console.log("Fichier trouvé dans le cache:", path);
       const cachedUrl = await getFromCache(path);
       if (cachedUrl) {
+        console.log("URL du cache récupérée:", cachedUrl);
+        console.log("=== FIN (CACHE) ===");
         return cachedUrl;
       }
+    } else {
+      console.log("Fichier non trouvé dans le cache");
     }
 
     // If not in cache, proceed normally
+    console.log("=== VÉRIFICATION PROVIDER ===");
     const useOneDrive = await isOneDriveEnabled();
-    console.log("Using storage provider for retrieval:", useOneDrive ? "OneDrive" : "Supabase");
+    console.log("Provider utilisé:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
     if (useOneDrive) {
-      // Get direct download URL from OneDrive
-      audioUrl = await getOneDriveSharedLink(`audio/${path}`);
-      console.log("OneDrive direct download URL retrieved:", audioUrl);
+      console.log("=== RÉCUPÉRATION ONEDRIVE ===");
+      console.log("Chemin OneDrive:", `audio/${path}`);
+      try {
+        // Get direct download URL from OneDrive
+        audioUrl = await getOneDriveSharedLink(`audio/${path}`);
+        console.log("URL OneDrive récupérée:", audioUrl);
+      } catch (oneDriveError) {
+        console.error("=== ERREUR ONEDRIVE ===");
+        console.error("Erreur OneDrive:", oneDriveError);
+        console.error("=====================");
+        throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
+      }
     } else {
+      console.log("=== RÉCUPÉRATION SUPABASE ===");
+      
       // Vérifie si le fichier existe
-      const { data: fileExists } = await supabase.storage
+      console.log("Vérification existence du fichier:", path);
+      const { data: fileExists, error: listError } = await supabase.storage
         .from('audio')
         .list('', { search: path });
 
-      if (!fileExists || fileExists.length === 0) {
-        console.error("Fichier non trouvé dans le stockage:", path);
-        throw new Error("Fichier audio non trouvé");
+      if (listError) {
+        console.error("=== ERREUR LISTE SUPABASE ===");
+        console.error("Erreur lors de la liste:", listError);
+        console.error("=============================");
+        throw new Error(`Erreur lors de la vérification du fichier: ${listError.message}`);
       }
 
+      if (!fileExists || fileExists.length === 0) {
+        console.error("=== FICHIER NON TROUVÉ ===");
+        console.error("Fichier recherché:", path);
+        console.error("Résultat de la recherche:", fileExists);
+        console.error("========================");
+        throw new Error(`Fichier audio non trouvé dans le stockage: ${path}`);
+      }
+
+      console.log("Fichier trouvé, génération URL signée");
       const { data, error } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
 
       if (error) {
-        console.error("Erreur lors de la récupération du fichier:", error);
-        throw error;
+        console.error("=== ERREUR URL SIGNÉE ===");
+        console.error("Erreur:", error);
+        console.error("========================");
+        throw new Error(`Erreur lors de la génération de l'URL: ${error.message}`);
       }
 
       if (!data?.signedUrl) {
+        console.error("=== ERREUR: URL VIDE ===");
         throw new Error("URL signée non générée");
       }
 
       audioUrl = data.signedUrl;
+      console.log("URL Supabase générée:", audioUrl);
     }
 
+    console.log("=== MISE EN CACHE ===");
     // Try to cache for future retrievals
     try {
-      console.log("Fetching audio for cache:", audioUrl);
+      console.log("Téléchargement pour mise en cache:", audioUrl);
       const response = await fetch(audioUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+        console.warn("=== AVERTISSEMENT CACHE ===");
+        console.warn(`Impossible de télécharger pour le cache: ${response.status} ${response.statusText}`);
+        console.warn("URL:", audioUrl);
+        console.warn("==========================");
+        // Continue même si la mise en cache échoue
+      } else {
+        const blob = await response.blob();
+        await addToCache(path, blob);
+        console.log(`Fichier mis en cache: ${path}, taille: ${blob.size} bytes`);
       }
-      const blob = await response.blob();
-      await addToCache(path, blob);
-      console.log(`Audio file cached successfully: ${path}, size: ${blob.size} bytes`);
     } catch (cacheError) {
-      console.warn("Impossible de mettre en cache le fichier:", cacheError);
-      // Continue even if caching fails
+      console.warn("=== AVERTISSEMENT CACHE ===");
+      console.warn("Impossible de mettre en cache:", cacheError);
+      console.warn("==========================");
+      // Continue même si la mise en cache échoue
     }
 
+    console.log("=== FIN RÉCUPÉRATION RÉUSSIE ===");
+    console.log("URL finale:", audioUrl);
+    console.log("===============================");
     return audioUrl;
   } catch (error) {
-    console.error("Erreur lors de la récupération du fichier:", error);
+    console.error("=== ERREUR FINALE ===");
+    console.error("Erreur lors de la récupération:", error);
+    console.error("Chemin:", path);
+    console.error("Type d'erreur:", error instanceof Error ? error.constructor.name : typeof error);
+    console.error("Message:", error instanceof Error ? error.message : String(error));
+    console.error("================");
     throw error;
   }
 };

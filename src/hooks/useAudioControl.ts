@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -43,6 +42,12 @@ export const useAudioControl = ({
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setIsChangingSong(true);
       
+      console.log("=== TENTATIVE DE LECTURE ===");
+      console.log("Chanson demandée:", song.title, "par", song.artist);
+      console.log("ID de la chanson:", song.id);
+      console.log("Chemin du fichier:", song.url);
+      console.log("=============================");
+      
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
@@ -52,10 +57,19 @@ export const useAudioControl = ({
       }
 
       try {
+        console.log("=== RÉCUPÉRATION DU FICHIER AUDIO ===");
+        console.log("Appel de getAudioFile avec le chemin:", song.url);
+        
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
+          console.error("=== ERREUR: Aucune URL audio retournée ===");
           throw new Error('Fichier audio non trouvé');
         }
+
+        console.log("=== URL AUDIO RÉCUPÉRÉE ===");
+        console.log("URL générée:", audioUrl);
+        console.log("Type d'URL:", audioUrl.startsWith('http') ? 'HTTP' : audioUrl.startsWith('blob:') ? 'Blob' : 'Autre');
+        console.log("============================");
 
         // Configure CORS for audio elements
         audioRef.current.crossOrigin = "anonymous";
@@ -64,18 +78,21 @@ export const useAudioControl = ({
         audioRef.current.preload = "auto";
         audioRef.current.load();
         
-        console.log("=== AUDIO SETUP DEBUG ===");
-        console.log("Audio URL:", audioUrl);
-        console.log("CrossOrigin set to:", audioRef.current.crossOrigin);
-        console.log("Audio element ready state:", audioRef.current.readyState);
-        console.log("========================");
+        console.log("=== CONFIGURATION AUDIO ELEMENT ===");
+        console.log("Audio URL assignée:", audioUrl);
+        console.log("CrossOrigin défini:", audioRef.current.crossOrigin);
+        console.log("Ready state:", audioRef.current.readyState);
+        console.log("===================================");
         
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
-            console.log("Lecture démarrée avec succès:", song.title);
+            console.log("=== LECTURE RÉUSSIE ===");
+            console.log("Chanson:", song.title);
+            console.log("Volume:", audioRef.current.volume);
+            console.log("======================");
             
             setTimeout(() => preloadNextTracks(), 1000);
             
@@ -84,25 +101,34 @@ export const useAudioControl = ({
               changeTimeoutRef.current = null;
             }, 1200);
           }).catch(error => {
-            console.error("Error starting playback:", error);
+            console.error("=== ERREUR DE LECTURE ===");
+            console.error("Type d'erreur:", error.name);
+            console.error("Message:", error.message);
+            console.error("Erreur complète:", error);
+            console.error("URL tentée:", audioUrl);
+            console.error("========================");
             
             // Handle CORS errors specifically
             if (error.name === 'NotAllowedError' || error.message.includes('CORS')) {
-              console.log("CORS error detected, trying without crossOrigin");
+              console.log("=== TENTATIVE SANS CORS ===");
               audioRef.current.crossOrigin = null;
               audioRef.current.load();
               
               audioRef.current.play().then(() => {
                 setIsPlaying(true);
                 audioRef.current.volume = volume / 100;
-                console.log("Lecture démarrée sans CORS:", song.title);
+                console.log("=== LECTURE SANS CORS RÉUSSIE ===");
+                console.log("Chanson:", song.title);
+                console.log("================================");
                 
                 changeTimeoutRef.current = window.setTimeout(() => {
                   setIsChangingSong(false);
                   changeTimeoutRef.current = null;
                 }, 1200);
               }).catch(fallbackError => {
-                console.error("Fallback playback also failed:", fallbackError);
+                console.error("=== ERREUR LECTURE SANS CORS ===");
+                console.error("Erreur fallback:", fallbackError);
+                console.error("===============================");
                 setIsPlaying(false);
                 setIsChangingSong(false);
                 toast.error("Impossible de lire ce titre - problème CORS");
@@ -110,13 +136,43 @@ export const useAudioControl = ({
             } else {
               setIsPlaying(false);
               setIsChangingSong(false);
-              toast.error("Impossible de lire ce titre");
+              
+              // More specific error messages for users
+              if (error.name === 'NotSupportedError') {
+                toast.error("Format audio non supporté");
+              } else if (error.name === 'NetworkError') {
+                toast.error("Erreur réseau - fichier inaccessible");
+              } else if (error.name === 'AbortError') {
+                toast.error("Lecture interrompue");
+              } else {
+                toast.error(`Impossible de lire ce titre: ${error.message}`);
+              }
             }
           });
         }
       } catch (error) {
-        console.error("Error playing audio:", error);
-        toast.error("Impossible de lire ce titre");
+        console.error("=== ERREUR LORS DE LA RÉCUPÉRATION ===");
+        console.error("Erreur:", error);
+        console.error("Message:", error instanceof Error ? error.message : 'Erreur inconnue');
+        console.error("Chanson:", song.title);
+        console.error("Chemin:", song.url);
+        console.error("=====================================");
+        
+        // More specific error handling based on error type
+        if (error instanceof Error) {
+          if (error.message.includes('non trouvé') || error.message.includes('not found')) {
+            toast.error(`Fichier audio introuvable pour "${song.title}"`);
+          } else if (error.message.includes('OneDrive') || error.message.includes('Dropbox')) {
+            toast.error("Erreur de stockage cloud - contactez l'administrateur");
+          } else if (error.message.includes('réseau') || error.message.includes('network')) {
+            toast.error("Erreur réseau - vérifiez votre connexion");
+          } else {
+            toast.error(`Erreur: ${error.message}`);
+          }
+        } else {
+          toast.error("Erreur inconnue lors de la lecture");
+        }
+        
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
         setIsPlaying(false);
