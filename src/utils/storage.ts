@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -169,31 +170,6 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
   console.log("Storing playlist cover for:", playlistId, typeof file);
   
   try {
-    // First, check if the 'media' bucket exists, and create it if it doesn't
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error("Error listing buckets:", bucketsError);
-      throw bucketsError;
-    }
-    
-    const mediaBucketExists = buckets?.some(bucket => bucket.name === 'media');
-    
-    if (!mediaBucketExists) {
-      console.log("Media bucket doesn't exist. Creating now...");
-      // We need to create the bucket first since it doesn't exist
-      const { error: createBucketError } = await supabase.storage.createBucket('media', {
-        public: true,
-        fileSizeLimit: 5242880 // 5MB
-      });
-      
-      if (createBucketError) {
-        console.error("Error creating media bucket:", createBucketError);
-        throw createBucketError;
-      }
-      console.log("Media bucket created successfully");
-    }
-    
     let fileToUpload: File;
     
     if (file instanceof Blob) {
@@ -239,7 +215,7 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
     const fileName = `playlist-covers/${playlistId}.jpg`;
     console.log(`Uploading playlist cover to storage: ${fileName}, size: ${fileToUpload.size} bytes`);
     
-    // Upload the file
+    // Upload the file to the media bucket (which now exists)
     const { data, error } = await supabase.storage
       .from('media')
       .upload(fileName, fileToUpload, {
