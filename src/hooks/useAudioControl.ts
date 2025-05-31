@@ -35,18 +35,17 @@ export const useAudioControl = ({
 
   const play = useCallback(async (song?: Song) => {
     if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours, ignorer l'appel");
+      console.log("🚫 Changement de chanson déjà en cours, ignorer l'appel");
       return;
     }
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setIsChangingSong(true);
       
-      console.log("=== TENTATIVE DE LECTURE ===");
-      console.log("Chanson demandée:", song.title, "par", song.artist);
-      console.log("ID de la chanson:", song.id);
-      console.log("Chemin du fichier:", song.url);
-      console.log("=============================");
+      console.log("🎵 === DÉBUT LECTURE NOUVELLE CHANSON ===");
+      console.log("🎶 Chanson:", song.title, "par", song.artist);
+      console.log("🆔 ID:", song.id);
+      console.log("📁 Chemin:", song.url);
       
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
@@ -57,42 +56,125 @@ export const useAudioControl = ({
       }
 
       try {
-        console.log("=== RÉCUPÉRATION DU FICHIER AUDIO ===");
-        console.log("Appel de getAudioFile avec le chemin:", song.url);
-        
+        console.log("🔍 Récupération du fichier audio...");
         const audioUrl = await getAudioFile(song.url);
         if (!audioUrl) {
-          console.error("=== ERREUR: Aucune URL audio retournée ===");
+          console.error("❌ Aucune URL audio retournée");
           throw new Error('Fichier audio non trouvé');
         }
 
-        console.log("=== URL AUDIO RÉCUPÉRÉE ===");
-        console.log("URL générée:", audioUrl);
-        console.log("Type d'URL:", audioUrl.startsWith('http') ? 'HTTP' : audioUrl.startsWith('blob:') ? 'Blob' : 'Autre');
-        console.log("============================");
+        console.log("✅ URL audio récupérée:", audioUrl);
+        console.log("🔗 Type d'URL:", audioUrl.startsWith('http') ? 'HTTP' : audioUrl.startsWith('blob:') ? 'Blob' : 'Autre');
 
-        // Configure CORS for audio elements
+        // Configuration de l'élément audio
         audioRef.current.crossOrigin = "anonymous";
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
         audioRef.current.preload = "auto";
+        
+        console.log("⚙️ Configuration audio element terminée");
+        console.log("🔊 Volume initial:", volume / 100);
+        
+        // Événements de debugging pour comprendre pourquoi ça reste à 0
+        const debugEvents = () => {
+          console.log("📊 === ÉTAT AUDIO ELEMENT ===");
+          console.log("🔄 ReadyState:", audioRef.current.readyState);
+          console.log("⏰ CurrentTime:", audioRef.current.currentTime);
+          console.log("⏱️ Duration:", audioRef.current.duration);
+          console.log("⏸️ Paused:", audioRef.current.paused);
+          console.log("🔇 Muted:", audioRef.current.muted);
+          console.log("🔊 Volume:", audioRef.current.volume);
+          console.log("🌐 NetworkState:", audioRef.current.networkState);
+          console.log("❌ Error:", audioRef.current.error);
+          console.log("===============================");
+        };
+
+        // Ajouter des listeners temporaires pour le debug
+        const onLoadStart = () => console.log("🚀 loadstart: Début du chargement");
+        const onLoadedMetadata = () => {
+          console.log("📋 loadedmetadata: Métadonnées chargées");
+          debugEvents();
+        };
+        const onCanPlay = () => {
+          console.log("▶️ canplay: Prêt à jouer");
+          debugEvents();
+        };
+        const onCanPlayThrough = () => {
+          console.log("🎯 canplaythrough: Peut jouer complètement");
+          debugEvents();
+        };
+        const onTimeUpdate = () => {
+          console.log("⏰ timeupdate: Temps actuel:", audioRef.current.currentTime);
+        };
+        const onError = (e: any) => {
+          console.error("💥 Erreur audio:", e);
+          console.error("💥 Détails erreur:", audioRef.current.error);
+          debugEvents();
+        };
+        const onStalled = () => {
+          console.warn("⚠️ stalled: Téléchargement bloqué");
+          debugEvents();
+        };
+        const onSuspend = () => {
+          console.warn("⏸️ suspend: Téléchargement suspendu");
+          debugEvents();
+        };
+        const onProgress = () => {
+          console.log("📈 progress: Chargement en cours");
+          if (audioRef.current.buffered.length > 0) {
+            console.log("📊 Buffered:", audioRef.current.buffered.end(0), "secondes");
+          }
+        };
+
+        // Ajouter tous les listeners
+        audioRef.current.addEventListener('loadstart', onLoadStart);
+        audioRef.current.addEventListener('loadedmetadata', onLoadedMetadata);
+        audioRef.current.addEventListener('canplay', onCanPlay);
+        audioRef.current.addEventListener('canplaythrough', onCanPlayThrough);
+        audioRef.current.addEventListener('timeupdate', onTimeUpdate);
+        audioRef.current.addEventListener('error', onError);
+        audioRef.current.addEventListener('stalled', onStalled);
+        audioRef.current.addEventListener('suspend', onSuspend);
+        audioRef.current.addEventListener('progress', onProgress);
+
+        // Fonction de nettoyage des listeners
+        const cleanup = () => {
+          audioRef.current?.removeEventListener('loadstart', onLoadStart);
+          audioRef.current?.removeEventListener('loadedmetadata', onLoadedMetadata);
+          audioRef.current?.removeEventListener('canplay', onCanPlay);
+          audioRef.current?.removeEventListener('canplaythrough', onCanPlayThrough);
+          audioRef.current?.removeEventListener('timeupdate', onTimeUpdate);
+          audioRef.current?.removeEventListener('error', onError);
+          audioRef.current?.removeEventListener('stalled', onStalled);
+          audioRef.current?.removeEventListener('suspend', onSuspend);
+          audioRef.current?.removeEventListener('progress', onProgress);
+        };
+
         audioRef.current.load();
         
-        console.log("=== CONFIGURATION AUDIO ELEMENT ===");
-        console.log("Audio URL assignée:", audioUrl);
-        console.log("CrossOrigin défini:", audioRef.current.crossOrigin);
-        console.log("Ready state:", audioRef.current.readyState);
-        console.log("===================================");
+        console.log("🔄 Load() appelé, état initial:");
+        debugEvents();
+        
+        // Attendre un peu pour voir l'état après load
+        setTimeout(() => {
+          console.log("🕐 État après 1 seconde:");
+          debugEvents();
+        }, 1000);
         
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
+            console.log("✅ === LECTURE RÉUSSIE ===");
+            console.log("🎵 Chanson:", song.title);
+            console.log("🔊 Volume:", audioRef.current.volume);
+            
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
-            console.log("=== LECTURE RÉUSSIE ===");
-            console.log("Chanson:", song.title);
-            console.log("Volume:", audioRef.current.volume);
-            console.log("======================");
+            
+            debugEvents();
+            
+            // Nettoyer les listeners après succès
+            setTimeout(cleanup, 5000);
             
             setTimeout(() => preloadNextTracks(), 1000);
             
@@ -101,71 +183,40 @@ export const useAudioControl = ({
               changeTimeoutRef.current = null;
             }, 1200);
           }).catch(error => {
-            console.error("=== ERREUR DE LECTURE ===");
-            console.error("Type d'erreur:", error.name);
-            console.error("Message:", error.message);
-            console.error("Erreur complète:", error);
-            console.error("URL tentée:", audioUrl);
-            console.error("========================");
+            console.error("❌ === ERREUR DE LECTURE ===");
+            console.error("🔴 Type:", error.name);
+            console.error("💬 Message:", error.message);
+            console.error("🔍 Détails:", error);
             
-            // Handle CORS errors specifically
-            if (error.name === 'NotAllowedError' || error.message.includes('CORS')) {
-              console.log("=== TENTATIVE SANS CORS ===");
-              audioRef.current.crossOrigin = null;
-              audioRef.current.load();
-              
-              audioRef.current.play().then(() => {
-                setIsPlaying(true);
-                audioRef.current.volume = volume / 100;
-                console.log("=== LECTURE SANS CORS RÉUSSIE ===");
-                console.log("Chanson:", song.title);
-                console.log("================================");
-                
-                changeTimeoutRef.current = window.setTimeout(() => {
-                  setIsChangingSong(false);
-                  changeTimeoutRef.current = null;
-                }, 1200);
-              }).catch(fallbackError => {
-                console.error("=== ERREUR LECTURE SANS CORS ===");
-                console.error("Erreur fallback:", fallbackError);
-                console.error("===============================");
-                setIsPlaying(false);
-                setIsChangingSong(false);
-                toast.error("Impossible de lire ce titre - problème CORS");
-              });
+            debugEvents();
+            cleanup();
+            
+            // Gestion spécifique des erreurs
+            if (error.name === 'NotAllowedError') {
+              console.log("🔒 Erreur de permission - tentative sans interaction utilisateur");
+              toast.error("Cliquez d'abord sur la page puis réessayez");
+            } else if (error.name === 'NotSupportedError') {
+              console.log("🚫 Format non supporté");
+              toast.error("Format audio non supporté");
+            } else if (error.name === 'NetworkError') {
+              console.log("🌐 Erreur réseau");
+              toast.error("Erreur réseau - fichier inaccessible");
             } else {
-              setIsPlaying(false);
-              setIsChangingSong(false);
-              
-              // More specific error messages for users
-              if (error.name === 'NotSupportedError') {
-                toast.error("Format audio non supporté");
-              } else if (error.name === 'NetworkError') {
-                toast.error("Erreur réseau - fichier inaccessible");
-              } else if (error.name === 'AbortError') {
-                toast.error("Lecture interrompue");
-              } else {
-                toast.error(`Impossible de lire ce titre: ${error.message}`);
-              }
+              toast.error(`Erreur de lecture: ${error.message}`);
             }
+            
+            setIsPlaying(false);
+            setIsChangingSong(false);
           });
         }
       } catch (error) {
-        console.error("=== ERREUR LORS DE LA RÉCUPÉRATION ===");
-        console.error("Erreur:", error);
-        console.error("Message:", error instanceof Error ? error.message : 'Erreur inconnue');
-        console.error("Chanson:", song.title);
-        console.error("Chemin:", song.url);
-        console.error("=====================================");
+        console.error("💥 === ERREUR RÉCUPÉRATION FICHIER ===");
+        console.error("🔴 Erreur:", error);
+        console.error("💬 Message:", error instanceof Error ? error.message : 'Erreur inconnue');
         
-        // More specific error handling based on error type
         if (error instanceof Error) {
           if (error.message.includes('non trouvé') || error.message.includes('not found')) {
             toast.error(`Fichier audio introuvable pour "${song.title}"`);
-          } else if (error.message.includes('OneDrive') || error.message.includes('Dropbox')) {
-            toast.error("Erreur de stockage cloud - contactez l'administrateur");
-          } else if (error.message.includes('réseau') || error.message.includes('network')) {
-            toast.error("Erreur réseau - vérifiez votre connexion");
           } else {
             toast.error(`Erreur: ${error.message}`);
           }
@@ -179,19 +230,22 @@ export const useAudioControl = ({
         setIsChangingSong(false);
       }
     } else if (audioRef.current) {
+      // Reprendre la lecture existante
+      console.log("▶️ Reprise de la lecture existante");
       try {
         audioRef.current.volume = volume / 100;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
+            console.log("✅ Reprise réussie");
             setIsPlaying(true);
           }).catch(error => {
-            console.error("Error resuming playback:", error);
+            console.error("❌ Erreur reprise:", error);
             setIsPlaying(false);
           });
         }
       } catch (error) {
-        console.error("Error resuming audio:", error);
+        console.error("💥 Erreur reprise audio:", error);
         setIsPlaying(false);
       }
     }
