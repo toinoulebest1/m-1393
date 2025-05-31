@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { Player } from "@/components/Player";
+import { formatRelativeTime } from "@/utils/dateUtils";
 
 interface Playlist {
   id: string;
@@ -36,6 +36,7 @@ interface Playlist {
   cover_image_url: string | null;
   created_at: string;
   song_count?: number;
+  updated_at: string;
 }
 
 const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: () => void }) => {
@@ -126,9 +127,14 @@ const PlaylistCard = ({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
         <p className="text-spotify-neutral text-sm line-clamp-2 mb-3">{playlist.description}</p>
       )}
       
-      <p className="text-xs text-spotify-neutral/80 font-medium">
-        {playlist.song_count || 0} {playlist.song_count === 1 ? t('common.track') : t('common.tracks')}
-      </p>
+      <div className="space-y-1">
+        <p className="text-xs text-spotify-neutral/80 font-medium">
+          {playlist.song_count || 0} {playlist.song_count === 1 ? t('common.track') : t('common.tracks')}
+        </p>
+        <p className="text-xs text-spotify-neutral/60">
+          Mise à jour {formatRelativeTime(playlist.updated_at)}
+        </p>
+      </div>
       
       <div 
         className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10 playlist-actions" 

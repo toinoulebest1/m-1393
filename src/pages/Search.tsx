@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Player } from "@/components/Player";
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { searchArtist } from "@/services/deezerApi";
+import { formatRelativeTime } from "@/utils/dateUtils";
 
 const GENRES = [
   "Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", 
@@ -477,7 +477,7 @@ const Search = () => {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              Créée le {new Date(playlist.created_at).toLocaleDateString()}
+                              Mise à jour {formatRelativeTime(playlist.updated_at)}
                             </p>
                           </div>
                         </div>
@@ -564,7 +564,7 @@ const Search = () => {
                                 </p>
                               )}
                               <p className="text-xs text-muted-foreground">
-                                Créée le {new Date(playlist.created_at).toLocaleDateString()}
+                                Mise à jour {formatRelativeTime(playlist.updated_at)}
                               </p>
                             </div>
                           </div>
