@@ -491,30 +491,36 @@ const PlaylistDetail = () => {
       
       if (error) throw error;
       
-      // If this is the first song being added to an empty playlist, set its image as cover
       const isEmptyPlaylist = songs.length === 0;
       const hasNoCover = !playlist?.cover_image_url;
+      const willHaveMultipleSongs = songs.length + selectedSongs.length > 1;
       
       console.log("Playlist state:", { 
         isEmptyPlaylist, 
         hasNoCover, 
         selectedSongsCount: selectedSongs.length,
+        currentSongsCount: songs.length,
+        willHaveMultipleSongs,
         firstSongHasImage: selectedSongs[0]?.imageUrl 
       });
       
+      // If this is the first song being added to an empty playlist, set its image as cover
       if (isEmptyPlaylist && selectedSongs.length > 0 && hasNoCover && selectedSongs[0].imageUrl) {
         console.log("Setting first song as cover...");
         await setFirstSongAsCover(selectedSongs[0]);
       }
       
-      // Refresh playlist songs
+      // Refresh playlist songs first
       await fetchPlaylistDetails();
       
-      console.log("Songs added, triggering cover update");
-      // Force trigger the cover update with a longer delay to ensure songs are loaded
-      setTimeout(() => {
-        updatePlaylistCover();
-      }, 1000); // Increased delay to ensure data is ready
+      // If we now have multiple songs, generate a composite cover
+      if (willHaveMultipleSongs) {
+        console.log("Playlist will have multiple songs, generating composite cover...");
+        // Delay to ensure the new songs are loaded in the state
+        setTimeout(() => {
+          updatePlaylistCover();
+        }, 1000);
+      }
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
