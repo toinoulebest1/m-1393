@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Song } from '@/types/player';
 import { toast } from 'sonner';
@@ -75,14 +74,42 @@ export const usePlayerQueue = ({
       return;
     }
     
+    console.log("=== NEXT SONG DEBUG ===");
+    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
+    console.log("Queue length:", queue.length);
+    console.log("Queue songs:", queue.map(s => `${s.title} (${s.id})`));
+    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
       return;
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    console.log("Current index in queue:", currentIndex);
+    
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
+      console.log("Trying to find song by title/artist...");
+      
+      // Essayer de trouver par titre et artiste si l'ID ne correspond pas
+      const fallbackIndex = queue.findIndex(song => 
+        song.title === currentSong.title && song.artist === currentSong.artist
+      );
+      
+      if (fallbackIndex !== -1) {
+        console.log("Found song by title/artist at index:", fallbackIndex);
+        const nextIndex = fallbackIndex + 1;
+        if (nextIndex < queue.length) {
+          console.log(`Playing next song: ${queue[nextIndex].title}`);
+          await play(queue[nextIndex]);
+          return;
+        }
+      }
+      
+      console.log("Could not find current song in queue, playing first song");
+      if (queue.length > 0) {
+        await play(queue[0]);
+      }
       return;
     }
     
@@ -99,6 +126,7 @@ export const usePlayerQueue = ({
         toast.info("Fin de la playlist");
       }
     }
+    console.log("=====================");
   }, [currentSong, isChangingSong, queue, play, repeatMode]);
 
   const previousSong = useCallback(async () => {
@@ -107,14 +135,39 @@ export const usePlayerQueue = ({
       return;
     }
     
+    console.log("=== PREVIOUS SONG DEBUG ===");
+    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
+    console.log("Queue length:", queue.length);
+    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
       return;
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    console.log("Current index in queue:", currentIndex);
+    
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
+      
+      // Essayer de trouver par titre et artiste si l'ID ne correspond pas
+      const fallbackIndex = queue.findIndex(song => 
+        song.title === currentSong.title && song.artist === currentSong.artist
+      );
+      
+      if (fallbackIndex !== -1) {
+        console.log("Found song by title/artist at index:", fallbackIndex);
+        if (fallbackIndex > 0) {
+          console.log(`Playing previous song: ${queue[fallbackIndex - 1].title}`);
+          await play(queue[fallbackIndex - 1]);
+          return;
+        }
+      }
+      
+      console.log("Could not find current song in queue, playing last song");
+      if (queue.length > 0) {
+        await play(queue[queue.length - 1]);
+      }
       return;
     }
     
@@ -130,6 +183,7 @@ export const usePlayerQueue = ({
         toast.info("Déjà au début de la playlist");
       }
     }
+    console.log("=========================");
   }, [currentSong, isChangingSong, queue, play, repeatMode]);
 
   const getNextSong = useCallback((): Song | null => {

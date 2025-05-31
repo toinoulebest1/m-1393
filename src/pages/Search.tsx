@@ -135,9 +135,24 @@ const Search = () => {
       return;
     }
 
-    // Remplacer le queue pour inclure toute la liste des résultats
+    console.log("=== QUEUE DEBUG ===");
+    console.log("Setting queue with results:", results.length, "songs");
+    console.log("Playing song:", song.title, "with ID:", song.id);
+    console.log("Song exists in results:", results.some(r => r.id === song.id));
+    
+    // S'assurer que la queue contient tous les résultats
     setQueue(results);
-
+    
+    // Vérifier que la chanson est bien dans les résultats
+    const songInResults = results.find(r => r.id === song.id);
+    if (!songInResults) {
+      console.error("Song not found in results, adding it");
+      const updatedResults = [song, ...results];
+      setQueue(updatedResults);
+    }
+    
+    console.log("==================");
+    
     play(song);
   };
 
