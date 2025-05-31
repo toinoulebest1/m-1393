@@ -14,6 +14,13 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 const globalAudio = new Audio();
 globalAudio.crossOrigin = "anonymous";
 
+// Helper function to create next audio element
+const createNextAudio = () => {
+  const nextAudio = new Audio();
+  nextAudio.crossOrigin = "anonymous";
+  return nextAudio;
+};
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Hooks personnalisés qui encapsulent la logique
   const { 
@@ -51,11 +58,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Refs audio
   const audioRef = useRef<HTMLAudioElement>(globalAudio);
-  const nextAudioRef = useRef<HTMLAudioElement>(() => {
-    const nextAudio = new Audio();
-    nextAudio.crossOrigin = "anonymous";
-    return nextAudio;
-  }());
+  const nextAudioRef = useRef<HTMLAudioElement>(createNextAudio());
   const changeTimeoutRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
 
