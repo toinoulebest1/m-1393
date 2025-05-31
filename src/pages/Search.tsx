@@ -102,16 +102,10 @@ const Search = () => {
       console.log("Search query:", query);
 
       if (searchFilter === "playlist") {
-        // Search in playlists only with owner information - using proper join syntax
+        // Search in playlists only - first get playlists, then get owner info separately
         let playlistQuery = supabase
           .from('playlists')
-          .select(`
-            *,
-            profiles!playlists_user_id_fkey (
-              id,
-              username
-            )
-          `);
+          .select('*');
 
         if (!isWildcardSearch) {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
@@ -161,9 +155,17 @@ const Search = () => {
               
               if (canView) {
                 console.log("User can view playlist, adding as shared");
+                // Get owner username for shared playlists
+                const { data: ownerProfile } = await supabase
+                  .from('profiles')
+                  .select('username')
+                  .eq('id', playlist.user_id)
+                  .single();
+                
                 visiblePlaylists.push({
                   ...playlist,
-                  isSharedByFriend: true
+                  isSharedByFriend: true,
+                  profiles: ownerProfile
                 });
               }
             } catch (error) {
@@ -194,16 +196,10 @@ const Search = () => {
         
         promises.push(songQuery);
 
-        // Search playlists with owner information - using proper join syntax
+        // Search playlists - first get playlists, then get owner info separately
         let playlistQuery = supabase
           .from('playlists')
-          .select(`
-            *,
-            profiles!playlists_user_id_fkey (
-              id,
-              username
-            )
-          `);
+          .select('*');
 
         if (!isWildcardSearch) {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
@@ -257,9 +253,17 @@ const Search = () => {
               }
               
               if (canView) {
+                // Get owner username for shared playlists
+                const { data: ownerProfile } = await supabase
+                  .from('profiles')
+                  .select('username')
+                  .eq('id', playlist.user_id)
+                  .single();
+                
                 visiblePlaylists.push({
                   ...playlist,
-                  isSharedByFriend: true
+                  isSharedByFriend: true,
+                  profiles: ownerProfile
                 });
               }
             } catch (error) {
