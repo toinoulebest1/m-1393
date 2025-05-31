@@ -33,26 +33,18 @@ export const CastButton = () => {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm"
+        <Button
+          variant="ghost"
+          size="icon"
           className={cn(
-            "flex items-center gap-2 rounded-full px-3 py-2 bg-gradient-to-r",
-            isCasting 
-              ? "from-purple-600 to-blue-500 text-white hover:from-purple-700 hover:to-blue-600" 
-              : "from-white/5 to-white/10 hover:from-white/10 hover:to-white/20 border border-white/10"
+            "text-spotify-neutral hover:text-white transition-colors",
+            isCasting && "text-spotify-accent"
           )}
         >
           {isCasting ? (
-            <Airplay className="w-4 h-4" />
+            <Airplay className="w-5 h-5" />
           ) : (
-            <Cast className="w-4 h-4" />
-          )}
-          <span className="text-xs font-medium">
-            {isCasting ? activeDevice?.name || 'Diffusion' : 'Diffuser'}
-          </span>
-          {isCasting && (
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-spotify-accent rounded-full"></span>
+            <Cast className="w-5 h-5" />
           )}
         </Button>
       </PopoverTrigger>
