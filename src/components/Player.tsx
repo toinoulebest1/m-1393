@@ -1,4 +1,3 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -132,7 +131,7 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50 relative">
+    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
       {/* Overlay de chargement pour toute la longueur */}
       {isChangingSong && (
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10">
