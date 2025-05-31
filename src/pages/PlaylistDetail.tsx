@@ -1,11 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import { Clock, MoreHorizontal, Music2, Plus, Play, Image as ImageIcon } from "lucide-react";
+import { Clock, MoreHorizontal, Music2, Plus, Play, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -650,6 +649,15 @@ const PlaylistDetail = () => {
     console.log("Report song:", song.title);
   };
 
+  const songCardContextMenu = (song: PlaylistSong) => [
+    {
+      label: "Retirer de la playlist",
+      icon: <Trash2 className="h-4 w-4" />,
+      action: () => handleRemoveSong(song.id),
+      show: true
+    }
+  ];
+
   useEffect(() => {
     fetchPlaylistDetails();
     
@@ -861,48 +869,18 @@ const PlaylistDetail = () => {
               {songs.map((song) => (
                 <div 
                   key={song.id} 
-                  className="group relative"
+                  className="cursor-pointer"
+                  onClick={() => playSong(song.songs)}
                 >
-                  <div 
-                    className="cursor-pointer"
-                    onClick={() => playSong(song.songs)}
-                  >
-                    <SongCard
-                      song={song.songs}
-                      isCurrentSong={isCurrentSong(song.songs)}
-                      isFavorite={isFavoriteSong(song.songs)}
-                      dominantColor={dominantColors[song.songs.id] || null}
-                      onLyricsClick={() => handleLyricsClick(song.songs)}
-                      onReportClick={() => handleReportClick(song.songs)}
-                    />
-                  </div>
-                  
-                  {/* Bouton de suppression */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 bg-spotify-dark border-spotify-border">
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveSong(song.id);
-                          }}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
-                          Retirer de la playlist
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <SongCard
+                    song={song.songs}
+                    isCurrentSong={isCurrentSong(song.songs)}
+                    isFavorite={isFavoriteSong(song.songs)}
+                    dominantColor={dominantColors[song.songs.id] || null}
+                    onLyricsClick={() => handleLyricsClick(song.songs)}
+                    onReportClick={() => handleReportClick(song.songs)}
+                    contextMenuItems={songCardContextMenu(song)}
+                  />
                 </div>
               ))}
             </div>
