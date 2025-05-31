@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { EqualizerSettings, EqualizerPreset, DEFAULT_PRESETS } from '@/types/equalizer';
 
@@ -14,10 +13,18 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const bypassGainNodeRef = useRef<GainNode | null>(null);
 
-  // État de l'égaliseur
+  // État de l'égaliseur - maintenant avec enabled: true par défaut
   const [settings, setSettings] = useState<EqualizerSettings>(() => {
     const saved = localStorage.getItem('equalizerSettings');
-    return saved ? JSON.parse(saved) : DEFAULT_PRESETS[0].settings;
+    if (saved) {
+      const parsedSettings = JSON.parse(saved);
+      // S'assurer que enabled est true si pas défini
+      return {
+        ...parsedSettings,
+        enabled: parsedSettings.enabled !== false
+      };
+    }
+    return DEFAULT_PRESETS[0].settings;
   });
 
   const [currentPreset, setCurrentPreset] = useState<string | null>(() => {
@@ -81,6 +88,16 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
 
       setIsInitialized(true);
       console.log('Égaliseur initialisé avec succès, enabled:', settings.enabled);
+      
+      // S'assurer que l'égaliseur est activé après l'initialisation
+      if (!settings.enabled) {
+        console.log('Activation automatique de l\'égaliseur après initialisation');
+        setSettings(prev => {
+          const newSettings = { ...prev, enabled: true };
+          localStorage.setItem('equalizerSettings', JSON.stringify(newSettings));
+          return newSettings;
+        });
+      }
     } catch (error) {
       console.error('Erreur lors de l\'initialisation de l\'égaliseur:', error);
     }

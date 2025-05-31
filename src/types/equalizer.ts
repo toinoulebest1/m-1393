@@ -29,7 +29,7 @@ export interface EqualizerContextType {
   setPreAmp: (gain: number) => void;
 }
 
-// Presets par défaut
+// Presets par défaut - maintenant avec enabled: true pour Flat
 export const DEFAULT_PRESETS: EqualizerPreset[] = [
   {
     name: "Flat",
