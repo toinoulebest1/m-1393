@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,18 +81,35 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
     ctx.fillStyle = '#121212';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Determine grid size based on number of images
-    const numImages = Math.min(songsWithImages.length, 4);
-    const gridSize = numImages === 1 ? 1 : 2;
+    // For single image, use the full canvas
+    if (songsWithImages.length === 1) {
+      console.log("Using single image for cover");
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      return new Promise((resolve) => {
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => {
+          console.error("Failed to load single image");
+          resolve(null);
+        };
+        img.src = songsWithImages[0].songs.imageUrl!;
+      });
+    }
+
+    // For multiple images, create a 2x2 grid
+    console.log(`Creating 2x2 grid for ${Math.min(songsWithImages.length, 4)} images`);
+    const gridSize = 2;
     const imageSize = canvas.width / gridSize;
 
-    console.log(`Creating ${gridSize}x${gridSize} grid for ${numImages} images`);
-
-    // Load and draw images
+    // Load all images first
     const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
-      return new Promise<void>((resolve, reject) => {
+      return new Promise<HTMLImageElement | null>((resolve) => {
         if (!song.songs.imageUrl) {
-          resolve();
+          resolve(null);
           return;
         }
         
@@ -101,47 +117,67 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
+        // Set a timeout for loading
+        const timeout = setTimeout(() => {
+          console.warn(`Image ${index + 1} timed out`);
+          resolve(null);
+        }, 10000);
+        
         img.onload = () => {
-          try {
-            // Calculate position in the grid
-            const row = Math.floor(index / gridSize);
-            const col = index % gridSize;
-            const x = col * imageSize;
-            const y = row * imageSize;
-            
-            console.log(`Drawing image ${index + 1} at position (${x}, ${y}) with size ${imageSize}x${imageSize}`);
-            
-            // Draw the image
-            ctx.drawImage(img, x, y, imageSize, imageSize);
-            console.log(`Image ${index + 1} drawn successfully`);
-            resolve();
-          } catch (error) {
-            console.error(`Error drawing image ${index + 1}:`, error);
-            resolve(); // Still resolve to not block other images
-          }
+          clearTimeout(timeout);
+          console.log(`Image ${index + 1} loaded successfully`);
+          resolve(img);
         };
         
         img.onerror = (e) => {
+          clearTimeout(timeout);
           console.error(`Error loading image ${index + 1}:`, e);
-          resolve(); // Still resolve to not block other images
+          resolve(null);
         };
         
-        // Add a small delay to help with CORS issues
+        // Try to load with a small delay
         setTimeout(() => {
-          img.src = song.songs.imageUrl;
-        }, index * 100);
+          img.src = song.songs.imageUrl!;
+        }, index * 200);
       });
     });
 
     try {
-      // Wait for all images to be drawn
-      await Promise.all(imagePromises);
-      console.log("All images drawn to canvas");
+      // Wait for all images to load
+      const loadedImages = await Promise.all(imagePromises);
+      console.log(`Loaded ${loadedImages.filter(img => img !== null).length} images successfully`);
 
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      console.log("Canvas converted to data URL successfully");
-      return dataUrl;
+      // Draw the loaded images
+      loadedImages.forEach((img, index) => {
+        if (img) {
+          const row = Math.floor(index / gridSize);
+          const col = index % gridSize;
+          const x = col * imageSize;
+          const y = row * imageSize;
+          
+          console.log(`Drawing image ${index + 1} at position (${x}, ${y}) with size ${imageSize}x${imageSize}`);
+          ctx.drawImage(img, x, y, imageSize, imageSize);
+        }
+      });
+
+      // Add a subtle border between images
+      ctx.strokeStyle = '#333333';
+      ctx.lineWidth = 2;
+      
+      // Vertical line
+      ctx.beginPath();
+      ctx.moveTo(imageSize, 0);
+      ctx.lineTo(imageSize, canvas.height);
+      ctx.stroke();
+      
+      // Horizontal line
+      ctx.beginPath();
+      ctx.moveTo(0, imageSize);
+      ctx.lineTo(canvas.width, imageSize);
+      ctx.stroke();
+
+      console.log("Canvas composite created successfully");
+      return canvas.toDataURL('image/jpeg', 0.85);
     } catch (err) {
       console.error("Error during image processing:", err);
       return null;
@@ -506,27 +542,16 @@ const PlaylistDetail = () => {
       
       if (error) throw error;
       
-      const isEmptyPlaylist = songs.length === 0;
-      const hasNoCover = !playlist?.cover_image_url;
-      const willHaveMultipleSongs = songs.length + selectedSongs.length > 1;
+      console.log("Songs added successfully, refreshing playlist...");
       
-      console.log("Playlist state:", { 
-        isEmptyPlaylist, 
-        hasNoCover, 
-        selectedSongsCount: selectedSongs.length,
-        currentSongsCount: songs.length,
-        willHaveMultipleSongs,
-        firstSongHasImage: selectedSongs[0]?.imageUrl 
-      });
-      
-      // Refresh playlist songs first to get the updated songs list
+      // Refresh playlist songs first
       await fetchPlaylistDetails();
       
-      // Always generate a composite cover after adding songs, regardless of count
-      console.log("Generating composite cover after adding songs...");
+      // Force update the cover after a longer delay to ensure all data is loaded
       setTimeout(() => {
+        console.log("Force updating playlist cover...");
         updatePlaylistCover();
-      }, 1500); // Increased delay to ensure the fetchPlaylistDetails is complete
+      }, 2000);
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
