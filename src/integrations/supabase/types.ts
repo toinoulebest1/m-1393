@@ -651,6 +651,10 @@ export type Database = {
         Args: { playlist_id: string; viewer_user_id: string }
         Returns: boolean
       }
+      can_view_playlist_songs: {
+        Args: { playlist_id: string; viewer_user_id: string }
+        Returns: boolean
+      }
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string

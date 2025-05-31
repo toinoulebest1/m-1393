@@ -86,10 +86,16 @@ const Search = () => {
     setIsLoading(true);
     try {
       if (searchFilter === "playlist") {
-        // Search in playlists only
+        // Search in playlists only with owner information
         let playlistQuery = supabase
           .from('playlists')
-          .select('*');
+          .select(`
+            *,
+            profiles:user_id (
+              id,
+              username
+            )
+          `);
 
         if (!isWildcardSearch) {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
@@ -101,7 +107,28 @@ const Search = () => {
           throw playlistError;
         }
 
-        setPlaylistResults(playlistData || []);
+        // Filter only playlists that the current user can view
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const visiblePlaylists = [];
+          for (const playlist of playlistData || []) {
+            const { data: canView } = await supabase.rpc('can_view_playlist', {
+              playlist_id: playlist.id,
+              viewer_user_id: user.id
+            });
+            
+            if (canView) {
+              visiblePlaylists.push({
+                ...playlist,
+                isSharedByFriend: playlist.user_id !== user.id
+              });
+            }
+          }
+          setPlaylistResults(visiblePlaylists);
+        } else {
+          setPlaylistResults([]);
+        }
+        
         setResults([]);
         
         if (isWildcardSearch) {
@@ -122,10 +149,16 @@ const Search = () => {
         
         promises.push(songQuery);
 
-        // Search playlists
+        // Search playlists with owner information
         let playlistQuery = supabase
           .from('playlists')
-          .select('*');
+          .select(`
+            *,
+            profiles:user_id (
+              id,
+              username
+            )
+          `);
 
         if (!isWildcardSearch) {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
@@ -152,14 +185,35 @@ const Search = () => {
           bitrate: '320 kbps'
         }));
 
+        // Filter playlists that the current user can view
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const visiblePlaylists = [];
+          for (const playlist of playlistResult.data || []) {
+            const { data: canView } = await supabase.rpc('can_view_playlist', {
+              playlist_id: playlist.id,
+              viewer_user_id: user.id
+            });
+            
+            if (canView) {
+              visiblePlaylists.push({
+                ...playlist,
+                isSharedByFriend: playlist.user_id !== user.id
+              });
+            }
+          }
+          setPlaylistResults(visiblePlaylists);
+        } else {
+          setPlaylistResults([]);
+        }
+
         setResults(formattedResults);
-        setPlaylistResults(playlistResult.data || []);
         
         if (isWildcardSearch) {
           toast.success(`Tous les morceaux (${formattedResults.length}) et playlists (${playlistResult.data?.length || 0}) listés`);
         }
       } else {
-        // Search in songs only (title, artist, genre filters)
+        // ... keep existing code (search in songs only for title, artist, genre filters) the same
         let queryBuilder = supabase
           .from('songs')
           .select('*');
@@ -476,6 +530,11 @@ const Search = () => {
                                 {playlist.description}
                               </p>
                             )}
+                            {playlist.isSharedByFriend && playlist.profiles?.username && (
+                              <p className="text-xs text-blue-400 font-medium">
+                                Partagée par {playlist.profiles.username}
+                              </p>
+                            )}
                             <p className="text-xs text-muted-foreground">
                               Mise à jour {formatRelativeTime(playlist.updated_at)}
                             </p>
@@ -561,6 +620,11 @@ const Search = () => {
                               {playlist.description && (
                                 <p className="text-sm text-muted-foreground truncate">
                                   {playlist.description}
+                                </p>
+                              )}
+                              {playlist.isSharedByFriend && playlist.profiles?.username && (
+                                <p className="text-xs text-blue-400 font-medium">
+                                  Partagée par {playlist.profiles.username}
                                 </p>
                               )}
                               <p className="text-xs text-muted-foreground">
