@@ -27,7 +27,8 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
     }
     return {
       ...DEFAULT_PRESETS[0].settings,
-      enabled: false // Désactivé par défaut
+      enabled: false, // Désactivé par défaut
+      preAmp: -15 // PreAmp par défaut à -15dB
     };
   });
 
