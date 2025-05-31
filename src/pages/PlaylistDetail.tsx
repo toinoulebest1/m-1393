@@ -159,7 +159,10 @@ const PlaylistDetail = () => {
 
   // Function to set the first song's image as playlist cover
   const setFirstSongAsCover = async (firstSong: Song) => {
-    if (!playlistId || !firstSong.imageUrl) return;
+    if (!playlistId || !firstSong.imageUrl) {
+      console.log("Cannot set first song as cover: missing playlistId or imageUrl");
+      return;
+    }
     
     try {
       console.log("Setting first song's image as playlist cover:", firstSong.imageUrl);
@@ -172,12 +175,23 @@ const PlaylistDetail = () => {
       
       if (updateError) throw updateError;
       
-      // Update local state
+      // Update local state immediately for UI feedback
       setPlaylist(prev => prev ? { ...prev, cover_image_url: firstSong.imageUrl } : null);
       
-      console.log("Playlist cover updated to first song's image");
+      console.log("Playlist cover updated to first song's image successfully");
+      
+      // Show success message
+      toast({
+        description: t('playlists.coverUpdated')
+      });
+      
     } catch (error) {
       console.error("Error setting first song as cover:", error);
+      toast({
+        title: t('common.error'),
+        description: t('playlists.errorUploadingCover'),
+        variant: "destructive"
+      });
     }
   };
 
@@ -478,7 +492,18 @@ const PlaylistDetail = () => {
       if (error) throw error;
       
       // If this is the first song being added to an empty playlist, set its image as cover
-      if (songs.length === 0 && selectedSongs.length > 0 && !playlist?.cover_image_url) {
+      const isEmptyPlaylist = songs.length === 0;
+      const hasNoCover = !playlist?.cover_image_url;
+      
+      console.log("Playlist state:", { 
+        isEmptyPlaylist, 
+        hasNoCover, 
+        selectedSongsCount: selectedSongs.length,
+        firstSongHasImage: selectedSongs[0]?.imageUrl 
+      });
+      
+      if (isEmptyPlaylist && selectedSongs.length > 0 && hasNoCover && selectedSongs[0].imageUrl) {
+        console.log("Setting first song as cover...");
         await setFirstSongAsCover(selectedSongs[0]);
       }
       
