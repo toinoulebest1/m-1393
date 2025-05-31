@@ -504,6 +504,46 @@ export const Player = () => {
                   </>
                 )}
                 <CastButton />
+                
+                {/* Bouton pour l'égaliseur */}
+                <Popover open={showEqualizer} onOpenChange={setShowEqualizer}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "text-spotify-neutral hover:text-white transition-all",
+                        showEqualizer && "text-spotify-accent",
+                        isEqualizerEnabled && "text-spotify-accent"
+                      )}
+                      title="Égaliseur audio"
+                      disabled={isChangingSong}
+                    >
+                      <Settings2 className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="top" 
+                    align="end" 
+                    className="p-0 w-auto border-white/20 bg-spotify-dark"
+                    sideOffset={10}
+                  >
+                    <AudioEqualizer
+                      settings={equalizerSettings}
+                      presets={equalizerPresets}
+                      currentPreset={currentEqualizerPreset}
+                      isEnabled={isEqualizerEnabled}
+                      isInitialized={isEqualizerInitialized}
+                      onUpdateBand={updateEqualizerBand}
+                      onApplyPreset={applyEqualizerPreset}
+                      onToggleEnabled={toggleEqualizer}
+                      onReset={resetEqualizer}
+                      onSetPreAmp={setEqualizerPreAmp}
+                      onInitialize={initializeEqualizer}
+                    />
+                  </PopoverContent>
+                </Popover>
+                
                 <div className="flex items-center space-x-2">
                   <Volume2 className="text-spotify-neutral w-5 h-5" />
                   <Slider
@@ -613,6 +653,46 @@ export const Player = () => {
                         <path d="m20 12-6 6" />
                       </svg>
                     </Button>
+                    
+                    {/* Bouton pour l'égaliseur sur mobile */}
+                    <Popover open={showEqualizer} onOpenChange={setShowEqualizer}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "p-1.5 text-spotify-neutral hover:text-white transition-all",
+                            showEqualizer && "text-spotify-accent",
+                            isEqualizerEnabled && "text-spotify-accent",
+                            isChangingSong && "opacity-50"
+                          )}
+                          disabled={isChangingSong}
+                        >
+                          <Settings2 className="w-4 h-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        side="top" 
+                        align="end" 
+                        className="p-0 w-auto border-white/20 bg-spotify-dark"
+                        sideOffset={10}
+                      >
+                        <AudioEqualizer
+                          settings={equalizerSettings}
+                          presets={equalizerPresets}
+                          currentPreset={currentEqualizerPreset}
+                          isEnabled={isEqualizerEnabled}
+                          isInitialized={isEqualizerInitialized}
+                          onUpdateBand={updateEqualizerBand}
+                          onApplyPreset={applyEqualizerPreset}
+                          onToggleEnabled={toggleEqualizer}
+                          onReset={resetEqualizer}
+                          onSetPreAmp={setEqualizerPreAmp}
+                          onInitialize={initializeEqualizer}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    
                     <CastButton />
                   </div>
                 </div>
