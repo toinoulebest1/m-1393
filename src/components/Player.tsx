@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -136,7 +137,17 @@ export const Player = () => {
         <EqualizerWrapper onClose={toggleEqualizerVisibility} />
       )}
       
-      <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
+      <div className="relative flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
+        {/* Overlay de chargement */}
+        {isChangingSong && (
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+            <div className="flex items-center gap-3 bg-spotify-dark/80 px-4 py-2 rounded-full border border-spotify-border">
+              <div className="w-4 h-4 border-2 border-spotify-accent border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm text-white font-medium">Chargement de la musique...</span>
+            </div>
+          </div>
+        )}
+
         {currentSong ? (
           <div className="flex items-center space-x-4 w-48 overflow-hidden">
             <div className="w-12 h-12 rounded overflow-hidden shadow-md">
