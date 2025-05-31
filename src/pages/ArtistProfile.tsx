@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { searchArtist, getArtistById, ArtistProfileResponse } from "@/services/deezerApi";
@@ -425,16 +424,11 @@ const ArtistProfile = () => {
                                   alt={album.title}
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
-                                {/* Suppression de l'effet de scintillement */}
+                                {/* Suppression de l'effet de scintillement et du lien vers album.link */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <a 
-                                    href={album.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-spotify-accent/90 rounded-full p-3 text-white hover:bg-spotify-accent transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300"
-                                  >
-                                    <ExternalLink className="h-5 w-5" />
-                                  </a>
+                                  <div className="bg-spotify-accent/90 rounded-full p-3 text-white hover:bg-spotify-accent transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                    <Info className="h-5 w-5" />
+                                  </div>
                                 </div>
                               </div>
                               <CardContent className="p-3 flex flex-col flex-1">

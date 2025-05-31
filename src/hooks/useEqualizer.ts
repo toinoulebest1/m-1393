@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { EqualizerSettings, EqualizerPreset, DEFAULT_PRESETS } from '@/types/equalizer';
 
@@ -28,8 +27,13 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
     if (!audioElement || isInitialized) return;
 
     try {
-      // Créer le contexte audio
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      // Créer le contexte audio avec fallback pour webkit
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API not supported');
+      }
+      
+      audioContextRef.current = new AudioContextClass();
       const audioContext = audioContextRef.current;
 
       // Créer le nœud source

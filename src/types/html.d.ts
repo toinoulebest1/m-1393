@@ -6,3 +6,9 @@ declare module 'react' {
     directory?: string;
   }
 }
+
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
