@@ -661,7 +661,10 @@ const PlaylistDetail = () => {
   ];
 
   const handleVisibilityChanged = (newVisibility: string) => {
-    // Mise à jour locale pour l'interface, les données sont stockées dans user_settings
+    // Update local state to reflect the change
+    if (playlist) {
+      setPlaylist(prev => prev ? { ...prev, visibility: newVisibility } : null);
+    }
     console.log('Visibility changed to:', newVisibility);
   };
 
@@ -870,7 +873,7 @@ const PlaylistDetail = () => {
 
                 <PlaylistVisibilitySettings
                   playlistId={playlistId!}
-                  currentVisibility="private"
+                  currentVisibility={playlist?.visibility || "private"}
                   onVisibilityChanged={handleVisibilityChanged}
                 />
               </div>
