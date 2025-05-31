@@ -7,12 +7,14 @@ interface UsePlayerQueueProps {
   currentSong: Song | null;
   isChangingSong: boolean;
   setIsChangingSong: (value: boolean) => void;
+  play: (song: Song) => Promise<void>;
 }
 
 export const usePlayerQueue = ({
   currentSong,
   isChangingSong,
-  setIsChangingSong
+  setIsChangingSong,
+  play
 }: UsePlayerQueueProps) => {
   // État de la file d'attente
   const [queue, setQueueInternal] = useState<Song[]>(() => {
@@ -73,31 +75,31 @@ export const usePlayerQueue = ({
       return;
     }
     
-    setIsChangingSong(true);
-    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
-      setIsChangingSong(false);
       return;
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
-      setIsChangingSong(false);
       return;
     }
     
     const nextIndex = currentIndex + 1;
     if (nextIndex < queue.length) {
-      // Next song will be handled by the play function in useAudioControl
-      // This is just a placeholder for the queue logic
-      console.log(`Next song in queue: ${queue[nextIndex].title}`);
+      console.log(`Playing next song: ${queue[nextIndex].title}`);
+      await play(queue[nextIndex]);
     } else {
       console.log("End of queue reached");
-      setIsChangingSong(false);
+      if (repeatMode === 'all' && queue.length > 0) {
+        console.log("Repeating playlist from beginning");
+        await play(queue[0]);
+      } else {
+        toast.info("Fin de la playlist");
+      }
     }
-  }, [currentSong, isChangingSong, queue, setIsChangingSong]);
+  }, [currentSong, isChangingSong, queue, play, repeatMode]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
@@ -105,30 +107,30 @@ export const usePlayerQueue = ({
       return;
     }
     
-    setIsChangingSong(true);
-    
     if (!currentSong || queue.length === 0) {
       console.log("No current song or queue is empty");
-      setIsChangingSong(false);
       return;
     }
     
     const currentIndex = queue.findIndex(song => song.id === currentSong.id);
     if (currentIndex === -1) {
       console.log("Current song not found in queue");
-      setIsChangingSong(false);
       return;
     }
     
-    // Previous song handling will be done in useAudioControl
-    // This is just queue-related logic
     if (currentIndex > 0) {
-      console.log(`Previous song in queue: ${queue[currentIndex - 1].title}`);
+      console.log(`Playing previous song: ${queue[currentIndex - 1].title}`);
+      await play(queue[currentIndex - 1]);
     } else {
       console.log("Already at first track");
-      setIsChangingSong(false);
+      if (repeatMode === 'all' && queue.length > 0) {
+        console.log("Going to last song in playlist");
+        await play(queue[queue.length - 1]);
+      } else {
+        toast.info("Déjà au début de la playlist");
+      }
     }
-  }, [currentSong, isChangingSong, queue, setIsChangingSong]);
+  }, [currentSong, isChangingSong, queue, play, repeatMode]);
 
   const getNextSong = useCallback((): Song | null => {
     if (!currentSong || queue.length === 0) return null;

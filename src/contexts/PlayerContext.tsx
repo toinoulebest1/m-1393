@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
@@ -35,14 +34,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     searchQuery, setSearchQuery,
     playbackRate, setPlaybackRate
   } = usePlayerState();
-
-  const {
-    queue, setQueue,
-    shuffleMode, setShuffleMode,
-    repeatMode, setRepeatMode,
-    addToQueue, toggleShuffle, toggleRepeat,
-    nextSong, previousSong, getNextSong
-  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong });
 
   const {
     favorites, setFavorites,
@@ -86,11 +77,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsChangingSong,
     volume,
     setIsPlaying,
-    queue,
+    queue: [], // We'll update this with the real queue after usePlayerQueue
     changeTimeoutRef,
     setNextSongPreloaded,
     preloadNextTracks
   });
+
+  // Now we can use the play function in usePlayerQueue
+  const {
+    queue, setQueue,
+    shuffleMode, setShuffleMode,
+    repeatMode, setRepeatMode,
+    addToQueue, toggleShuffle, toggleRepeat,
+    nextSong, previousSong, getNextSong
+  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play });
 
   // Sauvegarde de la progression avant fermeture de page
   useEffect(() => {
