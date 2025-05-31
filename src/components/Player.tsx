@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -302,6 +303,13 @@ export const Player = () => {
     // Force local position update for immediate UI feedback
     setCurrentPosition(value);
   };
+
+  // Fonction corrigée pour gérer le changement de volume
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0];
+    console.log("Volume change:", newVolume);
+    setVolume(newVolume);
+  };
   
   const songInfo = getDisplayedSongInfo ? getDisplayedSongInfo() : { title: currentSong?.title, artist: currentSong?.artist };
   const blurImage = shouldBlurImage ? shouldBlurImage() : false;
@@ -551,7 +559,8 @@ export const Player = () => {
                     max={100}
                     step={1}
                     className="w-24"
-                    onValueChange={(value) => setVolume(value[0])}
+                    onValueChange={handleVolumeChange}
+                    disabled={isChangingSong}
                   />
                 </div>
               </div>
