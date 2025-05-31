@@ -355,15 +355,7 @@ const ArtistProfile = () => {
                                           <p className="text-xs text-muted-foreground mt-1">
                                             Album de {profileData.artist.name}
                                           </p>
-                                          <a 
-                                            href={track.album.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-spotify-accent mt-2 inline-flex items-center gap-1 hover:underline"
-                                          >
-                                            <ExternalLink className="h-3 w-3" />
-                                            Voir sur Deezer
-                                          </a>
+                                          {/* Removed the link to album.link as it doesn't exist in the type */}
                                         </div>
                                       </div>
                                     </HoverCardContent>
