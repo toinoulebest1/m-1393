@@ -1,3 +1,4 @@
+
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -219,6 +220,29 @@ export const Player = () => {
     navigate("/synced-lyrics");
   };
 
+  // Handle favorite toggle with proper error handling
+  const handleFavoriteToggle = async () => {
+    if (!currentSong) {
+      toast.error(t('player.noSongSelected'));
+      return;
+    }
+
+    try {
+      console.log("=== FAVORITE TOGGLE DEBUG ===");
+      console.log("Current song:", currentSong);
+      console.log("Current favorites count:", favorites.length);
+      console.log("Is currently favorite:", favorites.some(fav => fav.id === currentSong.id));
+      
+      await toggleFavorite(currentSong);
+      
+      console.log("Favorite toggle completed");
+      console.log("==============================");
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      toast.error("Erreur lors de la modification des favoris");
+    }
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
       {/* Overlay de chargement pour toute la longueur */}
@@ -351,18 +375,20 @@ export const Player = () => {
           >
             <Settings2 className="h-5 w-5" />
           </Button>
+          
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              if (currentSong) {
-                toggleFavorite(currentSong);
-              } else {
-                toast.error(t('player.noSongSelected'));
-              }
-            }}
+            onClick={handleFavoriteToggle}
+            disabled={!currentSong}
+            className="text-spotify-neutral hover:text-white transition-colors"
           >
-            <Heart className={cn("w-5 h-5 transition-colors cursor-pointer", favorites.some(fav => fav.id === currentSong?.id) ? "text-red-500" : "text-spotify-neutral hover:text-white")} />
+            <Heart className={cn(
+              "w-5 h-5 transition-colors cursor-pointer", 
+              favorites.some(fav => fav.id === currentSong?.id) 
+                ? "text-red-500 fill-red-500" 
+                : "text-spotify-neutral hover:text-white"
+            )} />
           </Button>
           
           <div className="flex items-center space-x-2">
