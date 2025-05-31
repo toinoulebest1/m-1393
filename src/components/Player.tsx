@@ -132,22 +132,22 @@ export const Player = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50 relative">
+      {/* Overlay de chargement pour toute la longueur */}
+      {isChangingSong && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10">
+          <div className="flex items-center gap-3 bg-spotify-dark/80 px-4 py-2 rounded-full border border-spotify-border">
+            <div className="w-4 h-4 border-2 border-spotify-accent border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm text-white font-medium">Chargement de la musique...</span>
+          </div>
+        </div>
+      )}
+
       {currentSong && showEqualizer && (
         <EqualizerWrapper onClose={toggleEqualizerVisibility} />
       )}
       
-      <div className="relative flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
-        {/* Overlay de chargement */}
-        {isChangingSong && (
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-            <div className="flex items-center gap-3 bg-spotify-dark/80 px-4 py-2 rounded-full border border-spotify-border">
-              <div className="w-4 h-4 border-2 border-spotify-accent border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm text-white font-medium">Chargement de la musique...</span>
-            </div>
-          </div>
-        )}
-
+      <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {currentSong ? (
           <div className="flex items-center space-x-4 w-48 overflow-hidden">
             <div className="w-12 h-12 rounded overflow-hidden shadow-md">
