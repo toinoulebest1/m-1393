@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -88,15 +87,33 @@ export const PlaylistVisibilitySettings = ({
         friends: newFriends
       };
 
-      const { error } = await supabase
-        .from('user_settings')
-        .upsert({
-          user_id: user.id,
-          key: `playlist_visibility_${playlistId}`,
-          settings: settings
-        });
+      const settingsKey = `playlist_visibility_${playlistId}`;
 
-      if (error) throw error;
+      // First, try to update existing record
+      const { error: updateError } = await supabase
+        .from('user_settings')
+        .update({
+          settings: settings,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('key', settingsKey);
+
+      // If update didn't affect any rows (record doesn't exist), try to insert
+      if (updateError && updateError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: user.id,
+            key: settingsKey,
+            settings: settings
+          });
+
+        if (insertError) throw insertError;
+      } else if (updateError) {
+        throw updateError;
+      }
+
     } catch (error) {
       console.error("Error saving playlist settings:", error);
       throw error;
