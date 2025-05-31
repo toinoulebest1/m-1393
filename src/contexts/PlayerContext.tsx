@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
@@ -77,13 +78,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsChangingSong,
     volume,
     setIsPlaying,
-    queue: [], // We'll update this with the real queue after usePlayerQueue
     changeTimeoutRef,
     setNextSongPreloaded,
     preloadNextTracks
   });
 
-  // Now we can use the play function in usePlayerQueue
+  // Maintenant nous pouvons utiliser la fonction play dans usePlayerQueue
   const {
     queue, setQueue,
     shuffleMode, setShuffleMode,

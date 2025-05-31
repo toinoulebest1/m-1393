@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -14,7 +15,6 @@ interface UseAudioControlProps {
   setIsChangingSong: (value: boolean) => void;
   volume: number;
   setIsPlaying: (value: boolean) => void;
-  queue: Song[];
   changeTimeoutRef: React.MutableRefObject<number | null>;
   setNextSongPreloaded: (value: boolean) => void;
   preloadNextTracks: () => Promise<void>;
@@ -29,7 +29,6 @@ export const useAudioControl = ({
   setIsChangingSong,
   volume,
   setIsPlaying,
-  queue,
   changeTimeoutRef,
   setNextSongPreloaded,
   preloadNextTracks
