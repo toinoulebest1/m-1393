@@ -2,7 +2,6 @@
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { useAudioControl } from "@/hooks/useAudioControl";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,9 +9,11 @@ import { EqualizerWrapper } from "@/components/EqualizerWrapper";
 import { toast } from "sonner";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export const Player = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   
   const {
     currentSong,
@@ -50,6 +51,27 @@ export const Player = () => {
   const [isMuted, setIsMuted] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
 
+  // Update progress in real-time
+  useEffect(() => {
+    const audioElement = getCurrentAudioElement();
+    if (!audioElement) return;
+
+    const updateProgress = () => {
+      if (audioElement.duration && !isNaN(audioElement.duration)) {
+        const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+        setProgress(progressPercent);
+      }
+    };
+
+    audioElement.addEventListener('timeupdate', updateProgress);
+    audioElement.addEventListener('loadedmetadata', updateProgress);
+
+    return () => {
+      audioElement.removeEventListener('timeupdate', updateProgress);
+      audioElement.removeEventListener('loadedmetadata', updateProgress);
+    };
+  }, [getCurrentAudioElement, setProgress]);
+
   useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
       extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
@@ -74,7 +96,13 @@ export const Player = () => {
   };
 
   const handleProgressChange = (value: number[]) => {
-    setProgress(value[0]);
+    const newProgress = value[0];
+    const audioElement = getCurrentAudioElement();
+    if (audioElement && audioElement.duration) {
+      const newTime = (newProgress / 100) * audioElement.duration;
+      audioElement.currentTime = newTime;
+      setProgress(newProgress);
+    }
   };
 
   // Fixed volume change handler
@@ -87,6 +115,19 @@ export const Player = () => {
     
     // Also update the actual audio element volume directly
     updateVolumeDirectly(newVolume);
+  };
+
+  // Format time helper function
+  const formatTime = (timeInSeconds: number) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Navigate to synced lyrics
+  const handleLyricsNavigation = () => {
+    navigate("/synced-lyrics");
   };
 
   return (
@@ -176,8 +217,8 @@ export const Player = () => {
           </div>
           
           <div className="w-full flex items-center space-x-2">
-            <span className="text-xs text-spotify-neutral">
-              {/* {formatTime(progress)} */}
+            <span className="text-xs text-spotify-neutral w-12 text-right">
+              {formatTime((getCurrentAudioElement()?.currentTime || 0))}
             </span>
             <Slider
               value={[progress]}
@@ -187,13 +228,23 @@ export const Player = () => {
               onValueChange={handleProgressChange}
               disabled={isChangingSong || !currentSong}
             />
-            <span className="text-xs text-spotify-neutral">
-              {/* {formatTime(currentSong?.duration || 0)} */}
+            <span className="text-xs text-spotify-neutral w-12">
+              {formatTime(getCurrentAudioElement()?.duration || 0)}
             </span>
           </div>
         </div>
 
         <div className="flex items-center space-x-4 w-48">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLyricsNavigation}
+            disabled={!currentSong}
+            className="text-spotify-neutral hover:text-white transition-colors"
+          >
+            <Mic className="h-5 w-5" />
+          </Button>
+          
           <Button
             variant="ghost"
             size="icon"
