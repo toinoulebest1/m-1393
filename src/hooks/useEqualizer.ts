@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { EqualizerSettings, EqualizerPreset, DEFAULT_PRESETS } from '@/types/equalizer';
 
@@ -48,11 +49,11 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       // Créer le nœud source
       sourceNodeRef.current = audioContext.createMediaElementSource(audioElement);
 
-      // Créer le gain node pour le préamplificateur
+      // Créer le gain node pour le préamplificateur avec gain initial à 1 (pas d'amplification)
       gainNodeRef.current = audioContext.createGain();
-      gainNodeRef.current.gain.value = Math.pow(10, settings.preAmp / 20);
+      gainNodeRef.current.gain.value = 1; // Toujours 1 pour commencer
 
-      // Créer un gain node pour le bypass
+      // Créer un gain node pour le bypass avec gain à 1
       bypassGainNodeRef.current = audioContext.createGain();
       bypassGainNodeRef.current.gain.value = 1;
 
@@ -62,7 +63,8 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
         filter.type = band.type;
         filter.frequency.value = band.frequency;
         filter.Q.value = band.Q || 1;
-        filter.gain.value = settings.enabled ? band.gain : 0;
+        // Toujours commencer avec un gain de 0 pour éviter l'amplification
+        filter.gain.value = 0;
         return filter;
       });
 
@@ -87,17 +89,25 @@ export const useEqualizer = ({ audioElement }: UseEqualizerProps) => {
       currentNode.connect(audioContext.destination);
 
       setIsInitialized(true);
-      console.log('Égaliseur initialisé avec succès, enabled:', settings.enabled);
+      console.log('Égaliseur initialisé avec succès, tous les gains à 0');
       
-      // S'assurer que l'égaliseur est activé après l'initialisation
-      if (!settings.enabled) {
-        console.log('Activation automatique de l\'égaliseur après initialisation');
-        setSettings(prev => {
-          const newSettings = { ...prev, enabled: true };
-          localStorage.setItem('equalizerSettings', JSON.stringify(newSettings));
-          return newSettings;
-        });
-      }
+      // Maintenant appliquer les réglages utilisateur APRÈS l'initialisation
+      setTimeout(() => {
+        // Appliquer le préampli
+        if (gainNodeRef.current) {
+          gainNodeRef.current.gain.value = Math.pow(10, settings.preAmp / 20);
+        }
+        
+        // Appliquer les gains des bandes seulement si l'égaliseur est activé
+        if (settings.enabled) {
+          filtersRef.current.forEach((filter, index) => {
+            filter.gain.value = settings.bands[index].gain;
+          });
+        }
+        
+        console.log('Réglages d\'égaliseur appliqués après initialisation');
+      }, 100);
+      
     } catch (error) {
       console.error('Erreur lors de l\'initialisation de l\'égaliseur:', error);
     }
