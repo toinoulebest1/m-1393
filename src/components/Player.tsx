@@ -1,38 +1,27 @@
-
 import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useAudioControl } from "@/hooks/useAudioControl";
 import { cn } from "@/lib/utils";
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { AudioEqualizer } from "@/components/AudioEqualizer";
 import { toast } from "sonner";
-import { CastButton } from "./CastButton";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Progress } from "@/components/ui/progress";
-import { useEffect, useRef, useState } from "react";
-import { updatePositionState, durationToSeconds } from "@/utils/mediaSession";
-import { Button } from "./ui/button";
-import { LyricsFullscreenView } from "./LyricsFullscreenView";
-import { AudioEqualizer } from "./AudioEqualizer";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { extractDominantColor } from "@/utils/colorExtractor";
+import { useTranslation } from "react-i18next";
 
 export const Player = () => {
-  const isMobile = useIsMobile();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { t } = useTranslation();
   
-  const { 
-    currentSong, 
-    isPlaying, 
+  const {
+    currentSong,
+    isPlaying,
     progress,
     volume,
     shuffleMode,
     repeatMode,
     favorites,
-    playbackRate,
+    isChangingSong,
     play,
     pause,
     setVolume,
@@ -42,795 +31,190 @@ export const Player = () => {
     toggleShuffle,
     toggleRepeat,
     toggleFavorite,
-    isChangingSong,
-    stopCurrentSong,
-    getCurrentAudioElement,
-    // Égaliseur
-    equalizerSettings,
-    equalizerPresets,
-    currentEqualizerPreset,
-    isEqualizerEnabled,
-    isEqualizerInitialized,
-    updateEqualizerBand,
-    applyEqualizerPreset,
-    toggleEqualizer,
-    resetEqualizer,
-    setEqualizerPreAmp,
-    initializeEqualizer
+    getCurrentAudioElement
   } = usePlayer();
-  
-  // Check if the current page is the blind test page
-  const isBlindTest = location.pathname === '/blind-test';
-  const isSyncedLyricsPage = location.pathname === '/synced-lyrics';
-  
-  const positionUpdateIntervalRef = useRef<number | null>(null);
-  const [currentPosition, setCurrentPosition] = useState(0);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  // Nouvelle logique pour accéder à l'élément audio global
-  useEffect(() => {
-    const audio = getCurrentAudioElement();
-    if (audio) {
-      setAudioElement(audio);
-      console.log("Audio element accessed successfully in Player component");
-    } else {
-      console.error("Failed to access audio element");
-    }
-  }, [getCurrentAudioElement, currentSong]);
-
-  const [showLyrics, setShowLyrics] = useState(false);
+  const { updateVolume } = useAudioControl();
+  
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [showEqualizer, setShowEqualizer] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const playerRef = useRef<HTMLDivElement>(null);
 
-  // Intervalle de mise à jour de la position
   useEffect(() => {
-    // Clear any existing interval
-    if (positionUpdateIntervalRef.current) {
-      window.clearInterval(positionUpdateIntervalRef.current);
-      positionUpdateIntervalRef.current = null;
-    }
-
-    if (isPlaying && audioElement) {
-      // Créer un intervalle qui s'exécute plus fréquemment pour une mise à jour fluide
-      positionUpdateIntervalRef.current = window.setInterval(() => {
-        const audio = getCurrentAudioElement();
-        if (audio && !isNaN(audio.duration) && audio.duration > 0) {
-          const currentTime = audio.currentTime;
-          const duration = audio.duration;
-          
-          // Calculer la progression en pourcentage
-          const newProgress = (currentTime / duration) * 100;
-          
-          // Mettre à jour l'état local pour l'affichage
-          setCurrentPosition(newProgress);
-          
-          // Mettre à jour le MediaSession API
-          if ('mediaSession' in navigator) {
-            updatePositionState(duration, currentTime, audio.playbackRate || 1);
-          }
-        }
-      }, 250); // Mise à jour 4 fois par seconde pour plus de fluidité
-    }
-
-    return () => {
-      if (positionUpdateIntervalRef.current) {
-        window.clearInterval(positionUpdateIntervalRef.current);
-      }
-    };
-  }, [isPlaying, currentSong, audioElement, getCurrentAudioElement]); 
-
-  const formatTime = (position: number) => {
-    if (!currentSong) return "0:00";
-    
-    try {
-      if (audioElement && !isNaN(audioElement.duration)) {
-        // Utiliser directement la position de l'audio en cours de lecture
-        const currentTime = (position / 100) * audioElement.duration;
-        const currentMinutes = Math.floor(currentTime / 60);
-        const currentSeconds = Math.floor(currentTime % 60);
-        
-        return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
-      }
-      
-      if (currentSong.duration && currentSong.duration.includes(':')) {
-        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
-        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
-        
-        const totalSeconds = minutes * 60 + seconds;
-        const currentTime = (position / 100) * totalSeconds;
-        const currentMinutes = Math.floor(currentTime / 60);
-        const currentSeconds = Math.floor(currentTime % 60);
-        
-        return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
-      }
-      
-      const duration = parseFloat(currentSong.duration);
-      if (isNaN(duration)) return "0:00";
-      
-      const currentTime = (position / 100) * duration;
-      const currentMinutes = Math.floor(currentTime / 60);
-      const currentSeconds = Math.floor(currentTime % 60);
-      
-      return `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error("Error formatting time:", error);
-      return "0:00";
-    }
-  };
-
-  const formatDuration = (duration: string | undefined) => {
-    if (!duration) return "0:00";
-    
-    try {
-      if (duration.includes(':')) {
-        const [minutes, seconds] = duration.split(':').map(Number);
-        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      }
-      
-      const durationInSeconds = parseFloat(duration);
-      if (isNaN(durationInSeconds)) return "0:00";
-      
-      const minutes = Math.floor(durationInSeconds / 60);
-      const seconds = Math.floor(durationInSeconds % 60);
-      
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error("Error formatting duration:", error);
-      return "0:00";
-    }
-  };
-
-  const handleFavorite = () => {
-    if (currentSong) {
-      toggleFavorite(currentSong);
-      toast.success(`${favorites.some(s => s.id === currentSong.id) ? 'Retiré des' : 'Ajouté aux'} favoris`);
-    }
-  };
-
-  const toggleLyrics = () => {
-    setShowLyrics(!showLyrics);
-  };
-  
-  // Fonction pour naviguer vers la page des paroles synchronisées
-  const navigateToSyncedLyrics = () => {
-    navigate('/synced-lyrics');
-  };
-  
-  // Function to get displayed song info for blind test mode
-  const getDisplayedSongInfo = () => {
-    if (!isBlindTest || !currentSong) {
-      return { title: currentSong?.title, artist: currentSong?.artist };
-    }
-    
-    // In blind test, hide information
-    const urlParams = new URLSearchParams(location.search);
-    const mode = urlParams.get('mode');
-    const gameState = urlParams.get('state');
-    
-    // If the game is over or answer was shown, display full info
-    if (gameState === 'over' || gameState === 'answered') {
-      return { title: currentSong.title, artist: currentSong.artist };
-    }
-    
-    // Otherwise mask based on game mode
-    if (mode === 'title') {
-      return { title: '••••••', artist: currentSong.artist };
-    } else if (mode === 'artist') {
-      return { title: currentSong.title, artist: '••••••' };
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
     } else {
-      return { title: '••••••', artist: '••••••' };
+      setDominantColor(null);
     }
-  };
-  
-  // Function to determine if image should be blurred in blind test
-  const shouldBlurImage = () => {
-    if (!isBlindTest) return false;
-    
-    const urlParams = new URLSearchParams(location.search);
-    const gameState = urlParams.get('state');
-    
-    // Only show clear image if game is over or answer was shown
-    return !(gameState === 'over' || gameState === 'answered');
-  };
-  
-  // Helper function to prevent right-click on images during blind test
-  const handleContextMenu = (e: React.MouseEvent) => {
-    if (isBlindTest) {
-      e.preventDefault();
-      return false;
+  }, [currentSong?.imageUrl]);
+
+  useEffect(() => {
+    const audioElement = getCurrentAudioElement();
+    if (audioElement) {
+      audioElement.muted = isMuted;
     }
+  }, [isMuted, getCurrentAudioElement]);
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
   };
-  
-  // Helper to get placeholder image for blind test
-  const getImageSrc = () => {
-    if (isBlindTest && shouldBlurImage()) {
-      // Use a generic music placeholder instead of the actual image
-      return "https://picsum.photos/56/56";
-    }
-    return currentSong?.imageUrl || "https://picsum.photos/56/56";
+
+  const toggleEqualizerVisibility = () => {
+    setShowEqualizer(!showEqualizer);
   };
-  
-  const handleSkipForward = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Next song button clicked");
-    
-    // Désactiver temporairement le bouton si un changement est déjà en cours
-    if (isChangingSong) {
-      toast.info("Changement de piste en cours...");
-      return;
-    }
-    
-    // Stop the current song immediately before loading the next one
-    stopCurrentSong();
-    
-    // Call the nextSong function from PlayerContext
-    nextSong();
-  };
-  
-  const handleSkipBack = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Previous song button clicked");
-    
-    // Désactiver temporairement le bouton si un changement est déjà en cours
-    if (isChangingSong) {
-      toast.info("Changement de piste en cours...");
-      return;
-    }
-    
-    // Stop the current song immediately before loading the previous one
-    stopCurrentSong();
-    
-    // Call the previousSong function from PlayerContext
-    previousSong();
-  };
-  
-  const handlePlayPause = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Play/pause button clicked");
-    
-    if (isPlaying) {
-      pause();
-    } else {
-      play();
-    }
-  };
-  
-  const handleProgressChange = (value: number) => {
-    setProgress(value);
-    // Force local position update for immediate UI feedback
-    setCurrentPosition(value);
+
+  const handleProgressChange = (value: number[]) => {
+    setProgress(value[0]);
   };
 
   // Fonction corrigée pour gérer le changement de volume
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
-    console.log("Volume change:", newVolume);
+    console.log("Volume change requested:", newVolume);
+    
+    // Update the context volume
     setVolume(newVolume);
+    
+    // Also update the actual audio element volume directly
+    const audioElement = getCurrentAudioElement();
+    if (audioElement) {
+      audioElement.volume = newVolume / 100;
+      console.log("Audio element volume set to:", audioElement.volume);
+    }
   };
-  
-  const songInfo = getDisplayedSongInfo ? getDisplayedSongInfo() : { title: currentSong?.title, artist: currentSong?.artist };
-  const blurImage = shouldBlurImage ? shouldBlurImage() : false;
-
-  // Determine if the lyrics buttons should be shown (hide during blind test)
-  const shouldShowLyricsButton = !isBlindTest;
-
-  // Utiliser currentPosition pour l'affichage mais garder progress pour les contrôles
-  const displayPosition = currentPosition > 0 ? currentPosition : progress;
 
   return (
-    <>
-      {/* La bannière "En cours de lecture" a été supprimée */}
-
-      <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-95 border-t border-white/5 p-4 z-50">
-        <div className="max-w-7xl mx-auto">
-          {!isMobile ? (
-            // Affichage standard pour ordinateurs
-            <div className="flex items-center justify-between">
-              <div className="flex items-center flex-1 min-w-0">
-                {currentSong && (
-                  <>
-                    <div className="relative w-14 h-14 mr-4">
-                      <img
-                        src={getImageSrc()}
-                        alt="Album art"
-                        className={cn(
-                          "w-full h-full rounded-lg shadow-lg",
-                          blurImage && "blur-md"
-                        )}
-                        onContextMenu={handleContextMenu}
-                        draggable="false"
-                      />
-                      {blurImage && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center z-10"
-                          onContextMenu={handleContextMenu}
-                        >
-                          <Mic className="w-6 h-6 text-white/50" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-white truncate">
-                        {songInfo.title || '••••••'}
-                      </h3>
-                      <p className="text-sm text-spotify-neutral truncate">
-                        {songInfo.artist || '••••••'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleFavorite}
-                      className="ml-4 p-2 hover:bg-white/5 rounded-full transition-colors"
-                    >
-                      <Heart
-                        className={cn(
-                          "w-5 h-5 transition-all duration-300",
-                          favorites.some(s => s.id === currentSong.id)
-                            ? "text-red-500 fill-red-500"
-                            : "text-spotify-neutral hover:text-white"
-                        )}
-                      />
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="flex flex-col items-center space-y-2 flex-1 max-w-xl">
-                <div className="flex items-center space-x-6">
-                  <button 
-                    className={cn(
-                      "text-spotify-neutral hover:text-white transition-all",
-                      shuffleMode && "text-spotify-accent"
-                    )}
-                    onClick={toggleShuffle}
-                    disabled={isChangingSong}
-                  >
-                    <Shuffle className={cn(
-                      "w-4 h-4",
-                      isChangingSong && "opacity-50"
-                    )} />
-                  </button>
-                  <button 
-                    className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
-                    onClick={handleSkipBack}
-                    disabled={isChangingSong}
-                  >
-                    <SkipBack className={cn(
-                      "w-5 h-5",
-                      isChangingSong && "opacity-50"
-                    )} />
-                  </button>
-                  <button 
-                    className={cn(
-                      "bg-white rounded-full p-2 hover:scale-110 transition-all shadow-lg hover:shadow-white/20",
-                      isChangingSong && "opacity-70"
-                    )}
-                    onClick={handlePlayPause}
-                    disabled={isChangingSong}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-6 h-6 text-spotify-dark" />
-                    ) : (
-                      <Play className="w-6 h-6 text-spotify-dark" />
-                    )}
-                  </button>
-                  <button 
-                    className="text-spotify-neutral hover:text-white transition-all hover:scale-110"
-                    onClick={handleSkipForward}
-                    disabled={isChangingSong}
-                  >
-                    <SkipForward className={cn(
-                      "w-5 h-5",
-                      isChangingSong && "opacity-50"
-                    )} />
-                  </button>
-                  <button 
-                    className={cn(
-                      "text-spotify-neutral hover:text-white transition-all",
-                      repeatMode !== 'none' && "text-spotify-accent"
-                    )}
-                    onClick={toggleRepeat}
-                    disabled={isChangingSong}
-                  >
-                    {repeatMode === 'one' ? (
-                      <Repeat1 className={cn(
-                        "w-4 h-4",
-                        isChangingSong && "opacity-50"
-                      )} />
-                    ) : (
-                      <Repeat className={cn(
-                        "w-4 h-4",
-                        isChangingSong && "opacity-50"
-                      )} />
-                    )}
-                  </button>
-                </div>
-                <div className="w-full flex items-center space-x-2">
-                  <span className="text-xs text-spotify-neutral">{formatTime(displayPosition)}</span>
-                  <Slider
-                    value={[displayPosition]}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                    onValueChange={(value) => handleProgressChange(value[0])}
-                    disabled={isChangingSong}
-                  />
-                  <span className="text-xs text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                {currentSong && shouldShowLyricsButton && (
-                  <>
-                    {/* Bouton pour les paroles standard (modal) */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "text-spotify-neutral hover:text-white transition-all",
-                        showLyrics && "text-spotify-accent"
-                      )}
-                      onClick={toggleLyrics}
-                      title="Afficher les paroles"
-                      disabled={isChangingSong}
-                    >
-                      <Mic className="w-5 h-5" />
-                    </Button>
-                    
-                    {/* Nouveau bouton pour les paroles synchronisées (page dédiée) */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "text-spotify-neutral hover:text-white transition-all",
-                        isSyncedLyricsPage && "text-spotify-accent"
-                      )}
-                      onClick={navigateToSyncedLyrics}
-                      title="Paroles synchronisées"
-                      disabled={isChangingSong}
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                        <path d="M9 8h6" />
-                        <path d="M9 12h3" />
-                        <path d="m14 12 6 6" />
-                        <path d="m20 12-6 6" />
-                      </svg>
-                    </Button>
-                  </>
-                )}
-                <CastButton />
-                
-                {/* Bouton pour l'égaliseur */}
-                <Popover open={showEqualizer} onOpenChange={setShowEqualizer}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "text-spotify-neutral hover:text-white transition-all",
-                        showEqualizer && "text-spotify-accent",
-                        isEqualizerEnabled && "text-spotify-accent"
-                      )}
-                      title="Égaliseur audio"
-                      disabled={isChangingSong}
-                    >
-                      <Settings2 className="w-5 h-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    side="top" 
-                    align="end" 
-                    className="p-0 w-auto border-white/20 bg-spotify-dark"
-                    sideOffset={10}
-                  >
-                    <AudioEqualizer
-                      settings={equalizerSettings}
-                      presets={equalizerPresets}
-                      currentPreset={currentEqualizerPreset}
-                      isEnabled={isEqualizerEnabled}
-                      isInitialized={isEqualizerInitialized}
-                      onUpdateBand={updateEqualizerBand}
-                      onApplyPreset={applyEqualizerPreset}
-                      onToggleEnabled={toggleEqualizer}
-                      onReset={resetEqualizer}
-                      onSetPreAmp={setEqualizerPreAmp}
-                      onInitialize={initializeEqualizer}
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <div className="flex items-center space-x-2">
-                  <Volume2 className="text-spotify-neutral w-5 h-5" />
-                  <Slider
-                    value={[volume]}
-                    max={100}
-                    step={1}
-                    className="w-24"
-                    onValueChange={handleVolumeChange}
-                    disabled={isChangingSong}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Mise en page adaptée pour mobiles
-            <div className="flex flex-col space-y-2">
-              {currentSong && (
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    <div className="relative w-12 h-12">
-                      <img
-                        src={getImageSrc()}
-                        alt="Album art"
-                        className={cn(
-                          "w-full h-full rounded-md shadow-md",
-                          blurImage && "blur-md"
-                        )}
-                        onContextMenu={handleContextMenu}
-                        draggable="false"
-                      />
-                      {blurImage && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center z-10"
-                          onContextMenu={handleContextMenu}
-                        >
-                          <Mic className="w-5 h-5 text-white/50" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 max-w-[50vw]">
-                      <h3 className="font-medium text-white text-sm truncate">
-                        {songInfo.title || '••••••'}
-                      </h3>
-                      <p className="text-xs text-spotify-neutral truncate">
-                        {songInfo.artist || '•••••'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={handleFavorite}
-                      className="p-1.5 hover:bg-white/5 rounded-full transition-colors"
-                      disabled={isChangingSong}
-                    >
-                      <Heart
-                        className={cn(
-                          "w-4 h-4 transition-all duration-300",
-                          favorites.some(s => s.id === currentSong.id)
-                            ? "text-red-500 fill-red-500"
-                            : "text-spotify-neutral hover:text-white",
-                          isChangingSong && "opacity-50"
-                        )}
-                      />
-                    </button>
-                    
-                    {/* Bouton pour les paroles standard (modal) sur mobile */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                        showLyrics && "text-spotify-accent",
-                        isChangingSong && "opacity-50"
-                      )}
-                      onClick={toggleLyrics}
-                      disabled={isChangingSong}
-                    >
-                      <Mic className="w-4 h-4" />
-                    </Button>
-                    
-                    {/* Nouveau bouton pour les paroles synchronisées (page dédiée) sur mobile */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                        isSyncedLyricsPage && "text-spotify-accent",
-                        isChangingSong && "opacity-50"
-                      )}
-                      onClick={navigateToSyncedLyrics}
-                      disabled={isChangingSong}
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-                        <path d="M9 8h6" />
-                        <path d="M9 12h3" />
-                        <path d="m14 12 6 6" />
-                        <path d="m20 12-6 6" />
-                      </svg>
-                    </Button>
-                    
-                    {/* Bouton pour l'égaliseur sur mobile */}
-                    <Popover open={showEqualizer} onOpenChange={setShowEqualizer}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "p-1.5 text-spotify-neutral hover:text-white transition-all",
-                            showEqualizer && "text-spotify-accent",
-                            isEqualizerEnabled && "text-spotify-accent",
-                            isChangingSong && "opacity-50"
-                          )}
-                          disabled={isChangingSong}
-                        >
-                          <Settings2 className="w-4 h-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent 
-                        side="top" 
-                        align="end" 
-                        className="p-0 w-auto border-white/20 bg-spotify-dark"
-                        sideOffset={10}
-                      >
-                        <AudioEqualizer
-                          settings={equalizerSettings}
-                          presets={equalizerPresets}
-                          currentPreset={currentEqualizerPreset}
-                          isEnabled={isEqualizerEnabled}
-                          isInitialized={isEqualizerInitialized}
-                          onUpdateBand={updateEqualizerBand}
-                          onApplyPreset={applyEqualizerPreset}
-                          onToggleEnabled={toggleEqualizer}
-                          onReset={resetEqualizer}
-                          onSetPreAmp={setEqualizerPreAmp}
-                          onInitialize={initializeEqualizer}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    
-                    <CastButton />
-                  </div>
-                </div>
-              )}
-
-              {/* Durée affichée pour les mobiles */}
-              <div className="flex items-center justify-between text-xs px-1 mb-0.5">
-                <span className="text-spotify-neutral">{formatTime(displayPosition)}</span>
-                <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
-              </div>
-
-              {/* Barre de progression pour mobiles */}
-              <Progress 
-                value={displayPosition} 
-                className="h-1.5 w-full bg-secondary/30" 
-                onClick={(e) => {
-                  if (isChangingSong) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const percent = ((e.clientX - rect.left) / rect.width) * 100;
-                  handleProgressChange(Math.max(0, Math.min(100, percent)));
-                }}
+    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
+      {currentSong && showEqualizer && (
+        <AudioEqualizer onClose={toggleEqualizerVisibility} />
+      )}
+      
+      <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
+        {currentSong ? (
+          <div className="flex items-center space-x-4 w-48 overflow-hidden">
+            <div className="w-12 h-12 rounded overflow-hidden shadow-md">
+              <img
+                src={currentSong.imageUrl || 'https://picsum.photos/100'}
+                alt="Current Song"
+                className="w-full h-full object-cover"
               />
-
-              {/* Contrôles de lecture pour mobiles */}
-              <div className="flex items-center justify-between mt-1 pt-1">
-                <button 
-                  className={cn(
-                    "text-spotify-neutral p-1.5 hover:text-white transition-all",
-                    shuffleMode && "text-spotify-accent",
-                    isChangingSong && "opacity-50"
-                  )}
-                  onClick={toggleShuffle}
-                  disabled={isChangingSong}
-                >
-                  <Shuffle className="w-3.5 h-3.5" />
-                </button>
-
-                <button 
-                  className={cn(
-                    "text-spotify-neutral hover:text-white p-1.5 transition-all",
-                    isChangingSong && "opacity-50"
-                  )}
-                  onClick={handleSkipBack}
-                  disabled={isChangingSong}
-                >
-                  <SkipBack className="w-5 h-5" />
-                </button>
-                
-                <button 
-                  className={cn(
-                    "bg-white rounded-full p-2 hover:scale-105 transition-all",
-                    isChangingSong && "opacity-70"
-                  )}
-                  onClick={handlePlayPause}
-                  disabled={isChangingSong}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-5 h-5 text-spotify-dark" />
-                  ) : (
-                    <Play className="w-5 h-5 text-spotify-dark" />
-                  )}
-                </button>
-                
-                <button 
-                  className={cn(
-                    "text-spotify-neutral hover:text-white p-1.5 transition-all",
-                    isChangingSong && "opacity-50"
-                  )}
-                  onClick={handleSkipForward}
-                  disabled={isChangingSong}
-                >
-                  <SkipForward className="w-5 h-5" />
-                </button>
-                
-                <button 
-                  className={cn(
-                    "text-spotify-neutral p-1.5 hover:text-white transition-all",
-                    repeatMode !== 'none' && "text-spotify-accent",
-                    isChangingSong && "opacity-50"
-                  )}
-                  onClick={toggleRepeat}
-                  disabled={isChangingSong}
-                >
-                  {repeatMode === 'one' ? (
-                    <Repeat1 className="w-3.5 h-3.5" />
-                  ) : (
-                    <Repeat className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              </div>
             </div>
-          )}
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-sm font-semibold text-white truncate">{currentSong.title}</span>
+              <span className="text-xs text-spotify-neutral truncate">{currentSong.artist || 'Unknown Artist'}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="w-48"></div>
+        )}
+        
+        <div className="flex-1 flex flex-col items-center space-y-2 max-w-md mx-8">
+          <div className="flex items-center space-x-4">
+            <Shuffle
+              className={cn("w-5 h-5 text-spotify-neutral hover:text-white transition-colors cursor-pointer", shuffleMode && "text-spotify-accent")}
+              onClick={toggleShuffle}
+            />
+            <SkipBack
+              className="w-6 h-6 text-spotify-neutral hover:text-white transition-colors cursor-pointer"
+              onClick={previousSong}
+              disabled={isChangingSong}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 p-0 rounded-full bg-white hover:bg-white/10"
+              onClick={() => {
+                if (currentSong) {
+                  isPlaying ? pause() : play();
+                }
+              }}
+              disabled={!currentSong}
+            >
+              {isPlaying ? (
+                <Pause className="h-6 w-6 text-black" />
+              ) : (
+                <Play className="h-6 w-6 text-black" />
+              )}
+            </Button>
+            <SkipForward
+              className="w-6 h-6 text-spotify-neutral hover:text-white transition-colors cursor-pointer"
+              onClick={nextSong}
+              disabled={isChangingSong}
+            />
+            {repeatMode === 'none' && (
+              <Repeat
+                className="w-5 h-5 text-spotify-neutral hover:text-white transition-colors cursor-pointer"
+                onClick={toggleRepeat}
+              />
+            )}
+            {repeatMode === 'all' && (
+              <Repeat
+                className="w-5 h-5 text-spotify-accent hover:text-white transition-colors cursor-pointer"
+                onClick={toggleRepeat}
+              />
+            )}
+            {repeatMode === 'one' && (
+              <Repeat1
+                className="w-5 h-5 text-spotify-accent hover:text-white transition-colors cursor-pointer"
+                onClick={toggleRepeat}
+              />
+            )}
+          </div>
+          
+          <div className="w-full flex items-center space-x-2">
+            <span className="text-xs text-spotify-neutral">
+              {/* {formatTime(progress)} */}
+            </span>
+            <Slider
+              value={[progress]}
+              max={100}
+              step={0.1}
+              className="flex-1"
+              onValueChange={handleProgressChange}
+              disabled={isChangingSong || !currentSong}
+            />
+            <span className="text-xs text-spotify-neutral">
+              {/* {formatTime(currentSong?.duration || 0)} */}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-4 w-48">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleEqualizerVisibility}
+          >
+            <Settings2 className="h-5 w-5 text-spotify-neutral hover:text-white transition-colors cursor-pointer" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (currentSong) {
+                toggleFavorite(currentSong);
+              } else {
+                toast.error(t('player.noSongSelected'));
+              }
+            }}
+          >
+            <Heart className={cn("w-5 h-5 transition-colors cursor-pointer", favorites.some(fav => fav.id === currentSong?.id) ? "text-red-500" : "text-spotify-neutral hover:text-white")} />
+          </Button>
+          
+          <div className="flex items-center space-x-2">
+            <Volume2 className="w-4 h-4 text-spotify-neutral" />
+            <Slider
+              value={[volume]}
+              max={100}
+              step={1}
+              className="w-24"
+              onValueChange={handleVolumeChange}
+              disabled={isChangingSong}
+            />
+          </div>
         </div>
       </div>
-      
-      {/* Add protection styles with dangerouslySetInnerHTML instead of jsx global */}
-      {isBlindTest && (
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-              img {
-                user-select: none;
-                -webkit-user-select: none;
-                -moz-user-select: none;
-                -ms-user-select: none;
-              }
-            `
-          }}
-        />
-      )}
-      
-      {/* Affichage des paroles en plein écran */}
-      {showLyrics && currentSong && (
-        <LyricsFullscreenView 
-          song={currentSong} 
-          onClose={() => setShowLyrics(false)} 
-        />
-      )}
-
-      {/* Indicateur visuel de chargement */}
-      {isChangingSong && (
-        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-sm px-4 py-2 rounded-full z-50 flex items-center">
-          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Changement de piste...
-        </div>
-      )}
-    </>
+    </div>
   );
 };
