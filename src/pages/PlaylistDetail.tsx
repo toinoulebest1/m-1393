@@ -55,135 +55,147 @@ interface Playlist {
   updated_at: string;
 }
 
-// Create a canvas with the song images in a grid layout
+// Simplified function to generate playlist cover
 const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | null> => {
+  console.log("=== STARTING PLAYLIST COVER GENERATION ===");
+  console.log(`Total songs in playlist: ${songs.length}`);
+  
+  if (songs.length === 0) {
+    console.log("No songs found, cannot generate cover");
+    return null;
+  }
+
+  // Filter songs that have images
+  const songsWithImages = songs.filter(song => song.songs.imageUrl);
+  console.log(`Songs with images: ${songsWithImages.length}`);
+  
+  if (songsWithImages.length === 0) {
+    console.log("No songs with images found");
+    return null;
+  }
+
   try {
-    // Filter songs that have images
-    const songsWithImages = songs.filter(song => song.songs.imageUrl);
-    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
-    
-    if (songsWithImages.length === 0) {
-      console.log("No songs with images found for cover generation");
-      return null;
-    }
-    
-    // Create a canvas element
+    // Create canvas
     const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 400;
+    const size = 400;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d');
+    
     if (!ctx) {
       console.error("Failed to get canvas context");
       return null;
     }
 
-    // Fill with dark background
-    ctx.fillStyle = '#121212';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Fill background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, size, size);
 
-    // For single image, use the full canvas
+    console.log(`Processing ${Math.min(songsWithImages.length, 4)} images`);
+
     if (songsWithImages.length === 1) {
-      console.log("Using single image for cover");
+      console.log("Single image mode");
       const img = new Image();
       img.crossOrigin = 'anonymous';
       
       return new Promise((resolve) => {
         img.onload = () => {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
+          console.log("Single image loaded successfully");
+          ctx.drawImage(img, 0, 0, size, size);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          console.log("Single image canvas created");
+          resolve(dataUrl);
         };
-        img.onerror = () => {
-          console.error("Failed to load single image");
+        img.onerror = (error) => {
+          console.error("Error loading single image:", error);
           resolve(null);
         };
         img.src = songsWithImages[0].songs.imageUrl!;
       });
     }
 
-    // For multiple images, create a 2x2 grid
-    console.log(`Creating 2x2 grid for ${Math.min(songsWithImages.length, 4)} images`);
-    const gridSize = 2;
-    const imageSize = canvas.width / gridSize;
-
-    // Load all images first
-    const imagePromises = songsWithImages.slice(0, 4).map((song, index) => {
-      return new Promise<HTMLImageElement | null>((resolve) => {
-        if (!song.songs.imageUrl) {
-          resolve(null);
-          return;
-        }
-        
-        console.log(`Loading image ${index + 1}:`, song.songs.imageUrl);
+    // Multiple images - create grid
+    console.log("Multiple images mode - creating 2x2 grid");
+    const imagesToLoad = songsWithImages.slice(0, 4);
+    const imageSize = size / 2;
+    
+    // Load all images
+    const imagePromises = imagesToLoad.map((song, index) => {
+      return new Promise<{img: HTMLImageElement, index: number} | null>((resolve) => {
+        console.log(`Loading image ${index + 1}: ${song.songs.imageUrl}`);
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
-        // Set a timeout for loading
         const timeout = setTimeout(() => {
-          console.warn(`Image ${index + 1} timed out`);
+          console.warn(`Image ${index + 1} loading timeout`);
           resolve(null);
         }, 10000);
         
         img.onload = () => {
           clearTimeout(timeout);
           console.log(`Image ${index + 1} loaded successfully`);
-          resolve(img);
+          resolve({img, index});
         };
         
-        img.onerror = (e) => {
+        img.onerror = (error) => {
           clearTimeout(timeout);
-          console.error(`Error loading image ${index + 1}:`, e);
+          console.error(`Error loading image ${index + 1}:`, error);
           resolve(null);
         };
         
-        // Try to load with a small delay
-        setTimeout(() => {
-          img.src = song.songs.imageUrl!;
-        }, index * 200);
+        img.src = song.songs.imageUrl!;
       });
     });
 
-    try {
-      // Wait for all images to load
-      const loadedImages = await Promise.all(imagePromises);
-      console.log(`Loaded ${loadedImages.filter(img => img !== null).length} images successfully`);
+    const loadedImages = await Promise.all(imagePromises);
+    const validImages = loadedImages.filter(item => item !== null);
+    
+    console.log(`Successfully loaded ${validImages.length} images`);
 
-      // Draw the loaded images
-      loadedImages.forEach((img, index) => {
-        if (img) {
-          const row = Math.floor(index / gridSize);
-          const col = index % gridSize;
-          const x = col * imageSize;
-          const y = row * imageSize;
-          
-          console.log(`Drawing image ${index + 1} at position (${x}, ${y}) with size ${imageSize}x${imageSize}`);
-          ctx.drawImage(img, x, y, imageSize, imageSize);
-        }
-      });
+    if (validImages.length === 0) {
+      console.error("No images could be loaded");
+      return null;
+    }
 
-      // Add a subtle border between images
-      ctx.strokeStyle = '#333333';
+    // Draw images in grid
+    validImages.forEach((item) => {
+      if (item) {
+        const { img, index } = item;
+        const row = Math.floor(index / 2);
+        const col = index % 2;
+        const x = col * imageSize;
+        const y = row * imageSize;
+        
+        console.log(`Drawing image ${index + 1} at position (${x}, ${y})`);
+        ctx.drawImage(img, x, y, imageSize, imageSize);
+      }
+    });
+
+    // Add grid lines for better visual separation
+    if (validImages.length > 1) {
+      ctx.strokeStyle = '#333';
       ctx.lineWidth = 2;
       
       // Vertical line
       ctx.beginPath();
       ctx.moveTo(imageSize, 0);
-      ctx.lineTo(imageSize, canvas.height);
+      ctx.lineTo(imageSize, size);
       ctx.stroke();
       
       // Horizontal line
       ctx.beginPath();
       ctx.moveTo(0, imageSize);
-      ctx.lineTo(canvas.width, imageSize);
+      ctx.lineTo(size, imageSize);
       ctx.stroke();
-
-      console.log("Canvas composite created successfully");
-      return canvas.toDataURL('image/jpeg', 0.85);
-    } catch (err) {
-      console.error("Error during image processing:", err);
-      return null;
     }
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    console.log("Grid canvas created successfully");
+    console.log("=== PLAYLIST COVER GENERATION COMPLETED ===");
+    return dataUrl;
+
   } catch (error) {
-    console.error('Error generating playlist cover:', error);
+    console.error('Error in generatePlaylistCover:', error);
     return null;
   }
 };
@@ -214,74 +226,44 @@ const PlaylistDetail = () => {
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
 
-  // Function to set the first song's image as playlist cover
-  const setFirstSongAsCover = async (firstSong: Song) => {
-    if (!playlistId || !firstSong.imageUrl) {
-      console.log("Cannot set first song as cover: missing playlistId or imageUrl");
+  // Create or update playlist cover based on song images
+  const updatePlaylistCover = async () => {
+    if (!playlistId || songs.length === 0) {
+      console.log("Cannot update cover: missing playlistId or no songs");
       return;
     }
     
-    try {
-      console.log("Setting first song's image as playlist cover:", firstSong.imageUrl);
-      
-      // Update playlist record with the first song's image
-      const { error: updateError } = await supabase
-        .from('playlists')
-        .update({ cover_image_url: firstSong.imageUrl })
-        .eq('id', playlistId);
-      
-      if (updateError) throw updateError;
-      
-      // Update local state immediately for UI feedback
-      setPlaylist(prev => prev ? { ...prev, cover_image_url: firstSong.imageUrl } : null);
-      
-      console.log("Playlist cover updated to first song's image successfully");
-      
-      // Show success message
-      toast({
-        description: t('playlists.coverUpdated')
-      });
-      
-    } catch (error) {
-      console.error("Error setting first song as cover:", error);
-      toast({
-        title: t('common.error'),
-        description: t('playlists.errorUploadingCover'),
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Create or update playlist cover based on song images
-  const updatePlaylistCover = async () => {
-    if (!playlistId || songs.length === 0) return;
+    console.log("=== STARTING PLAYLIST COVER UPDATE ===");
+    console.log(`Playlist ID: ${playlistId}`);
+    console.log(`Songs count: ${songs.length}`);
     
     try {
       setUploading(true);
-      console.log(`Starting playlist cover update for playlist ${playlistId} with ${songs.length} songs`);
       
-      // Always use our improved generatePlaylistCover function for multiple images
       const coverDataUrl = await generatePlaylistCover(songs);
       
       if (!coverDataUrl) {
-        console.log("No cover could be generated");
+        console.log("No cover data URL generated");
         setUploading(false);
         return;
       }
       
-      console.log("Cover data URL generated, uploading to storage");
+      console.log("Cover generated, uploading to storage...");
       
       // Upload using the storage function
       const publicUrl = await storePlaylistCover(playlistId, coverDataUrl);
+      console.log("Cover uploaded, public URL:", publicUrl);
       
       // Update playlist record
-      console.log("Updating playlist record with new cover URL:", publicUrl);
       const { error: updateError } = await supabase
         .from('playlists')
         .update({ cover_image_url: publicUrl })
         .eq('id', playlistId);
       
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Error updating playlist record:", updateError);
+        throw updateError;
+      }
       
       // Update local state
       setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
@@ -290,6 +272,8 @@ const PlaylistDetail = () => {
       toast({
         description: t('playlists.coverGenerated')
       });
+      
+      console.log("=== PLAYLIST COVER UPDATE COMPLETED ===");
     } catch (error) {
       console.error("Error updating playlist cover:", error);
       toast({
@@ -544,18 +528,19 @@ const PlaylistDetail = () => {
       
       console.log("Songs added successfully, refreshing playlist...");
       
-      // Refresh playlist songs first
+      // Refresh playlist data first
       await fetchPlaylistDetails();
-      
-      // Force update the cover after a longer delay to ensure all data is loaded
-      setTimeout(() => {
-        console.log("Force updating playlist cover...");
-        updatePlaylistCover();
-      }, 2000);
       
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
       });
+      
+      // Force update the cover after a delay to ensure all data is loaded
+      setTimeout(() => {
+        console.log("Triggering cover update after adding songs...");
+        updatePlaylistCover();
+      }, 1000);
+      
     } catch (error) {
       console.error("Error adding songs to playlist:", error);
       toast({
@@ -582,15 +567,12 @@ const PlaylistDetail = () => {
     setQueue(playlistSongs);
     play(playlistSongs[0]);
     
-    // Fix: Replace sonner toast.success with shadcn toast
     toast({
       description: t('player.playingPlaylist')
     });
   };
   
-  // Improved function to play a specific song
   const playSong = (song: Song) => {
-    // First, create queue from the entire playlist
     const playlistSongs = songs.map(item => ({
       id: item.songs.id,
       title: item.songs.title,
@@ -601,13 +583,9 @@ const PlaylistDetail = () => {
       genre: item.songs.genre
     }));
     
-    // Update the queue with all songs
     setQueue(playlistSongs);
-    
-    // Then start playing the selected song
     play(song);
     
-    // Fix: Replace sonner toast.success with shadcn toast
     toast({
       description: `${t('player.playing')}: ${song.title}`
     });
@@ -621,22 +599,17 @@ const PlaylistDetail = () => {
     return favorites.some(fav => fav.id === song.id);
   };
   
-  // Function to handle showing song lyrics
   const handleLyricsClick = (song: Song) => {
     console.log("Show lyrics for:", song.title);
-    // Here we could implement opening lyrics modal, similar to how it's done in other pages
   };
 
-  // Function to handle reporting a song
   const handleReportClick = (song: Song) => {
     console.log("Report song:", song.title);
-    // Here we could implement report functionality, similar to how it's done in other pages
   };
 
   useEffect(() => {
     fetchPlaylistDetails();
     
-    // Set up realtime subscriptions
     if (!playlistId) return;
     
     const playlistChannel = supabase
@@ -724,20 +697,42 @@ const PlaylistDetail = () => {
               )}
               
               <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <label htmlFor="cover-upload" className="cursor-pointer">
-                  <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
-                    <ImageIcon className="h-5 w-5" />
-                  </div>
-                  <input 
-                    id="cover-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleUploadCover}
-                    disabled={uploading}
-                  />
-                </label>
+                <div className="flex gap-2">
+                  <label htmlFor="cover-upload" className="cursor-pointer">
+                    <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
+                      <ImageIcon className="h-5 w-5" />
+                    </div>
+                    <input 
+                      id="cover-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleUploadCover}
+                      disabled={uploading}
+                    />
+                  </label>
+                  
+                  {songs.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updatePlaylistCover();
+                      }}
+                      disabled={uploading}
+                      className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full"
+                      title="Générer couverture"
+                    >
+                      <Music2 className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
               </div>
+              
+              {uploading && (
+                <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                </div>
+              )}
             </div>
             
             <div className="flex-1">
