@@ -14,6 +14,7 @@ interface PlaylistVisibilitySettingsProps {
   playlistId: string;
   currentVisibility: string;
   onVisibilityChanged: (newVisibility: string) => void;
+  isOwner: boolean; // Nouvelle prop pour vérifier si l'utilisateur est propriétaire
 }
 
 interface User {
@@ -24,8 +25,14 @@ interface User {
 export const PlaylistVisibilitySettings = ({ 
   playlistId, 
   currentVisibility, 
-  onVisibilityChanged 
+  onVisibilityChanged,
+  isOwner
 }: PlaylistVisibilitySettingsProps) => {
+  // Ne pas afficher le composant si l'utilisateur n'est pas le propriétaire
+  if (!isOwner) {
+    return null;
+  }
+
   const [visibility, setVisibility] = useState(currentVisibility);
   const [friends, setFriends] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);

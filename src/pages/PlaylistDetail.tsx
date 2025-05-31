@@ -54,6 +54,7 @@ interface Playlist {
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+  user_id: string;
   visibility?: string;
 }
 
@@ -223,6 +224,7 @@ const PlaylistDetail = () => {
   const [uploading, setUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const { toast } = useToast();
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
@@ -298,6 +300,15 @@ const PlaylistDetail = () => {
     
     try {
       setLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      setCurrentUserId(user.id);
       
       // Fetch playlist details with visibility
       const { data: playlistData, error: playlistError } = await supabase
@@ -665,6 +676,9 @@ const PlaylistDetail = () => {
     console.log('Visibility changed to:', newVisibility);
   };
 
+  // Déterminer si l'utilisateur est propriétaire de la playlist
+  const isOwner = playlist?.user_id === currentUserId;
+
   useEffect(() => {
     fetchPlaylistDetails();
     
@@ -754,40 +768,43 @@ const PlaylistDetail = () => {
                 <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
               )}
               
-              <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <div className="flex gap-2">
-                  <label htmlFor="cover-upload" className="cursor-pointer">
-                    <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
-                      <ImageIcon className="h-5 w-5" />
-                    </div>
-                    <input 
-                      id="cover-upload" 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handleUploadCover}
-                      disabled={uploading}
-                    />
-                  </label>
-                  
-                  {songs.length > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("Manual cover generation button clicked");
-                        console.log("Current playlistId:", playlistId);
-                        console.log("Current songs:", songs);
-                        updatePlaylistCover(playlistId, songs);
-                      }}
-                      disabled={uploading}
-                      className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full"
-                      title="Générer couverture"
-                    >
-                      <Music2 className="h-5 w-5" />
-                    </button>
-                  )}
+              {/* Afficher les contrôles de couverture seulement si l'utilisateur est propriétaire */}
+              {isOwner && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="flex gap-2">
+                    <label htmlFor="cover-upload" className="cursor-pointer">
+                      <div className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full">
+                        <ImageIcon className="h-5 w-5" />
+                      </div>
+                      <input 
+                        id="cover-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleUploadCover}
+                        disabled={uploading}
+                      />
+                    </label>
+                    
+                    {songs.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log("Manual cover generation button clicked");
+                          console.log("Current playlistId:", playlistId);
+                          console.log("Current songs:", songs);
+                          updatePlaylistCover(playlistId, songs);
+                        }}
+                        disabled={uploading}
+                        className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full"
+                        title="Générer couverture"
+                      >
+                        <Music2 className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
               
               {uploading && (
                 <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
@@ -801,7 +818,8 @@ const PlaylistDetail = () => {
                 {t('playlists.playlist')}
               </div>
               
-              {isEditingName ? (
+              {/* Afficher l'édition du nom seulement si l'utilisateur est propriétaire */}
+              {isEditingName && isOwner ? (
                 <div className="flex items-center gap-2 mb-4">
                   <Input 
                     value={editedName}
@@ -827,8 +845,8 @@ const PlaylistDetail = () => {
                 </div>
               ) : (
                 <h1 
-                  className="text-3xl font-bold text-white mb-2 cursor-pointer hover:underline"
-                  onClick={() => setIsEditingName(true)}
+                  className={`text-3xl font-bold text-white mb-2 ${isOwner ? 'cursor-pointer hover:underline' : ''}`}
+                  onClick={() => isOwner && setIsEditingName(true)}
                 >
                   {playlist?.name}
                 </h1>
@@ -853,25 +871,29 @@ const PlaylistDetail = () => {
                   </Button>
                 )}
                 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" className="border border-spotify-neutral">
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('playlists.addSongs')}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-                    <DialogHeader>
-                      <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-                    </DialogHeader>
-                    <SongPicker onSelectionConfirmed={handleAddSongs} />
-                  </DialogContent>
-                </Dialog>
+                {/* Afficher le bouton d'ajout de musiques seulement si l'utilisateur est propriétaire */}
+                {isOwner && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" className="border border-spotify-neutral">
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('playlists.addSongs')}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
+                      <DialogHeader>
+                        <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
+                      </DialogHeader>
+                      <SongPicker onSelectionConfirmed={handleAddSongs} />
+                    </DialogContent>
+                  </Dialog>
+                )}
 
                 <PlaylistVisibilitySettings
                   playlistId={playlistId!}
                   currentVisibility="private"
                   onVisibilityChanged={handleVisibilityChanged}
+                  isOwner={isOwner}
                 />
               </div>
             </div>
@@ -892,7 +914,7 @@ const PlaylistDetail = () => {
                     dominantColor={dominantColors[song.songs.id] || null}
                     onLyricsClick={() => handleLyricsClick(song.songs)}
                     onReportClick={() => handleReportClick(song.songs)}
-                    contextMenuItems={songCardContextMenu(song)}
+                    contextMenuItems={isOwner ? songCardContextMenu(song) : []}
                   />
                 </div>
               ))}
@@ -901,20 +923,23 @@ const PlaylistDetail = () => {
             <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
               <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
               <p className="text-spotify-neutral text-lg mb-4">{t('playlists.noSongs')}</p>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="bg-spotify-accent hover:bg-spotify-accent-hover">
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('playlists.addSongs')}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
-                  </DialogHeader>
-                  <SongPicker onSelectionConfirmed={handleAddSongs} />
-                </DialogContent>
-              </Dialog>
+              {/* Afficher le bouton d'ajout seulement si l'utilisateur est propriétaire */}
+              {isOwner && (
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="bg-spotify-accent hover:bg-spotify-accent-hover">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('playlists.addSongs')}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-spotify-dark text-white border-spotify-card max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>{t('playlists.addSongs')}</DialogTitle>
+                    </DialogHeader>
+                    <SongPicker onSelectionConfirmed={handleAddSongs} />
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           )}
         </div>
