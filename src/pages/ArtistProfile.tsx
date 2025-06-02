@@ -29,7 +29,7 @@ const ArtistProfile = () => {
   const [activeTab, setActiveTab] = useState('top');
   const [availableSongs, setAvailableSongs] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
-  const { play, currentSong, isPlaying, pause } = usePlayer();
+  const { play, currentSong, isPlaying, pause, getCurrentAudioElement } = usePlayer();
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
