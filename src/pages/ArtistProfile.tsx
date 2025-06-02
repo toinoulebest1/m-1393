@@ -33,6 +33,7 @@ const ArtistProfile = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [currentProgress, setCurrentProgress] = useState(0);
 
   useEffect(() => {
     const fetchArtistData = async () => {
@@ -232,6 +233,25 @@ const ArtistProfile = () => {
 
   const gradientOpacity = 0.3 + (scrollRatio * 0.7);
 
+  useEffect(() => {
+    if (!getCurrentAudioElement() || !currentSong) return;
+
+    const updateProgress = () => {
+      const audioElement = getCurrentAudioElement();
+      if (audioElement && audioElement.duration) {
+        const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+        setCurrentProgress(progressPercent);
+      }
+    };
+
+    const audioElement = getCurrentAudioElement();
+    audioElement.addEventListener('timeupdate', updateProgress);
+    
+    return () => {
+      audioElement.removeEventListener('timeupdate', updateProgress);
+    };
+  }, [getCurrentAudioElement, currentSong]);
+
   return (
     <div className="w-full min-h-full flex flex-col bg-gradient-to-b from-zinc-900 to-background">
       {/* Floating back button that becomes more visible on scroll */}
@@ -421,11 +441,21 @@ const ArtistProfile = () => {
                             <Card 
                               key={track.id} 
                               className={cn(
-                                "hover:bg-white/5 transition-all duration-300 bg-black/40 border-white/10 overflow-hidden group",
+                                "hover:bg-white/5 transition-all duration-300 bg-black/40 border-white/10 overflow-hidden group relative",
                                 isCurrentTrack && "animate-pulse border-spotify-accent/50 shadow-lg"
                               )}
                               style={currentTrackStyle}
                             >
+                              {/* Barre de progression pour la chanson en cours */}
+                              {isCurrentTrack && (
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+                                  <div 
+                                    className="h-full bg-gradient-to-r from-spotify-accent to-green-500 transition-all duration-200 ease-out"
+                                    style={{ width: `${currentProgress}%` }}
+                                  />
+                                </div>
+                              )}
+                              
                               <CardContent className="p-0">
                                 <div className="flex items-center gap-3 p-3">
                                   <div className="text-sm font-mono text-muted-foreground w-6 text-center flex items-center justify-center">
@@ -583,7 +613,7 @@ const ArtistProfile = () => {
                     )}
                   </TabsContent>
                   
-                  {/* Albums section sans effet de scintillement */}
+                  {/* Albums section */}
                   <TabsContent value="albums" className="mt-0">
                     {profileData.albums.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
