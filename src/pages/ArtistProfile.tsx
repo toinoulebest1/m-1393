@@ -9,6 +9,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Player } from "@/components/Player";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, Play, Music, Disc, User, Heart, Award, 
   Calendar, ExternalLink, PlayCircle, Clock, Share2,
@@ -19,12 +20,14 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { extractDominantColor, rgbToHex } from "@/utils/colorExtractor";
+import { Song } from "@/types/player";
 
 const ArtistProfile = () => {
   const { artistId, artistName } = useParams();
   const [profileData, setProfileData] = useState<ArtistProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('top'); // Utilisation des Tabs de Shadcn UI
+  const [activeTab, setActiveTab] = useState('top');
+  const [availableSongs, setAvailableSongs] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const { play } = usePlayer();
   const headerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +53,9 @@ const ArtistProfile = () => {
           // Extraire la couleur dominante de l'image de l'artiste
           const color = await extractDominantColor(data.artist.picture_xl);
           setDominantColor(color);
+
+          // Vérifier quelles chansons sont disponibles localement
+          await checkAvailableSongs(data.artist.name, data.topTracks);
         } else {
           toast.error("Impossible de trouver les informations de l'artiste");
         }
@@ -64,19 +70,83 @@ const ArtistProfile = () => {
     fetchArtistData();
   }, [artistId, artistName]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (headerRef.current) {
-        const scrollPosition = window.scrollY;
-        const headerHeight = headerRef.current.offsetHeight;
-        const ratio = Math.min(scrollPosition / (headerHeight / 2), 1);
-        setScrollRatio(ratio);
-      }
-    };
+  const checkAvailableSongs = async (artistName: string, tracks: any[]) => {
+    try {
+      console.log("Checking available songs for artist:", artistName);
+      console.log("Tracks to check:", tracks.map(t => t.title));
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+      const trackTitles = tracks.map(track => track.title.toLowerCase());
+      
+      const { data: songs, error } = await supabase
+        .from('songs')
+        .select('title, artist, id, file_path, duration, image_url, genre')
+        .ilike('artist', `%${artistName}%`);
+
+      if (error) {
+        console.error("Error checking available songs:", error);
+        return;
+      }
+
+      console.log("Found songs in database:", songs?.map(s => s.title) || []);
+
+      const available = new Set<string>();
+      
+      songs?.forEach(song => {
+        const songTitleLower = song.title.toLowerCase();
+        const matchingTrack = tracks.find(track => 
+          track.title.toLowerCase() === songTitleLower ||
+          track.title.toLowerCase().includes(songTitleLower) ||
+          songTitleLower.includes(track.title.toLowerCase())
+        );
+        
+        if (matchingTrack) {
+          available.add(matchingTrack.title);
+          console.log("Found match:", matchingTrack.title, "->", song.title);
+        }
+      });
+
+      console.log("Available songs:", Array.from(available));
+      setAvailableSongs(available);
+    } catch (error) {
+      console.error("Error in checkAvailableSongs:", error);
+    }
+  };
+
+  const handlePlayLocalSong = async (track: any) => {
+    try {
+      console.log("Playing local song:", track.title);
+      
+      const { data: songs, error } = await supabase
+        .from('songs')
+        .select('*')
+        .ilike('artist', `%${profileData?.artist.name}%`)
+        .ilike('title', `%${track.title}%`)
+        .limit(1);
+
+      if (error || !songs || songs.length === 0) {
+        console.error("Song not found in database:", error);
+        toast.error("Chanson non trouvée dans la base de données");
+        return;
+      }
+
+      const dbSong = songs[0];
+      const localSong: Song = {
+        id: dbSong.id,
+        title: dbSong.title,
+        artist: dbSong.artist,
+        duration: dbSong.duration || "3:00",
+        url: dbSong.file_path,
+        imageUrl: dbSong.image_url || track.album.cover_medium,
+        genre: dbSong.genre
+      };
+
+      console.log("Playing local song:", localSong);
+      await play(localSong);
+    } catch (error) {
+      console.error("Error playing local song:", error);
+      toast.error("Erreur lors de la lecture de la chanson");
+    }
+  };
 
   const handlePlayPreview = (preview: string, title: string, artist: string, imageUrl: string) => {
     const previewTrack = {
@@ -90,6 +160,20 @@ const ArtistProfile = () => {
     
     play(previewTrack);
   };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current) {
+        const scrollPosition = window.scrollY;
+        const headerHeight = headerRef.current.offsetHeight;
+        const ratio = Math.min(scrollPosition / (headerHeight / 2), 1);
+        setScrollRatio(ratio);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const formatFanCount = (count: number) => {
     if (count >= 1000000) {
@@ -117,7 +201,6 @@ const ArtistProfile = () => {
     }
   };
 
-  // Génère un style CSS pour le glow en fonction de la couleur dominante
   const getGlowStyle = () => {
     if (!dominantColor) return {};
     
@@ -298,94 +381,116 @@ const ArtistProfile = () => {
                   </div>
                 </div>
               
-                {/* Main content */}
+                {/* Main content with updated tracks section */}
                 <div className="max-w-6xl mx-auto px-6 md:px-12 py-8">
                   {/* Top Tracks Section */}
                   <TabsContent value="top" className="mt-0">
                     {profileData.topTracks.length > 0 ? (
                       <div className="space-y-4 animate-fade-in">
-                        {profileData.topTracks.map((track, index) => (
-                          <Card 
-                            key={track.id} 
-                            className="hover:bg-white/5 transition-colors bg-black/40 border-white/10 overflow-hidden group"
-                          >
-                            <CardContent className="p-0">
-                              <div className="flex items-center gap-3 p-3">
-                                <div className="text-sm font-mono text-muted-foreground w-6 text-center">
-                                  {index + 1}
-                                </div>
-                                
-                                <div className="relative overflow-hidden rounded-md">
-                                  <img 
-                                    src={track.album.cover_medium} 
-                                    alt={track.title}
-                                    className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
-                                  />
-                                  {/* Suppression de l'effet de scintillement */}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        {profileData.topTracks.map((track, index) => {
+                          const isAvailable = availableSongs.has(track.title);
+                          
+                          return (
+                            <Card 
+                              key={track.id} 
+                              className="hover:bg-white/5 transition-colors bg-black/40 border-white/10 overflow-hidden group"
+                            >
+                              <CardContent className="p-0">
+                                <div className="flex items-center gap-3 p-3">
+                                  <div className="text-sm font-mono text-muted-foreground w-6 text-center">
+                                    {index + 1}
+                                  </div>
+                                  
+                                  <div className="relative overflow-hidden rounded-md">
+                                    <img 
+                                      src={track.album.cover_medium} 
+                                      alt={track.title}
+                                      className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost"
+                                        className="h-8 w-8 rounded-full bg-spotify-accent/90 text-white hover:bg-spotify-accent hover:scale-105 transition-transform"
+                                        onClick={() => {
+                                          if (isAvailable) {
+                                            handlePlayLocalSong(track);
+                                          } else {
+                                            handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium);
+                                          }
+                                        }}
+                                      >
+                                        <Play className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{track.title}</h3>
+                                    <HoverCard>
+                                      <HoverCardTrigger>
+                                        <p className="text-sm text-white/60 truncate flex items-center gap-2">
+                                          <Disc className="h-3 w-3 inline" />
+                                          {track.album.title}
+                                        </p>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent className="w-80 bg-background/95 backdrop-blur-lg border-white/20">
+                                        <div className="flex space-x-4">
+                                          <img 
+                                            src={track.album.cover_medium} 
+                                            alt={track.album.title}
+                                            className="h-24 w-24 object-cover rounded-md"
+                                          />
+                                          <div>
+                                            <h4 className="text-sm font-semibold">{track.album.title}</h4>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              Album de {profileData.artist.name}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    {isAvailable ? (
+                                      <button 
+                                        onClick={() => handlePlayLocalSong(track)}
+                                        className="text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1 rounded-full hover:from-green-600 hover:to-emerald-700 transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
+                                      >
+                                        Disponible Ici
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
+                                        className="text-xs bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white px-3 py-1 rounded-full hover:from-[#9B87F5] hover:to-[#F97316] transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
+                                      >
+                                        Aperçu 30s
+                                      </button>
+                                    )}
+                                    <span className="text-xs text-white/40 hidden md:block">
+                                      {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+                                    </span>
                                     <Button 
                                       size="icon" 
                                       variant="ghost"
-                                      className="h-8 w-8 rounded-full bg-spotify-accent/90 text-white hover:bg-spotify-accent hover:scale-105 transition-transform"
-                                      onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
+                                      className="rounded-full hover:bg-white/10 text-white/80 hover:text-white"
+                                      onClick={() => {
+                                        if (isAvailable) {
+                                          handlePlayLocalSong(track);
+                                        } else {
+                                          handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium);
+                                        }
+                                      }}
                                     >
-                                      <Play className="h-4 w-4" />
+                                      <PlayCircle className="h-5 w-5" />
                                     </Button>
                                   </div>
                                 </div>
-                                
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{track.title}</h3>
-                                  <HoverCard>
-                                    <HoverCardTrigger>
-                                      <p className="text-sm text-white/60 truncate flex items-center gap-2">
-                                        <Disc className="h-3 w-3 inline" />
-                                        {track.album.title}
-                                      </p>
-                                    </HoverCardTrigger>
-                                    <HoverCardContent className="w-80 bg-background/95 backdrop-blur-lg border-white/20">
-                                      <div className="flex space-x-4">
-                                        <img 
-                                          src={track.album.cover_medium} 
-                                          alt={track.album.title}
-                                          className="h-24 w-24 object-cover rounded-md"
-                                        />
-                                        <div>
-                                          <h4 className="text-sm font-semibold">{track.album.title}</h4>
-                                          <p className="text-xs text-muted-foreground mt-1">
-                                            Album de {profileData.artist.name}
-                                          </p>
-                                          {/* Removed the link to album.link as it doesn't exist in the type */}
-                                        </div>
-                                      </div>
-                                    </HoverCardContent>
-                                  </HoverCard>
-                                </div>
-                                
-                                <div className="flex items-center gap-2">
-                                  {/* Badge "Disponible Ici" */}
-                                  <button 
-                                    onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
-                                    className="text-xs bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white px-3 py-1 rounded-full hover:from-[#9B87F5] hover:to-[#F97316] transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
-                                  >
-                                    Disponible Ici
-                                  </button>
-                                  <span className="text-xs text-white/40 hidden md:block">
-                                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
-                                  </span>
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost"
-                                    className="rounded-full hover:bg-white/10 text-white/80 hover:text-white"
-                                    onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
-                                  >
-                                    <PlayCircle className="h-5 w-5" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-10">
@@ -416,7 +521,6 @@ const ArtistProfile = () => {
                                   alt={album.title}
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
-                                {/* Suppression de l'effet de scintillement et du lien vers album.link */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <div className="bg-spotify-accent/90 rounded-full p-3 text-white hover:bg-spotify-accent transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
                                     <Info className="h-5 w-5" />
