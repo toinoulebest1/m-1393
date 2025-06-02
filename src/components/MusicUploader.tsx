@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 interface Song {
   id: string;
@@ -29,6 +30,7 @@ export const MusicUploader = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
   const [storageProvider, setStorageProvider] = useState<string>("Supabase");
+  const [currentUploadingSong, setCurrentUploadingSong] = useState<string | null>(null);
   // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
 
@@ -241,6 +243,7 @@ export const MusicUploader = () => {
     }
 
     const fileId = generateUUID();
+    setCurrentUploadingSong(file.name);
 
     try {
       let { artist, title } = parseFileName(file.name);
@@ -254,6 +257,7 @@ export const MusicUploader = () => {
       const songExists = await checkIfSongExists(artist, title);
       if (songExists) {
         toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
+        setCurrentUploadingSong(null);
         return null;
       }
 
@@ -261,7 +265,21 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setIsUploading(true);
 
+      // Simuler la progression d'upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + Math.random() * 15;
+        });
+      }, 200);
+
       await storeAudioFile(fileId, file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -316,6 +334,7 @@ export const MusicUploader = () => {
       if (songError) {
         console.error("Erreur lors de l'enregistrement dans la base de données:", songError);
         toast.error("Erreur lors de l'enregistrement de la chanson");
+        setCurrentUploadingSong(null);
         return null;
       }
       
@@ -381,6 +400,7 @@ export const MusicUploader = () => {
 
       setIsUploading(false);
       setUploadProgress(0);
+      setCurrentUploadingSong(null);
 
       return {
         id: fileId,
@@ -397,6 +417,7 @@ export const MusicUploader = () => {
       toast.error("Erreur lors de l'upload du fichier");
       setIsUploading(false);
       setUploadProgress(0);
+      setCurrentUploadingSong(null);
       return null;
     }
   };
@@ -587,6 +608,26 @@ export const MusicUploader = () => {
           Using: {storageProvider}
         </div>
       </div>
+
+      {/* Upload progress bar */}
+      {isUploading && (
+        <div className="mb-4 p-4 bg-spotify-dark/50 rounded-lg border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-foreground">
+              Upload en cours: {currentUploadingSong}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {Math.round(uploadProgress)}%
+            </div>
+          </div>
+          <Progress 
+            value={uploadProgress} 
+            className="h-2"
+            indicatorClassName="bg-spotify-accent transition-all duration-300"
+          />
+        </div>
+      )}
+
       {isDragging && (
         <div 
           className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
