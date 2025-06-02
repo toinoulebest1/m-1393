@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, Play, Music, Disc, User, Heart, Award, 
   Calendar, ExternalLink, PlayCircle, Clock, Share2,
-  Radio, Link, Globe, Info
+  Radio, Link, Globe, Info, Pause
 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { formatDistanceToNow } from "date-fns";
@@ -29,7 +29,7 @@ const ArtistProfile = () => {
   const [activeTab, setActiveTab] = useState('top');
   const [availableSongs, setAvailableSongs] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
-  const { play } = usePlayer();
+  const { play, currentSong, isPlaying, pause } = usePlayer();
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrollRatio, setScrollRatio] = useState(0);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
@@ -159,6 +159,25 @@ const ArtistProfile = () => {
     };
     
     play(previewTrack);
+  };
+
+  const handlePlayPause = (track: any) => {
+    const isCurrentTrack = currentSong?.title === track.title && currentSong?.artist === profileData?.artist.name;
+    
+    if (isCurrentTrack) {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    } else {
+      const isAvailable = availableSongs.has(track.title);
+      if (isAvailable) {
+        handlePlayLocalSong(track);
+      } else {
+        handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium);
+      }
+    }
   };
 
   useEffect(() => {
@@ -381,7 +400,7 @@ const ArtistProfile = () => {
                   </div>
                 </div>
               
-                {/* Main content with updated tracks section */}
+                {/* Main content with enhanced visual effects for current song */}
                 <div className="max-w-6xl mx-auto px-6 md:px-12 py-8">
                   {/* Top Tracks Section */}
                   <TabsContent value="top" className="mt-0">
@@ -389,44 +408,85 @@ const ArtistProfile = () => {
                       <div className="space-y-4 animate-fade-in">
                         {profileData.topTracks.map((track, index) => {
                           const isAvailable = availableSongs.has(track.title);
+                          const isCurrentTrack = currentSong?.title === track.title && currentSong?.artist === profileData?.artist.name;
+                          
+                          // Style dynamique pour la chanson en cours
+                          const currentTrackStyle = isCurrentTrack && dominantColor ? {
+                            background: `linear-gradient(to right, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3), rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1))`,
+                            borderColor: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)`,
+                            boxShadow: `0 0 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)`,
+                          } : {};
                           
                           return (
                             <Card 
                               key={track.id} 
-                              className="hover:bg-white/5 transition-colors bg-black/40 border-white/10 overflow-hidden group"
+                              className={cn(
+                                "hover:bg-white/5 transition-all duration-300 bg-black/40 border-white/10 overflow-hidden group",
+                                isCurrentTrack && "animate-pulse border-spotify-accent/50 shadow-lg"
+                              )}
+                              style={currentTrackStyle}
                             >
                               <CardContent className="p-0">
                                 <div className="flex items-center gap-3 p-3">
-                                  <div className="text-sm font-mono text-muted-foreground w-6 text-center">
-                                    {index + 1}
+                                  <div className="text-sm font-mono text-muted-foreground w-6 text-center flex items-center justify-center">
+                                    {isCurrentTrack && isPlaying ? (
+                                      <div className="flex gap-1">
+                                        <div className="w-1 h-4 bg-spotify-accent animate-bounce" style={{animationDelay: '0ms'}} />
+                                        <div className="w-1 h-4 bg-spotify-accent animate-bounce" style={{animationDelay: '150ms'}} />
+                                        <div className="w-1 h-4 bg-spotify-accent animate-bounce" style={{animationDelay: '300ms'}} />
+                                      </div>
+                                    ) : (
+                                      <span className={cn(isCurrentTrack && "text-spotify-accent font-bold")}>
+                                        {index + 1}
+                                      </span>
+                                    )}
                                   </div>
                                   
                                   <div className="relative overflow-hidden rounded-md">
                                     <img 
                                       src={track.album.cover_medium} 
                                       alt={track.title}
-                                      className="h-14 w-14 object-cover transition-transform group-hover:scale-110 duration-500"
+                                      className={cn(
+                                        "h-14 w-14 object-cover transition-transform duration-500",
+                                        isCurrentTrack ? "ring-2 ring-spotify-accent animate-pulse" : "group-hover:scale-110"
+                                      )}
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <div className={cn(
+                                      "absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity flex items-center justify-center",
+                                      isCurrentTrack ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                    )}>
                                       <Button 
                                         size="icon" 
                                         variant="ghost"
                                         className="h-8 w-8 rounded-full bg-spotify-accent/90 text-white hover:bg-spotify-accent hover:scale-105 transition-transform"
-                                        onClick={() => {
-                                          if (isAvailable) {
-                                            handlePlayLocalSong(track);
-                                          } else {
-                                            handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium);
-                                          }
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePlayPause(track);
                                         }}
                                       >
-                                        <Play className="h-4 w-4" />
+                                        {isCurrentTrack && isPlaying ? (
+                                          <Pause className="h-4 w-4" />
+                                        ) : (
+                                          <Play className="h-4 w-4" />
+                                        )}
                                       </Button>
                                     </div>
                                   </div>
                                   
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-medium truncate text-white group-hover:text-spotify-accent transition-colors">{track.title}</h3>
+                                    <h3 className={cn(
+                                      "font-medium truncate transition-colors",
+                                      isCurrentTrack 
+                                        ? "text-spotify-accent" 
+                                        : "text-white group-hover:text-spotify-accent"
+                                    )}>
+                                      {track.title}
+                                      {isCurrentTrack && (
+                                        <span className="ml-2 text-xs bg-spotify-accent text-black px-2 py-1 rounded-full animate-pulse">
+                                          En cours
+                                        </span>
+                                      )}
+                                    </h3>
                                     <HoverCard>
                                       <HoverCardTrigger>
                                         <p className="text-sm text-white/60 truncate flex items-center gap-2">
@@ -455,17 +515,33 @@ const ArtistProfile = () => {
                                   <div className="flex items-center gap-2">
                                     {isAvailable ? (
                                       <button 
-                                        onClick={() => handlePlayLocalSong(track)}
-                                        className="text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1 rounded-full hover:from-green-600 hover:to-emerald-700 transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePlayPause(track);
+                                        }}
+                                        className={cn(
+                                          "text-xs px-3 py-1 rounded-full transition-all duration-300 font-medium transform hover:scale-105 whitespace-nowrap",
+                                          isCurrentTrack 
+                                            ? "bg-gradient-to-r from-spotify-accent to-green-600 text-black animate-pulse" 
+                                            : "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700"
+                                        )}
                                       >
-                                        Disponible Ici
+                                        {isCurrentTrack && isPlaying ? "En lecture..." : "Disponible Ici"}
                                       </button>
                                     ) : (
                                       <button 
-                                        onClick={() => handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium)}
-                                        className="text-xs bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white px-3 py-1 rounded-full hover:from-[#9B87F5] hover:to-[#F97316] transition-colors duration-300 font-medium transform hover:scale-105 whitespace-nowrap"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePlayPause(track);
+                                        }}
+                                        className={cn(
+                                          "text-xs px-3 py-1 rounded-full transition-all duration-300 font-medium transform hover:scale-105 whitespace-nowrap",
+                                          isCurrentTrack 
+                                            ? "bg-gradient-to-r from-spotify-accent to-purple-600 text-black animate-pulse" 
+                                            : "bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white hover:from-[#9B87F5] hover:to-[#F97316]"
+                                        )}
                                       >
-                                        Aperçu 30s
+                                        {isCurrentTrack && isPlaying ? "Aperçu actuel" : "Aperçu 30s"}
                                       </button>
                                     )}
                                     <span className="text-xs text-white/40 hidden md:block">
@@ -474,16 +550,22 @@ const ArtistProfile = () => {
                                     <Button 
                                       size="icon" 
                                       variant="ghost"
-                                      className="rounded-full hover:bg-white/10 text-white/80 hover:text-white"
-                                      onClick={() => {
-                                        if (isAvailable) {
-                                          handlePlayLocalSong(track);
-                                        } else {
-                                          handlePlayPreview(track.preview, track.title, track.artist.name, track.album.cover_medium);
-                                        }
+                                      className={cn(
+                                        "rounded-full transition-colors",
+                                        isCurrentTrack 
+                                          ? "text-spotify-accent hover:text-white bg-spotify-accent/20" 
+                                          : "text-white/80 hover:text-white hover:bg-white/10"
+                                      )}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlayPause(track);
                                       }}
                                     >
-                                      <PlayCircle className="h-5 w-5" />
+                                      {isCurrentTrack && isPlaying ? (
+                                        <Pause className="h-5 w-5" />
+                                      ) : (
+                                        <PlayCircle className="h-5 w-5" />
+                                      )}
                                     </Button>
                                   </div>
                                 </div>
