@@ -19,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OneDriveShareConfig } from '@/components/OneDriveShareConfig';
+import { OneDriveTokenStatus } from '@/components/OneDriveTokenStatus';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -392,6 +393,9 @@ export const OneDriveSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Ajouter le composant de statut du jeton */}
+          <OneDriveTokenStatus />
+          
           <Tabs defaultValue="manual" onValueChange={(value) => setAuthMode(value as 'manual' | 'oauth')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="manual">Configuration manuelle</TabsTrigger>

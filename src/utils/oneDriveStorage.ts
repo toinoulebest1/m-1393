@@ -2,6 +2,7 @@ import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { fetchSharedOneDriveConfig } from './sharedOneDriveConfig';
+import { executeWithTokenRefresh, isTokenExpiredError } from './oneDriveTokenManager';
 
 // Add a simple local storage helper for OneDrive configuration
 export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
@@ -74,14 +75,7 @@ export const isOneDriveEnabledSync = (): boolean => {
 
 // Function to check if a file exists on OneDrive
 export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> => {
-  const config = await getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    return false;
-  }
-  
-  try {
+  return executeWithTokenRefresh(async (accessToken: string) => {
     // First check if we have this file path saved in our database
     let onedrivePath = `/${path}`;
     
@@ -102,9 +96,13 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
         if (fileRef.file_id) {
           const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileRef.file_id}`, {
             headers: {
-              'Authorization': `Bearer ${config.accessToken}`
+              'Authorization': `Bearer ${accessToken}`
             }
           });
+          
+          if (isTokenExpiredError(response)) {
+            throw new Error('401');
+          }
           
           return response.ok;
         }
@@ -117,15 +115,16 @@ export const checkFileExistsOnOneDrive = async (path: string): Promise<boolean> 
     const encodedPath = encodeURIComponent(onedrivePath);
     const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}`, {
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`
+        'Authorization': `Bearer ${accessToken}`
       }
     });
     
+    if (isTokenExpiredError(response)) {
+      throw new Error('401');
+    }
+    
     return response.ok;
-  } catch (error) {
-    console.error('Error checking if file exists on OneDrive:', error);
-    return false;
-  }
+  });
 };
 
 // Updated function to upload a file to OneDrive
@@ -133,29 +132,25 @@ export const uploadFileToOneDrive = async (
   file: File,
   path: string
 ): Promise<string> => {
-  const config = await getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    toast.error("Token d'accès OneDrive non configuré");
-    throw new Error('OneDrive access token not configured');
-  }
-  
-  console.log(`Uploading file to OneDrive: ${path}`, file);
-  console.log(`File size: ${file.size} bytes, type: ${file.type}`);
-  
-  try {
+  return executeWithTokenRefresh(async (accessToken: string) => {
+    console.log(`Uploading file to OneDrive: ${path}`, file);
+    console.log(`File size: ${file.size} bytes, type: ${file.type}`);
+    
     // For small files (< 4MB), use simple upload
     if (file.size < 4 * 1024 * 1024) {
       console.log('Using simple upload for small file');
       const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/content`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': file.type || 'application/octet-stream'
         },
         body: file
       });
+
+      if (isTokenExpiredError(response)) {
+        throw new Error('401');
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -189,7 +184,7 @@ export const uploadFileToOneDrive = async (
     const sessionResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/createUploadSession`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -199,6 +194,10 @@ export const uploadFileToOneDrive = async (
         }
       })
     });
+    
+    if (isTokenExpiredError(sessionResponse)) {
+      throw new Error('401');
+    }
     
     if (!sessionResponse.ok) {
       const errorText = await sessionResponse.text();
@@ -269,25 +268,12 @@ export const uploadFileToOneDrive = async (
     }
     
     return path;
-  } catch (error) {
-    console.error('Error uploading to OneDrive:', error);
-    toast.error("Échec de l'upload vers OneDrive. Vérifiez votre connexion et les permissions.");
-    throw error;
-  }
+  });
 };
 
 // Updated function to get a download URL for a file on OneDrive
-// This version uses the Graph API to get a direct download URL instead of a shared link
 export const getOneDriveSharedLink = async (path: string): Promise<string> => {
-  const config = await getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    toast.error("Token d'accès OneDrive non configuré");
-    throw new Error('OneDrive access token not configured');
-  }
-  
-  try {
+  return executeWithTokenRefresh(async (accessToken: string) => {
     // First check if we have this file path saved in our database
     let fileId: string | undefined;
     
@@ -313,9 +299,13 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
       const encodedPath = encodeURIComponent(path.startsWith('/') ? path : `/${path}`);
       const itemResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${encodedPath}`, {
         headers: {
-          'Authorization': `Bearer ${config.accessToken}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
+      
+      if (isTokenExpiredError(itemResponse)) {
+        throw new Error('401');
+      }
       
       if (!itemResponse.ok) {
         const errorText = await itemResponse.text();
@@ -348,12 +338,15 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
     }
     
     // Use the Graph API to get a direct download URL instead of a sharing link
-    // This avoids CORS issues since we're getting a direct download URL
     const downloadUrlResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}?select=@microsoft.graph.downloadUrl`, {
       headers: {
-        'Authorization': `Bearer ${config.accessToken}`
+        'Authorization': `Bearer ${accessToken}`
       }
     });
+    
+    if (isTokenExpiredError(downloadUrlResponse)) {
+      throw new Error('401');
+    }
     
     if (!downloadUrlResponse.ok) {
       const errorText = await downloadUrlResponse.text();
@@ -372,11 +365,7 @@ export const getOneDriveSharedLink = async (path: string): Promise<string> => {
     
     console.log('OneDrive direct download URL obtained:', downloadUrl);
     return downloadUrl;
-  } catch (error) {
-    console.error('Error getting OneDrive download URL:', error);
-    toast.error("Impossible d'obtenir l'URL de téléchargement OneDrive");
-    throw error;
-  }
+  });
 };
 
 // Function to migrate files from Supabase to OneDrive
@@ -605,44 +594,23 @@ export const migrateLyricsToOneDrive = async (
 
 // Function to upload lyrics to OneDrive
 export const uploadLyricsToOneDrive = async (songId: string, lyricsContent: string): Promise<string> => {
-  const config = await getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    toast.error("Token d'accès OneDrive non configuré");
-    throw new Error('OneDrive access token not configured');
-  }
-  
   console.log(`Uploading lyrics for song ${songId} to OneDrive`);
   
-  try {
-    // Convert the lyrics content to a file
-    const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
-    const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
-    
-    // OneDrive path for lyrics
-    const path = `lyrics/${songId}`;
-    
-    // Use the existing function to upload the file
-    const onedrivePath = await uploadFileToOneDrive(lyricsFile, path);
-    
-    return onedrivePath;
-  } catch (error) {
-    console.error('Error uploading lyrics to OneDrive:', error);
-    toast.error("Échec de l'upload des paroles vers OneDrive");
-    throw error;
-  }
+  // Convert the lyrics content to a file
+  const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
+  const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
+  
+  // OneDrive path for lyrics
+  const path = `lyrics/${songId}`;
+  
+  // Use the existing function to upload the file
+  const onedrivePath = await uploadFileToOneDrive(lyricsFile, path);
+  
+  return onedrivePath;
 };
 
 // Function to get lyrics from OneDrive
 export const getLyricsFromOneDrive = async (songId: string): Promise<string | null> => {
-  const config = await getOneDriveConfig();
-  
-  if (!config.accessToken) {
-    console.error("OneDrive access token not configured");
-    return null;
-  }
-  
   try {
     // Get a shared link to download the lyrics
     const url = await getOneDriveSharedLink(`lyrics/${songId}`);
