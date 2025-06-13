@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,10 @@ export const OneDriveSettings = () => {
 
   // État pour le mode de connexion
   const [authMode, setAuthMode] = useState<'manual' | 'oauth'>('manual');
+
+  // État pour les tests de connectivité
+  const [isTestingConnectivity, setIsTestingConnectivity] = useState(false);
+  const [connectivityResult, setConnectivityResult] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -201,6 +206,39 @@ export const OneDriveSettings = () => {
     }
   };
 
+  const testEdgeFunctionConnectivity = async () => {
+    setIsTestingConnectivity(true);
+    setConnectivityResult(null);
+
+    try {
+      console.log('Test de connectivité avec l\'edge function onedrive-token-exchange...');
+      
+      const { data, error } = await supabase.functions.invoke('onedrive-token-exchange', {
+        body: {
+          test: true
+        }
+      });
+      
+      console.log('Réponse du test de connectivité:', { data, error });
+      
+      if (error) {
+        console.error('Erreur de connectivité avec l\'edge function:', error);
+        setConnectivityResult('error');
+        toast.error(`Erreur de connectivité: ${error.message}`);
+      } else {
+        console.log('Test de connectivité réussi');
+        setConnectivityResult('success');
+        toast.success('Edge function accessible');
+      }
+    } catch (error) {
+      console.error('Erreur lors du test de connectivité:', error);
+      setConnectivityResult('error');
+      toast.error('Impossible de contacter l\'edge function');
+    } finally {
+      setIsTestingConnectivity(false);
+    }
+  };
+
   const handleStartOAuth = async () => {
     // Validation du Client ID
     if (!clientId || clientId.trim() === '') {
@@ -223,14 +261,18 @@ export const OneDriveSettings = () => {
         }
       });
       
+      console.log('Réponse du test de connectivité:', testResponse);
+      
       // Si l'edge function n'est pas accessible, on avertit l'utilisateur
-      if (!testResponse && !testResponse.error) {
-        toast.error('L\'edge function OneDrive n\'est pas accessible. Vérifiez la configuration du serveur.');
+      if (testResponse.error) {
+        console.error('Edge function non accessible:', testResponse.error);
+        toast.error(`L'edge function OneDrive n'est pas accessible: ${testResponse.error.message}. Vérifiez la configuration du serveur.`);
         return;
       }
     } catch (error) {
-      console.warn('Impossible de tester l\'edge function, on continue quand même:', error);
-      // On continue car certaines erreurs sont normales sans les bons paramètres
+      console.error('Impossible de tester l\'edge function:', error);
+      toast.error('Impossible de contacter l\'edge function. Vérifiez la configuration du serveur.');
+      return;
     }
 
     try {
@@ -494,6 +536,50 @@ export const OneDriveSettings = () => {
         <CardContent className="space-y-4">
           <OneDriveTokenStatus />
           
+          {/* Test de connectivité de l'edge function */}
+          <div className="space-y-2">
+            <Label>Test de connectivité serveur</Label>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={testEdgeFunctionConnectivity} 
+                disabled={isTestingConnectivity}
+                variant="outline"
+                size="sm"
+              >
+                {isTestingConnectivity ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Test en cours...
+                  </>
+                ) : (
+                  'Tester la connectivité serveur'
+                )}
+              </Button>
+            </div>
+            
+            {connectivityResult === 'success' && (
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-800 dark:text-green-400">
+                  L'edge function OneDrive est accessible et fonctionne correctement.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {connectivityResult === 'error' && (
+              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertDescription className="text-red-800 dark:text-red-400">
+                  Impossible de contacter l'edge function. Vérifiez que le secret ONEDRIVE_CLIENT_SECRET est configuré dans Supabase.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <p className="text-xs text-muted-foreground">
+              Testez la connectivité avec l'edge function avant de commencer le processus OAuth. Cela permet de détecter les problèmes de configuration serveur.
+            </p>
+          </div>
+          
           <Tabs defaultValue="manual" onValueChange={(value) => setAuthMode(value as 'manual' | 'oauth')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="manual">Configuration manuelle</TabsTrigger>
@@ -592,14 +678,18 @@ export const OneDriveSettings = () => {
                   onChange={(e) => setClientId(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Obtenez un Client ID depuis le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">Portail Azure</a>. Doit être un GUID valide.
+                  Obtenez un Client ID depuis le{' '}
+                  <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">
+                    Portail Azure
+                  </a>
+                  . Doit être un GUID valide.
                 </p>
               </div>
               
               <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
                 <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 <AlertDescription className="text-yellow-800 dark:text-yellow-400">
-                  <strong>Important :</strong> Assurez-vous que le secret ONEDRIVE_CLIENT_SECRET est configuré dans Supabase (Settings > Edge Functions > Secrets) avant de lancer OAuth.
+                  <strong>Important :</strong> Assurez-vous que le secret ONEDRIVE_CLIENT_SECRET est configuré dans Supabase (Settings {'>'}Edge Functions {'>'}Secrets) avant de lancer OAuth.
                 </AlertDescription>
               </Alert>
               
