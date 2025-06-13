@@ -20,6 +20,7 @@ import { ensureAudioBucketExists } from '@/utils/audioBucketSetup';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OneDriveShareConfig } from '@/components/OneDriveShareConfig';
 import { OneDriveTokenStatus } from '@/components/OneDriveTokenStatus';
+import { generateCodeVerifier, generateCodeChallenge, storePKCEParams } from '@/utils/pkce';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -145,43 +146,50 @@ export const OneDriveSettings = () => {
     }
   };
 
-  const handleStartOAuth = () => {
+  const handleStartOAuth = async () => {
     if (!clientId) {
       toast.error('Veuillez entrer un Client ID Microsoft');
       return;
     }
 
-    // Generate a random state for CSRF protection
-    const state = Math.random().toString(36).substring(2, 15);
+    try {
+      // Generate PKCE parameters
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      const state = Math.random().toString(36).substring(2, 15);
 
-    // Save the state to verify when the callback returns
-    localStorage.setItem('onedrive_auth_state', state);
+      // Store PKCE parameters for the callback
+      storePKCEParams(codeVerifier, state);
 
-    // Set the redirect URL to the callback URL of your application
-    const redirectUri = `${window.location.origin}/onedrive-callback`;
-    
-    // Build the OAuth URL
-    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}`;
+      // Set the redirect URL to the callback URL of your application
+      const redirectUri = `${window.location.origin}/onedrive-callback`;
+      
+      // Build the OAuth URL with PKCE parameters
+      const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    // Record the state in the database for verification
-    const saveState = async () => {
-      try {
-        await supabase
-          .from('oauth_states')
-          .insert({
-            state,
-            provider: 'onedrive'
-          });
-      } catch (error) {
-        console.error('Error saving OAuth state:', error);
-      }
-    };
+      // Record the state in the database for verification
+      const saveState = async () => {
+        try {
+          await supabase
+            .from('oauth_states')
+            .insert({
+              state,
+              provider: 'onedrive'
+            });
+        } catch (error) {
+          console.error('Error saving OAuth state:', error);
+        }
+      };
 
-    // Save state and then redirect
-    saveState().then(() => {
+      // Save state and then redirect
+      await saveState();
+      
       // Redirect to the OAuth URL
       window.location.href = oauthUrl;
-    });
+    } catch (error) {
+      console.error('Error starting OAuth flow:', error);
+      toast.error('Erreur lors du démarrage de l\'authentification OAuth');
+    }
   };
 
   // Fonction pour la migration des fichiers audio

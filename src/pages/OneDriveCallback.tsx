@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getOneDriveConfigSync, saveOneDriveConfig } from '@/utils/oneDriveStorage';
+import { retrieveAndClearPKCEParams } from '@/utils/pkce';
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { toast } from '@/hooks/use-toast';
@@ -42,11 +43,11 @@ const OneDriveCallback = () => {
           return;
         }
 
-        // Verify the state parameter
-        const savedState = localStorage.getItem('onedrive_auth_state');
+        // Verify the state parameter and retrieve code_verifier
+        const codeVerifier = retrieveAndClearPKCEParams(state);
         
-        if (!savedState || savedState !== state) {
-          setError("État invalide, possible tentative de CSRF");
+        if (!codeVerifier) {
+          setError("État invalide ou code verifier manquant, possible tentative de CSRF");
           setIsProcessing(false);
           return;
         }
@@ -79,12 +80,13 @@ const OneDriveCallback = () => {
         // Create the redirect URI
         const redirectUri = `${window.location.origin}/onedrive-callback`;
 
-        // Exchange the code for tokens using edge function
+        // Exchange the code for tokens using edge function with PKCE
         const { data, error: tokenError } = await supabase.functions.invoke('onedrive-token-exchange', {
           body: {
             code,
             redirectUri,
-            clientId
+            clientId,
+            codeVerifier // Include PKCE parameter
           }
         });
 
@@ -103,8 +105,7 @@ const OneDriveCallback = () => {
           clientId
         });
 
-        // Delete the used state from local storage and database
-        localStorage.removeItem('onedrive_auth_state');
+        // Delete the used state from database
         await supabase
           .from('oauth_states')
           .delete()

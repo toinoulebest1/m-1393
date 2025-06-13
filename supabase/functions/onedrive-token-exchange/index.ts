@@ -11,6 +11,7 @@ interface RequestBody {
   code: string;
   redirectUri: string;
   clientId: string;
+  codeVerifier: string; // Added for PKCE support
 }
 
 serve(async (req) => {
@@ -37,11 +38,11 @@ serve(async (req) => {
 
     // Parse the request body
     const body: RequestBody = await req.json();
-    const { code, redirectUri, clientId } = body;
+    const { code, redirectUri, clientId, codeVerifier } = body;
 
     // Check if all required parameters are provided
-    if (!code || !redirectUri || !clientId) {
-      return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
+    if (!code || !redirectUri || !clientId || !codeVerifier) {
+      return new Response(JSON.stringify({ error: 'Missing required parameters (code, redirectUri, clientId, codeVerifier)' }), {
         headers: { 'Content-Type': 'application/json' },
         status: 400
       });
@@ -57,7 +58,7 @@ serve(async (req) => {
       });
     }
 
-    // Exchange the code for tokens
+    // Exchange the code for tokens using PKCE
     const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
       method: 'POST',
       headers: {
@@ -68,7 +69,8 @@ serve(async (req) => {
         client_secret: clientSecret,
         code: code,
         redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
+        code_verifier: codeVerifier // PKCE parameter
       })
     });
 
