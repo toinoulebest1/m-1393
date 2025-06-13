@@ -32,6 +32,8 @@ export const OneDriveSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<'success' | 'error' | null>(null);
   const navigate = useNavigate();
   
   // États pour la migration des fichiers audio
@@ -107,6 +109,7 @@ export const OneDriveSettings = () => {
       });
       toast.success('Configuration OneDrive enregistrée');
       setTestResult(null); // Reset test result when saving new token
+      setRefreshResult(null); // Reset refresh result when saving new config
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration OneDrive:', error);
       toast.error('Échec de l\'enregistrement de la configuration OneDrive');
@@ -143,6 +146,57 @@ export const OneDriveSettings = () => {
       toast.error('Erreur lors du test du jeton OneDrive');
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleRefreshToken = async () => {
+    if (!refreshToken || !clientId) {
+      toast.error('Veuillez entrer un jeton de rafraîchissement et un Client ID');
+      return;
+    }
+
+    setIsRefreshing(true);
+    setRefreshResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('onedrive-refresh-token', {
+        body: {
+          refreshToken,
+          clientId
+        }
+      });
+
+      if (error || !data) {
+        console.error('Erreur lors du rafraîchissement du jeton:', error);
+        setRefreshResult('error');
+        toast.error('Échec du rafraîchissement du jeton');
+        return;
+      }
+
+      // Update the access token with the new one
+      setAccessToken(data.access_token);
+      
+      // Update the refresh token if a new one was provided
+      if (data.refresh_token) {
+        setRefreshToken(data.refresh_token);
+      }
+
+      // Save the new tokens
+      saveOneDriveConfig({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token || refreshToken,
+        isEnabled,
+        clientId
+      });
+
+      setRefreshResult('success');
+      toast.success('Jeton rafraîchi avec succès');
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement du jeton:', error);
+      setRefreshResult('error');
+      toast.error('Erreur lors du rafraîchissement du jeton');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -438,6 +492,57 @@ export const OneDriveSettings = () => {
                   Jeton de rafraîchissement pour générer de nouveaux jetons d'accès.
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="client-id-manual">Client ID Microsoft</Label>
+                <Input
+                  id="client-id-manual"
+                  type="text"
+                  placeholder="Entrez l'ID client de votre application Microsoft"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nécessaire pour le rafraîchissement automatique des jetons.
+                </p>
+              </div>
+
+              {refreshResult === 'success' && (
+                <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <AlertDescription className="text-green-800 dark:text-green-400">
+                    Le jeton a été rafraîchi avec succès et fonctionne correctement.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {refreshResult === 'error' && (
+                <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
+                  <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  <AlertDescription className="text-red-800 dark:text-red-400">
+                    Échec du rafraîchissement du jeton. Vérifiez votre jeton de rafraîchissement et Client ID.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Button 
+                onClick={handleRefreshToken} 
+                disabled={!refreshToken || !clientId || isRefreshing || isSaving}
+                variant="outline"
+                className="w-full"
+              >
+                {isRefreshing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Rafraîchissement en cours...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Rafraîchir le jeton
+                  </>
+                )}
+              </Button>
             </TabsContent>
             
             <TabsContent value="oauth" className="space-y-4">
