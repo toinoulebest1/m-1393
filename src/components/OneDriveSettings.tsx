@@ -21,6 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OneDriveShareConfig } from '@/components/OneDriveShareConfig';
 import { OneDriveTokenStatus } from '@/components/OneDriveTokenStatus';
 import { generateCodeVerifier, generateCodeChallenge, storePKCEParams } from '@/utils/pkce';
+import { OneDriveDiagnostics } from '@/components/OneDriveDiagnostics';
+import { OneDriveConfigGuide } from '@/components/OneDriveConfigGuide';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -169,7 +171,13 @@ export const OneDriveSettings = () => {
       if (error || !data) {
         console.error('Erreur lors du rafraîchissement du jeton:', error);
         setRefreshResult('error');
-        toast.error('Échec du rafraîchissement du jeton');
+        
+        // Afficher un message d'erreur plus spécifique basé sur la réponse
+        if (data?.error) {
+          toast.error(data.error);
+        } else {
+          toast.error('Échec du rafraîchissement du jeton');
+        }
         return;
       }
 
@@ -447,6 +455,10 @@ export const OneDriveSettings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Ajouter les nouveaux composants de diagnostic et guide */}
+      <OneDriveDiagnostics />
+      <OneDriveConfigGuide />
+      
       <Card className="w-full">
         <CardHeader>
           <CardTitle>Intégration Microsoft OneDrive</CardTitle>
@@ -520,7 +532,7 @@ export const OneDriveSettings = () => {
                 <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800">
                   <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                   <AlertDescription className="text-red-800 dark:text-red-400">
-                    Échec du rafraîchissement du jeton. Vérifiez votre jeton de rafraîchissement et Client ID.
+                    Échec du rafraîchissement du jeton. Vérifiez votre configuration dans les diagnostics ci-dessus.
                   </AlertDescription>
                 </Alert>
               )}

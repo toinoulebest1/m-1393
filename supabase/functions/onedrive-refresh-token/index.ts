@@ -22,7 +22,11 @@ serve(async (req) => {
   try {
     // Ensure the request is a POST
     if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      console.error('Invalid HTTP method:', req.method);
+      return new Response(JSON.stringify({ 
+        error: 'Method not allowed',
+        details: 'Only POST requests are accepted'
+      }), {
         headers: { 'Content-Type': 'application/json' },
         status: 405
       });
@@ -32,9 +36,26 @@ serve(async (req) => {
     const body: RefreshTokenRequest = await req.json();
     const { refreshToken, clientId } = body;
 
+    console.log('Token refresh request received for clientId:', clientId);
+
     // Check if all required parameters are provided
-    if (!refreshToken || !clientId) {
-      return new Response(JSON.stringify({ error: 'Missing refresh token or client ID' }), {
+    if (!refreshToken) {
+      console.error('Missing refresh token');
+      return new Response(JSON.stringify({ 
+        error: 'Missing refresh token',
+        details: 'Le jeton de rafraîchissement est requis'
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    if (!clientId) {
+      console.error('Missing client ID');
+      return new Response(JSON.stringify({ 
+        error: 'Missing client ID',
+        details: 'Le Client ID Microsoft est requis'
+      }), {
         headers: { 'Content-Type': 'application/json' },
         status: 400
       });
@@ -44,11 +65,17 @@ serve(async (req) => {
     const clientSecret = Deno.env.get('ONEDRIVE_CLIENT_SECRET');
     
     if (!clientSecret) {
-      return new Response(JSON.stringify({ error: 'Client secret not configured' }), {
+      console.error('ONEDRIVE_CLIENT_SECRET environment variable not configured');
+      return new Response(JSON.stringify({ 
+        error: 'Client secret not configured',
+        details: 'Le secret client OneDrive n\'est pas configuré sur le serveur. Contactez l\'administrateur.'
+      }), {
         headers: { 'Content-Type': 'application/json' },
         status: 500
       });
     }
+
+    console.log('Attempting token refresh with Microsoft...');
 
     // Use the refresh token to get a new access token
     const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
@@ -64,14 +91,32 @@ serve(async (req) => {
       })
     });
 
+    console.log('Microsoft response status:', tokenResponse.status);
+
     // Check if the token refresh was successful
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      console.error('OneDrive token refresh error:', errorData);
+      console.error('Microsoft token refresh error:', errorData);
+      
+      let userFriendlyMessage = 'Échec du rafraîchissement du jeton';
+      
+      try {
+        const errorJson = JSON.parse(errorData);
+        if (errorJson.error === 'invalid_client') {
+          userFriendlyMessage = 'Client ID ou secret client invalide. Vérifiez votre configuration Azure.';
+        } else if (errorJson.error === 'invalid_grant') {
+          userFriendlyMessage = 'Jeton de rafraîchissement expiré ou invalide. Reconnectez-vous via OAuth.';
+        } else if (errorJson.error_description) {
+          userFriendlyMessage = `Erreur Microsoft: ${errorJson.error_description}`;
+        }
+      } catch (parseError) {
+        console.error('Could not parse Microsoft error response:', parseError);
+      }
       
       return new Response(JSON.stringify({ 
-        error: 'Failed to refresh access token',
-        details: errorData
+        error: userFriendlyMessage,
+        details: errorData,
+        microsoftError: true
       }), {
         headers: { 'Content-Type': 'application/json' },
         status: 400
@@ -80,6 +125,7 @@ serve(async (req) => {
 
     // Parse the token response
     const tokenData = await tokenResponse.json();
+    console.log('Token refresh successful');
 
     // Return the new token data
     return new Response(JSON.stringify(tokenData), {
@@ -95,8 +141,9 @@ serve(async (req) => {
     
     // Return an error response
     return new Response(JSON.stringify({ 
-      error: 'Internal server error',
-      details: error.message 
+      error: 'Erreur interne du serveur',
+      details: error.message,
+      suggestion: 'Vérifiez votre connexion internet et réessayez'
     }), {
       headers: { 'Content-Type': 'application/json' },
       status: 500
