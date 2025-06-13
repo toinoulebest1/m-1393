@@ -81,12 +81,10 @@ export const OneDriveSettings = () => {
       const hasAdminRole = userRole?.role === 'admin';
       setIsAdmin(hasAdminRole);
       
-      // If not admin, redirect to home
       if (!hasAdminRole) {
         navigate('/');
         toast.error('Accès non autorisé');
       } else {
-        // Load config only if admin - use sync version to avoid awaiting
         const config = getOneDriveConfigSync();
         setAccessToken(config.accessToken || '');
         setRefreshToken(config.refreshToken || '');
@@ -110,8 +108,8 @@ export const OneDriveSettings = () => {
         clientId
       });
       toast.success('Configuration OneDrive enregistrée');
-      setTestResult(null); // Reset test result when saving new token
-      setRefreshResult(null); // Reset refresh result when saving new config
+      setTestResult(null);
+      setRefreshResult(null);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration OneDrive:', error);
       toast.error('Échec de l\'enregistrement de la configuration OneDrive');
@@ -125,7 +123,6 @@ export const OneDriveSettings = () => {
     setTestResult(null);
     
     try {
-      // Use Microsoft Graph API to test the token
       const response = await fetch('https://graph.microsoft.com/v1.0/me', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -172,7 +169,6 @@ export const OneDriveSettings = () => {
         console.error('Erreur lors du rafraîchissement du jeton:', error);
         setRefreshResult('error');
         
-        // Afficher un message d'erreur plus spécifique basé sur la réponse
         if (data?.error) {
           toast.error(data.error);
         } else {
@@ -181,15 +177,12 @@ export const OneDriveSettings = () => {
         return;
       }
 
-      // Update the access token with the new one
       setAccessToken(data.access_token);
       
-      // Update the refresh token if a new one was provided
       if (data.refresh_token) {
         setRefreshToken(data.refresh_token);
       }
 
-      // Save the new tokens
       saveOneDriveConfig({
         accessToken: data.access_token,
         refreshToken: data.refresh_token || refreshToken,
@@ -209,46 +202,63 @@ export const OneDriveSettings = () => {
   };
 
   const handleStartOAuth = async () => {
-    // Validation améliorée du Client ID
+    // Validation du Client ID
     if (!clientId || clientId.trim() === '') {
       toast.error('Veuillez entrer un Client ID Microsoft valide');
       return;
     }
 
-    // Vérifier que le Client ID ressemble à un GUID
     const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!guidRegex.test(clientId.trim())) {
       toast.error('Le Client ID doit être un GUID valide (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');
       return;
     }
 
+    // Test de connectivité avec l'edge function avant de commencer
     try {
-      // IMPORTANT: Sauvegarder la configuration avec le Client ID AVANT de démarrer OAuth
+      console.log('Test de connectivité avec l\'edge function...');
+      const testResponse = await supabase.functions.invoke('onedrive-token-exchange', {
+        body: {
+          test: true
+        }
+      });
+      
+      // Si l'edge function n'est pas accessible, on avertit l'utilisateur
+      if (!testResponse && !testResponse.error) {
+        toast.error('L\'edge function OneDrive n\'est pas accessible. Vérifiez la configuration du serveur.');
+        return;
+      }
+    } catch (error) {
+      console.warn('Impossible de tester l\'edge function, on continue quand même:', error);
+      // On continue car certaines erreurs sont normales sans les bons paramètres
+    }
+
+    try {
+      // Sauvegarder la configuration avec le Client ID AVANT de démarrer OAuth
       saveOneDriveConfig({
-        accessToken: '', // On garde les tokens vides pour l'instant
+        accessToken: '',
         refreshToken: '',
         isEnabled,
-        clientId: clientId.trim() // S'assurer qu'il n'y a pas d'espaces
+        clientId: clientId.trim()
       });
 
       console.log('Client ID sauvegardé avant OAuth:', clientId.trim());
-      toast.success('Client ID sauvegardé, démarrage de l\'authentification...');
+      toast.success('Client ID sauvegardé, vérification de la configuration serveur...');
 
-      // Generate PKCE parameters
+      // Génération des paramètres PKCE
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
       const state = Math.random().toString(36).substring(2, 15);
 
-      // Store PKCE parameters for the callback
+      // Stocker les paramètres PKCE pour le callback
       storePKCEParams(codeVerifier, state);
 
-      // Set the redirect URL to the callback URL of your application
       const redirectUri = `${window.location.origin}/onedrive-callback`;
       
-      // Build the OAuth URL with PKCE parameters
+      // Construire l'URL OAuth avec les paramètres PKCE
       const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId.trim()}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-      // Record the state in the database for verification
+      // Enregistrer l'état dans la base de données pour vérification
       const saveState = async () => {
         try {
           await supabase
@@ -262,12 +272,12 @@ export const OneDriveSettings = () => {
         }
       };
 
-      // Save state and then redirect
       await saveState();
       
       console.log('Redirection vers OAuth avec Client ID:', clientId.trim());
+      toast.success('Configuration validée, redirection vers Microsoft...');
       
-      // Redirect to the OAuth URL
+      // Redirection vers l'URL OAuth
       window.location.href = oauthUrl;
     } catch (error) {
       console.error('Error starting OAuth flow:', error);
@@ -292,7 +302,6 @@ export const OneDriveSettings = () => {
     setMigrationResults({ success: 0, failed: 0, failedFiles: [] });
 
     try {
-      // Ensure the audio bucket exists
       const bucketExists = await ensureAudioBucketExists();
       
       if (!bucketExists) {
@@ -300,7 +309,6 @@ export const OneDriveSettings = () => {
         return;
       }
 
-      // Get the list of audio files in Supabase
       const { data: songs, error: songsError } = await supabase
         .from('songs')
         .select('id, file_path')
@@ -332,7 +340,6 @@ export const OneDriveSettings = () => {
         description: `Démarrage de la migration de ${songs.length} fichiers...`
       });
       
-      // Start migration with progress callbacks
       const results = await migrateFilesToOneDrive(songs, {
         onProgress: (processed, total) => {
           setProcessedFiles(processed);
@@ -390,7 +397,6 @@ export const OneDriveSettings = () => {
     setLyricsResults({ success: 0, failed: 0, failedItems: [] });
 
     try {
-      // Vérifier si des paroles existent dans la base de données
       const { count, error: countError } = await supabase
         .from('lyrics')
         .select('*', { count: 'exact', head: true });
@@ -421,7 +427,6 @@ export const OneDriveSettings = () => {
         description: `Démarrage de la migration de ${count} paroles...`
       });
       
-      // Lancer la migration avec des callbacks de progression
       const results = await migrateLyricsToOneDrive({
         onProgress: (processed, total) => {
           setProcessedLyrics(processed);
@@ -476,7 +481,6 @@ export const OneDriveSettings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Ajouter les nouveaux composants de diagnostic et guide */}
       <OneDriveDiagnostics />
       <OneDriveConfigGuide />
       
@@ -488,7 +492,6 @@ export const OneDriveSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Ajouter le composant de statut du jeton */}
           <OneDriveTokenStatus />
           
           <Tabs defaultValue="manual" onValueChange={(value) => setAuthMode(value as 'manual' | 'oauth')}>
@@ -592,6 +595,13 @@ export const OneDriveSettings = () => {
                   Obtenez un Client ID depuis le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">Portail Azure</a>. Doit être un GUID valide.
                 </p>
               </div>
+              
+              <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <AlertDescription className="text-yellow-800 dark:text-yellow-400">
+                  <strong>Important :</strong> Assurez-vous que le secret ONEDRIVE_CLIENT_SECRET est configuré dans Supabase (Settings > Edge Functions > Secrets) avant de lancer OAuth.
+                </AlertDescription>
+              </Alert>
               
               <Button 
                 onClick={handleStartOAuth} 
@@ -778,7 +788,6 @@ export const OneDriveSettings = () => {
         </CardFooter>
       </Card>
       
-      {/* Add the sharing component for admins */}
       <OneDriveShareConfig />
     </div>
   );

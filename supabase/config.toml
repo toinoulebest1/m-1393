@@ -1,8 +1,51 @@
 
 project_id = "pwknncursthenghqgevl"
 
-[functions.send-weekly-reports]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[db]
+enabled = true
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[functions.onedrive-token-exchange]
+verify_jwt = false
+
+[functions.onedrive-refresh-token]
+verify_jwt = false
+
+[functions.deezer-proxy]
+verify_jwt = false
+
+[functions.deezer-search]
+verify_jwt = false
+
+[functions.deezer-artist]
 verify_jwt = false
 
 [functions.generate-lyrics]
-verify_jwt = true
+verify_jwt = false
+
+[functions.update-songs-metadata]
+verify_jwt = false
+
+[functions.voice-to-text]
+verify_jwt = false
+
+[functions.send-weekly-reports]
+verify_jwt = false
