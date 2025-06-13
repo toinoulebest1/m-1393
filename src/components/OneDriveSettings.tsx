@@ -209,12 +209,31 @@ export const OneDriveSettings = () => {
   };
 
   const handleStartOAuth = async () => {
-    if (!clientId) {
-      toast.error('Veuillez entrer un Client ID Microsoft');
+    // Validation améliorée du Client ID
+    if (!clientId || clientId.trim() === '') {
+      toast.error('Veuillez entrer un Client ID Microsoft valide');
+      return;
+    }
+
+    // Vérifier que le Client ID ressemble à un GUID
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!guidRegex.test(clientId.trim())) {
+      toast.error('Le Client ID doit être un GUID valide (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');
       return;
     }
 
     try {
+      // IMPORTANT: Sauvegarder la configuration avec le Client ID AVANT de démarrer OAuth
+      saveOneDriveConfig({
+        accessToken: '', // On garde les tokens vides pour l'instant
+        refreshToken: '',
+        isEnabled,
+        clientId: clientId.trim() // S'assurer qu'il n'y a pas d'espaces
+      });
+
+      console.log('Client ID sauvegardé avant OAuth:', clientId.trim());
+      toast.success('Client ID sauvegardé, démarrage de l\'authentification...');
+
       // Generate PKCE parameters
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -227,7 +246,7 @@ export const OneDriveSettings = () => {
       const redirectUri = `${window.location.origin}/onedrive-callback`;
       
       // Build the OAuth URL with PKCE parameters
-      const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+      const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId.trim()}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent('Files.ReadWrite offline_access')}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
       // Record the state in the database for verification
       const saveState = async () => {
@@ -245,6 +264,8 @@ export const OneDriveSettings = () => {
 
       // Save state and then redirect
       await saveState();
+      
+      console.log('Redirection vers OAuth avec Client ID:', clientId.trim());
       
       // Redirect to the OAuth URL
       window.location.href = oauthUrl;
@@ -563,12 +584,12 @@ export const OneDriveSettings = () => {
                 <Input
                   id="client-id"
                   type="text"
-                  placeholder="Entrez l'ID client de votre application Microsoft"
+                  placeholder="Entrez l'ID client de votre application Microsoft (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Obtenez un Client ID depuis le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">Portail Azure</a>.
+                  Obtenez un Client ID depuis le <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" className="underline">Portail Azure</a>. Doit être un GUID valide.
                 </p>
               </div>
               
@@ -584,7 +605,7 @@ export const OneDriveSettings = () => {
               <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
                 <RefreshCw className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertDescription className="text-blue-800 dark:text-blue-400">
-                  La connexion OAuth générera automatiquement un jeton d'accès et un jeton de rafraîchissement.
+                  La connexion OAuth générera automatiquement un jeton d'accès et un jeton de rafraîchissement. Le Client ID sera automatiquement sauvegardé.
                 </AlertDescription>
               </Alert>
             </TabsContent>

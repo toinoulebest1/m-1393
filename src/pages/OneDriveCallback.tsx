@@ -24,6 +24,8 @@ const OneDriveCallback = () => {
         const state = urlParams.get('state');
         const error = urlParams.get('error');
 
+        console.log('Callback reçu:', { code: code ? 'présent' : 'absent', state, error });
+
         if (error) {
           console.error("OAuth error:", error);
           setError(`Erreur d'authentification: ${error}`);
@@ -32,13 +34,13 @@ const OneDriveCallback = () => {
         }
 
         if (!code) {
-          setError("Aucun code d'autorisation reçu");
+          setError("Aucun code d'autorisation reçu de Microsoft");
           setIsProcessing(false);
           return;
         }
 
         if (!state) {
-          setError("Aucun état reçu pour la validation");
+          setError("Aucun état reçu pour la validation - possible problème de sécurité");
           setIsProcessing(false);
           return;
         }
@@ -47,7 +49,7 @@ const OneDriveCallback = () => {
         const codeVerifier = retrieveAndClearPKCEParams(state);
         
         if (!codeVerifier) {
-          setError("État invalide ou code verifier manquant, possible tentative de CSRF");
+          setError("État invalide ou code verifier manquant - possible tentative de CSRF. Réessayez la connexion.");
           setIsProcessing(false);
           return;
         }
@@ -62,23 +64,41 @@ const OneDriveCallback = () => {
 
         if (stateError || !stateData) {
           console.error("State verification error:", stateError);
-          setError("État non trouvé dans la base de données");
+          setError("État non trouvé dans la base de données - possible expiration. Réessayez la connexion.");
           setIsProcessing(false);
           return;
         }
 
-        // Get the client ID from config - use sync version
+        // Get the client ID from config - use sync version et vérification améliorée
         const config = getOneDriveConfigSync();
         const clientId = config.clientId;
         
+        console.log('Configuration récupérée:', { 
+          clientId: clientId ? `${clientId.substring(0, 8)}...` : 'non défini',
+          isEnabled: config.isEnabled 
+        });
+        
         if (!clientId) {
-          setError("Client ID non configuré");
+          setError("Client ID non configuré dans le stockage local. Vérifiez que vous avez bien entré le Client ID dans les paramètres OneDrive avant de lancer OAuth.");
+          setIsProcessing(false);
+          return;
+        }
+
+        // Validation du format du Client ID
+        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!guidRegex.test(clientId)) {
+          setError(`Client ID invalide (format incorrect): ${clientId}. Vérifiez le format dans les paramètres.`);
           setIsProcessing(false);
           return;
         }
 
         // Create the redirect URI
         const redirectUri = `${window.location.origin}/onedrive-callback`;
+
+        console.log('Échange du code contre des jetons...', {
+          redirectUri,
+          clientId: `${clientId.substring(0, 8)}...`
+        });
 
         // Exchange the code for tokens using edge function with PKCE
         const { data, error: tokenError } = await supabase.functions.invoke('onedrive-token-exchange', {
@@ -92,10 +112,13 @@ const OneDriveCallback = () => {
 
         if (tokenError || !data) {
           console.error("Token exchange error:", tokenError || "No data returned");
-          setError("Erreur lors de l'échange du code contre des jetons");
+          const errorMessage = tokenError?.message || "Aucune donnée retournée";
+          setError(`Erreur lors de l'échange du code contre des jetons: ${errorMessage}. Vérifiez votre configuration Azure et les secrets serveur.`);
           setIsProcessing(false);
           return;
         }
+
+        console.log('Échange de jeton réussi');
 
         // Save the tokens to local storage
         saveOneDriveConfig({
@@ -105,11 +128,15 @@ const OneDriveCallback = () => {
           clientId
         });
 
+        console.log('Jetons sauvegardés dans le stockage local');
+
         // Delete the used state from database
         await supabase
           .from('oauth_states')
           .delete()
           .eq('state', state);
+
+        console.log('État OAuth nettoyé de la base de données');
 
         // Success!
         setSuccess(true);
@@ -122,7 +149,8 @@ const OneDriveCallback = () => {
         }, 2000);
       } catch (err) {
         console.error("Error in OneDrive callback:", err);
-        setError(err instanceof Error ? err.message : "Une erreur inattendue s'est produite");
+        const errorMessage = err instanceof Error ? err.message : "Une erreur inattendue s'est produite";
+        setError(`Erreur inattendue: ${errorMessage}`);
         setIsProcessing(false);
       }
     };
@@ -141,13 +169,25 @@ const OneDriveCallback = () => {
             <p className="text-center text-spotify-neutral">
               Traitement de l'authentification OneDrive en cours...
             </p>
+            <p className="text-xs text-center text-muted-foreground">
+              Vérification des paramètres et échange des jetons
+            </p>
           </div>
         ) : error ? (
           <div className="space-y-4">
             <Alert variant="destructive">
-              <AlertTitle>Erreur</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTitle>Erreur de connexion OneDrive</AlertTitle>
+              <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
             </Alert>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Solutions possibles :</strong></p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Vérifiez que le Client ID est correctement configuré dans les paramètres</li>
+                <li>Assurez-vous que l'application Azure est bien configurée</li>
+                <li>Vérifiez que le secret client est configuré côté serveur</li>
+                <li>Essayez de relancer le processus OAuth depuis les paramètres</li>
+              </ul>
+            </div>
             <div className="flex justify-center">
               <Button onClick={() => navigate('/onedrive-settings')}>
                 Retourner aux paramètres
@@ -159,9 +199,12 @@ const OneDriveCallback = () => {
             <Alert className="border-green-400 bg-green-50 dark:bg-green-900/20">
               <AlertTitle className="text-green-800 dark:text-green-400">Connexion réussie!</AlertTitle>
               <AlertDescription className="text-green-700 dark:text-green-300">
-                Vous avez été connecté à OneDrive avec succès. Redirection en cours...
+                Vous avez été connecté à OneDrive avec succès. Les jetons ont été sauvegardés et vous pouvez maintenant utiliser OneDrive pour le stockage.
               </AlertDescription>
             </Alert>
+            <p className="text-xs text-center text-muted-foreground">
+              Redirection automatique vers les paramètres...
+            </p>
           </div>
         ) : null}
       </Card>
