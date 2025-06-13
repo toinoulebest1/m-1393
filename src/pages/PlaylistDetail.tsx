@@ -628,17 +628,7 @@ const PlaylistDetail = () => {
   };
   
   const playSong = (song: Song) => {
-    const playlistSongs = songs.map(item => ({
-      id: item.songs.id,
-      title: item.songs.title,
-      artist: item.songs.artist,
-      duration: item.songs.duration,
-      url: item.songs.url,
-      imageUrl: item.songs.imageUrl,
-      genre: item.songs.genre
-    }));
-    
-    setQueue(playlistSongs);
+    // Just play the selected song and add it to queue, like in search page
     play(song);
     
     toast({
