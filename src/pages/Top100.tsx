@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
 import ColorThief from 'colorthief';
 import { cn } from "@/lib/utils";
-import { TransitionGroup, CSSTransition } from 'react-transition-group';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
@@ -439,31 +439,37 @@ const Top100 = () => {
             </div>
           </div>
 
-          <TransitionGroup className="space-y-2">
-            {favoriteStats.map((stat, index) => {
-              const isCurrentSong = currentSong?.id === stat.song.id;
-              const glowStyle = isCurrentSong && dominantColor ? {
-                boxShadow: `
-                  0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
-                  0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
-                  0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
-                `,
-                transition: 'box-shadow 0.3s ease-in-out',
-                transform: 'scale(1.02)',
-              } : {};
+          <div className="space-y-2">
+            <AnimatePresence>
+              {favoriteStats.map((stat, index) => {
+                const isCurrentSong = currentSong?.id === stat.song.id;
+                const glowStyle = isCurrentSong && dominantColor ? {
+                  boxShadow: `
+                    0 0 10px 5px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3),
+                    0 0 20px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2),
+                    0 0 30px 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.1)
+                  `,
+                  transition: 'box-shadow 0.3s ease-in-out',
+                  transform: 'scale(1.02)',
+                } : {};
 
-              const rankNumber = index + 1;
-              const isTop3 = rankNumber <= 3;
+                const rankNumber = index + 1;
+                const isTop3 = rankNumber <= 3;
 
-              return (
-                <CSSTransition
-                  key={stat.songId}
-                  timeout={500}
-                  classNames="rank-item"
-                >
-                  <div
+                return (
+                  <motion.div
+                    key={stat.songId}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{
+                      layout: { duration: 0.8, ease: "easeInOut" },
+                      opacity: { duration: 0.3 },
+                      y: { duration: 0.3 }
+                    }}
                     className={cn(
-                      "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5 rank-item",
+                      "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
                       isCurrentSong 
                         ? "relative bg-white/5 shadow-lg overflow-hidden" 
                         : "bg-transparent"
@@ -579,11 +585,11 @@ const Top100 = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CSSTransition>
-              );
-            })}
-          </TransitionGroup>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
       <Player />
