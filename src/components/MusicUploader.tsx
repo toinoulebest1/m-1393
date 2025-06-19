@@ -1,9 +1,7 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
-import * as mm from 'music-metadata-browser';
 import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
 import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,9 +93,19 @@ export const MusicUploader = () => {
     return crypto.randomUUID();
   };
 
+  // Extraction métadonnées simplifiée pour éviter les erreurs Buffer
   const extractMetadata = async (file: File) => {
     try {
       console.log("Tentative d'extraction des métadonnées pour:", file.name);
+      
+      // Pour les fichiers FLAC, on skip l'extraction de métadonnées pour éviter l'erreur Buffer
+      if (file.name.toLowerCase().endsWith('.flac')) {
+        console.log("Fichier FLAC détecté - skip extraction métadonnées pour éviter erreur Buffer");
+        return null;
+      }
+      
+      // Dynamically import music-metadata-browser seulement pour les autres formats
+      const mm = await import('music-metadata-browser');
       const metadata = await mm.parseBlob(file);
       console.log("Métadonnées extraites avec succès:", metadata.common);
       
@@ -295,7 +303,7 @@ export const MusicUploader = () => {
     try {
       let { artist, title } = parseFileName(file.name);
       
-      // Extraction métadonnées en parallèle
+      // Extraction métadonnées en parallèle (seulement si pas FLAC)
       const metadataPromise = extractMetadata(file);
       const existsPromise = checkIfSongExists(artist, title);
       
@@ -314,7 +322,7 @@ export const MusicUploader = () => {
       console.log("⚡ Upload optimisé du fichier:", fileId);
       setIsUploading(true);
 
-      // Upload avec chunks pour de meilleures performances
+      // Upload avec chunks optimisé
       let uploadProgress = 0;
       const progressInterval = setInterval(() => {
         uploadProgress = Math.min(uploadProgress + 2, 90);
