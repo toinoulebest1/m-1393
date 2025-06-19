@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
@@ -6,20 +7,20 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
   const useOneDrive = await isOneDriveEnabled();
-  console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
+  console.log("Provider de stockage:", useOneDrive ? "OneDrive" : "Supabase");
   
   let fileToUpload: File;
   if (typeof file === 'string') {
     try {
-      console.log("Fetching file from URL:", file);
+      console.log("Récupération fichier depuis URL:", file);
       const response = await fetch(file);
       if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.statusText}`);
+        throw new Error(`Échec récupération: ${response.statusText}`);
       }
       const blob = await response.blob();
       fileToUpload = new File([blob], id, { type: blob.type || 'audio/mpeg' });
     } catch (error) {
-      console.error("Erreur lors de la conversion de l'URL en fichier:", error);
+      console.error("Erreur conversion URL:", error);
       throw error;
     }
   } else {
@@ -28,11 +29,11 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 
   try {
     if (useOneDrive) {
-      console.log("Uploading file to OneDrive storage:", id);
+      console.log("Upload OneDrive:", id);
       await uploadFileToOneDrive(fileToUpload, `audio/${id}`);
       return `audio/${id}`;
     } else {
-      console.log("Uploading file to Supabase storage:", id);
+      console.log("Upload Supabase:", id);
       const { data, error } = await supabase.storage
         .from('audio')
         .upload(id, fileToUpload, {
@@ -42,44 +43,44 @@ export const storeAudioFile = async (id: string, file: File | string) => {
         });
 
       if (error) {
-        console.error("Erreur lors du stockage du fichier:", error);
+        console.error("Erreur stockage:", error);
         throw error;
       }
 
-      console.log("File uploaded successfully:", data);
+      console.log("Upload réussi:", data);
       return data.path;
     }
   } catch (error) {
-    console.error("Erreur lors du stockage du fichier:", error);
+    console.error("Erreur stockage:", error);
     throw error;
   }
 };
 
 export const getAudioFile = async (path: string) => {
-  console.log("=== RÉCUPÉRATION ULTRA-RAPIDE ===");
+  console.log("=== RÉCUPÉRATION ULTRA-OPTIMISÉE ===");
   console.log("⚡ Chemin:", path);
   const startTime = performance.now();
   
   if (!path) {
-    throw new Error("Chemin du fichier non fourni");
+    throw new Error("Chemin non fourni");
   }
 
   try {
-    // Vérification cache ULTRA-RAPIDE (Promise.race avec timeout)
-    console.log("🚀 Cache check ultra-rapide...");
+    // Cache check ultra-rapide avec timeout 5ms
+    console.log("🚀 Cache ultra-rapide...");
     const cacheCheck = Promise.race([
       isInCache(path).then(async (inCache) => {
         if (inCache) {
           const cachedUrl = await getFromCache(path);
           if (cachedUrl) {
             const elapsed = performance.now() - startTime;
-            console.log("⚡ CACHE HIT:", elapsed.toFixed(1), "ms");
+            console.log("⚡ CACHE:", elapsed.toFixed(1), "ms");
             return cachedUrl;
           }
         }
         return null;
       }),
-      new Promise(resolve => setTimeout(() => resolve(null), 50)) // Timeout cache à 50ms
+      new Promise(resolve => setTimeout(() => resolve(null), 5)) // 5ms timeout
     ]);
 
     const cachedResult = await cacheCheck;
@@ -88,86 +89,65 @@ export const getAudioFile = async (path: string) => {
     }
 
     // Récupération réseau optimisée
-    console.log("📡 Récupération réseau rapide...");
+    console.log("📡 Réseau rapide...");
     const useOneDrive = await isOneDriveEnabled();
     console.log("Provider:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
     if (useOneDrive) {
-      console.log("⚡ OneDrive streaming...");
+      console.log("⚡ OneDrive...");
       try {
         audioUrl = await getOneDriveSharedLink(`audio/${path}`);
-        console.log("✅ OneDrive URL:", (performance.now() - startTime).toFixed(1), "ms");
+        console.log("✅ OneDrive:", (performance.now() - startTime).toFixed(1), "ms");
       } catch (oneDriveError) {
-        console.error("❌ OneDrive error:", oneDriveError);
-        throw new Error(`OneDrive indisponible: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
+        console.error("❌ OneDrive:", oneDriveError);
+        throw new Error(`OneDrive indisponible: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur'}`);
       }
     } else {
-      console.log("⚡ Supabase streaming...");
+      console.log("⚡ Supabase...");
       
-      // Vérification d'existence rapide (avec timeout)
-      const fileCheckPromise = Promise.race([
-        supabase.storage.from('audio').list('', { search: path }).then(({ data, error }) => {
-          if (error) throw error;
-          return data && data.length > 0;
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1000))
-      ]);
-
-      try {
-        const fileExists = await fileCheckPromise;
-        if (!fileExists) {
-          throw new Error(`Fichier non trouvé: ${path}`);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message === "Timeout") {
-          console.warn("⚠️ Vérification fichier timeout - tentative directe");
-        } else {
-          throw error;
-        }
-      }
-
+      // Pas de vérification d'existence pour gagner du temps
       const { data, error } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
 
       if (error) {
-        throw new Error(`Erreur URL signée: ${error.message}`);
+        throw new Error(`Erreur URL: ${error.message}`);
       }
 
       if (!data?.signedUrl) {
-        throw new Error("URL signée non générée");
+        throw new Error("URL non générée");
       }
 
       audioUrl = data.signedUrl;
-      console.log("✅ Supabase URL:", (performance.now() - startTime).toFixed(1), "ms");
+      console.log("✅ Supabase:", (performance.now() - startTime).toFixed(1), "ms");
     }
 
-    // Mise en cache différée (ne pas bloquer le streaming)
-    console.log("💾 Cache arrière-plan démarré");
+    // Cache différé très rapide
+    console.log("💾 Cache différé");
     setTimeout(async () => {
       try {
         if (!(await isInCache(path))) {
-          console.log("📡 Téléchargement cache...");
+          console.log("📡 Cache différé...");
           const response = await fetch(audioUrl);
           if (response.ok) {
             const blob = await response.blob();
             await addToCache(path, blob);
-            console.log("✅ Cache terminé:", blob.size, "bytes");
+            console.log("✅ Cache:", (blob.size / 1024 / 1024).toFixed(1), "MB");
           }
         }
-      } catch (cacheError) {
-        console.warn("⚠️ Cache arrière-plan échoué:", cacheError);
+      } catch (e) {
+        console.warn("⚠️ Cache différé échoué");
       }
-    }, 200); // Démarrer après 200ms
+    }, 100); // 100ms
 
     const totalElapsed = performance.now() - startTime;
     console.log("⚡ TOTAL:", totalElapsed.toFixed(1), "ms");
-    console.log("=============================");
+    console.log("==============================");
     return audioUrl;
   } catch (error) {
-    console.error("❌ ERREUR RÉCUPÉRATION:", error);
+    console.error("❌ ERREUR:", error);
     throw error;
   }
 };
@@ -175,18 +155,18 @@ export const getAudioFile = async (path: string) => {
 export const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
   try {
     const query = `${artist} ${title}`;
-    console.log("Recherche Deezer pour:", { artist, title });
+    console.log("Recherche Deezer:", { artist, title });
     
     const { data: supabaseData, error } = await supabase.functions.invoke('deezer-search', {
       body: { query }
     });
     
     if (error) {
-      console.error("Erreur lors de l'appel à l'edge function Deezer:", error);
+      console.error("Erreur Deezer:", error);
       return null;
     }
 
-    console.log("Résultat de la recherche Deezer:", supabaseData);
+    console.log("Résultat Deezer:", supabaseData);
     
     if (supabaseData?.data && supabaseData.data.length > 0) {
       const track = supabaseData.data[0];
@@ -198,13 +178,13 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
     
     return null;
   } catch (error) {
-    console.error("Erreur lors de la recherche Deezer:", error);
+    console.error("Erreur recherche Deezer:", error);
     return "https://picsum.photos/240/240";
   }
 };
 
 export const storePlaylistCover = async (playlistId: string, file: File | string | Blob) => {
-  console.log("Storing playlist cover for:", playlistId, typeof file);
+  console.log("Stockage couverture playlist:", playlistId, typeof file);
   
   try {
     let fileToUpload: File;
@@ -213,40 +193,40 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
       fileToUpload = new File([file], `playlist-${playlistId}.jpg`, { 
         type: 'image/jpeg' 
       });
-      console.log("Converted Blob to File object");
+      console.log("Blob vers File");
     } else if (typeof file === 'string') {
       if (file.startsWith('data:')) {
-        console.log("Processing data URL");
+        console.log("Data URL");
         const response = await fetch(file);
         const blob = await response.blob();
         fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
           type: 'image/jpeg' 
         });
-        console.log("Converted data URL to File object", blob.size, "bytes");
+        console.log("Data URL vers File", blob.size, "bytes");
       } else {
-        console.log("Fetching remote URL:", file);
+        console.log("URL distante:", file);
         const response = await fetch(file);
         if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.statusText}`);
+          throw new Error(`Échec récupération: ${response.statusText}`);
         }
         const blob = await response.blob();
         fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
           type: blob.type || 'image/jpeg' 
         });
-        console.log("Converted remote URL to File object", blob.size, "bytes");
+        console.log("URL vers File", blob.size, "bytes");
       }
     } else {
       fileToUpload = file;
-      console.log("Using provided File object");
+      console.log("File fourni");
     }
     
     if (!fileToUpload || fileToUpload.size === 0) {
-      console.error("Invalid file or empty file");
-      throw new Error("Invalid or empty file");
+      console.error("Fichier invalide");
+      throw new Error("Fichier invalide");
     }
     
     const fileName = `playlist-covers/${playlistId}.jpg`;
-    console.log(`Uploading playlist cover to storage: ${fileName}, size: ${fileToUpload.size} bytes`);
+    console.log(`Upload: ${fileName}, taille: ${fileToUpload.size} bytes`);
     
     const { data, error } = await supabase.storage
       .from('media')
@@ -257,21 +237,21 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
       });
     
     if (error) {
-      console.error("Error during storage upload:", error);
+      console.error("Erreur upload:", error);
       throw error;
     }
     
-    console.log("Upload succeeded, path:", data.path);
+    console.log("Upload réussi:", data.path);
     
     const timestamp = new Date().getTime();
     const { data: { publicUrl } } = supabase.storage
       .from('media')
       .getPublicUrl(`${fileName}?t=${timestamp}`);
     
-    console.log("Public URL generated:", publicUrl);
+    console.log("URL publique:", publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error("Error storing playlist cover:", error);
+    console.error("Erreur stockage couverture:", error);
     throw error;
   }
 };
@@ -288,7 +268,7 @@ export const getPlaylistCover = async (playlistId: string): Promise<string | nul
       });
       
     if (!fileExists || fileExists.length === 0) {
-      console.log("No existing cover found for playlist:", playlistId);
+      console.log("Pas de couverture:", playlistId);
       return null;
     }
     
@@ -297,10 +277,10 @@ export const getPlaylistCover = async (playlistId: string): Promise<string | nul
       .from('media')
       .getPublicUrl(`${fileName}?t=${timestamp}`);
     
-    console.log("Existing cover found:", publicUrl);
+    console.log("Couverture trouvée:", publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error("Error checking for playlist cover:", error);
+    console.error("Erreur récupération couverture:", error);
     return null;
   }
 };
@@ -311,10 +291,10 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       song.songs?.imageUrl && song.songs.imageUrl.startsWith('http')
     );
     
-    console.log(`Generating playlist cover from ${songsWithImages.length} songs with images`);
+    console.log(`Génération couverture depuis ${songsWithImages.length} chansons`);
     
     if (songsWithImages.length === 0) {
-      console.log("No songs with valid image URLs found");
+      console.log("Aucune chanson avec image");
       return null;
     }
     
@@ -324,7 +304,7 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error("Failed to get canvas context");
+      console.error("Échec contexte canvas");
       return null;
     }
 
@@ -334,7 +314,7 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
     const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
     const imageSize = canvas.width / gridSize;
     
-    console.log(`Using grid size: ${gridSize}x${gridSize}, image size: ${imageSize}px`);
+    console.log(`Grille: ${gridSize}x${gridSize}, taille: ${imageSize}px`);
 
     const loadImage = (url: string): Promise<HTMLImageElement | null> => {
       return new Promise(resolve => {
@@ -342,7 +322,7 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
         img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
         img.onerror = (e) => {
-          console.error(`Error loading image ${url}:`, e);
+          console.error(`Erreur image ${url}:`, e);
           resolve(null);
         };
         const cacheBuster = `?t=${new Date().getTime()}`;
@@ -356,10 +336,10 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
     
     const validImages = imagePromises.filter(img => img !== null) as HTMLImageElement[];
     
-    console.log(`Successfully loaded ${validImages.length} images out of ${songsWithImages.length} attempted`);
+    console.log(`${validImages.length} images chargées sur ${songsWithImages.length}`);
     
     if (validImages.length === 0) {
-      console.log("No images could be loaded successfully");
+      console.log("Aucune image chargée");
       return null;
     }
 
@@ -367,15 +347,15 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       const row = Math.floor(index / gridSize);
       const col = index % gridSize;
       ctx.drawImage(img, col * imageSize, row * imageSize, imageSize, imageSize);
-      console.log(`Drew image ${index + 1} at position [${row},${col}]`);
+      console.log(`Image ${index + 1} à [${row},${col}]`);
     });
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    console.log(`Generated data URL of length ${dataUrl.length}`);
+    console.log(`Data URL générée: ${dataUrl.length} caractères`);
     
     return dataUrl;
   } catch (error) {
-    console.error('Error generating playlist cover:', error);
+    console.error('Erreur génération couverture:', error);
     return null;
   }
 };
