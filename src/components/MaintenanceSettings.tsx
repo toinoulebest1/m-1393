@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -12,10 +13,6 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
-
-interface MaintenanceSettingsProps {
-  
-}
 
 export const MaintenanceSettings = () => {
   const { 
@@ -53,8 +50,6 @@ export const MaintenanceSettings = () => {
         { key: 'maintenance_total_steps', value: totalSteps?.toString() || null },
       ];
 
-      const wasMaintenanceMode = initialIsMaintenanceMode;
-
       for (const update of updates) {
         const { error } = await supabase
           .from('site_settings')
@@ -66,27 +61,7 @@ export const MaintenanceSettings = () => {
         if (error) throw error;
       }
 
-      // Si on vient de désactiver la maintenance, envoyer les notifications
-      if (wasMaintenanceMode && !isMaintenanceMode) {
-        try {
-          console.log('Maintenance désactivée, envoi des notifications...');
-          const { error: notificationError } = await supabase.functions.invoke(
-            'send-maintenance-notifications'
-          );
-          
-          if (notificationError) {
-            console.error('Erreur lors de l\'envoi des notifications:', notificationError);
-            toast.error('Paramètres sauvés mais erreur lors de l\'envoi des notifications');
-          } else {
-            toast.success('Paramètres sauvés et notifications envoyées !');
-          }
-        } catch (error) {
-          console.error('Erreur lors de l\'appel de la fonction de notification:', error);
-          toast.error('Paramètres sauvés mais erreur lors de l\'envoi des notifications');
-        }
-      } else {
-        toast.success('Paramètres sauvegardés avec succès !');
-      }
+      toast.success('Paramètres sauvegardés avec succès !');
 
       // Rafraîchir les paramètres
       await refetch();
