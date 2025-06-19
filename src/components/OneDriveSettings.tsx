@@ -88,7 +88,11 @@ export const OneDriveSettings = () => {
       
       if (!hasAdminRole) {
         navigate('/');
-        toast.error('Accès non autorisé');
+        toast({
+          title: "Erreur",
+          description: 'Accès non autorisé',
+          variant: "destructive"
+        });
       } else {
         // Pour les admins, synchroniser d'abord avec la configuration partagée si elle existe
         try {
@@ -144,12 +148,20 @@ export const OneDriveSettings = () => {
         isEnabled,
         clientId
       });
-      toast.success('Configuration OneDrive enregistrée');
+      toast({
+        title: "Succès",
+        description: 'Configuration OneDrive enregistrée',
+        variant: "default"
+      });
       setTestResult(null);
       setRefreshResult(null);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la configuration OneDrive:', error);
-      toast.error('Échec de l\'enregistrement de la configuration OneDrive');
+      toast({
+        title: "Erreur",
+        description: 'Échec de l\'enregistrement de la configuration OneDrive',
+        variant: "destructive"
+      });
     } finally {
       setIsSaving(false);
     }
@@ -170,16 +182,28 @@ export const OneDriveSettings = () => {
         const data = await response.json();
         console.log('OneDrive account info:', data);
         setTestResult('success');
-        toast.success('Jeton OneDrive valide');
+        toast({
+          title: "Succès",
+          description: 'Jeton OneDrive valide',
+          variant: "default"
+        });
       } else {
         console.error('Erreur lors du test du jeton OneDrive:', response.status, response.statusText);
         setTestResult('error');
-        toast.error('Jeton OneDrive invalide');
+        toast({
+          title: "Erreur",
+          description: 'Jeton OneDrive invalide',
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Erreur lors du test du jeton OneDrive:', error);
       setTestResult('error');
-      toast.error('Erreur lors du test du jeton OneDrive');
+      toast({
+        title: "Erreur",
+        description: 'Erreur lors du test du jeton OneDrive',
+        variant: "destructive"
+      });
     } finally {
       setIsTesting(false);
     }
@@ -187,7 +211,11 @@ export const OneDriveSettings = () => {
 
   const handleRefreshToken = async () => {
     if (!refreshToken || !clientId) {
-      toast.error('Veuillez entrer un jeton de rafraîchissement et un Client ID');
+      toast({
+        title: "Erreur",
+        description: 'Veuillez entrer un jeton de rafraîchissement et un Client ID',
+        variant: "destructive"
+      });
       return;
     }
 
@@ -207,9 +235,17 @@ export const OneDriveSettings = () => {
         setRefreshResult('error');
         
         if (data?.error) {
-          toast.error(data.error);
+          toast({
+            title: "Erreur",
+            description: data.error,
+            variant: "destructive"
+          });
         } else {
-          toast.error('Échec du rafraîchissement du jeton');
+          toast({
+            title: "Erreur",
+            description: 'Échec du rafraîchissement du jeton',
+            variant: "destructive"
+          });
         }
         return;
       }
@@ -228,11 +264,19 @@ export const OneDriveSettings = () => {
       });
 
       setRefreshResult('success');
-      toast.success('Jeton rafraîchi avec succès');
+      toast({
+        title: "Succès",
+        description: 'Jeton rafraîchi avec succès',
+        variant: "default"
+      });
     } catch (error) {
       console.error('Erreur lors du rafraîchissement du jeton:', error);
       setRefreshResult('error');
-      toast.error('Erreur lors du rafraîchissement du jeton');
+      toast({
+        title: "Erreur",
+        description: 'Erreur lors du rafraîchissement du jeton',
+        variant: "destructive"
+      });
     } finally {
       setIsRefreshing(false);
     }
@@ -256,16 +300,28 @@ export const OneDriveSettings = () => {
       if (error) {
         console.error('Erreur de connectivité avec l\'edge function:', error);
         setConnectivityResult('error');
-        toast.error(`Erreur de connectivité: ${error.message}`);
+        toast({
+          title: "Erreur",
+          description: `Erreur de connectivité: ${error.message}`,
+          variant: "destructive"
+        });
       } else {
         console.log('Test de connectivité réussi');
         setConnectivityResult('success');
-        toast.success('Edge function accessible');
+        toast({
+          title: "Succès",
+          description: 'Edge function accessible',
+          variant: "default"
+        });
       }
     } catch (error) {
       console.error('Erreur lors du test de connectivité:', error);
       setConnectivityResult('error');
-      toast.error('Impossible de contacter l\'edge function');
+      toast({
+        title: "Erreur",
+        description: 'Impossible de contacter l\'edge function',
+        variant: "destructive"
+      });
     } finally {
       setIsTestingConnectivity(false);
     }
@@ -274,13 +330,21 @@ export const OneDriveSettings = () => {
   const handleStartOAuth = async () => {
     // Validation du Client ID
     if (!clientId || clientId.trim() === '') {
-      toast.error('Veuillez entrer un Client ID Microsoft valide');
+      toast({
+        title: "Erreur",
+        description: 'Veuillez entrer un Client ID Microsoft valide',
+        variant: "destructive"
+      });
       return;
     }
 
     const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!guidRegex.test(clientId.trim())) {
-      toast.error('Le Client ID doit être un GUID valide (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)');
+      toast({
+        title: "Erreur",
+        description: 'Le Client ID doit être un GUID valide (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)',
+        variant: "destructive"
+      });
       return;
     }
 
@@ -298,12 +362,20 @@ export const OneDriveSettings = () => {
       // Si l'edge function n'est pas accessible, on avertit l'utilisateur
       if (testResponse.error) {
         console.error('Edge function non accessible:', testResponse.error);
-        toast.error(`L'edge function OneDrive n'est pas accessible: ${testResponse.error.message}. Vérifiez la configuration du serveur.`);
+        toast({
+          title: "Erreur",
+          description: `L'edge function OneDrive n'est pas accessible: ${testResponse.error.message}. Vérifiez la configuration du serveur.`,
+          variant: "destructive"
+        });
         return;
       }
     } catch (error) {
       console.error('Impossible de tester l\'edge function:', error);
-      toast.error('Impossible de contacter l\'edge function. Vérifiez la configuration du serveur.');
+      toast({
+        title: "Erreur",
+        description: 'Impossible de contacter l\'edge function. Vérifiez la configuration du serveur.',
+        variant: "destructive"
+      });
       return;
     }
 
@@ -317,7 +389,11 @@ export const OneDriveSettings = () => {
       });
 
       console.log('Client ID sauvegardé avant OAuth:', clientId.trim());
-      toast.success('Client ID sauvegardé, vérification de la configuration serveur...');
+      toast({
+        title: "Succès",
+        description: 'Client ID sauvegardé, vérification de la configuration serveur...',
+        variant: "default"
+      });
 
       // Génération des paramètres PKCE
       const codeVerifier = generateCodeVerifier();
@@ -349,13 +425,21 @@ export const OneDriveSettings = () => {
       await saveState();
       
       console.log('Redirection vers OAuth avec Client ID:', clientId.trim());
-      toast.success('Configuration validée, redirection vers Microsoft...');
+      toast({
+        title: "Succès",
+        description: 'Configuration validée, redirection vers Microsoft...',
+        variant: "default"
+      });
       
       // Redirection vers l'URL OAuth
       window.location.href = oauthUrl;
     } catch (error) {
       console.error('Error starting OAuth flow:', error);
-      toast.error('Erreur lors du démarrage de l\'authentification OAuth');
+      toast({
+        title: "Erreur",
+        description: 'Erreur lors du démarrage de l\'authentification OAuth',
+        variant: "destructive"
+      });
     }
   };
 
