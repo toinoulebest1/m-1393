@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,7 @@ import { useMaintenanceMode } from "./hooks/useMaintenanceMode";
 import { useBanStatus } from "./hooks/useBanStatus";
 import { BannedUserPage } from "./components/BannedUserPage";
 import { BrowserCompatibilityNotice } from "./components/BrowserCompatibilityNotice";
+import { AnnouncementDialog } from "./components/AnnouncementDialog";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -101,6 +103,11 @@ function App() {
         {/* Fixed provider order: PlayerProvider should wrap CastProvider */}
         <PlayerProvider>
           <CastProvider>
+            {/* Dialog d'annonces pour les utilisateurs connectés */}
+            {session?.user?.id && (
+              <AnnouncementDialog userId={session.user.id} />
+            )}
+            
             {/* Si l'utilisateur est banni (et n'est pas admin), afficher la page de bannissement */}
             {session && isBanned && !isAdmin && banInfo ? (
               <BannedUserPage banInfo={banInfo} />
