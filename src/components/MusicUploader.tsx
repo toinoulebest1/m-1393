@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -240,6 +241,46 @@ export const MusicUploader = () => {
     }
   };
 
+  // Fonction pour traiter les paroles en arrière-plan
+  const processLyricsInBackground = async (file: File, fileId: string, title: string, artist: string) => {
+    try {
+      const baseFileName = file.name.replace(/\.[^/.]+$/, "");
+      const possibleLrcNames = [
+        `${baseFileName}.lrc`,
+        `${title}.lrc`,
+        `${artist} - ${title}.lrc`,
+        `${title} - ${artist}.lrc`,
+        baseFileName.toLowerCase() + ".lrc",
+        title.toLowerCase() + ".lrc",
+        `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`
+      ];
+      
+      let lyricsFound = false;
+      let lrcFile: File | undefined;
+      
+      for (const lrcName of possibleLrcNames) {
+        if (lrcFilesRef.current.has(lrcName)) {
+          lrcFile = lrcFilesRef.current.get(lrcName);
+          break;
+        }
+      }
+      
+      if (lrcFile) {
+        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
+        if (lyricsFound) {
+          toast.success(`Paroles synchronisées importées`);
+        }
+      } else if (artist !== "Unknown Artist") {
+        const lyrics = await fetchLyrics(title, artist, fileId);
+        if (lyrics) {
+          toast.success(`Paroles récupérées pour "${title}"`);
+        }
+      }
+    } catch (error) {
+      console.warn("Erreur traitement paroles (non critique):", error);
+    }
+  };
+
   const processAudioFile = async (file: File, fileIndex: number, totalFiles: number) => {
     console.log("🎵 Traitement optimisé pour:", file.name);
     
@@ -350,7 +391,7 @@ export const MusicUploader = () => {
       
       // Traitement des paroles en arrière-plan (non bloquant)
       setTimeout(() => {
-        this.processLyricsInBackground(file, fileId, title, artist);
+        processLyricsInBackground(file, fileId, title, artist);
       }, 0);
 
       setIsUploading(false);
@@ -374,46 +415,6 @@ export const MusicUploader = () => {
       setUploadProgress(0);
       setCurrentUploadingSong(null);
       return null;
-    }
-  };
-
-  // Nouvelle méthode pour traiter les paroles en arrière-plan
-  private processLyricsInBackground = async (file: File, fileId: string, title: string, artist: string) => {
-    try {
-      const baseFileName = file.name.replace(/\.[^/.]+$/, "");
-      const possibleLrcNames = [
-        `${baseFileName}.lrc`,
-        `${title}.lrc`,
-        `${artist} - ${title}.lrc`,
-        `${title} - ${artist}.lrc`,
-        baseFileName.toLowerCase() + ".lrc",
-        title.toLowerCase() + ".lrc",
-        `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`
-      ];
-      
-      let lyricsFound = false;
-      let lrcFile: File | undefined;
-      
-      for (const lrcName of possibleLrcNames) {
-        if (lrcFilesRef.current.has(lrcName)) {
-          lrcFile = lrcFilesRef.current.get(lrcName);
-          break;
-        }
-      }
-      
-      if (lrcFile) {
-        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
-        if (lyricsFound) {
-          toast.success(`Paroles synchronisées importées`);
-        }
-      } else if (artist !== "Unknown Artist") {
-        const lyrics = await fetchLyrics(title, artist, fileId);
-        if (lyrics) {
-          toast.success(`Paroles récupérées pour "${title}"`);
-        }
-      }
-    } catch (error) {
-      console.warn("Erreur traitement paroles (non critique):", error);
     }
   };
 
@@ -476,7 +477,7 @@ export const MusicUploader = () => {
       }
     );
 
-    await uploadService.uploadFiles(audioFiles, this.processAudioFile.bind(this));
+    await uploadService.uploadFiles(audioFiles, processAudioFile);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
