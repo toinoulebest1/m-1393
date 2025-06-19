@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { AutoplayManager } from '@/utils/autoplayManager';
 import { AlertTriangle, Globe } from 'lucide-react';
@@ -133,9 +134,16 @@ export const BrowserCompatibilityNotice = () => {
           <p className="text-xl text-white mb-4">
             <strong>{browserInfo.name}</strong> bloque l'autoplay audio et n'est pas compatible avec cette application musicale.
           </p>
-          <p className="text-lg text-gray-300">
+          <p className="text-lg text-gray-300 mb-4">
             Pour une <strong>expérience optimale sans restrictions</strong>, vous devez utiliser <strong>Firefox</strong>.
           </p>
+          
+          {/* Nouveau message d'encouragement */}
+          <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mt-4">
+            <p className="text-sm text-blue-200">
+              💡 <strong>Bonne nouvelle :</strong> Nous faisons tout notre possible pour que ce navigateur soit compatible dans le futur !
+            </p>
+          </div>
         </div>
         
         {/* Instructions */}
