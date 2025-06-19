@@ -74,7 +74,7 @@ export const useAudioControl = ({
         const cacheCheckPromise = isInCache(song.url).then(async (inCache) => {
           if (inCache) {
             const cachedUrl = await getFromCache(song.url);
-            if (cachedUrl) {
+            if (cachedUrl && typeof cachedUrl === 'string') {
               console.log("⚡ Cache hit - URL immédiate:", (performance.now() - startTime).toFixed(1), "ms");
               return { url: cachedUrl, fromCache: true };
             }
@@ -83,7 +83,12 @@ export const useAudioControl = ({
         });
         
         // Récupération URL en parallèle (ne pas attendre le cache)
-        const urlPromise = getAudioFile(song.url).then(url => ({ url, fromCache: false }));
+        const urlPromise = getAudioFile(song.url).then(url => {
+          if (typeof url === 'string') {
+            return { url, fromCache: false };
+          }
+          throw new Error('URL audio invalide');
+        });
         
         // Prendre la première URL disponible (cache ou réseau)
         const audioData = await Promise.race([
@@ -96,7 +101,7 @@ export const useAudioControl = ({
         
         console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms", audioData.fromCache ? "(cache)" : "(réseau)");
 
-        if (!audioUrl) {
+        if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error('URL audio non disponible');
         }
 

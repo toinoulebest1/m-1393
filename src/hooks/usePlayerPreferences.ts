@@ -70,9 +70,13 @@ export const usePlayerPreferences = () => {
           console.log(`Préchargement de la piste: ${track.title}`);
           const { getAudioFile } = await import('@/utils/storage');
           const audioUrl = await getAudioFile(track.url);
-          if (!audioUrl) continue;
+          if (!audioUrl || typeof audioUrl !== 'string') continue;
           
-          await addToCache(track.url, await fetch(audioUrl).then(res => res.blob()));
+          const response = await fetch(audioUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            await addToCache(track.url, blob);
+          }
         }
       }
     } catch (error) {
