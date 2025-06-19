@@ -5,6 +5,7 @@ import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
 import { memoryCache } from '@/utils/memoryCache';
+import { AutoplayManager } from '@/utils/autoplayManager';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -170,85 +171,65 @@ export const useAudioControl = ({
             } catch (e) {
               console.warn("⚠️ Cache différé échoué");
             }
-          }, 25); // 25ms seulement
+          }, 25);
         }
         
-        // Démarrage immédiat
-        console.log("🚀 Play immédiat...");
+        // Démarrage avec gestion autoplay
+        console.log("🚀 Play avec gestion autoplay...");
         const playStartTime = performance.now();
         
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            const playElapsed = performance.now() - playStartTime;
-            const totalElapsed = performance.now() - startTime;
-            
-            console.log("✅ === SUCCÈS ULTRA-RAPIDE ===");
-            console.log("🎵 Chanson:", song.title);
-            console.log("⚡ Play:", playElapsed.toFixed(1), "ms");
-            console.log("⚡ Total:", totalElapsed.toFixed(1), "ms");
-            console.log("🎯 Perf:", totalElapsed < 100 ? "EXCELLENT" : totalElapsed < 200 ? "BON" : "LENT");
-            
-            setIsPlaying(true);
-            
-            // Vérification streaming ultra-courte
-            setTimeout(() => {
-              if (audio.currentTime === 0 && !audio.paused) {
-                console.log("📡 Buffering...");
-                
-                setTimeout(() => {
-                  if (audio.currentTime === 0 && !audio.paused) {
-                    toast.error("Connexion lente", {
-                      duration: 1500,
-                      action: {
-                        label: "Relancer",
-                        onClick: () => {
-                          audio.currentTime = 0;
-                          audio.play();
-                        }
-                      }
-                    });
-                  }
-                }, 1000); // Réduit à 1s
-              }
-            }, 100); // Réduit à 100ms
-            
-            // Préchargement différé ultra-court
-            setTimeout(() => preloadNextTracks(), 50);
-            
-            // Changement terminé ultra-rapide
-            changeTimeoutRef.current = window.setTimeout(() => {
-              setIsChangingSong(false);
-              changeTimeoutRef.current = null;
-            }, 25); // 25ms seulement
-            
-          }).catch(error => {
-            console.error("❌ Erreur play:", error.message);
-            handlePlayError(error, audio, song);
-          });
+        const success = await AutoplayManager.playAudio(audio);
+        
+        if (success) {
+          const playElapsed = performance.now() - playStartTime;
+          const totalElapsed = performance.now() - startTime;
+          
+          console.log("✅ === SUCCÈS ULTRA-RAPIDE ===");
+          console.log("🎵 Chanson:", song.title);
+          console.log("⚡ Play:", playElapsed.toFixed(1), "ms");
+          console.log("⚡ Total:", totalElapsed.toFixed(1), "ms");
+          console.log("🎯 Perf:", totalElapsed < 100 ? "EXCELLENT" : totalElapsed < 200 ? "BON" : "LENT");
+          
+          setIsPlaying(true);
+          
+          // Préchargement différé ultra-court
+          setTimeout(() => preloadNextTracks(), 50);
+          
+          // Changement terminé ultra-rapide
+          changeTimeoutRef.current = window.setTimeout(() => {
+            setIsChangingSong(false);
+            changeTimeoutRef.current = null;
+          }, 25);
+        } else {
+          console.log("⚠️ Lecture en attente d'activation utilisateur");
+          setIsChangingSong(false);
+          
+          // Afficher info navigateur si nécessaire
+          const browserInfo = AutoplayManager.getBrowserInfo();
+          if (!browserInfo.supportsAutoplay) {
+            toast.info(`${browserInfo.name} bloque l'autoplay - cliquez pour activer`, {
+              duration: 5000,
+              position: "top-center"
+            });
+          }
         }
+        
       } catch (error) {
         console.error("💥 Erreur récupération:", error);
-        
-        toast.error(`Impossible de lire "${song.title}"`);
-        setCurrentSong(null);
-        localStorage.removeItem('currentSong');
-        setIsPlaying(false);
-        setIsChangingSong(false);
+        handlePlayError(error as any, audio, song);
       }
     } else if (audioRef.current) {
-      // Reprise instantanée
-      console.log("⚡ Reprise instantanée");
+      // Reprise avec gestion autoplay
+      console.log("⚡ Reprise avec gestion autoplay");
       try {
         audioRef.current.volume = volume / 100;
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log("✅ Reprise OK");
-            setIsPlaying(true);
-          }).catch(error => {
-            handlePlayError(error, audioRef.current, currentSong);
-          });
+        const success = await AutoplayManager.playAudio(audioRef.current);
+        
+        if (success) {
+          console.log("✅ Reprise OK");
+          setIsPlaying(true);
+        } else {
+          console.log("⚠️ Reprise en attente d'activation");
         }
       } catch (error) {
         console.error("❌ Erreur reprise:", error);
@@ -258,11 +239,20 @@ export const useAudioControl = ({
   }, [audioRef, currentSong, isChangingSong, preloadNextTracks, setCurrentSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, volume]);
 
   const handlePlayError = useCallback((error: any, audio: HTMLAudioElement, song: Song | null) => {
+    console.error("❌ Erreur lecture:", error);
+    
     if (error.name === 'NotAllowedError') {
-      toast.error("Cliquez pour activer l'audio", {
+      const browserInfo = AutoplayManager.getBrowserInfo();
+      toast.error(`${browserInfo.name} bloque la lecture audio`, {
+        description: "Cliquez sur le bouton d'activation qui va apparaître",
+        duration: 5000,
         action: {
-          label: "Activer",
-          onClick: () => audio.play().then(() => setIsPlaying(true))
+          label: "Info",
+          onClick: () => {
+            toast.info("Utilisez Firefox pour une expérience optimale sans restrictions d'autoplay", {
+              duration: 8000
+            });
+          }
         }
       });
     } else {
