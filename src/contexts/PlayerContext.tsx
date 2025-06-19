@@ -10,7 +10,6 @@ import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
-import { supabase } from '@/integrations/supabase/client';
 
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -332,68 +331,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
 
-  // Enhanced function to completely remove a song from database and all lists
-  const removeSong = useCallback(async (songId: string) => {
-    try {
-      console.log("=== SONG DELETION DEBUG ===");
-      console.log("Attempting to delete song:", songId);
-      
-      // First, stop and remove from current playback if it's the current song
-      if (currentSong?.id === songId) {
-        stopCurrentSong();
-        setCurrentSong(null);
-        localStorage.removeItem('currentSong');
-        console.log("Stopped current song playback");
-      }
-      
-      // Remove from local state immediately for better UX
-      setQueue(prevQueue => {
-        const newQueue = prevQueue.filter(song => song.id !== songId);
-        console.log("Removed from queue, new queue size:", newQueue.length);
-        return newQueue;
-      });
-      
-      setHistory(prevHistory => {
-        const newHistory = prevHistory.filter(song => song.id !== songId);
-        console.log("Removed from history, new history size:", newHistory.length);
-        return newHistory;
-      });
-      
-      // Remove from favorites if present
-      if (favorites.some(song => song.id === songId)) {
-        removeFavorite(songId);
-        console.log("Removed from favorites");
-      }
-      
-      // Call the database function to delete the song completely
-      console.log("Calling database deletion function...");
-      const { data, error } = await supabase.rpc('delete_song_completely', {
-        song_id_param: songId
-      });
-      
-      if (error) {
-        console.error("Database deletion error:", error);
-        throw new Error(`Erreur lors de la suppression de la base de données: ${error.message}`);
-      }
-      
-      if (!data) {
-        console.error("Database deletion returned false");
-        throw new Error("La suppression de la chanson a échoué");
-      }
-      
-      console.log("Database deletion successful");
-      console.log("==============================");
-      
-      toast.success("La chanson a été supprimée définitivement de votre bibliothèque", {
-        duration: 3000
-      });
-      
-    } catch (error) {
-      console.error("Error in removeSong:", error);
-      toast.error(error instanceof Error ? error.message : "Erreur lors de la suppression de la chanson", {
-        duration: 5000
-      });
+  // Fonction pour supprimer une chanson de toutes les listes
+  const removeSong = useCallback((songId: string) => {
+    if (currentSong?.id === songId) {
+      stopCurrentSong();
+      setCurrentSong(null);
+      localStorage.removeItem('currentSong');
     }
+    
+    setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
+    setHistory(prevHistory => prevHistory.filter(song => song.id !== songId));
+    
+    if (favorites.some(song => song.id === songId)) {
+      removeFavorite(songId);
+    }
+    
+    toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
   // L'objet context complet avec l'égaliseur

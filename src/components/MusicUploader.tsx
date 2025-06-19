@@ -11,8 +11,6 @@ import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { GlobalUploadProgress } from "@/components/GlobalUploadProgress";
-import { useUploadProgress } from "@/hooks/useUploadProgress";
 
 interface Song {
   id: string;
@@ -33,10 +31,8 @@ export const MusicUploader = () => {
   const [dragCounter, setDragCounter] = useState(0);
   const [storageProvider, setStorageProvider] = useState<string>("Supabase");
   const [currentUploadingSong, setCurrentUploadingSong] = useState<string | null>(null);
+  // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
-  
-  // Nouveau hook pour la progression globale
-  const { stats: globalStats, startUpload, updateProgress, completeUpload, cancelUpload } = useUploadProgress();
 
   useEffect(() => {
     // Check which storage provider is active
@@ -238,7 +234,7 @@ export const MusicUploader = () => {
     }
   };
 
-  const processAudioFile = async (file: File, fileIndex: number, totalFiles: number) => {
+  const processAudioFile = async (file: File) => {
     console.log("Début du traitement pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
@@ -248,7 +244,6 @@ export const MusicUploader = () => {
 
     const fileId = generateUUID();
     setCurrentUploadingSong(file.name);
-    updateProgress(file.name, fileIndex, 0, file.size);
 
     try {
       let { artist, title } = parseFileName(file.name);
@@ -259,8 +254,6 @@ export const MusicUploader = () => {
         if (metadataResult.title) title = metadataResult.title;
       }
 
-      updateProgress(file.name, fileIndex, 20);
-
       const songExists = await checkIfSongExists(artist, title);
       if (songExists) {
         toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
@@ -268,23 +261,18 @@ export const MusicUploader = () => {
         return null;
       }
 
-      updateProgress(file.name, fileIndex, 30);
-
       console.log("Stockage du fichier audio:", fileId);
       setUploadProgress(0);
       setIsUploading(true);
 
-      // Progress pour l'upload du fichier
+      // Simuler la progression d'upload
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
-          const globalProgress = 30 + (newProgress * 0.4); // 30% à 70% pour l'upload
-          updateProgress(file.name, fileIndex, Math.min(globalProgress, 70));
-          if (newProgress >= 90) {
+          if (prev >= 90) {
             clearInterval(progressInterval);
-            return 90;
+            return prev;
           }
-          return newProgress;
+          return prev + Math.random() * 15;
         });
       }, 200);
 
@@ -292,7 +280,6 @@ export const MusicUploader = () => {
       
       clearInterval(progressInterval);
       setUploadProgress(100);
-      updateProgress(file.name, fileIndex, 70);
 
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
@@ -310,7 +297,6 @@ export const MusicUploader = () => {
 
       const formattedDuration = formatDuration(duration);
       URL.revokeObjectURL(audioUrl);
-      updateProgress(file.name, fileIndex, 80);
 
       let imageUrl = "https://picsum.photos/240/240";
       
@@ -331,8 +317,6 @@ export const MusicUploader = () => {
           imageUrl = deezerCover;
         }
       }
-
-      updateProgress(file.name, fileIndex, 90);
 
       const { data: songData, error: songError } = await supabase
         .from('songs')
@@ -417,7 +401,6 @@ export const MusicUploader = () => {
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentUploadingSong(null);
-      updateProgress(file.name, fileIndex + 1, 100);
 
       return {
         id: fileId,
@@ -440,6 +423,7 @@ export const MusicUploader = () => {
   };
 
   const processFiles = async (files: FileList | File[]) => {
+    // Réinitialiser le cache des fichiers LRC
     lrcFilesRef.current.clear();
     
     const allFiles = Array.from(files);
@@ -450,8 +434,11 @@ export const MusicUploader = () => {
       const fileName = file.name.toLowerCase();
       
       if (fileName.endsWith('.lrc')) {
+        // Stocker les fichiers LRC par nom complet et aussi par nom sans extension
         lrcFilesRef.current.set(file.name, file);
         console.log("Fichier LRC détecté et mis en cache:", file.name);
+        
+        // Afficher un toast pour informer l'utilisateur que des fichiers LRC ont été détectés
         toast.info(`Fichier de paroles détecté: ${file.name}`);
       } else if (file.type.startsWith('audio/')) {
         audioFiles.push(file);
@@ -466,19 +453,14 @@ export const MusicUploader = () => {
     console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
     console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
     
-    // Démarrer le suivi global
-    startUpload(audioFiles.length);
-
-    const processedSongs = [];
-    for (let i = 0; i < audioFiles.length; i++) {
-      const song = await processAudioFile(audioFiles[i], i + 1, audioFiles.length);
-      if (song) {
-        processedSongs.push(song);
-      }
+    // Afficher les noms des fichiers LRC pour le débogage
+    if (lrcFilesRef.current.size > 0) {
+      console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
     }
 
-    // Terminer le suivi global
-    completeUpload();
+    const processedSongs = await Promise.all(
+      audioFiles.map(processAudioFile)
+    );
 
     const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
     console.log("Chansons valides traitées:", validSongs);
@@ -487,6 +469,7 @@ export const MusicUploader = () => {
       validSongs.forEach(song => addToQueue(song));
     }
     
+    // Nettoyer le cache des fichiers LRC
     lrcFilesRef.current.clear();
   };
 
@@ -576,99 +559,88 @@ export const MusicUploader = () => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     await processFiles(files);
+    // Réinitialiser l'input pour permettre de sélectionner le même dossier plusieurs fois
     event.target.value = '';
   };
 
   return (
-    <>
-      <GlobalUploadProgress
-        isVisible={globalStats.isUploading}
-        progress={globalStats.progress}
-        currentFile={globalStats.currentFile}
-        filesProcessed={globalStats.filesProcessed}
-        totalFiles={globalStats.totalFiles}
-        estimatedTimeLeft={globalStats.estimatedTimeLeft}
-        uploadSpeed={globalStats.uploadSpeed}
-      />
-      
-      <div 
-        className={cn(
-          "p-4 relative transition-all duration-300",
-          isDragging && "bg-white/5 rounded-lg"
-        )}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex gap-2">
-            {/* Single file upload button */}
-            <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-              <Upload className="w-5 h-5" />
-              <span>{t('common.upload')} un fichier</span>
-              <input
-                type="file"
-                accept="audio/*,.lrc"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </label>
-            
-            {/* Directory upload button */}
-            <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-              <Upload className="w-5 h-5" />
-              <span>{t('common.upload')} un dossier</span>
-              <input
-                type="file"
-                accept="audio/*,.lrc"
-                multiple
-                webkitdirectory=""
-                directory=""
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </label>
-          </div>
-          <div className="text-xs text-spotify-neutral">
-            Using: {storageProvider}
-          </div>
-        </div>
-
-        {/* Upload progress bar */}
-        {isUploading && (
-          <div className="mb-4 p-4 bg-spotify-dark/50 rounded-lg border border-border">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-foreground">
-                Upload en cours: {currentUploadingSong}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {Math.round(uploadProgress)}%
-              </div>
-            </div>
-            <Progress 
-              value={uploadProgress} 
-              className="h-2"
-              indicatorClassName="bg-spotify-accent transition-all duration-300"
+    <div 
+      className={cn(
+        "p-4 relative transition-all duration-300",
+        isDragging && "bg-white/5 rounded-lg"
+      )}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex gap-2">
+          {/* Single file upload button */}
+          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
+            <Upload className="w-5 h-5" />
+            <span>{t('common.upload')} un fichier</span>
+            <input
+              type="file"
+              accept="audio/*,.lrc"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
             />
-          </div>
-        )}
-
-        {isDragging && (
-          <div 
-            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <p className="text-white text-lg font-medium">
-              Déposez vos fichiers ici
-            </p>
-          </div>
-        )}
+          </label>
+          
+          {/* Directory upload button */}
+          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
+            <Upload className="w-5 h-5" />
+            <span>{t('common.upload')} un dossier</span>
+            <input
+              type="file"
+              accept="audio/*,.lrc"
+              multiple
+              webkitdirectory=""
+              directory=""
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+        </div>
+        <div className="text-xs text-spotify-neutral">
+          Using: {storageProvider}
+        </div>
       </div>
-    </>
+
+      {/* Upload progress bar */}
+      {isUploading && (
+        <div className="mb-4 p-4 bg-spotify-dark/50 rounded-lg border border-border">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-foreground">
+              Upload en cours: {currentUploadingSong}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {Math.round(uploadProgress)}%
+            </div>
+          </div>
+          <Progress 
+            value={uploadProgress} 
+            className="h-2"
+            indicatorClassName="bg-spotify-accent transition-all duration-300"
+          />
+        </div>
+      )}
+
+      {isDragging && (
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm"
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <p className="text-white text-lg font-medium">
+            Déposez vos fichiers ici
+          </p>
+        </div>
+      )}
+    </div>
   );
 };

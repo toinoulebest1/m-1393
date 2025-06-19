@@ -829,10 +829,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      delete_song_completely: {
-        Args: { song_id_param: string }
-        Returns: boolean
-      }
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string
