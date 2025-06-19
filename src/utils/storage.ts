@@ -56,8 +56,81 @@ export const storeAudioFile = async (id: string, file: File | string) => {
   }
 };
 
+// New function to get permanent OneDrive link from cache
+export const getPermanentOneDriveLink = async (path: string): Promise<string | null> => {
+  console.log("=== RECHERCHE LIEN PERMANENT ===");
+  console.log("Chemin recherché:", path);
+  
+  try {
+    const { data, error } = await supabase
+      .from('onedrive_permanent_links')
+      .select('permanent_url, last_verified_at, is_active')
+      .eq('local_id', path)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Erreur lors de la recherche du lien permanent:", error);
+      return null;
+    }
+    
+    if (data?.permanent_url) {
+      console.log("Lien permanent trouvé:", data.permanent_url);
+      
+      // Update last_verified_at timestamp
+      await supabase
+        .from('onedrive_permanent_links')
+        .update({ last_verified_at: new Date().toISOString() })
+        .eq('local_id', path);
+      
+      return data.permanent_url;
+    }
+    
+    console.log("Aucun lien permanent trouvé pour:", path);
+    return null;
+  } catch (error) {
+    console.error("Erreur lors de la récupération du lien permanent:", error);
+    return null;
+  }
+};
+
+// New function to store permanent OneDrive link
+export const storePermanentOneDriveLink = async (
+  localId: string,
+  permanentUrl: string,
+  fileName?: string,
+  fileSize?: number
+): Promise<void> => {
+  console.log("=== STOCKAGE LIEN PERMANENT ===");
+  console.log("Local ID:", localId);
+  console.log("URL permanente:", permanentUrl);
+  
+  try {
+    const { error } = await supabase
+      .from('onedrive_permanent_links')
+      .upsert({
+        local_id: localId,
+        permanent_url: permanentUrl,
+        file_name: fileName,
+        file_size: fileSize,
+        is_active: true,
+        last_verified_at: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error("Erreur lors du stockage du lien permanent:", error);
+      throw error;
+    }
+    
+    console.log("Lien permanent stocké avec succès");
+  } catch (error) {
+    console.error("Erreur lors du stockage du lien permanent:", error);
+    throw error;
+  }
+};
+
 export const getAudioFile = async (path: string) => {
-  console.log("=== DÉBUT RÉCUPÉRATION FICHIER AUDIO ===");
+  console.log("=== DÉBUT RÉCUPÉRATION FICHIER AUDIO (OPTIMISÉ) ===");
   console.log("Chemin demandé:", path);
   
   if (!path) {
@@ -80,7 +153,7 @@ export const getAudioFile = async (path: string) => {
       console.log("Fichier non trouvé dans le cache");
     }
 
-    // If not in cache, proceed normally
+    // Check if OneDrive is enabled
     console.log("=== VÉRIFICATION PROVIDER ===");
     const useOneDrive = await isOneDriveEnabled();
     console.log("Provider utilisé:", useOneDrive ? "OneDrive" : "Supabase");
@@ -88,17 +161,26 @@ export const getAudioFile = async (path: string) => {
     let audioUrl: string;
     
     if (useOneDrive) {
-      console.log("=== RÉCUPÉRATION ONEDRIVE ===");
-      console.log("Chemin OneDrive:", `audio/${path}`);
-      try {
-        // Get direct download URL from OneDrive
-        audioUrl = await getOneDriveSharedLink(`audio/${path}`);
-        console.log("URL OneDrive récupérée:", audioUrl);
-      } catch (oneDriveError) {
-        console.error("=== ERREUR ONEDRIVE ===");
-        console.error("Erreur OneDrive:", oneDriveError);
-        console.error("=====================");
-        throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
+      console.log("=== RÉCUPÉRATION ONEDRIVE OPTIMISÉE ===");
+      
+      // First, try to get permanent link from cache
+      const permanentLink = await getPermanentOneDriveLink(path);
+      
+      if (permanentLink) {
+        console.log("Lien permanent trouvé dans le cache:", permanentLink);
+        audioUrl = permanentLink;
+      } else {
+        console.log("Aucun lien permanent en cache, utilisation de l'API...");
+        try {
+          // Fallback to API if no permanent link is cached
+          audioUrl = await getOneDriveSharedLink(`audio/${path}`);
+          console.log("URL OneDrive récupérée via API:", audioUrl);
+        } catch (oneDriveError) {
+          console.error("=== ERREUR ONEDRIVE ===");
+          console.error("Erreur OneDrive:", oneDriveError);
+          console.error("=====================");
+          throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
+        }
       }
     } else {
       console.log("=== RÉCUPÉRATION SUPABASE ===");
