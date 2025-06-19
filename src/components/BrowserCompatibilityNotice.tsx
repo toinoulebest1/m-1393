@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { AutoplayManager } from '@/utils/autoplayManager';
 import { AlertTriangle, Globe } from 'lucide-react';
