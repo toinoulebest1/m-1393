@@ -15,6 +15,9 @@ export const useMaintenanceMode = () => {
   const [settings, setSettings] = useState<MaintenanceSettings>({
     isMaintenanceMode: false,
     maintenanceMessage: '',
+    endTime: undefined,
+    currentStep: undefined,
+    totalSteps: undefined,
     isLoading: true
   });
 
@@ -33,13 +36,14 @@ export const useMaintenanceMode = () => {
 
       if (error) {
         console.error('Erreur lors de la vérification du mode maintenance:', error);
+        setSettings(prev => ({ ...prev, isLoading: false }));
         return;
       }
 
-      const settingsMap = data.reduce((acc, item) => {
+      const settingsMap = data?.reduce((acc, item) => {
         acc[item.key] = item.value;
         return acc;
-      }, {} as Record<string, string>);
+      }, {} as Record<string, string>) || {};
 
       setSettings({
         isMaintenanceMode: settingsMap.maintenance_mode === 'true',
