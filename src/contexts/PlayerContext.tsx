@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
@@ -116,7 +115,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const song = JSON.parse(savedSong);
         try {
           const audioUrl = await getAudioFile(song.url);
-          if (!audioUrl) return;
+          if (!audioUrl || typeof audioUrl !== 'string') return;
 
           audioRef.current.src = audioUrl;
           audioRef.current.load();
