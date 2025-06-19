@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -126,21 +127,6 @@ function App() {
                       )
                     } 
                   />
-                  
-                  {/* Nouvelle route pour la page Now Playing */}
-                  <Route 
-                    path="/now-playing" 
-                    element={
-                      session ? (
-                        <Layout showNowPlaying={true}>
-                          <div></div>
-                        </Layout>
-                      ) : (
-                        <Navigate to="/auth" />
-                      )
-                    } 
-                  />
-                  
                   <Route 
                     path="/favorites" 
                     element={
@@ -153,7 +139,6 @@ function App() {
                       )
                     } 
                   />
-                  
                   <Route 
                     path="/search" 
                     element={

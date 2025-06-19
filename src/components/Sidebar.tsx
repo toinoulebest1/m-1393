@@ -1,159 +1,138 @@
 
-import { Home, Search, Heart, Plus, Music, ListMusic, BarChart4, Settings, Album } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useUser } from "@/hooks/useUser";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
+import { Button } from "./ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { MusicUploader } from "./MusicUploader";
+import { ThemeToggle } from "./ThemeToggle";
+import { AdBanner } from "./AdBanner";
+import { useState, useEffect } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Sidebar = () => {
-  const { t } = useTranslation();
-  const { user, isLoading } = useUser();
   const location = useLocation();
-  const [username, setUsername] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const fetchUsername = async () => {
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .single();
+    const checkAdminStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        if (profile) {
-          setUsername(profile.username);
-        }
-      }
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
     };
 
-    fetchUsername();
-  }, [user]);
+    checkAdminStatus();
+  }, []);
 
-  if (isLoading) {
-    return <div>Loading sidebar...</div>;
+  const links = [
+    { to: "/", icon: Home, label: t('common.home') },
+    { to: "/search", icon: Search, label: t('common.search') },
+    { to: "/playlists", icon: ListMusic, label: t('common.playlists') },
+    { to: "/favorites", icon: Heart, label: t('common.favorites') },
+    { to: "/history", icon: History, label: t('common.history') },
+    { to: "/top100", icon: Trophy, label: t('common.top100') },
+    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
+  ];
+
+  if (isAdmin) {
+    links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
+    links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
+    links.push({ to: "/onedrive-settings", icon: CloudUpload, label: "OneDrive" });
+    links.push({ to: "/maintenance-admin", icon: Settings, label: "Maintenance" });
   }
 
+  const handleLanguageChange = (value: string) => {
+    i18n.changeLanguage(value);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/auth');
+      toast.success(t('common.logoutSuccess'));
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+      toast.error(t('common.logoutError'));
+    }
+  };
+
   return (
-    <div className="h-screen w-64 bg-spotify-base p-4 flex flex-col">
+    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
       <div className="mb-8">
-        <Link to="/" className="flex items-center space-x-2 font-semibold text-white">
-          <Music className="w-6 h-6" />
-          <span>Spotify</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Music2 className="w-8 h-8 text-spotify-accent" />
+          <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
+        </div>
       </div>
 
-      <nav className="flex-1">
-        <div className="space-y-1">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <Home className="w-5 h-5" />
-            <span>{t('sidebar.home')}</span>
-          </NavLink>
-          <NavLink
-            to="/search"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <Search className="w-5 h-5" />
-            <span>{t('sidebar.search')}</span>
-          </NavLink>
-          <NavLink
-            to="/playlists"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <ListMusic className="w-5 h-5" />
-            <span>{t('sidebar.playlists')}</span>
-          </NavLink>
-          <NavLink
-            to="/favorites"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <Heart className="w-5 h-5" />
-            <span>{t('sidebar.favorites')}</span>
-          </NavLink>
-          <Link 
-            to="/now-playing"
+      <nav className="space-y-2">
+        {links.map(({ to, icon: Icon, label }) => (
+          <Link
+            key={to}
+            to={to}
             className={cn(
-              "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
-              location.pathname === "/now-playing" 
-                ? "bg-spotify-accent text-white" 
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
+              "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors",
+              location.pathname === to
+                ? "bg-spotify-accent text-white"
+                : "text-spotify-neutral hover:text-white hover:bg-white/10"
             )}
           >
-            <Music className="w-5 h-5" />
-            <span>{t('sidebar.nowPlaying')}</span>
+            <Icon className="w-5 h-5" />
+            <span className="font-medium">{label}</span>
           </Link>
-          <NavLink
-            to="/top100"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <BarChart4 className="w-5 h-5" />
-            <span>{t('sidebar.top100')}</span>
-          </NavLink>
-          <NavLink
-            to="/history"
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
-              ${isActive
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/5"
-              }`
-            }
-          >
-            <Album className="w-5 h-5" />
-            <span>{t('sidebar.history')}</span>
-          </NavLink>
-        </div>
+        ))}
       </nav>
 
-      <div className="mt-auto">
-        {user ? (
-          <div className="flex items-center space-x-4">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={`https://avatar.vercel.sh/${username}.png`} />
-              <AvatarFallback>{username?.charAt(0).toUpperCase() || '?'}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium text-white">{username || 'Profile'}</span>
-          </div>
-        ) : (
-          <Button variant="secondary">{t('sidebar.login')}</Button>
-        )}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
+          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
+            <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
+              <SelectValue placeholder={t('common.language')} />
+            </SelectTrigger>
+            <SelectContent className="bg-spotify-dark border-white/10">
+              <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
+                Français
+              </SelectItem>
+              <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
+                English
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <ThemeToggle />
+
+          <MusicUploader />
+          
+          <AdBanner />
+        </div>
+
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-5 h-5 mr-2" />
+            <span>{t('common.logout')}</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
