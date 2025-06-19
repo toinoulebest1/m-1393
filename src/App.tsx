@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,16 +24,28 @@ import { OneDriveSettings } from "./components/OneDriveSettings";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import OneDriveCallback from "./pages/OneDriveCallback";
 import ArtistProfile from "./pages/ArtistProfile";
+import MaintenanceAdmin from "./pages/MaintenanceAdmin";
+import { MaintenancePage } from "./components/MaintenancePage";
+import { useMaintenanceMode } from "./hooks/useMaintenanceMode";
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading } = useMaintenanceMode();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
         setLoading(false);
+        
+        // Vérifier si l'utilisateur est admin
+        if (session?.user) {
+          checkAdminStatus(session.user.id);
+        } else {
+          setIsAdmin(false);
+        }
       }
     );
 
@@ -40,6 +53,10 @@ function App() {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setLoading(false);
+      
+      if (session?.user) {
+        checkAdminStatus(session.user.id);
+      }
     };
 
     checkSession();
@@ -49,11 +66,38 @@ function App() {
     };
   }, []);
 
-  if (loading) {
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
+    } catch (error) {
+      console.error('Erreur lors de la vérification du rôle admin:', error);
+      setIsAdmin(false);
+    }
+  };
+
+  if (loading || maintenanceLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-spotify-base">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-accent"></div>
       </div>
+    );
+  }
+
+  // Si le mode maintenance est activé et que l'utilisateur n'est pas admin
+  if (isMaintenanceMode && !isAdmin) {
+    return (
+      <ThemeProvider attribute="class" defaultTheme="dark">
+        <MaintenancePage 
+          message={maintenanceMessage}
+          onRetry={() => window.location.reload()}
+        />
+      </ThemeProvider>
     );
   }
 
@@ -172,6 +216,20 @@ function App() {
                     </Layout>
                   ) : (
                     <Navigate to="/auth" />
+                  )
+                } 
+              />
+              
+              {/* New maintenance admin route - only for admins */}
+              <Route 
+                path="/maintenance-admin" 
+                element={
+                  session && isAdmin ? (
+                    <Layout>
+                      <MaintenanceAdmin />
+                    </Layout>
+                  ) : (
+                    <Navigate to="/" />
                   )
                 } 
               />

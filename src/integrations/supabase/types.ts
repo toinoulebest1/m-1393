@@ -525,6 +525,30 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
       song_reports: {
         Row: {
           created_at: string | null
@@ -658,6 +682,10 @@ export type Database = {
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      has_role: {
+        Args: { _user_id: string; _role: string }
+        Returns: boolean
       }
       is_admin: {
         Args: { user_id: string }
