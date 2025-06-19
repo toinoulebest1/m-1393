@@ -1,12 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { getOneDriveConfigSync } from '@/utils/oneDriveStorage';
-import { saveSharedOneDriveConfig } from '@/utils/sharedOneDriveConfig';
+import { saveSharedOneDriveConfig, fetchSharedOneDriveConfig, invalidateSharedConfigCache } from '@/utils/sharedOneDriveConfig';
 import { Loader2, Share2, Shield } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -14,6 +14,23 @@ export const OneDriveShareConfig = () => {
   const [isSharing, setIsSharing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Vérifier l'état actuel du partage au chargement
+  useEffect(() => {
+    const checkSharingStatus = async () => {
+      try {
+        const sharedConfig = await fetchSharedOneDriveConfig();
+        setIsSharing(!!sharedConfig?.isEnabled);
+      } catch (error) {
+        console.error('Erreur lors de la vérification du statut de partage:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSharingStatus();
+  }, []);
   
   const handleShareConfig = async () => {
     setIsProcessing(true);
@@ -63,6 +80,54 @@ export const OneDriveShareConfig = () => {
     }
   };
 
+  const handleStopSharing = async () => {
+    setIsProcessing(true);
+    
+    try {
+      // Save an empty/disabled configuration to stop sharing
+      const disabledConfig = {
+        accessToken: '',
+        refreshToken: '',
+        isEnabled: false,
+        clientId: '',
+        isShared: false
+      };
+      
+      const success = await saveSharedOneDriveConfig(disabledConfig);
+      
+      if (success) {
+        setIsSharing(false);
+        // Invalider le cache pour forcer le rechargement
+        invalidateSharedConfigCache();
+        toast({
+          title: "Succès",
+          description: "Le partage de configuration OneDrive a été désactivé",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Error stopping OneDrive sharing:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de l'arrêt du partage",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardContent className="flex items-center justify-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Vérification du statut de partage...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -96,10 +161,7 @@ export const OneDriveShareConfig = () => {
                   if (checked) {
                     setShowConfirmation(true);
                   } else {
-                    // Implémenter la logique pour arrêter le partage si nécessaire
-                    toast({
-                      description: "Fonctionnalité de désactivation du partage non implémentée"
-                    });
+                    handleStopSharing();
                   }
                 }}
                 disabled={isProcessing}

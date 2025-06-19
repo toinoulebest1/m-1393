@@ -69,7 +69,7 @@ export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<
       refreshToken: config.refreshToken,
       isEnabled: config.isEnabled,
       clientId: config.clientId,
-      isShared: true
+      isShared: config.isShared || false
     };
 
     const { error } = await supabase
@@ -99,9 +99,13 @@ export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<
     sharedConfigCache = config;
     lastFetchTime = Date.now();
     
+    const successMessage = config.isEnabled ? 
+      'Configuration OneDrive partagée enregistrée avec succès' :
+      'Partage de configuration OneDrive désactivé avec succès';
+    
     toast({
       title: "Succès",
-      description: 'Configuration OneDrive partagée enregistrée avec succès',
+      description: successMessage,
       variant: "default"
     });
     return true;
@@ -110,6 +114,46 @@ export const saveSharedOneDriveConfig = async (config: OneDriveConfig): Promise<
     toast({
       title: "Erreur",
       description: 'Erreur lors de l\'enregistrement de la configuration OneDrive partagée',
+      variant: "destructive"
+    });
+    return false;
+  }
+};
+
+/**
+ * Removes the shared OneDrive configuration from the database
+ */
+export const removeSharedOneDriveConfig = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('app_settings')
+      .delete()
+      .eq('key', 'shared_onedrive_config');
+    
+    if (error) {
+      console.error('Error removing shared OneDrive config:', error);
+      toast({
+        title: "Erreur",
+        description: 'Erreur lors de la suppression de la configuration OneDrive partagée',
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Clear cache
+    invalidateSharedConfigCache();
+    
+    toast({
+      title: "Succès",
+      description: 'Configuration OneDrive partagée supprimée avec succès',
+      variant: "default"
+    });
+    return true;
+  } catch (error) {
+    console.error('Exception while removing shared OneDrive config:', error);
+    toast({
+      title: "Erreur",
+      description: 'Erreur lors de la suppression de la configuration OneDrive partagée',
       variant: "destructive"
     });
     return false;
