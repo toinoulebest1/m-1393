@@ -5,6 +5,7 @@ export interface OneDriveConfig {
   isEnabled: boolean;
   clientId: string;
   isShared?: boolean; // Added to indicate if the config is shared with all users
+  useDirectLinks?: boolean; // New option to choose between API and direct links
 }
 
 export interface OneDriveFileReference {
@@ -23,4 +24,5 @@ export type OneDriveConfigJson = {
   isEnabled: boolean;
   clientId: string;
   isShared?: boolean;
+  useDirectLinks?: boolean;
 }
