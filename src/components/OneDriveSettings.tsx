@@ -25,8 +25,6 @@ import { OneDriveDiagnostics } from '@/components/OneDriveDiagnostics';
 import { OneDriveConfigGuide } from '@/components/OneDriveConfigGuide';
 import { fetchSharedOneDriveConfig } from '@/utils/sharedOneDriveConfig';
 import { OneDrivePermanentLinksManager } from '@/components/OneDrivePermanentLinksManager';
-import { Settings } from 'lucide-react';
-import { OneDrivePlaybackSettings } from './OneDrivePlaybackSettings';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -643,14 +641,15 @@ export const OneDriveSettings = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <OneDriveDiagnostics />
+      <OneDriveConfigGuide />
+      
+      <Card className="w-full">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Configuration OneDrive
-          </CardTitle>
+          <CardTitle>Intégration Microsoft OneDrive</CardTitle>
           <CardDescription>
-            Configurez l'intégration OneDrive pour stocker et lire vos fichiers audio
+            Configurer OneDrive pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
+            Votre jeton sera automatiquement synchronisé entre tous vos appareils lorsque le partage est activé.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1002,9 +1001,6 @@ export const OneDriveSettings = () => {
       
       {/* Section des liens permanents OneDrive */}
       <OneDrivePermanentLinksManager />
-      
-      {/* Add the new playback settings component */}
-      <OneDrivePlaybackSettings />
     </div>
   );
 };

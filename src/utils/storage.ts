@@ -163,52 +163,23 @@ export const getAudioFile = async (path: string) => {
     if (useOneDrive) {
       console.log("=== RÉCUPÉRATION ONEDRIVE OPTIMISÉE ===");
       
-      // Check OneDrive playback mode preference with safe type checking
-      const { data: settingsData } = await supabase
-        .from('user_settings')
-        .select('settings')
-        .eq('key', 'onedrive_config')
-        .maybeSingle();
+      // First, try to get permanent link from cache
+      const permanentLink = await getPermanentOneDriveLink(path);
       
-      let useDirectLinks = false;
-      if (settingsData?.settings && typeof settingsData.settings === 'object') {
-        const settings = settingsData.settings as any;
-        useDirectLinks = settings?.useDirectLinks || false;
-      }
-      
-      console.log("Mode OneDrive utilisé:", useDirectLinks ? "Liens directs" : "API");
-      
-      if (useDirectLinks) {
-        // Try to get permanent link from cache first
-        const permanentLink = await getPermanentOneDriveLink(path);
-        
-        if (permanentLink) {
-          console.log("Lien permanent trouvé dans le cache:", permanentLink);
-          audioUrl = permanentLink;
-        } else {
-          console.log("Aucun lien permanent en cache pour:", path);
-          throw new Error(`Aucun lien permanent configuré pour: ${path}. Veuillez utiliser le gestionnaire de liens permanents ou basculer vers l'API OneDrive.`);
-        }
+      if (permanentLink) {
+        console.log("Lien permanent trouvé dans le cache:", permanentLink);
+        audioUrl = permanentLink;
       } else {
-        // Use OneDrive API
-        console.log("Utilisation de l'API OneDrive...");
+        console.log("Aucun lien permanent en cache, utilisation de l'API...");
         try {
+          // Fallback to API if no permanent link is cached
           audioUrl = await getOneDriveSharedLink(`audio/${path}`);
           console.log("URL OneDrive récupérée via API:", audioUrl);
         } catch (oneDriveError) {
-          console.error("=== ERREUR ONEDRIVE API ===");
+          console.error("=== ERREUR ONEDRIVE ===");
           console.error("Erreur OneDrive:", oneDriveError);
-          
-          // Fallback to permanent links if API fails
-          console.log("Tentative de récupération via lien permanent...");
-          const fallbackLink = await getPermanentOneDriveLink(path);
-          if (fallbackLink) {
-            console.log("Lien permanent de secours trouvé:", fallbackLink);
-            audioUrl = fallbackLink;
-          } else {
-            console.error("=====================");
-            throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
-          }
+          console.error("=====================");
+          throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
         }
       }
     } else {
