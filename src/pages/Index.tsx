@@ -79,10 +79,8 @@ const Index = () => {
 
   useEffect(() => {
     if (currentSong) {
-      // This will trigger a re-render when the current song changes
       setForceUpdate(prev => prev + 1);
       
-      // Show mobile notification when song changes
       if (isMobile && currentSong.id !== previousSongId) {
         const formatDuration = (duration: string | undefined) => {
           if (!duration) return "0:00";
@@ -230,7 +228,6 @@ const Index = () => {
         </div>
       )}
       
-      {/* Afficher la chanson indisponible si elle existe */}
       {unavailableSong && (
         <div className="fixed top-16 right-4 z-50 w-80">
           <div className="p-3 bg-black/60 backdrop-blur-md rounded-lg border border-red-500/30">
@@ -240,7 +237,6 @@ const Index = () => {
         </div>
       )}
       
-      {/* En-tête indiquant l'état de lecture */}
       <div className="w-full text-center pt-6 pb-2">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full backdrop-blur-sm">
           <Music className="w-5 h-5 text-spotify-accent animate-pulse" />
@@ -250,15 +246,18 @@ const Index = () => {
         </div>
       </div>
       
-      {/* Affichage de la musique en cours uniquement */}
       <div className="flex-1 w-full flex items-center justify-center">
         {currentSong ? (
           <div className="text-center p-6 max-w-md mx-auto">
-            <div className="w-64 h-64 mx-auto mb-8">
+            <div className="w-64 h-64 mx-auto mb-8 relative">
               <img 
                 src={currentSong.imageUrl || "https://picsum.photos/300/300"} 
                 alt="Album art" 
-                className="w-full h-full object-cover rounded-lg shadow-lg" 
+                className={`w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300 ${
+                  isPlaying 
+                    ? 'shadow-[0_0_30px_10px_rgba(155,135,245,0.4),0_0_60px_20px_rgba(155,135,245,0.2)] animate-glow' 
+                    : 'shadow-lg'
+                }`}
               />
             </div>
             <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
@@ -276,7 +275,6 @@ const Index = () => {
         )}
       </div>
       
-      {/* Gestionnaire de cache audio */}
       {showCacheManager && (
         <div className="absolute right-4 top-14 z-50 w-80">
           <AudioCacheManager />
