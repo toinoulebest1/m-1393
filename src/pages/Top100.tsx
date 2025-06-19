@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
 import ColorThief from 'colorthief';
 import { cn } from "@/lib/utils";
+import { TransitionGroup, CSSTransition } from 'react-transition-group';
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
@@ -206,7 +207,21 @@ const Top100 = () => {
           .slice(0, 100);
 
         console.log("Formatted and grouped stats:", formattedStats);
-        setFavoriteStats(formattedStats);
+        
+        // Smooth transition: preserve previous positions for animation
+        setFavoriteStats(prev => {
+          if (prev.length === 0) return formattedStats;
+          
+          // Create a map of previous positions
+          const prevPositions = new Map(prev.map((stat, index) => [stat.songId, index]));
+          
+          // Add transition data to new stats
+          return formattedStats.map((stat, newIndex) => ({
+            ...stat,
+            previousPosition: prevPositions.get(stat.songId) ?? -1,
+            currentPosition: newIndex
+          }));
+        });
       } catch (error) {
         console.error("Error in fetchFavoriteStats:", error);
       }
@@ -424,7 +439,7 @@ const Top100 = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <TransitionGroup className="space-y-2">
             {favoriteStats.map((stat, index) => {
               const isCurrentSong = currentSong?.id === stat.song.id;
               const glowStyle = isCurrentSong && dominantColor ? {
@@ -441,129 +456,134 @@ const Top100 = () => {
               const isTop3 = rankNumber <= 3;
 
               return (
-                <div
+                <CSSTransition
                   key={stat.songId}
-                  className={cn(
-                    "group p-4 rounded-lg transition-all duration-300 cursor-pointer hover:bg-white/5",
-                    isCurrentSong 
-                      ? "relative bg-white/5 shadow-lg overflow-hidden" 
-                      : "bg-transparent"
-                  )}
-                  onClick={() => handlePlay(stat.song)}
+                  timeout={500}
+                  classNames="rank-item"
                 >
-                  {isCurrentSong && (
-                    <div className="absolute inset-0 z-0 overflow-hidden">
-                      <div 
-                        className="absolute inset-0 animate-gradient opacity-20" 
-                        style={{
-                          backgroundSize: '200% 200%',
-                          animation: 'gradient 3s linear infinite',
-                          background: dominantColor 
-                            ? `linear-gradient(45deg, 
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
-                                rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
-                              )`
-                            : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className={cn(
-                        "w-8 h-8 flex items-center justify-center rounded-lg font-bold",
-                        isTop3 ? "bg-gradient-to-br" : "bg-white/5",
-                        rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
-                        rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
-                        rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
-                        !isTop3 && "text-spotify-neutral"
-                      )}>
-                        #{rankNumber}
+                  <div
+                    className={cn(
+                      "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5 rank-item",
+                      isCurrentSong 
+                        ? "relative bg-white/5 shadow-lg overflow-hidden" 
+                        : "bg-transparent"
+                    )}
+                    onClick={() => handlePlay(stat.song)}
+                  >
+                    {isCurrentSong && (
+                      <div className="absolute inset-0 z-0 overflow-hidden">
+                        <div 
+                          className="absolute inset-0 animate-gradient opacity-20" 
+                          style={{
+                            backgroundSize: '200% 200%',
+                            animation: 'gradient 3s linear infinite',
+                            background: dominantColor 
+                              ? `linear-gradient(45deg, 
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8),
+                                  rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)
+                                )`
+                              : 'linear-gradient(45deg, #8B5CF6, #D946EF, #0EA5E9)',
+                          }}
+                        />
                       </div>
-                      <img
-                        src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                        alt={`Pochette de ${stat.song.title}`}
-                        className={cn(
-                          "w-14 h-14 rounded-lg shadow-lg object-cover",
-                          isCurrentSong && "animate-pulse"
-                        )}
-                        style={glowStyle}
-                        loading="lazy"
-                      />
-                      <div>
-                        <h3 className={cn(
-                          "font-medium transition-colors",
-                          isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                    )}
+
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded-lg font-bold transition-all duration-500",
+                          isTop3 ? "bg-gradient-to-br" : "bg-white/5",
+                          rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
+                          rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
+                          rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
+                          !isTop3 && "text-spotify-neutral"
                         )}>
-                          {stat.song.title}
-                        </h3>
-                        <p className="text-sm text-spotify-neutral">{stat.song.artist}</p>
+                          #{rankNumber}
+                        </div>
+                        <img
+                          src={stat.song.image_url || PLACEHOLDER_IMAGE}
+                          alt={`Pochette de ${stat.song.title}`}
+                          className={cn(
+                            "w-14 h-14 rounded-lg shadow-lg object-cover",
+                            isCurrentSong && "animate-pulse"
+                          )}
+                          style={glowStyle}
+                          loading="lazy"
+                        />
+                        <div>
+                          <h3 className={cn(
+                            "font-medium transition-colors",
+                            isCurrentSong ? "text-white" : "text-spotify-neutral hover:text-white"
+                          )}>
+                            {stat.song.title}
+                          </h3>
+                          <p className="text-sm text-spotify-neutral">{stat.song.artist}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-6">
-                      <div className="flex items-center space-x-1 text-spotify-neutral">
-                        <span className="text-sm">{formatDuration(stat.song.duration)}</span>
-                      </div>
+                      <div className="flex items-center space-x-6">
+                        <div className="flex items-center space-x-1 text-spotify-neutral">
+                          <span className="text-sm">{formatDuration(stat.song.duration)}</span>
+                        </div>
 
-                      <div className="flex items-center space-x-2">
-                        <Heart className={`w-4 h-4 text-spotify-accent fill-spotify-accent ${
-                          isCurrentSong ? 'scale-110' : ''
-                        } transition-transform duration-300`} />
-                        <span className="text-sm">{stat.count || 0}</span>
-                      </div>
+                        <div className="flex items-center space-x-2">
+                          <Heart className={`w-4 h-4 text-spotify-accent fill-spotify-accent ${
+                            isCurrentSong ? 'scale-110' : ''
+                          } transition-transform duration-300`} />
+                          <span className="text-sm">{stat.count || 0}</span>
+                        </div>
 
-                      <div className="flex items-center space-x-2">
-                        {isAdmin && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlay(stat.song);
-                              }}
-                            >
-                              <Play className="w-5 h-5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedSong({
-                                  id: stat.song.id,
-                                  title: stat.song.title,
-                                  artist: stat.song.artist,
-                                });
-                              }}
-                            >
-                              <FileText className="w-5 h-5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-destructive/10 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(stat.songId);
-                              }}
-                              title="Supprimer du Top 100"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </Button>
-                          </>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {isAdmin && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePlay(stat.song);
+                                }}
+                              >
+                                <Play className="w-5 h-5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-white/10 text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSong({
+                                    id: stat.song.id,
+                                    title: stat.song.title,
+                                    artist: stat.song.artist,
+                                  });
+                                }}
+                              >
+                                <FileText className="w-5 h-5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-300 hover:bg-destructive/10 text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(stat.songId);
+                                }}
+                                title="Supprimer du Top 100"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </CSSTransition>
               );
             })}
-          </div>
+          </TransitionGroup>
         </div>
       </div>
       <Player />

@@ -1,4 +1,5 @@
 
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -138,6 +139,33 @@
     opacity: 0.95;
     transform: scale(1);
   }
+}
+
+/* Animations pour les transitions fluides du Top 100 */
+.rank-item-enter {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.rank-item-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rank-item-exit {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.rank-item-exit-active {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+  transition: all 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rank-item-move {
+  transition: transform 800ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .animate-gradient {
