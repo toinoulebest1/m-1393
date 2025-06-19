@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -440,7 +441,7 @@ const Top100 = () => {
           </div>
 
           <div className="space-y-2">
-            <AnimatePresence>
+            <AnimatePresence mode="popLayout">
               {favoriteStats.map((stat, index) => {
                 const isCurrentSong = currentSong?.id === stat.song.id;
                 const glowStyle = isCurrentSong && dominantColor ? {
@@ -460,16 +461,19 @@ const Top100 = () => {
                   <motion.div
                     key={stat.songId}
                     layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
+                    layoutId={stat.songId}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
                     transition={{
                       layout: { 
-                        duration: 1.2, 
-                        ease: [0.25, 0.46, 0.45, 0.94] // Courbe d'accélération naturelle
+                        duration: 0.6,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 20
                       },
-                      opacity: { duration: 0.4 },
-                      y: { duration: 0.4 }
+                      opacity: { duration: 0.3 },
+                      scale: { duration: 0.3 }
                     }}
                     className={cn(
                       "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
