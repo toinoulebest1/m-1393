@@ -163,14 +163,19 @@ export const getAudioFile = async (path: string) => {
     if (useOneDrive) {
       console.log("=== RÉCUPÉRATION ONEDRIVE OPTIMISÉE ===");
       
-      // Check OneDrive playback mode preference
+      // Check OneDrive playback mode preference with safe type checking
       const { data: settingsData } = await supabase
         .from('user_settings')
         .select('settings')
         .eq('key', 'onedrive_config')
         .maybeSingle();
       
-      const useDirectLinks = settingsData?.settings?.useDirectLinks || false;
+      let useDirectLinks = false;
+      if (settingsData?.settings && typeof settingsData.settings === 'object') {
+        const settings = settingsData.settings as any;
+        useDirectLinks = settings?.useDirectLinks || false;
+      }
+      
       console.log("Mode OneDrive utilisé:", useDirectLinks ? "Liens directs" : "API");
       
       if (useDirectLinks) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -6,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { OneDriveConfig } from '@/types/onedrive';
+import { OneDriveConfig, OneDriveConfigJson } from '@/types/onedrive';
 import { Settings, Zap, Cloud } from 'lucide-react';
 
 export const OneDrivePlaybackSettings = () => {
@@ -30,8 +29,12 @@ export const OneDrivePlaybackSettings = () => {
       }
 
       if (data?.settings) {
-        const oneDriveConfig = data.settings as OneDriveConfig;
-        setConfig(oneDriveConfig);
+        // Safe type conversion with validation
+        const settingsData = data.settings as unknown;
+        if (typeof settingsData === 'object' && settingsData !== null) {
+          const oneDriveConfig = settingsData as OneDriveConfig;
+          setConfig(oneDriveConfig);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
@@ -58,11 +61,21 @@ export const OneDrivePlaybackSettings = () => {
         useDirectLinks
       };
 
+      // Convert to JSON-compatible format for Supabase
+      const configJson: OneDriveConfigJson = {
+        accessToken: updatedConfig.accessToken,
+        refreshToken: updatedConfig.refreshToken,
+        isEnabled: updatedConfig.isEnabled,
+        clientId: updatedConfig.clientId,
+        isShared: updatedConfig.isShared,
+        useDirectLinks: updatedConfig.useDirectLinks
+      };
+
       const { error } = await supabase
         .from('user_settings')
         .upsert({
           key: 'onedrive_config',
-          settings: updatedConfig
+          settings: configJson as any
         });
 
       if (error) {
