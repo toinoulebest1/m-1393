@@ -94,9 +94,9 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="dark">
         <MaintenancePage 
           message={maintenanceMessage}
-          endTime={useMaintenanceMode().endTime}
-          currentStep={useMaintenanceMode().currentStep}
-          totalSteps={useMaintenanceMode().totalSteps}
+          endTime={endTime}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
           onRetry={() => window.location.reload()}
         />
       </ThemeProvider>
