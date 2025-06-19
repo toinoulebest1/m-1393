@@ -3,7 +3,6 @@ import { Construction, Home, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { MaintenanceCountdown } from "./MaintenanceCountdown";
 import { MaintenanceProgress } from "./MaintenanceProgress";
-import { MaintenanceNotification } from "./MaintenanceNotification";
 import { MaintenanceSocial } from "./MaintenanceSocial";
 
 interface MaintenancePageProps {
@@ -60,11 +59,6 @@ export const MaintenancePage = ({
             />
           </div>
         )}
-
-        {/* Notification par email */}
-        <div className="animate-fade-in">
-          <MaintenanceNotification />
-        </div>
 
         {/* Réseaux sociaux */}
         <div className="animate-fade-in">
