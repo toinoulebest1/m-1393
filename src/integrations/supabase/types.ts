@@ -217,6 +217,27 @@ export type Database = {
           },
         ]
       }
+      maintenance_notifications: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          subscribed_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          subscribed_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          subscribed_at?: string
+        }
+        Relationships: []
+      }
       music_preferences: {
         Row: {
           audio_quality: string | null

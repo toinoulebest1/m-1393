@@ -4,20 +4,43 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Bell, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const MaintenanceNotification = () => {
   const [email, setEmail] = useState("");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     if (!email || !email.includes("@")) {
       toast.error("Veuillez entrer une adresse email valide");
       return;
     }
-    
-    // Simuler l'inscription
-    setIsSubscribed(true);
-    toast.success("Vous serez notifié dès que le site sera disponible !");
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('maintenance_notifications')
+        .insert([{ email }]);
+
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+          toast.error("Cet email est déjà inscrit aux notifications");
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setIsSubscribed(true);
+      toast.success("Vous serez notifié dès que le site sera disponible !");
+    } catch (error) {
+      console.error('Erreur lors de l\'inscription:', error);
+      toast.error("Erreur lors de l'inscription. Veuillez réessayer.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubscribed) {
@@ -52,9 +75,18 @@ export const MaintenanceNotification = () => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="flex-1"
+          disabled={isLoading}
         />
-        <Button onClick={handleSubscribe} variant="outline">
-          <Bell className="w-4 h-4" />
+        <Button 
+          onClick={handleSubscribe} 
+          variant="outline"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <div className="w-4 h-4 animate-spin rounded-full border-2 border-spotify-accent border-t-transparent" />
+          ) : (
+            <Bell className="w-4 h-4" />
+          )}
         </Button>
       </div>
     </div>

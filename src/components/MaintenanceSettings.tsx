@@ -1,185 +1,180 @@
-
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
-import { Textarea } from "./ui/textarea";
-import { Input } from "./ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Calendar } from "./ui/calendar"
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { toast } from "sonner";
-import { Settings, AlertTriangle, Clock, BarChart3 } from "lucide-react";
-import { Label } from "./ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+
+interface MaintenanceSettingsProps {
+  
+}
 
 export const MaintenanceSettings = () => {
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [currentStep, setCurrentStep] = useState(1);
-  const [totalSteps, setTotalSteps] = useState(4);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const { settings, refetch } = useMaintenanceMode();
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(settings.isMaintenanceMode);
+  const [message, setMessage] = useState(settings.maintenanceMessage);
+  const [endTime, setEndTime] = useState<Date | undefined>(settings.endTime ? new Date(settings.endTime) : undefined);
+  const [currentStep, setCurrentStep] = useState<number | undefined>(settings.currentStep);
+  const [totalSteps, setTotalSteps] = useState<number | undefined>(settings.totalSteps);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    setIsMaintenanceMode(settings.isMaintenanceMode);
+    setMessage(settings.maintenanceMessage);
+    setEndTime(settings.endTime ? new Date(settings.endTime) : undefined);
+    setCurrentStep(settings.currentStep);
+    setTotalSteps(settings.totalSteps);
+  }, [settings]);
 
-  const fetchSettings = async () => {
+  const handleSave = async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('key, value')
-        .in('key', ['maintenance_mode', 'maintenance_message', 'maintenance_end_time', 'maintenance_current_step', 'maintenance_total_steps']);
+      const updates = [
+        { key: 'maintenance_mode', value: isMaintenanceMode.toString() },
+        { key: 'maintenance_message', value: message },
+        { key: 'maintenance_end_time', value: endTime ? endTime.toISOString() : null },
+        { key: 'maintenance_current_step', value: currentStep?.toString() || null },
+        { key: 'maintenance_total_steps', value: totalSteps?.toString() || null },
+      ];
 
-      if (error) throw error;
+      const wasMaintenanceMode = settings.isMaintenanceMode;
 
-      const settings = data.reduce((acc, item) => {
-        acc[item.key] = item.value;
-        return acc;
-      }, {} as Record<string, string>);
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('site_settings')
+          .upsert(
+            { key: update.key, value: update.value },
+            { onConflict: 'key' }
+          );
+        
+        if (error) throw error;
+      }
 
-      setIsMaintenanceMode(settings.maintenance_mode === 'true');
-      setMaintenanceMessage(settings.maintenance_message || '');
-      setEndTime(settings.maintenance_end_time || '');
-      setCurrentStep(parseInt(settings.maintenance_current_step) || 1);
-      setTotalSteps(parseInt(settings.maintenance_total_steps) || 4);
+      // Si on vient de désactiver la maintenance, envoyer les notifications
+      if (wasMaintenanceMode && !isMaintenanceMode) {
+        try {
+          console.log('Maintenance désactivée, envoi des notifications...');
+          const { error: notificationError } = await supabase.functions.invoke(
+            'send-maintenance-notifications'
+          );
+          
+          if (notificationError) {
+            console.error('Erreur lors de l\'envoi des notifications:', notificationError);
+            toast.error('Paramètres sauvés mais erreur lors de l\'envoi des notifications');
+          } else {
+            toast.success('Paramètres sauvés et notifications envoyées !');
+          }
+        } catch (error) {
+          console.error('Erreur lors de l\'appel de la fonction de notification:', error);
+          toast.error('Paramètres sauvés mais erreur lors de l\'envoi des notifications');
+        }
+      } else {
+        toast.success('Paramètres sauvegardés avec succès !');
+      }
+
+      // Rafraîchir les paramètres
+      await refetch();
     } catch (error) {
-      console.error('Erreur lors du chargement des paramètres:', error);
-      toast.error('Erreur lors du chargement des paramètres');
+      console.error('Erreur lors de la sauvegarde:', error);
+      toast.error('Erreur lors de la sauvegarde des paramètres');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveSettings = async () => {
-    setIsSaving(true);
-    try {
-      const settingsToUpdate = [
-        { key: 'maintenance_mode', value: isMaintenanceMode.toString() },
-        { key: 'maintenance_message', value: maintenanceMessage },
-        { key: 'maintenance_end_time', value: endTime },
-        { key: 'maintenance_current_step', value: currentStep.toString() },
-        { key: 'maintenance_total_steps', value: totalSteps.toString() }
-      ];
-
-      for (const setting of settingsToUpdate) {
-        const { error } = await supabase
-          .from('site_settings')
-          .upsert({ key: setting.key, value: setting.value }, { onConflict: 'key' });
-
-        if (error) throw error;
-      }
-
-      toast.success('Paramètres de maintenance sauvegardés');
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
-      toast.error('Erreur lors de la sauvegarde des paramètres');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Paramètres de maintenance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-spotify-accent"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Paramètres de maintenance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                <span className="font-medium">Mode maintenance</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Activer le mode maintenance bloquera l'accès au site pour tous les utilisateurs non-admin
-              </p>
-            </div>
-            <Switch
-              checked={isMaintenanceMode}
-              onCheckedChange={setIsMaintenanceMode}
+    <div className="space-y-4">
+      {/* Mode Maintenance */}
+      <div className="flex items-center justify-between">
+        <Label htmlFor="maintenanceMode">Mode Maintenance</Label>
+        <Switch
+          id="maintenanceMode"
+          checked={isMaintenanceMode}
+          onCheckedChange={(checked) => setIsMaintenanceMode(checked)}
+        />
+      </div>
+
+      {/* Message de Maintenance */}
+      <div>
+        <Label htmlFor="maintenanceMessage">Message de Maintenance</Label>
+        <Textarea
+          id="maintenanceMessage"
+          placeholder="Le site est actuellement en maintenance. Nous reviendrons bientôt !"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      </div>
+
+      {/* Date de Fin Estimée */}
+      <div>
+        <Label>Date de Fin Estimée</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className={cn(
+                "w-[240px] justify-start text-left font-normal",
+                !endTime && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {endTime ? format(endTime, "PPP") : <span>Choisir une date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={endTime}
+              onSelect={setEndTime}
+              disabled={(date) =>
+                date < new Date()
+              }
+              initialFocus
             />
-          </div>
+          </PopoverContent>
+        </Popover>
+      </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Message de maintenance</Label>
-            <Textarea
-              placeholder="Entrez le message à afficher aux utilisateurs..."
-              value={maintenanceMessage}
-              onChange={(e) => setMaintenanceMessage(e.target.value)}
-              rows={4}
-            />
-          </div>
+      {/* Progression */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="currentStep">Étape Actuelle</Label>
+          <Input
+            type="number"
+            id="currentStep"
+            placeholder="Étape actuelle"
+            value={currentStep === undefined ? '' : currentStep.toString()}
+            onChange={(e) => setCurrentStep(e.target.value ? parseInt(e.target.value) : undefined)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="totalSteps">Nombre Total d'Étapes</Label>
+          <Input
+            type="number"
+            id="totalSteps"
+            placeholder="Nombre total d'étapes"
+            value={totalSteps === undefined ? '' : totalSteps.toString()}
+            onChange={(e) => setTotalSteps(e.target.value ? parseInt(e.target.value) : undefined)}
+          />
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Fin estimée de la maintenance
-              </Label>
-              <Input
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Progression
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min="1"
-                  max={totalSteps}
-                  value={currentStep}
-                  onChange={(e) => setCurrentStep(parseInt(e.target.value) || 1)}
-                  placeholder="Étape actuelle"
-                />
-                <span className="flex items-center text-muted-foreground">/</span>
-                <Input
-                  type="number"
-                  min="1"
-                  value={totalSteps}
-                  onChange={(e) => setTotalSteps(parseInt(e.target.value) || 4)}
-                  placeholder="Total"
-                />
-              </div>
-            </div>
-          </div>
-
-          <Button 
-            onClick={saveSettings} 
-            disabled={isSaving}
-            className="w-full"
-          >
-            {isSaving ? 'Sauvegarde...' : 'Sauvegarder les paramètres'}
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Bouton de Sauvegarde */}
+      <Button onClick={handleSave} disabled={isLoading}>
+        {isLoading ? (
+          <div className="w-4 h-4 animate-spin rounded-full border-2 border-spotify-accent border-t-transparent" />
+        ) : (
+          'Sauvegarder'
+        )}
+      </Button>
     </div>
   );
 };
