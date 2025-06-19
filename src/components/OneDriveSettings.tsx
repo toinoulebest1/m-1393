@@ -24,7 +24,6 @@ import { generateCodeVerifier, generateCodeChallenge, storePKCEParams } from '@/
 import { OneDriveDiagnostics } from '@/components/OneDriveDiagnostics';
 import { OneDriveConfigGuide } from '@/components/OneDriveConfigGuide';
 import { fetchSharedOneDriveConfig } from '@/utils/sharedOneDriveConfig';
-import { OneDrivePermanentLinksManager } from '@/components/OneDrivePermanentLinksManager';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -998,9 +997,6 @@ export const OneDriveSettings = () => {
       </Card>
       
       <OneDriveShareConfig />
-      
-      {/* Section des liens permanents OneDrive */}
-      <OneDrivePermanentLinksManager />
     </div>
   );
 };

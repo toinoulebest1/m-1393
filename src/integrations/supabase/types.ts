@@ -365,42 +365,6 @@ export type Database = {
         }
         Relationships: []
       }
-      onedrive_permanent_links: {
-        Row: {
-          created_at: string
-          file_name: string | null
-          file_size: number | null
-          id: string
-          is_active: boolean
-          last_verified_at: string | null
-          local_id: string
-          permanent_url: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          file_name?: string | null
-          file_size?: number | null
-          id?: string
-          is_active?: boolean
-          last_verified_at?: string | null
-          local_id: string
-          permanent_url: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          file_name?: string | null
-          file_size?: number | null
-          id?: string
-          is_active?: boolean
-          last_verified_at?: string | null
-          local_id?: string
-          permanent_url?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       play_history: {
         Row: {
           id: string
