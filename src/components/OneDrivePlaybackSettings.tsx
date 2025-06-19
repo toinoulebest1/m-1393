@@ -56,6 +56,15 @@ export const OneDrivePlaybackSettings = () => {
 
     setUpdating(true);
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Error getting user:', userError);
+        toast.error('Erreur d\'authentification');
+        return;
+      }
+
       const updatedConfig: OneDriveConfig = {
         ...config,
         useDirectLinks
@@ -74,6 +83,7 @@ export const OneDrivePlaybackSettings = () => {
       const { error } = await supabase
         .from('user_settings')
         .upsert({
+          user_id: user.id,
           key: 'onedrive_config',
           settings: configJson as any
         });
