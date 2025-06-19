@@ -365,7 +365,7 @@ const SongMetadataUpdate = () => {
       setSyncProgress({ current: 0, total: allSongs.length });
       
       // Traitement par batch pour améliorer les performances
-      const BATCH_SIZE = 20; // Vérifier 20 fichiers à la fois
+      const BATCH_SIZE = 50; // Augmenté pour traiter plus de fichiers à la fois
       const batches = [];
       
       for (let i = 0; i < allSongs.length; i += BATCH_SIZE) {
@@ -375,87 +375,65 @@ const SongMetadataUpdate = () => {
       let songsToDelete: string[] = [];
       let processed = 0;
       
-      // Traitement parallèle des batches
-      for (const batch of batches) {
-        const batchPromises = batch.map(async (song) => {
-          try {
-            const filePath = `audio/${song.id}`;
-            const exists = await checkFileExistsOnOneDrive(filePath);
-            
-            if (!exists) {
-              console.log(`Le fichier ${filePath} n'existe pas sur OneDrive, marqué pour suppression`);
-              return song.id;
+      // Traitement parallèle des batches avec Promise.all
+      const batchPromises = batches.map(async (batch, batchIndex) => {
+        const batchResults = await Promise.all(
+          batch.map(async (song) => {
+            try {
+              const filePath = `audio/${song.id}`;
+              const exists = await checkFileExistsOnOneDrive(filePath);
+              
+              if (!exists) {
+                console.log(`Le fichier ${filePath} n'existe pas sur OneDrive, marqué pour suppression`);
+                return song.id;
+              }
+              return null;
+            } catch (error) {
+              console.error(`Erreur lors de la vérification du fichier ${song.id}:`, error);
+              // En cas d'erreur, on considère que le fichier existe pour éviter les suppressions accidentelles
+              return null;
             }
-            return null;
-          } catch (error) {
-            console.error(`Erreur lors de la vérification du fichier ${song.id}:`, error);
-            // En cas d'erreur, on considère que le fichier existe pour éviter les suppressions accidentelles
-            return null;
-          }
-        });
+          })
+        );
         
-        const batchResults = await Promise.all(batchPromises);
         const batchToDelete = batchResults.filter(id => id !== null) as string[];
-        
-        songsToDelete.push(...batchToDelete);
         processed += batch.length;
         
+        // Mise à jour du progrès
         setSyncProgress({ current: processed, total: allSongs.length });
         
-        // Petite pause entre les batches pour éviter de surcharger l'API
-        if (batches.indexOf(batch) < batches.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
+        return batchToDelete;
+      });
+      
+      // Attendre que tous les batches soient traités
+      const allBatchResults = await Promise.all(batchPromises);
+      songsToDelete = allBatchResults.flat();
       
       // Suppression par batch des chansons qui n'existent plus
       if (songsToDelete.length > 0) {
         toast.info(`Suppression de ${songsToDelete.length} chansons inexistantes...`);
         
-        // Utiliser la fonction SQL pour supprimer par batch
-        const DELETE_BATCH_SIZE = 10;
-        let deletedCount = 0;
+        // Utiliser l'edge function pour supprimer par batch
+        const { data, error: deleteError } = await supabase.functions.invoke('delete-songs-batch', {
+          body: { songIds: songsToDelete }
+        });
         
-        for (let i = 0; i < songsToDelete.length; i += DELETE_BATCH_SIZE) {
-          const deleteBatch = songsToDelete.slice(i, i + DELETE_BATCH_SIZE);
+        if (deleteError) {
+          console.error("Erreur lors de la suppression par batch:", deleteError);
+          toast.error("Erreur lors de la suppression des chansons");
+        } else if (data) {
+          const { deletedCount, totalRequested, errors } = data;
           
-          // Utiliser une requête SQL pour supprimer plusieurs chansons à la fois
-          const { error: deleteError } = await supabase.rpc('delete_songs_batch', {
-            song_ids: deleteBatch
-          });
-          
-          if (deleteError) {
-            console.error("Erreur lors de la suppression du batch:", deleteError);
-            
-            // Si la fonction batch n'existe pas, on supprime une par une
-            for (const songId of deleteBatch) {
-              try {
-                const { error: singleDeleteError } = await supabase.rpc('delete_song_completely', {
-                  song_id_param: songId
-                });
-                
-                if (!singleDeleteError) {
-                  deletedCount++;
-                }
-              } catch (error) {
-                console.error(`Erreur lors de la suppression de ${songId}:`, error);
-              }
-            }
-          } else {
-            deletedCount += deleteBatch.length;
+          if (deletedCount > 0) {
+            toast.success(t("common.songsDeletedSuccess", { count: deletedCount }));
+            // Rafraîchis la liste des chansons
+            refreshSongsList();
           }
           
-          // Petite pause entre les batches de suppression
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        
-        if (deletedCount > 0) {
-          toast.success(t("common.songsDeletedSuccess", { count: deletedCount }));
-          
-          // Rafraîchis la liste des chansons
-          refreshSongsList();
-        } else {
-          toast.error("Erreur lors de la suppression des chansons");
+          if (errors && errors.length > 0) {
+            console.error("Erreurs lors de la suppression:", errors);
+            toast.warning(`${errors.length} erreurs lors de la suppression`);
+          }
         }
       } else {
         toast.success(t("common.libraryUpToDate"));

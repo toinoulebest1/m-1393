@@ -833,6 +833,13 @@ export type Database = {
         Args: { song_id_param: string }
         Returns: boolean
       }
+      delete_songs_batch: {
+        Args: { song_ids: string[] }
+        Returns: {
+          deleted_count: number
+          errors: string[]
+        }[]
+      }
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string
