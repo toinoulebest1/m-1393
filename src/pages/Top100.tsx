@@ -464,9 +464,12 @@ const Top100 = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{
-                      layout: { duration: 0.8, ease: "easeInOut" },
-                      opacity: { duration: 0.3 },
-                      y: { duration: 0.3 }
+                      layout: { 
+                        duration: 1.2, 
+                        ease: [0.25, 0.46, 0.45, 0.94] // Courbe d'accélération naturelle
+                      },
+                      opacity: { duration: 0.4 },
+                      y: { duration: 0.4 }
                     }}
                     className={cn(
                       "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
