@@ -132,6 +132,7 @@ export const OneDriveSettings = () => {
           setClientId(config.clientId || '');
           setIsEnabled(config.isEnabled || false);
         }
+      }
       
       setIsLoading(false);
     };
