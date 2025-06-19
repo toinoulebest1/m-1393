@@ -24,13 +24,13 @@ export const AnnouncementDialog = ({ userId }: AnnouncementDialogProps) => {
 
   useEffect(() => {
     if (userId) {
-      checkForNewAnnouncements();
+      checkForActiveAnnouncements();
     }
   }, [userId]);
 
-  const checkForNewAnnouncements = async () => {
+  const checkForActiveAnnouncements = async () => {
     try {
-      // Récupérer les annonces actives
+      // Récupérer toutes les annonces actives
       const { data: activeAnnouncements, error: announcementsError } = await supabase
         .from('site_announcements')
         .select('*')
@@ -39,25 +39,8 @@ export const AnnouncementDialog = ({ userId }: AnnouncementDialogProps) => {
 
       if (announcementsError) throw announcementsError;
 
-      if (!activeAnnouncements || activeAnnouncements.length === 0) return;
-
-      // Récupérer les annonces déjà vues par l'utilisateur
-      const { data: viewedAnnouncements, error: viewsError } = await supabase
-        .from('user_announcement_views')
-        .select('announcement_id')
-        .eq('user_id', userId);
-
-      if (viewsError) throw viewsError;
-
-      const viewedIds = viewedAnnouncements?.map(v => v.announcement_id) || [];
-      
-      // Filtrer les annonces non vues
-      const newAnnouncements = activeAnnouncements.filter(
-        announcement => !viewedIds.includes(announcement.id)
-      );
-
-      if (newAnnouncements.length > 0) {
-        setAnnouncements(newAnnouncements);
+      if (activeAnnouncements && activeAnnouncements.length > 0) {
+        setAnnouncements(activeAnnouncements);
         setCurrentIndex(0);
         setIsOpen(true);
       }
@@ -66,25 +49,7 @@ export const AnnouncementDialog = ({ userId }: AnnouncementDialogProps) => {
     }
   };
 
-  const markAsViewed = async (announcementId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_announcement_views')
-        .insert([{
-          user_id: userId,
-          announcement_id: announcementId
-        }]);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Erreur lors du marquage comme vu:', error);
-    }
-  };
-
-  const handleNext = async () => {
-    // Marquer l'annonce actuelle comme vue
-    await markAsViewed(announcements[currentIndex].id);
-
+  const handleNext = () => {
     if (currentIndex < announcements.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -95,12 +60,7 @@ export const AnnouncementDialog = ({ userId }: AnnouncementDialogProps) => {
     }
   };
 
-  const handleClose = async () => {
-    // Marquer toutes les annonces restantes comme vues
-    for (let i = currentIndex; i < announcements.length; i++) {
-      await markAsViewed(announcements[i].id);
-    }
-    
+  const handleClose = () => {
     setIsOpen(false);
     setCurrentIndex(0);
     setAnnouncements([]);
@@ -166,7 +126,7 @@ export const AnnouncementDialog = ({ userId }: AnnouncementDialogProps) => {
             {!isLastAnnouncement ? (
               <>
                 <Button variant="outline" onClick={handleClose} size="sm">
-                  Ignorer les suivantes
+                  Fermer
                 </Button>
                 <Button onClick={handleNext} size="sm">
                   Suivant
