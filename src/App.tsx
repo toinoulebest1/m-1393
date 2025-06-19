@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -109,6 +108,7 @@ function App() {
           <CastProvider>
             <Routes>
               <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
+              
               <Route 
                 path="/" 
                 element={
