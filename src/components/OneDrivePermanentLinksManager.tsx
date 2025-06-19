@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { storePermanentOneDriveLink, getPermanentOneDriveLink } from '@/utils/storage';
-import { Trash2, Plus, ExternalLink, Clock } from 'lucide-react';
+import { getOneDriveSharedLink, checkFileExistsOnOneDrive } from '@/utils/oneDriveStorage';
+import { Trash2, Plus, ExternalLink, Clock, Zap, RefreshCw } from 'lucide-react';
 
 interface PermanentLink {
   id: string;
@@ -28,6 +29,7 @@ export const OneDrivePermanentLinksManager = () => {
   const [newUrl, setNewUrl] = useState('');
   const [newFileName, setNewFileName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
 
   // Load existing permanent links
   const loadLinks = async () => {
@@ -55,6 +57,98 @@ export const OneDrivePermanentLinksManager = () => {
   useEffect(() => {
     loadLinks();
   }, []);
+
+  // Auto-generate permanent links for all songs
+  const handleAutoGenerate = async () => {
+    setAutoGenerating(true);
+    
+    try {
+      // Get all songs from the database
+      const { data: songs, error: songsError } = await supabase
+        .from('songs')
+        .select('id, title, artist, file_path');
+
+      if (songsError) {
+        console.error('Erreur lors de la récupération des chansons:', songsError);
+        toast.error('Erreur lors de la récupération des chansons');
+        return;
+      }
+
+      if (!songs || songs.length === 0) {
+        toast.info('Aucune chanson trouvée dans la base de données');
+        return;
+      }
+
+      let processedCount = 0;
+      let successCount = 0;
+      let errorCount = 0;
+
+      toast.info(`Démarrage de la génération automatique pour ${songs.length} chansons...`);
+
+      for (const song of songs) {
+        try {
+          const localId = `audio/${song.id}`;
+          
+          // Check if we already have a permanent link for this song
+          const existingLink = links.find(link => link.local_id === localId && link.is_active);
+          if (existingLink) {
+            console.log(`Lien permanent déjà existant pour ${song.title}`);
+            processedCount++;
+            continue;
+          }
+
+          // Check if the file exists on OneDrive
+          const fileExists = await checkFileExistsOnOneDrive(localId);
+          if (!fileExists) {
+            console.log(`Fichier non trouvé sur OneDrive: ${song.title}`);
+            processedCount++;
+            errorCount++;
+            continue;
+          }
+
+          // Get the OneDrive sharing link
+          const permanentUrl = await getOneDriveSharedLink(localId);
+          
+          // Store the permanent link
+          await storePermanentOneDriveLink(
+            localId, 
+            permanentUrl, 
+            `${song.artist} - ${song.title}.mp3`
+          );
+
+          console.log(`Lien permanent créé pour: ${song.title}`);
+          successCount++;
+          
+        } catch (error) {
+          console.error(`Erreur pour ${song.title}:`, error);
+          errorCount++;
+        }
+        
+        processedCount++;
+        
+        // Update progress every 5 songs
+        if (processedCount % 5 === 0) {
+          toast.info(`Progression: ${processedCount}/${songs.length} chansons traitées`);
+        }
+      }
+
+      // Show final results
+      if (successCount > 0) {
+        toast.success(`Génération terminée: ${successCount} liens créés, ${errorCount} erreurs`);
+      } else {
+        toast.warning(`Génération terminée: Aucun nouveau lien créé, ${errorCount} erreurs`);
+      }
+
+      // Reload the links
+      await loadLinks();
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération automatique:', error);
+      toast.error('Erreur lors de la génération automatique');
+    } finally {
+      setAutoGenerating(false);
+    }
+  };
 
   // Add new permanent link
   const handleAddLink = async () => {
@@ -166,6 +260,33 @@ export const OneDrivePermanentLinksManager = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Auto-generation button */}
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+            <div>
+              <h3 className="font-semibold text-blue-900">Génération automatique</h3>
+              <p className="text-sm text-blue-700">
+                Créez automatiquement les liens permanents pour toutes vos chansons OneDrive
+              </p>
+            </div>
+            <Button 
+              onClick={handleAutoGenerate} 
+              disabled={autoGenerating}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            >
+              {autoGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Générer automatiquement
+                </>
+              )}
+            </Button>
+          </div>
+
           {/* Add new link form */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/50">
             <div>
