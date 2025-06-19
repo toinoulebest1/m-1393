@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -125,19 +124,32 @@ export const useAudioControl = ({
           new Promise<null>(resolve => setTimeout(() => resolve(null), 2)) // 2ms timeout
         ]);
         
-        // 3. Récupération réseau en parallèle
+        // 3. Récupération réseau avec gestion d'erreur améliorée
         const networkPromise = getAudioFile(song.url).then(url => {
           if (typeof url === 'string') {
             return { url, fromCache: false };
           }
           throw new Error('URL invalide');
+        }).catch(error => {
+          console.error("❌ Erreur récupération réseau:", error.message);
+          
+          // Gestion spécifique des erreurs OneDrive
+          if (error.message.includes('OneDrive') || error.message.includes('jeton')) {
+            throw new Error('OneDrive non configuré ou jeton expiré. Veuillez configurer OneDrive dans les paramètres.');
+          }
+          
+          throw error;
         });
         
         // Prendre la première URL disponible
         const audioData = await Promise.race([
           cacheCheck.then(result => result || Promise.reject("No cache")),
           networkPromise
-        ]).catch(() => networkPromise);
+        ]).catch(async () => {
+          // Si le cache et le réseau échouent, essayer le réseau seul
+          console.log("⚠️ Cache indisponible, tentative réseau seule...");
+          return await networkPromise;
+        });
         
         const audioUrl = audioData.url;
         const elapsed = performance.now() - startTime;
@@ -253,6 +265,18 @@ export const useAudioControl = ({
             toast.info("Utilisez Firefox pour une expérience optimale sans restrictions d'autoplay", {
               duration: 8000
             });
+          }
+        }
+      });
+    } else if (error.message?.includes('OneDrive') || error.message?.includes('jeton')) {
+      toast.error("Configuration OneDrive requise", {
+        description: "OneDrive n'est pas configuré ou le jeton a expiré",
+        duration: 8000,
+        action: {
+          label: "Configurer",
+          onClick: () => {
+            // Rediriger vers les paramètres OneDrive
+            window.location.href = '/onedrive-settings';
           }
         }
       });
