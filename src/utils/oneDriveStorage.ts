@@ -1,3 +1,4 @@
+
 import { OneDriveConfig, OneDriveFileReference } from '@/types/onedrive';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -6,7 +7,21 @@ import { executeWithTokenRefresh, isTokenExpiredError } from './oneDriveTokenMan
 
 // Add a simple local storage helper for OneDrive configuration
 export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
-  // Try to get user's personal configuration first
+  // First, try to get the shared config if it's enabled
+  try {
+    const sharedConfig = await fetchSharedOneDriveConfig();
+    if (sharedConfig && sharedConfig.accessToken && sharedConfig.isEnabled) {
+      console.log('Using shared OneDrive configuration');
+      return {
+        ...sharedConfig,
+        isEnabled: true, // Enable it automatically for the user
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching shared OneDrive config:', error);
+  }
+  
+  // If no shared config or it's not enabled, try to get user's personal configuration
   const configStr = localStorage.getItem('onedrive_config');
   if (configStr) {
     try {
@@ -17,20 +32,6 @@ export const getOneDriveConfig = async (): Promise<OneDriveConfig> => {
     } catch (e) {
       console.error('Error parsing OneDrive config:', e);
     }
-  }
-  
-  // If no personal config or it's not valid, try to get the shared config
-  try {
-    const sharedConfig = await fetchSharedOneDriveConfig();
-    if (sharedConfig && sharedConfig.accessToken) {
-      console.log('Using shared OneDrive configuration');
-      return {
-        ...sharedConfig,
-        isEnabled: true, // Enable it automatically for the user
-      };
-    }
-  } catch (error) {
-    console.error('Error fetching shared OneDrive config:', error);
   }
   
   // Return empty config if nothing else is available
