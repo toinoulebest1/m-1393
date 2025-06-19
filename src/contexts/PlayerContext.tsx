@@ -59,14 +59,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Hook d'égaliseur
   const equalizer = useEqualizer({ audioElement: audioRef.current });
 
-  // Hook ultra-rapide pour le préchargement intelligent
+  // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
+  const {
+    queue, setQueue,
+    shuffleMode, setShuffleMode,
+    repeatMode, setRepeatMode,
+    addToQueue, toggleShuffle, toggleRepeat,
+    nextSong, previousSong, getNextSong
+  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play: async () => {} });
+
+  // Hook ultra-rapide pour le préchargement intelligent - APRÈS usePlayerQueue
   const { getCacheStats } = useUltraFastPlayer({
     currentSong,
     queue,
     isPlaying
   });
 
-  // Fonctions exposées à travers le contexte - définies en premier
+  // Fonctions exposées à travers le contexte - définies après les hooks
   const { 
     play, 
     pause, 
@@ -89,29 +98,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNextSongPreloaded,
     preloadNextTracks
   });
-
-  // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
-  const {
-    queue, setQueue,
-    shuffleMode, setShuffleMode,
-    repeatMode, setRepeatMode,
-    addToQueue, toggleShuffle, toggleRepeat,
-    nextSong, previousSong, getNextSong
-  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play });
-
-  // Sauvegarde de la progression avant fermeture de page
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (audioRef.current && !isNaN(audioRef.current.currentTime)) {
-        localStorage.setItem('audioProgress', audioRef.current.currentTime.toString());
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
 
   // Restauration de la lecture au chargement
   useEffect(() => {
