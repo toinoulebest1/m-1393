@@ -5,7 +5,6 @@ import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache'
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
   
-  // Check if we should use OneDrive instead of Supabase
   const useOneDrive = await isOneDriveEnabled();
   console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
   
@@ -57,128 +56,118 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 };
 
 export const getAudioFile = async (path: string) => {
-  console.log("=== DÉBUT RÉCUPÉRATION FICHIER AUDIO ===");
-  console.log("Chemin demandé:", path);
+  console.log("=== RÉCUPÉRATION ULTRA-RAPIDE ===");
+  console.log("⚡ Chemin:", path);
+  const startTime = performance.now();
   
   if (!path) {
-    console.error("=== ERREUR: Chemin vide ===");
     throw new Error("Chemin du fichier non fourni");
   }
 
   try {
-    // Check cache first for quick retrieval
-    console.log("=== VÉRIFICATION CACHE ===");
-    if (await isInCache(path)) {
-      console.log("Fichier trouvé dans le cache:", path);
-      const cachedUrl = await getFromCache(path);
-      if (cachedUrl) {
-        console.log("URL du cache récupérée:", cachedUrl);
-        console.log("=== FIN (CACHE) ===");
-        return cachedUrl;
-      }
-    } else {
-      console.log("Fichier non trouvé dans le cache");
+    // Vérification cache ULTRA-RAPIDE (Promise.race avec timeout)
+    console.log("🚀 Cache check ultra-rapide...");
+    const cacheCheck = Promise.race([
+      isInCache(path).then(async (inCache) => {
+        if (inCache) {
+          const cachedUrl = await getFromCache(path);
+          if (cachedUrl) {
+            const elapsed = performance.now() - startTime;
+            console.log("⚡ CACHE HIT:", elapsed.toFixed(1), "ms");
+            return cachedUrl;
+          }
+        }
+        return null;
+      }),
+      new Promise(resolve => setTimeout(() => resolve(null), 50)) // Timeout cache à 50ms
+    ]);
+
+    const cachedResult = await cacheCheck;
+    if (cachedResult) {
+      return cachedResult;
     }
 
-    // If not in cache, proceed normally
-    console.log("=== VÉRIFICATION PROVIDER ===");
+    // Récupération réseau optimisée
+    console.log("📡 Récupération réseau rapide...");
     const useOneDrive = await isOneDriveEnabled();
-    console.log("Provider utilisé:", useOneDrive ? "OneDrive" : "Supabase");
+    console.log("Provider:", useOneDrive ? "OneDrive" : "Supabase");
 
     let audioUrl: string;
     
     if (useOneDrive) {
-      console.log("=== RÉCUPÉRATION ONEDRIVE ===");
-      console.log("Chemin OneDrive:", `audio/${path}`);
+      console.log("⚡ OneDrive streaming...");
       try {
-        // Get direct download URL from OneDrive
         audioUrl = await getOneDriveSharedLink(`audio/${path}`);
-        console.log("URL OneDrive récupérée:", audioUrl);
+        console.log("✅ OneDrive URL:", (performance.now() - startTime).toFixed(1), "ms");
       } catch (oneDriveError) {
-        console.error("=== ERREUR ONEDRIVE ===");
-        console.error("Erreur OneDrive:", oneDriveError);
-        console.error("=====================");
-        throw new Error(`Fichier non disponible sur OneDrive: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
+        console.error("❌ OneDrive error:", oneDriveError);
+        throw new Error(`OneDrive indisponible: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
       }
     } else {
-      console.log("=== RÉCUPÉRATION SUPABASE ===");
+      console.log("⚡ Supabase streaming...");
       
-      // Vérifie si le fichier existe
-      console.log("Vérification existence du fichier:", path);
-      const { data: fileExists, error: listError } = await supabase.storage
-        .from('audio')
-        .list('', { search: path });
+      // Vérification d'existence rapide (avec timeout)
+      const fileCheckPromise = Promise.race([
+        supabase.storage.from('audio').list('', { search: path }).then(({ data, error }) => {
+          if (error) throw error;
+          return data && data.length > 0;
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1000))
+      ]);
 
-      if (listError) {
-        console.error("=== ERREUR LISTE SUPABASE ===");
-        console.error("Erreur lors de la liste:", listError);
-        console.error("=============================");
-        throw new Error(`Erreur lors de la vérification du fichier: ${listError.message}`);
+      try {
+        const fileExists = await fileCheckPromise;
+        if (!fileExists) {
+          throw new Error(`Fichier non trouvé: ${path}`);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "Timeout") {
+          console.warn("⚠️ Vérification fichier timeout - tentative directe");
+        } else {
+          throw error;
+        }
       }
 
-      if (!fileExists || fileExists.length === 0) {
-        console.error("=== FICHIER NON TROUVÉ ===");
-        console.error("Fichier recherché:", path);
-        console.error("Résultat de la recherche:", fileExists);
-        console.error("========================");
-        throw new Error(`Fichier audio non trouvé dans le stockage: ${path}`);
-      }
-
-      console.log("Fichier trouvé, génération URL signée");
       const { data, error } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
 
       if (error) {
-        console.error("=== ERREUR URL SIGNÉE ===");
-        console.error("Erreur:", error);
-        console.error("========================");
-        throw new Error(`Erreur lors de la génération de l'URL: ${error.message}`);
+        throw new Error(`Erreur URL signée: ${error.message}`);
       }
 
       if (!data?.signedUrl) {
-        console.error("=== ERREUR: URL VIDE ===");
         throw new Error("URL signée non générée");
       }
 
       audioUrl = data.signedUrl;
-      console.log("URL Supabase générée:", audioUrl);
+      console.log("✅ Supabase URL:", (performance.now() - startTime).toFixed(1), "ms");
     }
 
-    console.log("=== MISE EN CACHE ===");
-    // Try to cache for future retrievals
-    try {
-      console.log("Téléchargement pour mise en cache:", audioUrl);
-      const response = await fetch(audioUrl);
-      if (!response.ok) {
-        console.warn("=== AVERTISSEMENT CACHE ===");
-        console.warn(`Impossible de télécharger pour le cache: ${response.status} ${response.statusText}`);
-        console.warn("URL:", audioUrl);
-        console.warn("==========================");
-        // Continue même si la mise en cache échoue
-      } else {
-        const blob = await response.blob();
-        await addToCache(path, blob);
-        console.log(`Fichier mis en cache: ${path}, taille: ${blob.size} bytes`);
+    // Mise en cache différée (ne pas bloquer le streaming)
+    console.log("💾 Cache arrière-plan démarré");
+    setTimeout(async () => {
+      try {
+        if (!(await isInCache(path))) {
+          console.log("📡 Téléchargement cache...");
+          const response = await fetch(audioUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            await addToCache(path, blob);
+            console.log("✅ Cache terminé:", blob.size, "bytes");
+          }
+        }
+      } catch (cacheError) {
+        console.warn("⚠️ Cache arrière-plan échoué:", cacheError);
       }
-    } catch (cacheError) {
-      console.warn("=== AVERTISSEMENT CACHE ===");
-      console.warn("Impossible de mettre en cache:", cacheError);
-      console.warn("==========================");
-      // Continue même si la mise en cache échoue
-    }
+    }, 200); // Démarrer après 200ms
 
-    console.log("=== FIN RÉCUPÉRATION RÉUSSIE ===");
-    console.log("URL finale:", audioUrl);
-    console.log("===============================");
+    const totalElapsed = performance.now() - startTime;
+    console.log("⚡ TOTAL:", totalElapsed.toFixed(1), "ms");
+    console.log("=============================");
     return audioUrl;
   } catch (error) {
-    console.error("=== ERREUR FINALE ===");
-    console.error("Erreur lors de la récupération:", error);
-    console.error("Chemin:", path);
-    console.error("Type d'erreur:", error instanceof Error ? error.constructor.name : typeof error);
-    console.error("Message:", error instanceof Error ? error.message : String(error));
-    console.error("================");
+    console.error("❌ ERREUR RÉCUPÉRATION:", error);
     throw error;
   }
 };
@@ -214,7 +203,6 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
   }
 };
 
-// Enhanced function to store playlist cover images
 export const storePlaylistCover = async (playlistId: string, file: File | string | Blob) => {
   console.log("Storing playlist cover for:", playlistId, typeof file);
   
@@ -227,10 +215,8 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
       });
       console.log("Converted Blob to File object");
     } else if (typeof file === 'string') {
-      // Handle data URL or remote URL
       if (file.startsWith('data:')) {
         console.log("Processing data URL");
-        // Convert data URL to Blob
         const response = await fetch(file);
         const blob = await response.blob();
         fileToUpload = new File([blob], `playlist-${playlistId}.jpg`, { 
@@ -239,7 +225,6 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
         console.log("Converted data URL to File object", blob.size, "bytes");
       } else {
         console.log("Fetching remote URL:", file);
-        // Fetch remote URL
         const response = await fetch(file);
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.statusText}`);
@@ -255,7 +240,6 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
       console.log("Using provided File object");
     }
     
-    // Make sure we have a valid image file before proceeding
     if (!fileToUpload || fileToUpload.size === 0) {
       console.error("Invalid file or empty file");
       throw new Error("Invalid or empty file");
@@ -264,7 +248,6 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
     const fileName = `playlist-covers/${playlistId}.jpg`;
     console.log(`Uploading playlist cover to storage: ${fileName}, size: ${fileToUpload.size} bytes`);
     
-    // Upload the file to the media bucket (which now exists)
     const { data, error } = await supabase.storage
       .from('media')
       .upload(fileName, fileToUpload, {
@@ -280,7 +263,6 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
     
     console.log("Upload succeeded, path:", data.path);
     
-    // Get public URL with cache-busting parameter
     const timestamp = new Date().getTime();
     const { data: { publicUrl } } = supabase.storage
       .from('media')
@@ -294,12 +276,10 @@ export const storePlaylistCover = async (playlistId: string, file: File | string
   }
 };
 
-// New function to fetch an existing playlist cover
 export const getPlaylistCover = async (playlistId: string): Promise<string | null> => {
   try {
     const fileName = `playlist-covers/${playlistId}.jpg`;
     
-    // Check if the file exists
     const { data: fileExists } = await supabase.storage
       .from('media')
       .list('playlist-covers', {
@@ -312,7 +292,6 @@ export const getPlaylistCover = async (playlistId: string): Promise<string | nul
       return null;
     }
     
-    // Get public URL with cache-busting parameter
     const timestamp = new Date().getTime();
     const { data: { publicUrl } } = supabase.storage
       .from('media')
@@ -326,10 +305,8 @@ export const getPlaylistCover = async (playlistId: string): Promise<string | nul
   }
 };
 
-// Better image generation with error handling and higher quality
 export const generateImageFromSongs = async (songs: any[]): Promise<string | null> => {
   try {
-    // Filter songs that have images
     const songsWithImages = songs.filter(song => 
       song.songs?.imageUrl && song.songs.imageUrl.startsWith('http')
     );
@@ -341,10 +318,9 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       return null;
     }
     
-    // Create canvas with higher resolution
     const canvas = document.createElement('canvas');
-    canvas.width = 600;  // Higher resolution
-    canvas.height = 600; // Higher resolution
+    canvas.width = 600;
+    canvas.height = 600;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -352,17 +328,14 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       return null;
     }
 
-    // Fill with dark background
     ctx.fillStyle = '#121212';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Determine grid size based on number of images (up to 4)
     const gridSize = Math.min(songsWithImages.length, 4) === 1 ? 1 : 2;
     const imageSize = canvas.width / gridSize;
     
     console.log(`Using grid size: ${gridSize}x${gridSize}, image size: ${imageSize}px`);
 
-    // Load images with proper error handling
     const loadImage = (url: string): Promise<HTMLImageElement | null> => {
       return new Promise(resolve => {
         const img = new Image();
@@ -372,18 +345,15 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
           console.error(`Error loading image ${url}:`, e);
           resolve(null);
         };
-        // Add cache-busting parameter
         const cacheBuster = `?t=${new Date().getTime()}`;
         img.src = url.includes('?') ? `${url}&cb=${cacheBuster}` : `${url}${cacheBuster}`;
       });
     };
 
-    // Process images in parallel with proper error handling
     const imagePromises = await Promise.all(
       songsWithImages.slice(0, 4).map(song => loadImage(song.songs.imageUrl))
     );
     
-    // Filter out any failed images
     const validImages = imagePromises.filter(img => img !== null) as HTMLImageElement[];
     
     console.log(`Successfully loaded ${validImages.length} images out of ${songsWithImages.length} attempted`);
@@ -393,7 +363,6 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       return null;
     }
 
-    // Draw valid images to the canvas
     validImages.forEach((img, index) => {
       const row = Math.floor(index / gridSize);
       const col = index % gridSize;
@@ -401,7 +370,6 @@ export const generateImageFromSongs = async (songs: any[]): Promise<string | nul
       console.log(`Drew image ${index + 1} at position [${row},${col}]`);
     });
 
-    // Convert to high-quality data URL
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     console.log(`Generated data URL of length ${dataUrl.length}`);
     
