@@ -1,4 +1,3 @@
-
 import { Player } from "@/components/Player";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -462,18 +461,17 @@ const Top100 = () => {
                     key={stat.songId}
                     layout
                     layoutId={stat.songId}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, x: -100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 100 }}
                     transition={{
                       layout: { 
-                        duration: 0.6,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 20
+                        duration: 0.8,
+                        type: "tween",
+                        ease: [0.25, 0.1, 0.25, 1.0]
                       },
-                      opacity: { duration: 0.3 },
-                      scale: { duration: 0.3 }
+                      opacity: { duration: 0.4 },
+                      x: { duration: 0.5, ease: "easeOut" }
                     }}
                     className={cn(
                       "group p-4 rounded-lg transition-all duration-500 cursor-pointer hover:bg-white/5",
