@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,21 +89,6 @@ function App() {
     );
   }
 
-  // Si le mode maintenance est activé et que l'utilisateur n'est pas admin
-  if (isMaintenanceMode && !isAdmin) {
-    return (
-      <ThemeProvider attribute="class" defaultTheme="dark">
-        <MaintenancePage 
-          message={maintenanceMessage}
-          endTime={endTime}
-          currentStep={currentStep}
-          totalSteps={totalSteps}
-          onRetry={() => window.location.reload()}
-        />
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider attribute="class" defaultTheme="dark">
       <Router>
@@ -110,210 +96,229 @@ function App() {
         <PlayerProvider>
           <CastProvider>
             <Routes>
+              {/* Route d'authentification toujours accessible, même en mode maintenance */}
               <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
               
-              <Route 
-                path="/" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Index />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/favorites" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Favorites />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/search" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Search />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/history" 
-                element={
-                  session ? (
-                    <Layout>
-                      <History />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/top100" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Top100 />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/blind-test" 
-                element={
-                  session ? (
-                    <Layout>
-                      <BlindTest />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/reports" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Reports />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/metadata-update" 
-                element={
-                  session ? (
-                    <Layout>
-                      <SongMetadataUpdate />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
+              {/* Si le mode maintenance est activé et que l'utilisateur n'est pas admin */}
+              {isMaintenanceMode && !isAdmin ? (
+                <Route 
+                  path="*" 
+                  element={
+                    <MaintenancePage 
+                      message={maintenanceMessage}
+                      endTime={endTime}
+                      currentStep={currentStep}
+                      totalSteps={totalSteps}
+                      onRetry={() => window.location.reload()}
+                    />
+                  } 
+                />
+              ) : (
+                <>
+                  <Route 
+                    path="/" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Index />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/favorites" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Favorites />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/search" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Search />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/history" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <History />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/top100" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Top100 />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/blind-test" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <BlindTest />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/reports" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Reports />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/metadata-update" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <SongMetadataUpdate />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
 
-              {/* New OneDrive settings route */}
-              <Route 
-                path="/onedrive-settings" 
-                element={
-                  session ? (
-                    <Layout>
-                      <OneDriveSettings />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* New maintenance admin route - only for admins */}
-              <Route 
-                path="/maintenance-admin" 
-                element={
-                  session && isAdmin ? (
-                    <Layout>
-                      <MaintenanceAdmin />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/" />
-                  )
-                } 
-              />
-              
-              {/* New playlist routes */}
-              <Route 
-                path="/playlists" 
-                element={
-                  session ? (
-                    <Layout>
-                      <Playlists />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/playlist/:playlistId" 
-                element={
-                  session ? (
-                    <Layout>
-                      <PlaylistDetail />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* Synced lyrics route */}
-              <Route 
-                path="/synced-lyrics" 
-                element={
-                  session ? (
-                    <Layout hideNavbar>
-                      <SyncedLyricsView />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* OneDrive callback route */}
-              <Route 
-                path="/onedrive-callback" 
-                element={
-                  session ? (
-                    <OneDriveCallback />
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              
-              {/* New route for artist profiles */}
-              <Route 
-                path="/artist/:artistId" 
-                element={
-                  session ? (
-                    <Layout>
-                      <ArtistProfile />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
-              <Route 
-                path="/artist/name/:artistName" 
-                element={
-                  session ? (
-                    <Layout>
-                      <ArtistProfile />
-                    </Layout>
-                  ) : (
-                    <Navigate to="/auth" />
-                  )
-                } 
-              />
+                  {/* New OneDrive settings route */}
+                  <Route 
+                    path="/onedrive-settings" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <OneDriveSettings />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  
+                  {/* New maintenance admin route - only for admins */}
+                  <Route 
+                    path="/maintenance-admin" 
+                    element={
+                      session && isAdmin ? (
+                        <Layout>
+                          <MaintenanceAdmin />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/" />
+                      )
+                    } 
+                  />
+                  
+                  {/* New playlist routes */}
+                  <Route 
+                    path="/playlists" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <Playlists />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/playlist/:playlistId" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <PlaylistDetail />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  
+                  {/* Synced lyrics route */}
+                  <Route 
+                    path="/synced-lyrics" 
+                    element={
+                      session ? (
+                        <Layout hideNavbar>
+                          <SyncedLyricsView />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  
+                  {/* OneDrive callback route */}
+                  <Route 
+                    path="/onedrive-callback" 
+                    element={
+                      session ? (
+                        <OneDriveCallback />
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  
+                  {/* New route for artist profiles */}
+                  <Route 
+                    path="/artist/:artistId" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <ArtistProfile />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/artist/name/:artistName" 
+                    element={
+                      session ? (
+                        <Layout>
+                          <ArtistProfile />
+                        </Layout>
+                      ) : (
+                        <Navigate to="/auth" />
+                      )
+                    } 
+                  />
+                </>
+              )}
             </Routes>
           </CastProvider>
         </PlayerProvider>
