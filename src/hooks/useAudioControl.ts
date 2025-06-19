@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -97,7 +98,7 @@ export const useAudioControl = ({
               
             }).catch(error => {
               console.error("❌ Erreur play cache mémoire:", error.message);
-              handlePlayError(error, audio, song);
+              handlePlayError(error, song);
             });
           }
           return;
@@ -216,7 +217,7 @@ export const useAudioControl = ({
         
       } catch (error) {
         console.error("💥 Erreur récupération:", error);
-        handlePlayError(error as any, audio, song);
+        handlePlayError(error as any, song);
       }
     } else if (audioRef.current) {
       // Reprise avec gestion autoplay
@@ -238,7 +239,7 @@ export const useAudioControl = ({
     }
   }, [audioRef, currentSong, isChangingSong, preloadNextTracks, setCurrentSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, volume]);
 
-  const handlePlayError = useCallback((error: any, audio: HTMLAudioElement, song: Song | null) => {
+  const handlePlayError = useCallback((error: any, song: Song | null) => {
     console.error("❌ Erreur lecture:", error);
     
     if (error.name === 'NotAllowedError') {
