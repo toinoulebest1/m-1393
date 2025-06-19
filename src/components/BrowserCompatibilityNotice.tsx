@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { AutoplayManager } from '@/utils/autoplayManager';
-import { X, AlertTriangle, Firefox } from 'lucide-react';
+import { AlertTriangle, Globe } from 'lucide-react';
 
 export const BrowserCompatibilityNotice = () => {
   const [browserInfo, setBrowserInfo] = useState<{ name: string; supportsAutoplay: boolean } | null>(null);
@@ -43,7 +43,7 @@ export const BrowserCompatibilityNotice = () => {
         {/* Instructions */}
         <div className="bg-white/5 border border-white/10 rounded-lg p-6 mb-8">
           <h3 className="text-xl font-semibold text-white mb-4 flex items-center justify-center gap-2">
-            <Firefox className="w-6 h-6" />
+            <Globe className="w-6 h-6" />
             Comment installer Firefox
           </h3>
           <div className="space-y-3 text-left">
@@ -69,7 +69,7 @@ export const BrowserCompatibilityNotice = () => {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold px-8 py-4 rounded-lg text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
         >
-          <Firefox className="w-6 h-6" />
+          <Globe className="w-6 h-6" />
           Télécharger Firefox
         </a>
         
