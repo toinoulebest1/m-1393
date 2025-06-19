@@ -23,6 +23,12 @@ interface UserBan {
   expires_at: string | null;
   created_at: string;
   is_active: boolean;
+  user_profile?: {
+    username: string;
+  };
+  banned_by_profile?: {
+    username: string;
+  };
 }
 
 interface UserProfile {
@@ -50,7 +56,11 @@ export const UserBanManagement = () => {
         .ilike('username', `%${searchTerm}%`)
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur lors du chargement des utilisateurs:', error);
+        return;
+      }
+      
       setUsers(data || []);
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error);
@@ -60,25 +70,56 @@ export const UserBanManagement = () => {
   // Charger les bannissements actifs
   const loadBans = async () => {
     try {
-      const { data, error } = await supabase
+      // Récupérer les bans
+      const { data: bansData, error: bansError } = await supabase
         .from('user_bans')
-        .select(`
-          *,
-          profiles!user_bans_user_id_fkey(username),
-          banned_by_profile:profiles!user_bans_banned_by_fkey(username)
-        `)
+        .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setBans(data || []);
+      if (bansError) {
+        console.error('Erreur lors du chargement des bannissements:', bansError);
+        return;
+      }
+
+      // Récupérer les profils des utilisateurs bannis et de ceux qui ont banni
+      const userIds = [...new Set([
+        ...(bansData?.map(ban => ban.user_id) || []),
+        ...(bansData?.map(ban => ban.banned_by) || [])
+      ])];
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Erreur lors du chargement des profils:', profilesError);
+        return;
+      }
+
+      // Associer les profils aux bans
+      const bansWithProfiles = bansData?.map(ban => ({
+        ...ban,
+        user_profile: profilesData?.find(p => p.id === ban.user_id),
+        banned_by_profile: profilesData?.find(p => p.id === ban.banned_by)
+      })) || [];
+
+      setBans(bansWithProfiles);
     } catch (error) {
       console.error('Erreur lors du chargement des bannissements:', error);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    if (searchTerm.length > 0) {
+      const timeoutId = setTimeout(() => {
+        loadUsers();
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setUsers([]);
+    }
   }, [searchTerm]);
 
   useEffect(() => {
@@ -99,7 +140,10 @@ export const UserBanManagement = () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Utilisateur non connecté');
+      if (!user) {
+        toast.error('Utilisateur non connecté');
+        return;
+      }
 
       const { error } = await supabase
         .from('user_bans')
@@ -111,7 +155,11 @@ export const UserBanManagement = () => {
           expires_at: banType === 'temporary' ? expiresAt?.toISOString() : null
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur lors du bannissement:', error);
+        toast.error('Erreur lors du bannissement de l\'utilisateur: ' + error.message);
+        return;
+      }
 
       toast.success('Utilisateur banni avec succès');
       
@@ -120,6 +168,7 @@ export const UserBanManagement = () => {
       setReason("");
       setExpiresAt(undefined);
       setBanType("temporary");
+      setSearchTerm("");
       
       // Recharger la liste des bans
       loadBans();
@@ -138,7 +187,11 @@ export const UserBanManagement = () => {
         .update({ is_active: false })
         .eq('id', banId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur lors du débannissement:', error);
+        toast.error('Erreur lors du débannissement: ' + error.message);
+        return;
+      }
 
       toast.success('Utilisateur débanni avec succès');
       loadBans();
@@ -147,6 +200,8 @@ export const UserBanManagement = () => {
       toast.error('Erreur lors du débannissement');
     }
   };
+
+  const selectedUserProfile = users.find(u => u.id === selectedUser);
 
   return (
     <div className="space-y-6">
@@ -173,8 +228,29 @@ export const UserBanManagement = () => {
             />
           </div>
           
+          {/* Utilisateur sélectionné */}
+          {selectedUserProfile && (
+            <div className="mt-2 p-2 bg-spotify-accent/20 border border-spotify-accent/30 rounded-md flex items-center gap-2">
+              <div className="w-6 h-6 bg-spotify-accent rounded-full flex items-center justify-center text-xs">
+                {selectedUserProfile.username?.[0]?.toUpperCase()}
+              </div>
+              <span className="text-white font-medium">{selectedUserProfile.username}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedUser("");
+                  setSearchTerm("");
+                }}
+                className="ml-auto text-xs"
+              >
+                ✕
+              </Button>
+            </div>
+          )}
+          
           {/* Liste des utilisateurs trouvés */}
-          {users.length > 0 && searchTerm && (
+          {users.length > 0 && searchTerm && !selectedUser && (
             <div className="mt-2 bg-spotify-base border border-spotify-neutral/20 rounded-md max-h-48 overflow-y-auto">
               {users.map((user) => (
                 <div
@@ -288,7 +364,7 @@ export const UserBanManagement = () => {
             <TableBody>
               {bans.map((ban) => (
                 <TableRow key={ban.id}>
-                  <TableCell>{(ban as any).profiles?.username || 'Utilisateur inconnu'}</TableCell>
+                  <TableCell>{ban.user_profile?.username || 'Utilisateur inconnu'}</TableCell>
                   <TableCell>
                     <span className={cn(
                       "px-2 py-1 rounded text-xs",
@@ -306,7 +382,7 @@ export const UserBanManagement = () => {
                       : 'Jamais'
                     }
                   </TableCell>
-                  <TableCell>{(ban as any).banned_by_profile?.username || 'Admin'}</TableCell>
+                  <TableCell>{ban.banned_by_profile?.username || 'Admin'}</TableCell>
                   <TableCell>
                     <Button
                       size="sm"
