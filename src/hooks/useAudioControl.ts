@@ -57,7 +57,30 @@ export const useAudioControl = ({
 
       try {
         console.log("🔍 Récupération du fichier audio...");
-        const audioUrl = await getAudioFile(song.url);
+        
+        // Démarrer la récupération de l'URL audio
+        const audioUrlPromise = getAudioFile(song.url);
+        
+        // Vérifier d'abord le cache pour une lecture immédiate
+        console.log("🚀 Vérification cache pour lecture immédiate...");
+        const isAlreadyCached = await isInCache(song.url);
+        
+        let audioUrl: string;
+        
+        if (isAlreadyCached) {
+          console.log("✅ Fichier trouvé dans le cache - lecture immédiate");
+          const cachedUrl = await getFromCache(song.url);
+          if (cachedUrl) {
+            audioUrl = cachedUrl;
+          } else {
+            console.log("⚠️ Cache invalide, attente de l'URL principale");
+            audioUrl = await audioUrlPromise;
+          }
+        } else {
+          console.log("📡 Pas de cache - récupération depuis le stockage");
+          audioUrl = await audioUrlPromise;
+        }
+
         if (!audioUrl) {
           console.error("❌ Aucune URL audio retournée");
           throw new Error('Fichier audio non trouvé');
@@ -66,11 +89,40 @@ export const useAudioControl = ({
         console.log("✅ URL audio récupérée:", audioUrl);
         console.log("🔗 Type d'URL:", audioUrl.startsWith('http') ? 'HTTP' : audioUrl.startsWith('blob:') ? 'Blob' : 'Autre');
 
-        // Configuration de l'élément audio
+        // Configuration de l'élément audio pour streaming
         audioRef.current.crossOrigin = "anonymous";
         audioRef.current.src = audioUrl;
         audioRef.current.currentTime = 0;
-        audioRef.current.preload = "auto";
+        
+        // Configuration optimisée pour le streaming
+        if (audioUrl.startsWith('http')) {
+          console.log("🌐 Configuration streaming pour URL HTTP");
+          audioRef.current.preload = "metadata"; // Charge seulement les métadonnées au début
+          
+          // Si ce n'est pas déjà en cache, démarrer le téléchargement en arrière-plan
+          if (!isAlreadyCached) {
+            console.log("💾 Démarrage du téléchargement en arrière-plan pour cache");
+            // Téléchargement asynchrone sans bloquer la lecture
+            fetch(audioUrl)
+              .then(response => {
+                if (response.ok) {
+                  return response.blob();
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              })
+              .then(blob => {
+                console.log("✅ Téléchargement terminé, ajout au cache:", blob.size, "bytes");
+                return addToCache(song.url, blob);
+              })
+              .catch(error => {
+                console.warn("⚠️ Échec du téléchargement en arrière-plan:", error);
+                // La lecture continue même si le cache échoue
+              });
+          }
+        } else {
+          console.log("💿 Configuration standard pour URL locale/blob");
+          audioRef.current.preload = "auto";
+        }
         
         console.log("⚙️ Configuration audio element terminée");
         console.log("🔊 Volume initial:", volume / 100);
@@ -80,50 +132,58 @@ export const useAudioControl = ({
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            console.log("✅ === LECTURE RÉUSSIE ===");
+            console.log("✅ === LECTURE RÉUSSIE (STREAMING) ===");
             console.log("🎵 Chanson:", song.title);
             console.log("🔊 Volume:", audioRef.current.volume);
+            console.log("📡 Mode streaming:", audioUrl.startsWith('http') ? 'Activé' : 'Local');
             
             setIsPlaying(true);
             audioRef.current.volume = volume / 100;
             
-            // 🔥 NOUVELLE VÉRIFICATION : Si le temps ne progresse pas après 2 secondes
+            // Vérification de progression adaptée au streaming
             const timeCheckTimeout = setTimeout(() => {
-              console.log("🕐 === VÉRIFICATION PROGRESSION TEMPS ===");
+              console.log("🕐 === VÉRIFICATION PROGRESSION STREAMING ===");
               console.log("⏰ Temps actuel après 2 secondes:", audioRef.current.currentTime);
               console.log("⏸️ État pause:", audioRef.current.paused);
               console.log("🔇 État muet:", audioRef.current.muted);
               console.log("🔊 Volume:", audioRef.current.volume);
+              console.log("📊 Ready state:", audioRef.current.readyState);
+              console.log("🌐 Network state:", audioRef.current.networkState);
               
-              if (audioRef.current.currentTime === 0 && !audioRef.current.paused) {
-                console.log("🚨 PROBLÈME DÉTECTÉ: Temps bloqué à 0 malgré lecture");
-                console.log("🔧 Tentative de solution: interaction utilisateur requise");
+              // Pour le streaming, accepter un démarrage plus lent
+              if (audioRef.current.currentTime === 0 && !audioRef.current.paused && audioRef.current.readyState < 3) {
+                console.log("📡 Streaming en cours - attente du buffering...");
                 
-                // Force une nouvelle tentative de lecture
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-                
-                // Afficher un message à l'utilisateur
-                toast.error("Cliquez n'importe où sur la page puis réessayez la lecture", {
-                  duration: 5000,
-                  action: {
-                    label: "Réessayer",
-                    onClick: () => {
-                      console.log("🔄 Nouvelle tentative de lecture après interaction");
-                      audioRef.current.play().then(() => {
-                        console.log("✅ Lecture réussie après interaction utilisateur");
-                        setIsPlaying(true);
-                      }).catch(err => {
-                        console.error("❌ Échec même après interaction:", err);
-                        setIsPlaying(false);
-                      });
-                    }
+                // Attendre encore un peu pour le buffering
+                setTimeout(() => {
+                  if (audioRef.current.currentTime === 0 && !audioRef.current.paused) {
+                    console.log("🚨 PROBLÈME STREAMING: Aucune progression après buffering");
+                    toast.error("Problème de streaming - cliquez pour réessayer", {
+                      duration: 5000,
+                      action: {
+                        label: "Réessayer",
+                        onClick: () => {
+                          console.log("🔄 Nouvelle tentative de streaming");
+                          audioRef.current.pause();
+                          audioRef.current.currentTime = 0;
+                          audioRef.current.play().then(() => {
+                            console.log("✅ Streaming réussi après nouvelle tentative");
+                            setIsPlaying(true);
+                          }).catch(err => {
+                            console.error("❌ Échec streaming même après nouvelle tentative:", err);
+                            setIsPlaying(false);
+                          });
+                        }
+                      }
+                    });
+                    setIsPlaying(false);
+                  } else {
+                    console.log("✅ Streaming démarré avec succès:", audioRef.current.currentTime, "secondes");
                   }
-                });
+                }, 3000); // Attente supplémentaire pour le streaming
                 
-                setIsPlaying(false);
               } else if (audioRef.current.currentTime > 0) {
-                console.log("✅ Temps progresse normalement:", audioRef.current.currentTime, "secondes");
+                console.log("✅ Lecture progresse normalement:", audioRef.current.currentTime, "secondes");
               }
               console.log("=======================================");
             }, 2000);
@@ -135,15 +195,15 @@ export const useAudioControl = ({
               changeTimeoutRef.current = null;
             }, 1200);
           }).catch(error => {
-            console.error("❌ === ERREUR DE LECTURE ===");
+            console.error("❌ === ERREUR DE LECTURE STREAMING ===");
             console.error("🔴 Type:", error.name);
             console.error("💬 Message:", error.message);
             console.error("🔍 Détails:", error);
             
-            // Gestion spécifique des erreurs
+            // Gestion spécifique des erreurs de streaming
             if (error.name === 'NotAllowedError') {
-              console.log("🔒 Erreur de permission - tentative sans interaction utilisateur");
-              toast.error("Veuillez cliquer sur la page puis réessayer la lecture", {
+              console.log("🔒 Erreur de permission - interaction utilisateur requise");
+              toast.error("Cliquez sur la page puis réessayez la lecture", {
                 duration: 5000,
                 action: {
                   label: "Réessayer",
@@ -159,12 +219,12 @@ export const useAudioControl = ({
               });
             } else if (error.name === 'NotSupportedError') {
               console.log("🚫 Format non supporté");
-              toast.error("Format audio non supporté");
+              toast.error("Format audio non supporté pour le streaming");
             } else if (error.name === 'NetworkError') {
-              console.log("🌐 Erreur réseau");
-              toast.error("Erreur réseau - fichier inaccessible");
+              console.log("🌐 Erreur réseau streaming");
+              toast.error("Erreur réseau - vérifiez votre connexion");
             } else {
-              toast.error(`Erreur de lecture: ${error.message}`);
+              toast.error(`Erreur streaming: ${error.message}`);
             }
             
             setIsPlaying(false);
@@ -172,7 +232,7 @@ export const useAudioControl = ({
           });
         }
       } catch (error) {
-        console.error("💥 === ERREUR RÉCUPÉRATION FICHIER ===");
+        console.error("💥 === ERREUR RÉCUPÉRATION FICHIER STREAMING ===");
         console.error("🔴 Erreur:", error);
         console.error("💬 Message:", error instanceof Error ? error.message : 'Erreur inconnue');
         
@@ -183,7 +243,7 @@ export const useAudioControl = ({
             toast.error(`Erreur: ${error.message}`);
           }
         } else {
-          toast.error("Erreur inconnue lors de la lecture");
+          toast.error("Erreur inconnue lors du streaming");
         }
         
         setCurrentSong(null);
