@@ -18,21 +18,29 @@ interface MaintenanceSettingsProps {
 }
 
 export const MaintenanceSettings = () => {
-  const { settings, refetch } = useMaintenanceMode();
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(settings.isMaintenanceMode);
-  const [message, setMessage] = useState(settings.maintenanceMessage);
-  const [endTime, setEndTime] = useState<Date | undefined>(settings.endTime ? new Date(settings.endTime) : undefined);
-  const [currentStep, setCurrentStep] = useState<number | undefined>(settings.currentStep);
-  const [totalSteps, setTotalSteps] = useState<number | undefined>(settings.totalSteps);
+  const { 
+    isMaintenanceMode: initialIsMaintenanceMode,
+    maintenanceMessage: initialMaintenanceMessage,
+    endTime: initialEndTime,
+    currentStep: initialCurrentStep,
+    totalSteps: initialTotalSteps,
+    refetch 
+  } = useMaintenanceMode();
+  
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(initialIsMaintenanceMode);
+  const [message, setMessage] = useState(initialMaintenanceMessage);
+  const [endTime, setEndTime] = useState<Date | undefined>(initialEndTime ? new Date(initialEndTime) : undefined);
+  const [currentStep, setCurrentStep] = useState<number | undefined>(initialCurrentStep);
+  const [totalSteps, setTotalSteps] = useState<number | undefined>(initialTotalSteps);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setIsMaintenanceMode(settings.isMaintenanceMode);
-    setMessage(settings.maintenanceMessage);
-    setEndTime(settings.endTime ? new Date(settings.endTime) : undefined);
-    setCurrentStep(settings.currentStep);
-    setTotalSteps(settings.totalSteps);
-  }, [settings]);
+    setIsMaintenanceMode(initialIsMaintenanceMode);
+    setMessage(initialMaintenanceMessage);
+    setEndTime(initialEndTime ? new Date(initialEndTime) : undefined);
+    setCurrentStep(initialCurrentStep);
+    setTotalSteps(initialTotalSteps);
+  }, [initialIsMaintenanceMode, initialMaintenanceMessage, initialEndTime, initialCurrentStep, initialTotalSteps]);
 
   const handleSave = async () => {
     setIsLoading(true);
@@ -45,7 +53,7 @@ export const MaintenanceSettings = () => {
         { key: 'maintenance_total_steps', value: totalSteps?.toString() || null },
       ];
 
-      const wasMaintenanceMode = settings.isMaintenanceMode;
+      const wasMaintenanceMode = initialIsMaintenanceMode;
 
       for (const update of updates) {
         const { error } = await supabase
