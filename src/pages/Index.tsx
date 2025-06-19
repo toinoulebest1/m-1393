@@ -13,6 +13,7 @@ import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveSt
 import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
 import { Music } from "lucide-react";
+import { extractDominantColor } from "@/utils/colorExtractor";
 
 const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -22,10 +23,25 @@ const Index = () => {
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [unavailableSong, setUnavailableSong] = useState<Song | null>(null);
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
 
   // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+
+  // Extract dominant color when song changes
+  useEffect(() => {
+    const extractColor = async () => {
+      if (currentSong?.imageUrl) {
+        const color = await extractDominantColor(currentSong.imageUrl);
+        setDominantColor(color);
+      } else {
+        setDominantColor(null);
+      }
+    };
+
+    extractColor();
+  }, [currentSong?.imageUrl]);
 
   // Set up MediaSession API for mobile device notifications
   useEffect(() => {
@@ -207,6 +223,14 @@ const Index = () => {
     };
   }, [userId, username, refreshCurrentSong]);
 
+  const getGlowStyle = () => {
+    if (!isPlaying || !dominantColor) return {};
+    
+    return {
+      boxShadow: `0 0 30px 10px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4), 0 0 60px 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2)`
+    };
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       <BrowserCompatibilityNotice />
@@ -253,11 +277,8 @@ const Index = () => {
               <img 
                 src={currentSong.imageUrl || "https://picsum.photos/300/300"} 
                 alt="Album art" 
-                className={`w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300 ${
-                  isPlaying 
-                    ? 'shadow-[0_0_30px_10px_rgba(155,135,245,0.4),0_0_60px_20px_rgba(155,135,245,0.2)] animate-glow' 
-                    : 'shadow-lg'
-                }`}
+                className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300"
+                style={getGlowStyle()}
               />
             </div>
             <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
