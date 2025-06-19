@@ -14,10 +14,7 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
   });
 
   useEffect(() => {
-    console.log('MaintenanceCountdown - endTime reçu:', endTime);
-    
     if (!endTime) {
-      console.log('MaintenanceCountdown - Pas de endTime fourni');
       return;
     }
 
@@ -26,25 +23,16 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
       let end: number;
       
       try {
-        // Essayer de parser la date de différentes façons
         end = new Date(endTime).getTime();
         
-        // Vérifier si la date est valide
         if (isNaN(end)) {
-          console.error('MaintenanceCountdown - Date invalide:', endTime);
           return;
         }
-        
-        console.log('MaintenanceCountdown - Date de fin:', new Date(end));
-        console.log('MaintenanceCountdown - Date actuelle:', new Date(now));
-        
       } catch (error) {
-        console.error('MaintenanceCountdown - Erreur de parsing de date:', error);
         return;
       }
       
       const distance = end - now;
-      console.log('MaintenanceCountdown - Distance en ms:', distance);
 
       if (distance > 0) {
         const newTimeLeft = {
@@ -53,10 +41,8 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
           seconds: Math.floor((distance % (1000 * 60)) / 1000)
         };
         
-        console.log('MaintenanceCountdown - Temps restant:', newTimeLeft);
         setTimeLeft(newTimeLeft);
       } else {
-        console.log('MaintenanceCountdown - Temps écoulé');
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
         clearInterval(timer);
       }
@@ -80,7 +66,6 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
   }, [endTime]);
 
   if (!endTime) {
-    console.log('MaintenanceCountdown - Composant non affiché car pas de endTime');
     return null;
   }
 
@@ -110,11 +95,6 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
           </div>
           <div className="text-xs text-spotify-neutral">Secondes</div>
         </div>
-      </div>
-      
-      {/* Debug info - à supprimer une fois que ça marche */}
-      <div className="text-xs text-spotify-neutral text-center opacity-50">
-        Debug: {endTime} → {new Date(endTime).toLocaleString()}
       </div>
     </div>
   );

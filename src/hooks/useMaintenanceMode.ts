@@ -40,15 +40,10 @@ export const useMaintenanceMode = () => {
         return;
       }
 
-      console.log('useMaintenanceMode - Données récupérées:', data);
-
       const settingsMap = data?.reduce((acc, item) => {
         acc[item.key] = item.value;
         return acc;
       }, {} as Record<string, string>) || {};
-
-      console.log('useMaintenanceMode - Settings mappés:', settingsMap);
-      console.log('useMaintenanceMode - maintenance_end_time brut:', settingsMap.maintenance_end_time);
 
       const newSettings = {
         isMaintenanceMode: settingsMap.maintenance_mode === 'true',
@@ -58,9 +53,6 @@ export const useMaintenanceMode = () => {
         totalSteps: settingsMap.maintenance_total_steps ? parseInt(settingsMap.maintenance_total_steps) : undefined,
         isLoading: false
       };
-
-      console.log('useMaintenanceMode - Nouveaux settings:', newSettings);
-      console.log('useMaintenanceMode - endTime final:', newSettings.endTime);
 
       setSettings(newSettings);
     } catch (error) {
@@ -84,7 +76,6 @@ export const useMaintenanceMode = () => {
           filter: 'key=in.(maintenance_mode,maintenance_message,maintenance_end_time,maintenance_current_step,maintenance_total_steps)'
         },
         () => {
-          console.log('useMaintenanceMode - Changement détecté, rechargement...');
           checkMaintenanceMode();
         }
       )
