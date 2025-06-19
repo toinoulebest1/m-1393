@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,12 +26,15 @@ import ArtistProfile from "./pages/ArtistProfile";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
 import { MaintenancePage } from "./components/MaintenancePage";
 import { useMaintenanceMode } from "./hooks/useMaintenanceMode";
+import { useBanStatus } from "./hooks/useBanStatus";
+import { BannedUserPage } from "./components/BannedUserPage";
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const { isMaintenanceMode, maintenanceMessage, endTime, currentStep, totalSteps, isLoading: maintenanceLoading } = useMaintenanceMode();
+  const { isBanned, banInfo, isLoading: banLoading } = useBanStatus(session?.user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -81,11 +83,20 @@ function App() {
     }
   };
 
-  if (loading || maintenanceLoading) {
+  if (loading || maintenanceLoading || banLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-spotify-base">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify-accent"></div>
       </div>
+    );
+  }
+
+  // Si l'utilisateur est banni (et n'est pas admin), afficher la page de bannissement
+  if (session && isBanned && !isAdmin && banInfo) {
+    return (
+      <ThemeProvider attribute="class" defaultTheme="dark">
+        <BannedUserPage banInfo={banInfo} />
+      </ThemeProvider>
     );
   }
 
