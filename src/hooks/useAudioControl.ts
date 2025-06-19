@@ -220,9 +220,9 @@ export const useAudioControl = ({
     if (audio && audio.duration) {
       const time = (newProgress / 100) * audio.duration;
       if ('fastSeek' in audio) {
-        (audio as any).fastSeek(time);
+        (audio as HTMLAudioElement & { fastSeek: (time: number) => void }).fastSeek(time);
       } else {
-        audio.currentTime = time;
+        (audio as HTMLAudioElement).currentTime = time;
       }
     }
     return newProgress;
