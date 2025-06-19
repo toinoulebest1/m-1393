@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { getOneDriveConfigSync } from '@/utils/oneDriveStorage';
+import { getOneDriveConfigSync, saveOneDriveConfig } from '@/utils/oneDriveStorage';
 import { saveSharedOneDriveConfig, fetchSharedOneDriveConfig, invalidateSharedConfigCache } from '@/utils/sharedOneDriveConfig';
 import { Loader2, Share2, Shield, Users } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,12 +16,34 @@ export const OneDriveShareConfig = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Vérifier l'état actuel du partage au chargement
+  // Vérifier l'état actuel du partage au chargement et synchroniser le jeton admin
   useEffect(() => {
-    const checkSharingStatus = async () => {
+    const checkSharingStatusAndSyncToken = async () => {
       try {
         const sharedConfig = await fetchSharedOneDriveConfig();
-        setIsSharing(!!sharedConfig?.isEnabled);
+        const isCurrentlySharing = !!sharedConfig?.isEnabled;
+        setIsSharing(isCurrentlySharing);
+        
+        // Si le partage est activé, synchroniser le jeton local avec la configuration partagée
+        if (isCurrentlySharing && sharedConfig?.accessToken) {
+          const localConfig = getOneDriveConfigSync();
+          
+          // Si le jeton local est vide mais qu'il y a un jeton partagé, le restaurer localement
+          if (!localConfig.accessToken && sharedConfig.accessToken) {
+            console.log('Synchronisation du jeton OneDrive depuis la configuration partagée');
+            saveOneDriveConfig({
+              accessToken: sharedConfig.accessToken,
+              refreshToken: sharedConfig.refreshToken || '',
+              clientId: sharedConfig.clientId || '',
+              isEnabled: true
+            });
+            toast({
+              title: "Synchronisation",
+              description: "Votre jeton OneDrive a été synchronisé depuis la configuration partagée",
+              variant: "default"
+            });
+          }
+        }
       } catch (error) {
         console.error('Erreur lors de la vérification du statut de partage:', error);
       } finally {
@@ -29,7 +51,7 @@ export const OneDriveShareConfig = () => {
       }
     };
 
-    checkSharingStatus();
+    checkSharingStatusAndSyncToken();
   }, []);
   
   const handleShareConfig = async () => {
@@ -63,7 +85,7 @@ export const OneDriveShareConfig = () => {
         setIsSharing(true);
         toast({
           title: "Succès",
-          description: "Votre configuration OneDrive est maintenant partagée avec tous les utilisateurs. Ils peuvent maintenant accéder aux fichiers sans configurer leur propre jeton.",
+          description: "Votre configuration OneDrive est maintenant partagée avec tous les utilisateurs et synchronisée entre vos appareils.",
           variant: "default"
         });
       }
@@ -138,7 +160,8 @@ export const OneDriveShareConfig = () => {
         </CardTitle>
         <CardDescription>
           En tant qu'administrateur, vous pouvez partager votre configuration OneDrive avec tous les utilisateurs.
-          Une fois activé, tous les utilisateurs pourront accéder aux fichiers OneDrive sans configurer leur propre jeton.
+          Une fois activé, tous les utilisateurs pourront accéder aux fichiers OneDrive sans configurer leur propre jeton,
+          et votre jeton sera synchronisé entre tous vos appareils.
         </CardDescription>
       </CardHeader>
       
@@ -148,7 +171,7 @@ export const OneDriveShareConfig = () => {
             <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
             <AlertDescription className="text-green-800 dark:text-green-300">
               <p className="font-medium">Configuration OneDrive partagée activée</p>
-              <p>Tous les utilisateurs de l'application peuvent maintenant accéder aux fichiers stockés sur votre OneDrive sans configurer leur propre jeton d'accès.</p>
+              <p>Tous les utilisateurs de l'application peuvent maintenant accéder aux fichiers stockés sur votre OneDrive sans configurer leur propre jeton d'accès. Votre jeton est automatiquement synchronisé entre tous vos appareils.</p>
             </AlertDescription>
           </Alert>
         )}
@@ -159,7 +182,8 @@ export const OneDriveShareConfig = () => {
             <AlertDescription className="text-yellow-800 dark:text-yellow-300">
               <p className="font-medium mb-2">Confirmation de partage</p>
               <p className="mb-3">Vous êtes sur le point de partager votre configuration OneDrive avec tous les utilisateurs. 
-              Cela permettra à tous les utilisateurs d'accéder aux fichiers audio et paroles stockés sur votre OneDrive sans qu'ils aient besoin de configurer leur propre jeton.</p>
+              Cela permettra à tous les utilisateurs d'accéder aux fichiers audio et paroles stockés sur votre OneDrive sans qu'ils aient besoin de configurer leur propre jeton.
+              De plus, votre jeton sera automatiquement synchronisé entre tous vos appareils.</p>
               <p>Voulez-vous continuer?</p>
             </AlertDescription>
           </Alert>
@@ -181,7 +205,7 @@ export const OneDriveShareConfig = () => {
               <Label htmlFor="share-onedrive">Partager ma configuration OneDrive avec tous les utilisateurs</Label>
             </div>
             <div className="text-sm text-muted-foreground">
-              {isSharing ? "Configuration partagée" : "Non partagée"}
+              {isSharing ? "Configuration partagée et synchronisée" : "Non partagée"}
             </div>
           </div>
         )}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +23,7 @@ import { OneDriveTokenStatus } from '@/components/OneDriveTokenStatus';
 import { generateCodeVerifier, generateCodeChallenge, storePKCEParams } from '@/utils/pkce';
 import { OneDriveDiagnostics } from '@/components/OneDriveDiagnostics';
 import { OneDriveConfigGuide } from '@/components/OneDriveConfigGuide';
+import { fetchSharedOneDriveConfig } from '@/utils/sharedOneDriveConfig';
 
 export const OneDriveSettings = () => {
   const [accessToken, setAccessToken] = useState('');
@@ -69,7 +69,7 @@ export const OneDriveSettings = () => {
   const [connectivityResult, setConnectivityResult] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkAdminStatusAndSyncToken = async () => {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -90,17 +90,49 @@ export const OneDriveSettings = () => {
         navigate('/');
         toast.error('Accès non autorisé');
       } else {
-        const config = getOneDriveConfigSync();
-        setAccessToken(config.accessToken || '');
-        setRefreshToken(config.refreshToken || '');
-        setClientId(config.clientId || '');
-        setIsEnabled(config.isEnabled || false);
-      }
+        // Pour les admins, synchroniser d'abord avec la configuration partagée si elle existe
+        try {
+          const sharedConfig = await fetchSharedOneDriveConfig();
+          let configToUse = getOneDriveConfigSync();
+          
+          // Si une configuration partagée existe et que la locale est vide, utiliser la partagée
+          if (sharedConfig?.isEnabled && sharedConfig.accessToken && !configToUse.accessToken) {
+            console.log('Synchronisation du jeton admin depuis la configuration partagée');
+            configToUse = {
+              accessToken: sharedConfig.accessToken,
+              refreshToken: sharedConfig.refreshToken || '',
+              clientId: sharedConfig.clientId || '',
+              isEnabled: sharedConfig.isEnabled
+            };
+            
+            // Sauvegarder localement pour la prochaine fois
+            saveOneDriveConfig(configToUse);
+            
+            toast({
+              title: "Synchronisation",
+              description: "Votre jeton OneDrive a été synchronisé depuis la configuration partagée",
+              variant: "default"
+            });
+          }
+          
+          setAccessToken(configToUse.accessToken || '');
+          setRefreshToken(configToUse.refreshToken || '');
+          setClientId(configToUse.clientId || '');
+          setIsEnabled(configToUse.isEnabled || false);
+        } catch (error) {
+          console.error('Erreur lors de la synchronisation:', error);
+          // En cas d'erreur, utiliser la configuration locale
+          const config = getOneDriveConfigSync();
+          setAccessToken(config.accessToken || '');
+          setRefreshToken(config.refreshToken || '');
+          setClientId(config.clientId || '');
+          setIsEnabled(config.isEnabled || false);
+        }
       
       setIsLoading(false);
     };
 
-    checkAdminStatus();
+    checkAdminStatusAndSyncToken();
   }, [navigate]);
 
   const handleSaveConfig = async () => {
@@ -531,6 +563,7 @@ export const OneDriveSettings = () => {
           <CardTitle>Intégration Microsoft OneDrive</CardTitle>
           <CardDescription>
             Configurer OneDrive pour stocker vos fichiers musicaux et paroles au lieu d'utiliser le stockage Supabase.
+            Votre jeton sera automatiquement synchronisé entre tous vos appareils lorsque le partage est activé.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
