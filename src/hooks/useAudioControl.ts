@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -35,12 +34,18 @@ export const useAudioControl = ({
 }: UseAudioControlProps) => {
 
   const play = useCallback(async (song?: Song) => {
-    if (isChangingSong) return;
+    if (isChangingSong) {
+      console.log("🚫 Changement de chanson déjà en cours, ignorer l'appel");
+      return;
+    }
     
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setIsChangingSong(true);
       
-      // Configuration ultra-rapide immédiate
+      console.log("🎵 === LECTURE ULTRA-RAPIDE ===");
+      console.log("🎶 Chanson:", song.title, "par", song.artist);
+      console.log("⚡ Mode streaming optimisé activé");
+      
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
@@ -50,131 +55,160 @@ export const useAudioControl = ({
       }
 
       try {
-        // Pré-configuration audio optimisée
-        const audio = audioRef.current;
-        if (!audio) {
-          throw new Error('Audio element not available');
+        // Configuration audio optimisée AVANT la récupération de l'URL
+        console.log("⚡ Pré-configuration audio pour streaming instantané");
+        audioRef.current.crossOrigin = "anonymous";
+        audioRef.current.preload = "none"; // Pas de préchargement, on veut juste commencer
+        audioRef.current.volume = volume / 100;
+        
+        // Optimisation streaming
+        if (audioRef.current.buffered) {
+          // Vider les anciens buffers si possible
+          audioRef.current.currentTime = 0;
         }
         
-        audio.crossOrigin = "anonymous";
-        audio.preload = "none";
-        audio.volume = volume / 100;
-        
-        // Optimisations streaming agressives
-        if ('fastSeek' in audio) {
-          (audio as any).fastSeek = true;
-        }
-        
+        console.log("🚀 Récupération URL ultra-rapide...");
         const startTime = performance.now();
         
-        // Triple stratégie parallèle pour URL ultra-rapide
-        const [cachePromise, storagePromise, backupPromise] = [
-          // Stratégie 1: Cache instantané (priorité max)
-          Promise.race([
-            isInCache(song.url).then(async (inCache) => {
-              if (inCache) {
-                const cached = await getFromCache(song.url);
-                if (cached && typeof cached === 'string') {
-                  return { url: cached, source: 'cache', priority: 1 };
-                }
-              }
-              throw new Error('No cache');
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cache timeout')), 10))
-          ]).catch(() => null),
-          
-          // Stratégie 2: Storage direct (priorité haute)
-          getAudioFile(song.url).then(url => {
-            if (typeof url === 'string') {
-              return { url, source: 'storage', priority: 2 };
+        // Vérification cache ULTRA rapide (sans await pour les opérations lentes)
+        const cacheCheckPromise = isInCache(song.url).then(async (inCache) => {
+          if (inCache) {
+            const cachedUrl = await getFromCache(song.url);
+            if (cachedUrl && typeof cachedUrl === 'string') {
+              console.log("⚡ Cache hit - URL immédiate:", (performance.now() - startTime).toFixed(1), "ms");
+              return { url: cachedUrl, fromCache: true };
             }
-            throw new Error('Invalid storage URL');
-          }).catch(() => null),
-          
-          // Stratégie 3: Backup rapide (si disponible)
-          new Promise(resolve => setTimeout(() => resolve(null), 30))
-        ];
-
-        // Prendre la première URL disponible
-        const results = await Promise.allSettled([cachePromise, storagePromise, backupPromise]);
-        const validResults = results
-          .filter(r => r.status === 'fulfilled' && r.value)
-          .map(r => r.status === 'fulfilled' ? r.value : null)
-          .filter(Boolean)
-          .sort((a, b) => (a?.priority || 10) - (b?.priority || 10));
-
-        if (validResults.length === 0) {
-          throw new Error('Aucune URL disponible');
-        }
-
-        const audioData = validResults[0];
+          }
+          return null;
+        });
+        
+        // Récupération URL en parallèle (ne pas attendre le cache)
+        const urlPromise = getAudioFile(song.url).then(url => {
+          if (typeof url === 'string') {
+            return { url, fromCache: false };
+          }
+          throw new Error('URL audio invalide');
+        });
+        
+        // Prendre la première URL disponible (cache ou réseau)
+        const audioData = await Promise.race([
+          cacheCheckPromise.then(result => result || Promise.reject("No cache")),
+          urlPromise
+        ]).catch(() => urlPromise); // Fallback sur l'URL réseau si cache échoue
+        
         const audioUrl = audioData.url;
         const elapsed = performance.now() - startTime;
         
-        if (elapsed < 40) {
-          console.log(`⚡ Ultra-rapide: ${elapsed.toFixed(0)}ms (${audioData.source})`);
+        console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms", audioData.fromCache ? "(cache)" : "(réseau)");
+
+        if (!audioUrl || typeof audioUrl !== 'string') {
+          throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming hyper-optimisée
-        audio.src = audioUrl;
+        // Configuration streaming ultra-optimisée
+        console.log("⚡ Configuration streaming instantané");
+        audioRef.current.src = audioUrl;
         
-        // Optimisations navigateur
+        // Optimisations pour streaming HTTP
         if (audioUrl.startsWith('http')) {
-          audio.preload = "metadata";
+          // Configuration aggressive pour démarrage immédiat
+          audioRef.current.preload = "metadata";
           
-          // Cache intelligent en arrière-plan (sans attendre)
-          if (audioData.source !== 'cache') {
+          // Si pas encore en cache, démarrer le téléchargement en arrière-plan APRÈS le démarrage
+          if (!audioData.fromCache) {
+            // Téléchargement différé pour ne pas bloquer la lecture
             setTimeout(async () => {
               try {
-                const response = await fetch(audioUrl, { 
-                  method: 'HEAD',
-                  cache: 'force-cache'
-                });
+                console.log("📡 Téléchargement arrière-plan démarré");
+                const response = await fetch(audioUrl);
                 if (response.ok) {
-                  // Cache différé pour ne pas ralentir
-                  fetch(audioUrl).then(r => r.blob()).then(blob => {
-                    addToCache(song.url, blob);
-                  });
+                  const blob = await response.blob();
+                  await addToCache(song.url, blob);
+                  console.log("💾 Mise en cache terminée:", blob.size, "bytes");
                 }
-              } catch (e) { /* Silent fail */ }
-            }, 20);
+              } catch (error) {
+                console.warn("⚠️ Cache en arrière-plan échoué:", error);
+              }
+            }, 100); // Démarrer après 100ms seulement
           }
         } else {
-          audio.preload = "auto";
+          audioRef.current.preload = "auto";
         }
         
-        // Démarrage immédiat ultra-optimisé
-        const playPromise = audio.play();
+        // Démarrage immédiat sans attendre load
+        console.log("🚀 Démarrage immédiat...");
+        const playStartTime = performance.now();
+        
+        const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            const totalTime = performance.now() - startTime;
-            if (totalTime < 80) {
-              console.log(`🚀 Instantané: ${totalTime.toFixed(0)}ms`);
-            }
+            const playElapsed = performance.now() - playStartTime;
+            const totalElapsed = performance.now() - startTime;
+            
+            console.log("✅ === LECTURE INSTANTANÉE RÉUSSIE ===");
+            console.log("🎵 Chanson:", song.title);
+            console.log("⚡ Temps de démarrage:", playElapsed.toFixed(1), "ms");
+            console.log("⚡ Temps total:", totalElapsed.toFixed(1), "ms");
+            console.log("🎯 Performance:", totalElapsed < 500 ? "EXCELLENT" : totalElapsed < 1000 ? "BON" : "À AMÉLIORER");
             
             setIsPlaying(true);
             
-            // Pré-chargement intelligent différé
-            setTimeout(preloadNextTracks, 100);
+            // Vérification rapide du streaming
+            setTimeout(() => {
+              if (audioRef.current.currentTime === 0 && !audioRef.current.paused) {
+                console.log("📡 Streaming en cours - buffering initial...");
+                
+                // Attente courte pour le buffering streaming
+                setTimeout(() => {
+                  if (audioRef.current.currentTime === 0 && !audioRef.current.paused) {
+                    console.log("⚠️ Streaming lent - cliquez pour forcer");
+                    toast.error("Connexion lente - cliquez pour relancer", {
+                      duration: 3000,
+                      action: {
+                        label: "Relancer",
+                        onClick: () => {
+                          audioRef.current.currentTime = 0;
+                          audioRef.current.play();
+                        }
+                      }
+                    });
+                  }
+                }, 2000);
+              }
+            }, 500);
             
-            // Fin de changement ultra-rapide
+            // Préchargement des pistes suivantes (différé)
+            setTimeout(() => preloadNextTracks(), 500);
+            
+            // Fin du changement (très rapide)
             changeTimeoutRef.current = window.setTimeout(() => {
               setIsChangingSong(false);
               changeTimeoutRef.current = null;
-            }, 60);
+            }, 300); // Réduit de 1200ms à 300ms
             
           }).catch(error => {
+            console.error("❌ === ERREUR STREAMING INSTANTANÉ ===");
+            console.error("🔴 Erreur:", error.message);
+            
             if (error.name === 'NotAllowedError') {
-              toast.error("Cliquez pour activer l'audio");
+              toast.error("Cliquez d'abord sur la page pour activer l'audio", {
+                action: {
+                  label: "Réessayer",
+                  onClick: () => audioRef.current.play().then(() => setIsPlaying(true))
+                }
+              });
             } else {
-              toast.error("Erreur de lecture");
+              toast.error(`Erreur streaming: ${error.message}`);
             }
+            
             setIsPlaying(false);
             setIsChangingSong(false);
           });
         }
       } catch (error) {
-        console.error("Erreur lecture:", error);
+        console.error("💥 === ERREUR RÉCUPÉRATION ULTRA-RAPIDE ===");
+        console.error("🔴 Erreur:", error);
+        
         toast.error(`Impossible de lire "${song.title}"`);
         setCurrentSong(null);
         localStorage.removeItem('currentSong');
@@ -183,19 +217,28 @@ export const useAudioControl = ({
       }
     } else if (audioRef.current) {
       // Reprise ultra-rapide
+      console.log("⚡ Reprise instantanée");
       try {
-        const audio = audioRef.current;
-        audio.volume = volume / 100;
-        const playPromise = audio.play();
+        audioRef.current.volume = volume / 100;
+        const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
-          playPromise.then(() => setIsPlaying(true)).catch(error => {
+          playPromise.then(() => {
+            console.log("✅ Reprise réussie");
+            setIsPlaying(true);
+          }).catch(error => {
             if (error.name === 'NotAllowedError') {
-              toast.error("Cliquez pour reprendre");
+              toast.error("Cliquez pour reprendre la lecture", {
+                action: {
+                  label: "Reprendre",
+                  onClick: () => audioRef.current.play().then(() => setIsPlaying(true))
+                }
+              });
             }
             setIsPlaying(false);
           });
         }
       } catch (error) {
+        console.error("❌ Erreur reprise:", error);
         setIsPlaying(false);
       }
     }
@@ -216,14 +259,9 @@ export const useAudioControl = ({
   }, [audioRef]);
 
   const updateProgress = useCallback((newProgress: number) => {
-    const audio = audioRef.current;
-    if (audio && audio.duration) {
-      const time = (newProgress / 100) * audio.duration;
-      if ('fastSeek' in audio) {
-        (audio as HTMLAudioElement & { fastSeek: (time: number) => void }).fastSeek(time);
-      } else {
-        (audio as HTMLAudioElement).currentTime = time;
-      }
+    if (audioRef.current) {
+      const time = (newProgress / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = time;
     }
     return newProgress;
   }, [audioRef]);
@@ -239,6 +277,7 @@ export const useAudioControl = ({
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      console.log("Current song stopped immediately");
     }
   }, [audioRef]);
 
@@ -274,6 +313,8 @@ export const useAudioControl = ({
         if ('mediaSession' in navigator) {
           updateMediaSessionMetadata(updatedSong);
         }
+        
+        console.log("Current song metadata refreshed:", updatedSong.title);
       }
     } catch (error) {
       console.error("Error in refreshCurrentSong:", error);

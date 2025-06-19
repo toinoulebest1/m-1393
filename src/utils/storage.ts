@@ -1,14 +1,17 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
+  console.log("Stockage du fichier audio:", id);
+  
   const useOneDrive = await isOneDriveEnabled();
+  console.log("Using storage provider:", useOneDrive ? "OneDrive" : "Supabase");
   
   let fileToUpload: File;
   if (typeof file === 'string') {
     try {
+      console.log("Fetching file from URL:", file);
       const response = await fetch(file);
       if (!response.ok) {
         throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -25,9 +28,11 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 
   try {
     if (useOneDrive) {
+      console.log("Uploading file to OneDrive storage:", id);
       await uploadFileToOneDrive(fileToUpload, `audio/${id}`);
       return `audio/${id}`;
     } else {
+      console.log("Uploading file to Supabase storage:", id);
       const { data, error } = await supabase.storage
         .from('audio')
         .upload(id, fileToUpload, {
@@ -37,9 +42,11 @@ export const storeAudioFile = async (id: string, file: File | string) => {
         });
 
       if (error) {
+        console.error("Erreur lors du stockage du fichier:", error);
         throw error;
       }
 
+      console.log("File uploaded successfully:", data);
       return data.path;
     }
   } catch (error) {
@@ -49,56 +56,81 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 };
 
 export const getAudioFile = async (path: string) => {
+  console.log("=== RÉCUPÉRATION ULTRA-RAPIDE ===");
+  console.log("⚡ Chemin:", path);
+  const startTime = performance.now();
+  
   if (!path) {
     throw new Error("Chemin du fichier non fourni");
   }
 
   try {
-    // Cache ultra-rapide (15ms max pour optimisation maximale)
-    const cacheResult = await Promise.race([
+    // Vérification cache ULTRA-RAPIDE (Promise.race avec timeout)
+    console.log("🚀 Cache check ultra-rapide...");
+    const cacheCheck = Promise.race([
       isInCache(path).then(async (inCache) => {
         if (inCache) {
-          const cached = await getFromCache(path);
-          if (cached) {
-            return cached;
+          const cachedUrl = await getFromCache(path);
+          if (cachedUrl) {
+            const elapsed = performance.now() - startTime;
+            console.log("⚡ CACHE HIT:", elapsed.toFixed(1), "ms");
+            return cachedUrl;
           }
         }
         return null;
       }),
-      new Promise(resolve => setTimeout(() => resolve(null), 15))
+      new Promise(resolve => setTimeout(() => resolve(null), 50)) // Timeout cache à 50ms
     ]);
 
-    if (cacheResult) {
-      return cacheResult;
+    const cachedResult = await cacheCheck;
+    if (cachedResult) {
+      return cachedResult;
     }
 
-    // Récupération réseau hyper-optimisée avec timeout agressif
+    // Récupération réseau optimisée
+    console.log("📡 Récupération réseau rapide...");
     const useOneDrive = await isOneDriveEnabled();
+    console.log("Provider:", useOneDrive ? "OneDrive" : "Supabase");
+
     let audioUrl: string;
     
     if (useOneDrive) {
+      console.log("⚡ OneDrive streaming...");
       try {
-        audioUrl = await Promise.race([
-          getOneDriveSharedLink(`audio/${path}`),
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('OneDrive timeout')), 200)
-          )
-        ]);
+        audioUrl = await getOneDriveSharedLink(`audio/${path}`);
+        console.log("✅ OneDrive URL:", (performance.now() - startTime).toFixed(1), "ms");
       } catch (oneDriveError) {
+        console.error("❌ OneDrive error:", oneDriveError);
         throw new Error(`OneDrive indisponible: ${oneDriveError instanceof Error ? oneDriveError.message : 'Erreur inconnue'}`);
       }
     } else {
-      // Récupération Supabase optimisée avec timeout
-      const signedUrlPromise = supabase.storage
+      console.log("⚡ Supabase streaming...");
+      
+      // Vérification d'existence rapide (avec timeout)
+      const fileCheckPromise = Promise.race([
+        supabase.storage.from('audio').list('', { search: path }).then(({ data, error }) => {
+          if (error) throw error;
+          return data && data.length > 0;
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1000))
+      ]);
+
+      try {
+        const fileExists = await fileCheckPromise;
+        if (!fileExists) {
+          throw new Error(`Fichier non trouvé: ${path}`);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "Timeout") {
+          console.warn("⚠️ Vérification fichier timeout - tentative directe");
+        } else {
+          throw error;
+        }
+      }
+
+      const { data, error } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
-
-      const { data, error } = await Promise.race([
-        signedUrlPromise,
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Supabase timeout')), 150)
-        )
-      ]);
 
       if (error) {
         throw new Error(`Erreur URL signée: ${error.message}`);
@@ -109,32 +141,33 @@ export const getAudioFile = async (path: string) => {
       }
 
       audioUrl = data.signedUrl;
+      console.log("✅ Supabase URL:", (performance.now() - startTime).toFixed(1), "ms");
     }
 
-    // Cache différé ultra-léger (ne pas bloquer)
+    // Mise en cache différée (ne pas bloquer le streaming)
+    console.log("💾 Cache arrière-plan démarré");
     setTimeout(async () => {
       try {
         if (!(await isInCache(path))) {
-          // Préchargement intelligent avec priorité basse
-          fetch(audioUrl, { 
-            method: 'HEAD',
-            cache: 'force-cache'
-          }).then(response => {
-            if (response.ok) {
-              // Cache différé pour ne pas impacter les performances
-              setTimeout(() => {
-                fetch(audioUrl).then(r => r.blob()).then(blob => {
-                  addToCache(path, blob);
-                });
-              }, 50);
-            }
-          });
+          console.log("📡 Téléchargement cache...");
+          const response = await fetch(audioUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            await addToCache(path, blob);
+            console.log("✅ Cache terminé:", blob.size, "bytes");
+          }
         }
-      } catch (e) { /* Silent */ }
-    }, 20);
+      } catch (cacheError) {
+        console.warn("⚠️ Cache arrière-plan échoué:", cacheError);
+      }
+    }, 200); // Démarrer après 200ms
 
+    const totalElapsed = performance.now() - startTime;
+    console.log("⚡ TOTAL:", totalElapsed.toFixed(1), "ms");
+    console.log("=============================");
     return audioUrl;
   } catch (error) {
+    console.error("❌ ERREUR RÉCUPÉRATION:", error);
     throw error;
   }
 };
@@ -142,6 +175,7 @@ export const getAudioFile = async (path: string) => {
 export const searchDeezerTrack = async (artist: string, title: string): Promise<string | null> => {
   try {
     const query = `${artist} ${title}`;
+    console.log("Recherche Deezer pour:", { artist, title });
     
     const { data: supabaseData, error } = await supabase.functions.invoke('deezer-search', {
       body: { query }
@@ -151,10 +185,13 @@ export const searchDeezerTrack = async (artist: string, title: string): Promise<
       console.error("Erreur lors de l'appel à l'edge function Deezer:", error);
       return null;
     }
+
+    console.log("Résultat de la recherche Deezer:", supabaseData);
     
     if (supabaseData?.data && supabaseData.data.length > 0) {
       const track = supabaseData.data[0];
       if (track.album?.cover_xl) {
+        console.log("Pochette trouvée:", track.album.cover_xl);
         return track.album.cover_xl;
       }
     }
