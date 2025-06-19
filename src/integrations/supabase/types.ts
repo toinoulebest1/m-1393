@@ -642,6 +642,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_bans: {
+        Row: {
+          ban_type: string
+          banned_by: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          ban_type: string
+          banned_by: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          reason: string
+          user_id: string
+        }
+        Update: {
+          ban_type?: string
+          banned_by?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -700,6 +733,10 @@ export type Database = {
         Args: { playlist_id: string; viewer_user_id: string }
         Returns: boolean
       }
+      deactivate_expired_bans: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       generate_random_username: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -709,6 +746,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      is_user_banned: {
         Args: { user_id: string }
         Returns: boolean
       }
