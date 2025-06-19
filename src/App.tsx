@@ -31,7 +31,7 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading } = useMaintenanceMode();
+  const { isMaintenanceMode, maintenanceMessage, endTime, currentStep, totalSteps, isLoading: maintenanceLoading } = useMaintenanceMode();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -94,6 +94,9 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="dark">
         <MaintenancePage 
           message={maintenanceMessage}
+          endTime={useMaintenanceMode().endTime}
+          currentStep={useMaintenanceMode().currentStep}
+          totalSteps={useMaintenanceMode().totalSteps}
           onRetry={() => window.location.reload()}
         />
       </ThemeProvider>

@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 interface MaintenanceSettings {
   isMaintenanceMode: boolean;
   maintenanceMessage: string;
+  endTime?: string;
+  currentStep?: number;
+  totalSteps?: number;
   isLoading: boolean;
 }
 
@@ -20,7 +23,13 @@ export const useMaintenanceMode = () => {
       const { data, error } = await supabase
         .from('site_settings')
         .select('key, value')
-        .in('key', ['maintenance_mode', 'maintenance_message']);
+        .in('key', [
+          'maintenance_mode', 
+          'maintenance_message', 
+          'maintenance_end_time', 
+          'maintenance_current_step', 
+          'maintenance_total_steps'
+        ]);
 
       if (error) {
         console.error('Erreur lors de la vérification du mode maintenance:', error);
@@ -35,6 +44,9 @@ export const useMaintenanceMode = () => {
       setSettings({
         isMaintenanceMode: settingsMap.maintenance_mode === 'true',
         maintenanceMessage: settingsMap.maintenance_message || 'Le site est actuellement en maintenance. Nous reviendrons bientôt !',
+        endTime: settingsMap.maintenance_end_time || undefined,
+        currentStep: settingsMap.maintenance_current_step ? parseInt(settingsMap.maintenance_current_step) : undefined,
+        totalSteps: settingsMap.maintenance_total_steps ? parseInt(settingsMap.maintenance_total_steps) : undefined,
         isLoading: false
       });
     } catch (error) {
@@ -55,7 +67,7 @@ export const useMaintenanceMode = () => {
           event: '*',
           schema: 'public',
           table: 'site_settings',
-          filter: 'key=in.(maintenance_mode,maintenance_message)'
+          filter: 'key=in.(maintenance_mode,maintenance_message,maintenance_end_time,maintenance_current_step,maintenance_total_steps)'
         },
         () => {
           checkMaintenanceMode();
