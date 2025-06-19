@@ -25,11 +25,13 @@ export const useUploadProgress = () => {
   const startTimeRef = useRef<number>(0);
   const processedSizesRef = useRef<number[]>([]);
   const lastUpdateTimeRef = useRef<number>(0);
+  const completedFilesRef = useRef<number>(0);
 
   const startUpload = useCallback((totalFiles: number) => {
     startTimeRef.current = Date.now();
     processedSizesRef.current = [];
     lastUpdateTimeRef.current = Date.now();
+    completedFilesRef.current = 0;
     
     setStats({
       isUploading: true,
@@ -49,33 +51,47 @@ export const useUploadProgress = () => {
     fileSize?: number
   ) => {
     const now = Date.now();
-    const totalProgress = filesProcessed > 0 
-      ? ((filesProcessed - 1) / stats.totalFiles) * 100 + (fileProgress / stats.totalFiles)
-      : (fileProgress / stats.totalFiles);
+    
+    // Calcul de progression plus précis pour uploads parallèles
+    const totalProgress = Math.min(
+      ((completedFilesRef.current + (fileProgress / 100)) / stats.totalFiles) * 100,
+      100
+    );
 
-    // Calculer la vitesse d'upload
+    // Calcul vitesse d'upload amélioré
     let uploadSpeed = 0;
     if (fileSize && lastUpdateTimeRef.current > 0) {
-      const timeDiff = (now - lastUpdateTimeRef.current) / 1000; // en secondes
+      const timeDiff = (now - lastUpdateTimeRef.current) / 1000;
       if (timeDiff > 0) {
         uploadSpeed = fileSize / timeDiff;
         processedSizesRef.current.push(fileSize);
+        
+        // Moyenne mobile sur les 5 derniers uploads
+        if (processedSizesRef.current.length > 5) {
+          processedSizesRef.current = processedSizesRef.current.slice(-5);
+        }
       }
     }
 
-    // Calculer le temps estimé
+    // Estimation temps restant améliorée
     let estimatedTimeLeft = 0;
-    if (totalProgress > 5) { // Attendre au moins 5% pour avoir une estimation
+    if (totalProgress > 2) {
       const elapsedTime = (now - startTimeRef.current) / 1000;
+      const avgTimePerPercent = elapsedTime / totalProgress;
       const remainingProgress = 100 - totalProgress;
-      estimatedTimeLeft = (elapsedTime / totalProgress) * remainingProgress;
+      estimatedTimeLeft = avgTimePerPercent * remainingProgress;
+    }
+
+    // Mise à jour des fichiers complétés
+    if (fileProgress >= 100 && filesProcessed > completedFilesRef.current) {
+      completedFilesRef.current = filesProcessed;
     }
 
     lastUpdateTimeRef.current = now;
 
     setStats(prev => ({
       ...prev,
-      progress: Math.min(totalProgress, 100),
+      progress: totalProgress,
       currentFile,
       filesProcessed,
       estimatedTimeLeft,
@@ -90,7 +106,7 @@ export const useUploadProgress = () => {
       progress: 100
     }));
 
-    // Masquer la barre après 2 secondes
+    // Auto-hide après 3 secondes
     setTimeout(() => {
       setStats({
         isUploading: false,
@@ -101,7 +117,7 @@ export const useUploadProgress = () => {
         estimatedTimeLeft: 0,
         uploadSpeed: 0
       });
-    }, 2000);
+    }, 3000);
   }, []);
 
   const cancelUpload = useCallback(() => {

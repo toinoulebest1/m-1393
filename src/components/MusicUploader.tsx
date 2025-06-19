@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { GlobalUploadProgress } from "@/components/GlobalUploadProgress";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
+import { ParallelUploadService } from "@/services/uploadService";
+import { uploadFileInChunks } from "@/utils/chunkUpload";
 
 interface Song {
   id: string;
@@ -239,7 +241,7 @@ export const MusicUploader = () => {
   };
 
   const processAudioFile = async (file: File, fileIndex: number, totalFiles: number) => {
-    console.log("Début du traitement pour:", file.name);
+    console.log("🎵 Traitement optimisé pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
       toast.error("Type de fichier non supporté");
@@ -248,92 +250,85 @@ export const MusicUploader = () => {
 
     const fileId = generateUUID();
     setCurrentUploadingSong(file.name);
-    updateProgress(file.name, fileIndex, 0, file.size);
 
     try {
       let { artist, title } = parseFileName(file.name);
-      const metadataResult = await extractMetadata(file);
+      
+      // Extraction métadonnées en parallèle
+      const metadataPromise = extractMetadata(file);
+      const existsPromise = checkIfSongExists(artist, title);
+      
+      const [metadataResult, songExists] = await Promise.all([metadataPromise, existsPromise]);
       
       if (metadataResult) {
         if (metadataResult.artist) artist = metadataResult.artist;
         if (metadataResult.title) title = metadataResult.title;
       }
 
-      updateProgress(file.name, fileIndex, 20);
-
-      const songExists = await checkIfSongExists(artist, title);
       if (songExists) {
         toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
-        setCurrentUploadingSong(null);
         return null;
       }
 
-      updateProgress(file.name, fileIndex, 30);
-
-      console.log("Stockage du fichier audio:", fileId);
-      setUploadProgress(0);
+      console.log("⚡ Upload optimisé du fichier:", fileId);
       setIsUploading(true);
 
-      // Progress pour l'upload du fichier
+      // Upload avec chunks pour de meilleures performances
+      let uploadProgress = 0;
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
-          const globalProgress = 30 + (newProgress * 0.4); // 30% à 70% pour l'upload
-          updateProgress(file.name, fileIndex, Math.min(globalProgress, 70));
-          if (newProgress >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return newProgress;
-        });
-      }, 200);
+        uploadProgress = Math.min(uploadProgress + 2, 90);
+        setUploadProgress(uploadProgress);
+      }, 50);
 
-      await storeAudioFile(fileId, file);
+      await uploadFileInChunks(file, fileId, {
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+          updateProgress(file.name, fileIndex, 30 + (progress * 0.4));
+        }
+      });
       
       clearInterval(progressInterval);
-      setUploadProgress(100);
-      updateProgress(file.name, fileIndex, 70);
-
+      
+      // Traitement audio en parallèle
       const audioUrl = URL.createObjectURL(file);
       const audio = new Audio();
       
-      const duration = await new Promise<number>((resolve, reject) => {
-        audio.addEventListener('loadedmetadata', () => {
-          resolve(audio.duration);
-        });
-        audio.addEventListener('error', (e) => {
-          console.error("Erreur lors du chargement de l'audio:", e);
-          reject(e);
-        });
-        audio.src = audioUrl;
-      });
+      const [duration] = await Promise.all([
+        new Promise<number>((resolve, reject) => {
+          audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
+          audio.addEventListener('error', reject);
+          audio.src = audioUrl;
+        })
+      ]);
 
-      const formattedDuration = formatDuration(duration);
       URL.revokeObjectURL(audioUrl);
-      updateProgress(file.name, fileIndex, 80);
+      const formattedDuration = formatDuration(duration);
 
+      // Recherche de pochette en parallèle avec la base de données
       let imageUrl = "https://picsum.photos/240/240";
+      const imagePromises = [];
       
       if (metadataResult?.picture) {
-        try {
-          const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
-          imageUrl = URL.createObjectURL(blob);
-          console.log("Pochette créée depuis les métadonnées");
-        } catch (error) {
-          console.error("Erreur lors de la création du blob:", error);
+        imagePromises.push(
+          Promise.resolve().then(() => {
+            const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
+            return URL.createObjectURL(blob);
+          })
+        );
+      }
+      
+      imagePromises.push(searchDeezerTrack(artist, title));
+      
+      const imageResults = await Promise.allSettled(imagePromises);
+      
+      for (const result of imageResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          imageUrl = result.value;
+          break;
         }
       }
 
-      if (imageUrl === "https://picsum.photos/240/240") {
-        const deezerCover = await searchDeezerTrack(artist, title);
-        if (deezerCover) {
-          console.log("Pochette Deezer trouvée:", deezerCover);
-          imageUrl = deezerCover;
-        }
-      }
-
-      updateProgress(file.name, fileIndex, 90);
-
+      // Insertion en base de données
       const { data: songData, error: songError } = await supabase
         .from('songs')
         .insert({
@@ -348,76 +343,19 @@ export const MusicUploader = () => {
         .single();
 
       if (songError) {
-        console.error("Erreur lors de l'enregistrement dans la base de données:", songError);
+        console.error("Erreur lors de l'enregistrement:", songError);
         toast.error("Erreur lors de l'enregistrement de la chanson");
-        setCurrentUploadingSong(null);
         return null;
       }
       
-      // Recherche améliorée des fichiers LRC correspondants
-      const baseFileName = file.name.replace(/\.[^/.]+$/, "");
-      console.log("Recherche de fichiers LRC pour le nom de base:", baseFileName);
-      
-      // Vérifier différents formats possibles de noms de fichiers LRC
-      const possibleLrcNames = [
-        `${baseFileName}.lrc`,                       // même nom que l'audio
-        `${title}.lrc`,                             // titre uniquement
-        `${artist} - ${title}.lrc`,                 // artiste - titre
-        `${title} - ${artist}.lrc`,                 // titre - artiste
-        baseFileName.toLowerCase() + ".lrc",        // nom de base en minuscules
-        title.toLowerCase() + ".lrc",               // titre en minuscules
-        `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`  // artiste - titre en minuscules
-      ];
-      
-      console.log("Recherche parmi les noms de fichiers LRC possibles:", possibleLrcNames);
-      
-      let lyricsFound = false;
-      let lrcFile: File | undefined;
-      
-      // Rechercher parmi tous les noms possibles
-      for (const lrcName of possibleLrcNames) {
-        if (lrcFilesRef.current.has(lrcName)) {
-          console.log(`Fichier LRC correspondant trouvé: ${lrcName}`);
-          lrcFile = lrcFilesRef.current.get(lrcName);
-          break;
-        }
-      }
-      
-      // Si on a trouvé un fichier LRC, le traiter
-      if (lrcFile) {
-        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
-        
-        if (lyricsFound) {
-          toast.success(`Paroles synchronisées importées depuis le fichier LRC`);
-        }
-      } else {
-        console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
-        console.log("Noms de fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
-      }
-      
-      // Si aucun fichier LRC n'a été trouvé, essayer de récupérer les paroles en ligne
-      if (!lyricsFound && artist !== "Unknown Artist") {
-        // Toast de chargement des paroles
-        const lyricsToastId = toast.loading(`Récupération des paroles pour "${title}"...`);
-        
-        // Récupération des paroles en arrière-plan
-        fetchLyrics(title, artist, fileId).then(lyrics => {
-          if (lyrics) {
-            toast.success(`Paroles récupérées pour "${title}"`, {
-              id: lyricsToastId
-            });
-          } else {
-            toast.error(`Impossible de trouver les paroles pour "${title}"`, {
-              id: lyricsToastId
-            });
-          }
-        });
-      }
+      // Traitement des paroles en arrière-plan (non bloquant)
+      setTimeout(() => {
+        this.processLyricsInBackground(file, fileId, title, artist);
+      }, 0);
 
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentUploadingSong(null);
-      updateProgress(file.name, fileIndex + 1, 100);
 
       return {
         id: fileId,
@@ -430,12 +368,52 @@ export const MusicUploader = () => {
       };
 
     } catch (error) {
-      console.error("Erreur lors du traitement du fichier:", error);
+      console.error("Erreur lors du traitement:", error);
       toast.error("Erreur lors de l'upload du fichier");
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentUploadingSong(null);
       return null;
+    }
+  };
+
+  // Nouvelle méthode pour traiter les paroles en arrière-plan
+  private processLyricsInBackground = async (file: File, fileId: string, title: string, artist: string) => {
+    try {
+      const baseFileName = file.name.replace(/\.[^/.]+$/, "");
+      const possibleLrcNames = [
+        `${baseFileName}.lrc`,
+        `${title}.lrc`,
+        `${artist} - ${title}.lrc`,
+        `${title} - ${artist}.lrc`,
+        baseFileName.toLowerCase() + ".lrc",
+        title.toLowerCase() + ".lrc",
+        `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`
+      ];
+      
+      let lyricsFound = false;
+      let lrcFile: File | undefined;
+      
+      for (const lrcName of possibleLrcNames) {
+        if (lrcFilesRef.current.has(lrcName)) {
+          lrcFile = lrcFilesRef.current.get(lrcName);
+          break;
+        }
+      }
+      
+      if (lrcFile) {
+        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
+        if (lyricsFound) {
+          toast.success(`Paroles synchronisées importées`);
+        }
+      } else if (artist !== "Unknown Artist") {
+        const lyrics = await fetchLyrics(title, artist, fileId);
+        if (lyrics) {
+          toast.success(`Paroles récupérées pour "${title}"`);
+        }
+      }
+    } catch (error) {
+      console.warn("Erreur traitement paroles (non critique):", error);
     }
   };
 
@@ -445,13 +423,13 @@ export const MusicUploader = () => {
     const allFiles = Array.from(files);
     const audioFiles: File[] = [];
     
-    // Première passe pour identifier les fichiers audio et LRC
+    // Identification des fichiers
     allFiles.forEach(file => {
       const fileName = file.name.toLowerCase();
       
       if (fileName.endsWith('.lrc')) {
         lrcFilesRef.current.set(file.name, file);
-        console.log("Fichier LRC détecté et mis en cache:", file.name);
+        console.log("📝 Fichier LRC détecté:", file.name);
         toast.info(`Fichier de paroles détecté: ${file.name}`);
       } else if (file.type.startsWith('audio/')) {
         audioFiles.push(file);
@@ -463,31 +441,42 @@ export const MusicUploader = () => {
       return;
     }
 
-    console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
-    console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
-    
-    // Démarrer le suivi global
+    console.log(`🚀 Upload parallèle de ${audioFiles.length} fichiers`);
     startUpload(audioFiles.length);
 
-    const processedSongs = [];
-    for (let i = 0; i < audioFiles.length; i++) {
-      const song = await processAudioFile(audioFiles[i], i + 1, audioFiles.length);
-      if (song) {
-        processedSongs.push(song);
+    // Service d'upload parallèle
+    const uploadService = new ParallelUploadService(
+      (progress) => {
+        updateProgress(
+          progress.currentFile || "Traitement...",
+          progress.completed,
+          progress.progress
+        );
+      },
+      (results) => {
+        completeUpload();
+        
+        const validSongs = results
+          .filter(result => result.success && result.song)
+          .map(result => result.song);
+
+        console.log(`✅ Upload terminé: ${validSongs.length}/${audioFiles.length} réussis`);
+        
+        if (validSongs.length > 0) {
+          validSongs.forEach(song => addToQueue(song));
+          toast.success(`${validSongs.length} chanson(s) ajoutée(s) avec succès!`);
+        }
+        
+        const failedCount = results.length - validSongs.length;
+        if (failedCount > 0) {
+          toast.error(`${failedCount} fichier(s) ont échoué`);
+        }
+        
+        lrcFilesRef.current.clear();
       }
-    }
+    );
 
-    // Terminer le suivi global
-    completeUpload();
-
-    const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
-    console.log("Chansons valides traitées:", validSongs);
-
-    if (validSongs.length > 0) {
-      validSongs.forEach(song => addToQueue(song));
-    }
-    
-    lrcFilesRef.current.clear();
+    await uploadService.uploadFiles(audioFiles, this.processAudioFile.bind(this));
   };
 
   const handleDrop = async (e: React.DragEvent) => {
