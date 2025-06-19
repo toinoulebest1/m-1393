@@ -4,15 +4,18 @@ import { Sidebar } from "./Sidebar";
 import { NowPlaying } from "./NowPlaying";
 import { usePlayerState } from "@/hooks/usePlayerState";
 import { useBanCheck } from "@/hooks/useBanCheck";
+import { useLocation } from "react-router-dom";
 
 interface LayoutProps {
   children: ReactNode;
   hideNavbar?: boolean;
+  showNowPlaying?: boolean;
 }
 
-export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
+export const Layout = ({ children, hideNavbar = false, showNowPlaying = false }: LayoutProps) => {
   const { currentSong } = usePlayerState();
   const { isBanned, isLoading: banCheckLoading } = useBanCheck();
+  const location = useLocation();
 
   // Si l'utilisateur est banni, ne pas afficher l'interface
   if (banCheckLoading) {
@@ -40,11 +43,6 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
         <main className="h-screen overflow-y-auto">
           {children}
         </main>
-        {currentSong && (
-          <div className="fixed bottom-0 left-0 right-0 z-50">
-            <NowPlaying />
-          </div>
-        )}
       </div>
     );
   }
@@ -58,7 +56,8 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
-        {currentSong && (
+        {/* NowPlaying ne s'affiche que si showNowPlaying est true */}
+        {showNowPlaying && currentSong && (
           <div className="flex-shrink-0">
             <NowPlaying />
           </div>
