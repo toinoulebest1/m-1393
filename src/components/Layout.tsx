@@ -7,9 +7,10 @@ import { useBanCheck } from "@/hooks/useBanCheck";
 
 interface LayoutProps {
   children: ReactNode;
+  hideNavbar?: boolean;
 }
 
-export const Layout = ({ children }: LayoutProps) => {
+export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
   const { currentSong } = usePlayerState();
   const { isBanned, isLoading: banCheckLoading } = useBanCheck();
 
@@ -29,6 +30,21 @@ export const Layout = ({ children }: LayoutProps) => {
           <h1 className="text-2xl font-bold mb-4">Compte banni</h1>
           <p>Votre compte a été banni. Vous allez être déconnecté automatiquement.</p>
         </div>
+      </div>
+    );
+  }
+
+  if (hideNavbar) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-spotify-dark via-[#1e2435] to-[#141824]">
+        <main className="h-screen overflow-y-auto">
+          {children}
+        </main>
+        {currentSong && (
+          <div className="fixed bottom-0 left-0 right-0 z-50">
+            <NowPlaying />
+          </div>
+        )}
       </div>
     );
   }

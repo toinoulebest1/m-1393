@@ -23,12 +23,8 @@ interface UserBan {
   expires_at: string | null;
   created_at: string;
   is_active: boolean;
-  profiles?: {
-    username: string;
-  };
-  banned_by_profile?: {
-    username: string;
-  };
+  user_username?: string;
+  banned_by_username?: string;
 }
 
 interface UserProfile {
@@ -78,13 +74,9 @@ export const UserBanManagement = () => {
       // D'abord, désactiver les bans expirés
       await supabase.rpc('deactivate_expired_bans');
 
-      const { data, error } = await supabase
+      const { data: banData, error } = await supabase
         .from('user_bans')
-        .select(`
-          *,
-          profiles!user_bans_user_id_fkey(username),
-          banned_by_profile:profiles!user_bans_banned_by_fkey(username)
-        `)
+        .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -92,9 +84,34 @@ export const UserBanManagement = () => {
         console.error('Erreur lors du chargement des bannissements:', error);
         return;
       }
+
+      // Enrichir les données avec les noms d'utilisateur
+      const enrichedBans = await Promise.all(
+        (banData || []).map(async (ban) => {
+          // Récupérer le nom de l'utilisateur banni
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', ban.user_id)
+            .single();
+
+          // Récupérer le nom de l'administrateur qui a banni
+          const { data: adminProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', ban.banned_by)
+            .single();
+
+          return {
+            ...ban,
+            user_username: userProfile?.username || 'Utilisateur inconnu',
+            banned_by_username: adminProfile?.username || 'Admin'
+          };
+        })
+      );
       
-      console.log('Bannissements chargés:', data);
-      setBans(data || []);
+      console.log('Bannissements chargés:', enrichedBans);
+      setBans(enrichedBans);
     } catch (error) {
       console.error('Erreur lors du chargement des bannissements:', error);
     }
@@ -353,9 +370,9 @@ export const UserBanManagement = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-spotify-accent rounded-full flex items-center justify-center text-xs">
-                          {ban.profiles?.username?.[0]?.toUpperCase() || '?'}
+                          {ban.user_username?.[0]?.toUpperCase() || '?'}
                         </div>
-                        {ban.profiles?.username || 'Utilisateur inconnu'}
+                        {ban.user_username || 'Utilisateur inconnu'}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -379,7 +396,7 @@ export const UserBanManagement = () => {
                         : 'Jamais'
                       }
                     </TableCell>
-                    <TableCell>{ban.banned_by_profile?.username || 'Admin'}</TableCell>
+                    <TableCell>{ban.banned_by_username || 'Admin'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
