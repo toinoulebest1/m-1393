@@ -76,7 +76,7 @@ export const useAudioControl = ({
               }
               throw new Error('No cache');
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cache timeout')), 30))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Cache timeout')), 15))
           ]).catch(() => null),
           
           // Stratégie 2: Storage direct (priorité haute)
@@ -88,7 +88,7 @@ export const useAudioControl = ({
           }).catch(() => null),
           
           // Stratégie 3: Backup rapide (si disponible)
-          new Promise(resolve => setTimeout(() => resolve(null), 100))
+          new Promise(resolve => setTimeout(() => resolve(null), 50))
         ];
 
         // Prendre la première URL disponible
@@ -107,7 +107,7 @@ export const useAudioControl = ({
         const audioUrl = audioData.url;
         const elapsed = performance.now() - startTime;
         
-        if (elapsed < 100) {
+        if (elapsed < 50) {
           console.log(`⚡ Ultra-rapide: ${elapsed.toFixed(0)}ms (${audioData.source})`);
         }
 
@@ -123,7 +123,7 @@ export const useAudioControl = ({
             setTimeout(async () => {
               try {
                 const response = await fetch(audioUrl, { 
-                  method: 'HEAD', // Vérification rapide
+                  method: 'HEAD',
                   cache: 'force-cache'
                 });
                 if (response.ok) {
@@ -133,7 +133,7 @@ export const useAudioControl = ({
                   });
                 }
               } catch (e) { /* Silent fail */ }
-            }, 50);
+            }, 25);
           }
         } else {
           audio.preload = "auto";
@@ -144,20 +144,20 @@ export const useAudioControl = ({
         if (playPromise !== undefined) {
           playPromise.then(() => {
             const totalTime = performance.now() - startTime;
-            if (totalTime < 200) {
+            if (totalTime < 100) {
               console.log(`🚀 Instantané: ${totalTime.toFixed(0)}ms`);
             }
             
             setIsPlaying(true);
             
             // Pré-chargement intelligent différé
-            setTimeout(preloadNextTracks, 300);
+            setTimeout(preloadNextTracks, 150);
             
             // Fin de changement ultra-rapide
             changeTimeoutRef.current = window.setTimeout(() => {
               setIsChangingSong(false);
               changeTimeoutRef.current = null;
-            }, 150);
+            }, 75);
             
           }).catch(error => {
             if (error.name === 'NotAllowedError') {
@@ -211,7 +211,7 @@ export const useAudioControl = ({
   }, [audioRef]);
 
   const updateProgress = useCallback((newProgress: number) => {
-    if (audioRef.current) {
+    if (audioRef.current && audioRef.current.duration) {
       const time = (newProgress / 100) * audioRef.current.duration;
       if ('fastSeek' in audioRef.current) {
         (audioRef.current as any).fastSeek(time);
