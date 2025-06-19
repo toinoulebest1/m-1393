@@ -16,9 +16,9 @@ export const BrowserCompatibilityNotice = () => {
     return null;
   }
 
-  // Overlay plein écran pour les autres navigateurs
+  // Overlay plein écran pour tous les autres navigateurs - bloque TOUT
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+    <div className="fixed inset-0 z-[99999] bg-black flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }}>
       <div className="text-center max-w-2xl mx-4 p-8">
         {/* Icône d'avertissement */}
         <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-8">
