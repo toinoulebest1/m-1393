@@ -66,7 +66,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isPlaying
   });
 
-  // Fonctions exposées à travers le contexte
+  // Fonctions exposées à travers le contexte - définies en premier
   const { 
     play, 
     pause, 
@@ -90,7 +90,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  // Maintenant nous pouvons utiliser la fonction play dans usePlayerQueue
+  // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
   const {
     queue, setQueue,
     shuffleMode, setShuffleMode,
