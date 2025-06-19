@@ -1,7 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 import { preloadAudio, isInCache, getFromCache, addToCache } from './audioCache';
+import { memoryCache } from './memoryCache';
 
 export const storeAudioFile = async (id: string, file: File | string) => {
   console.log("Stockage du fichier audio:", id);
@@ -57,7 +57,7 @@ export const storeAudioFile = async (id: string, file: File | string) => {
 };
 
 export const getAudioFile = async (path: string) => {
-  console.log("=== RÉCUPÉRATION ULTRA-OPTIMISÉE ===");
+  console.log("=== RÉCUPÉRATION ULTRA-INSTANTANÉE ===");
   console.log("⚡ Chemin:", path);
   const startTime = performance.now();
   
@@ -66,21 +66,34 @@ export const getAudioFile = async (path: string) => {
   }
 
   try {
-    // Cache check ultra-rapide avec timeout 5ms
-    console.log("🚀 Cache ultra-rapide...");
+    // 1. Cache mémoire ultra-rapide (< 1ms)
+    console.log("⚡ Cache mémoire...");
+    const memoryUrl = memoryCache.get(path);
+    if (memoryUrl) {
+      const elapsed = performance.now() - startTime;
+      console.log("⚡ CACHE MÉMOIRE:", elapsed.toFixed(1), "ms");
+      return memoryUrl;
+    }
+
+    // 2. Cache IndexedDB avec timeout ultra-court (2ms)
+    console.log("💾 Cache IndexedDB...");
     const cacheCheck = Promise.race([
       isInCache(path).then(async (inCache) => {
         if (inCache) {
           const cachedUrl = await getFromCache(path);
           if (cachedUrl) {
             const elapsed = performance.now() - startTime;
-            console.log("⚡ CACHE:", elapsed.toFixed(1), "ms");
+            console.log("💾 CACHE INDEXEDDB:", elapsed.toFixed(1), "ms");
+            
+            // Ajouter au cache mémoire pour la prochaine fois
+            memoryCache.set(path, cachedUrl);
+            
             return cachedUrl;
           }
         }
         return null;
       }),
-      new Promise(resolve => setTimeout(() => resolve(null), 5)) // 5ms timeout
+      new Promise(resolve => setTimeout(() => resolve(null), 2)) // 2ms timeout
     ]);
 
     const cachedResult = await cacheCheck;
@@ -88,8 +101,8 @@ export const getAudioFile = async (path: string) => {
       return cachedResult;
     }
 
-    // Récupération réseau optimisée
-    console.log("📡 Réseau rapide...");
+    // 3. Récupération réseau ultra-optimisée
+    console.log("📡 Réseau ultra-rapide...");
     const useOneDrive = await isOneDriveEnabled();
     console.log("Provider:", useOneDrive ? "OneDrive" : "Supabase");
 
@@ -107,7 +120,6 @@ export const getAudioFile = async (path: string) => {
     } else {
       console.log("⚡ Supabase...");
       
-      // Pas de vérification d'existence pour gagner du temps
       const { data, error } = await supabase.storage
         .from('audio')
         .createSignedUrl(path, 3600);
@@ -124,7 +136,10 @@ export const getAudioFile = async (path: string) => {
       console.log("✅ Supabase:", (performance.now() - startTime).toFixed(1), "ms");
     }
 
-    // Cache différé très rapide
+    // Ajouter au cache mémoire immédiatement
+    memoryCache.set(path, audioUrl);
+
+    // Cache différé ultra-rapide (25ms)
     console.log("💾 Cache différé");
     setTimeout(async () => {
       try {
@@ -140,7 +155,7 @@ export const getAudioFile = async (path: string) => {
       } catch (e) {
         console.warn("⚠️ Cache différé échoué");
       }
-    }, 100); // 100ms
+    }, 25); // 25ms
 
     const totalElapsed = performance.now() - startTime;
     console.log("⚡ TOTAL:", totalElapsed.toFixed(1), "ms");

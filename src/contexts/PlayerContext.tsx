@@ -6,6 +6,7 @@ import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
+import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
 import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
@@ -57,6 +58,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Hook d'égaliseur
   const equalizer = useEqualizer({ audioElement: audioRef.current });
+
+  // Hook ultra-rapide pour le préchargement intelligent
+  const { getCacheStats } = useUltraFastPlayer({
+    currentSong,
+    queue,
+    isPlaying
+  });
 
   // Fonctions exposées à travers le contexte
   const { 
@@ -125,7 +133,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           setCurrentSong(song);
-          // Fix the type error by properly updating the queue with a correctly typed new array
           const updatedQueue = [...queue];
           if (!updatedQueue.some(s => s.id === song.id)) {
             updatedQueue.unshift(song);
@@ -265,7 +272,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setNextSongPreloaded(false);
                 fadingRef.current = false;
                 
-                // Mettre à jour les métadonnées MediaSession lors du crossfade
                 if ('mediaSession' in navigator) {
                   updateMediaSessionMetadata(nextTrack);
                   console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
@@ -301,7 +307,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (nextTrack) {
             console.log("Passage à la chanson suivante:", nextTrack.title);
             
-            // Mettre à jour les métadonnées MediaSession avant de jouer la prochaine chanson
             if ('mediaSession' in navigator) {
               updateMediaSessionMetadata(nextTrack);
               console.log("Métadonnées MediaSession mises à jour lors du passage automatique:", nextTrack.title);
@@ -311,7 +316,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           } else if (repeatMode === 'all' && queue.length > 0) {
             console.log("Répétition de la playlist depuis le début");
             
-            // Mettre à jour les métadonnées MediaSession pour la première chanson
             if ('mediaSession' in navigator) {
               updateMediaSessionMetadata(queue[0]);
               console.log("Métadonnées MediaSession mises à jour lors de la répétition de playlist:", queue[0].title);
@@ -343,20 +347,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Fonction pour supprimer une chanson de toutes les listes
   const removeSong = useCallback((songId: string) => {
-    // Si c'est la chanson en cours, on l'arrête
     if (currentSong?.id === songId) {
       stopCurrentSong();
       setCurrentSong(null);
       localStorage.removeItem('currentSong');
     }
     
-    // Suppression de la file d'attente
     setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
-    
-    // Suppression de l'historique
     setHistory(prevHistory => prevHistory.filter(song => song.id !== songId));
     
-    // Suppression des favoris si présent
     if (favorites.some(song => song.id === songId)) {
       removeFavorite(songId);
     }
@@ -398,7 +397,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setPlaybackRate: updatePlaybackRate,
     refreshCurrentSong,
     getCurrentAudioElement,
-    // Égaliseur
     equalizerSettings: equalizer.settings,
     equalizerPresets: equalizer.presets,
     currentEqualizerPreset: equalizer.currentPreset,
