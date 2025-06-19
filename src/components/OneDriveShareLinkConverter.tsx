@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { convertOneDriveShareLinkToDownload, extractFileInfoFromShareLink } from '@/utils/oneDriveUrlConverter';
 import { storePermanentOneDriveLink } from '@/utils/storage';
-import { ExternalLink, Convert, Plus } from 'lucide-react';
+import { ExternalLink, ArrowRightLeft, Plus } from 'lucide-react';
 
 export const OneDriveShareLinkConverter = () => {
   const [shareUrl, setShareUrl] = useState('');
@@ -81,7 +81,7 @@ export const OneDriveShareLinkConverter = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Convert className="w-5 h-5" />
+          <ArrowRightLeft className="w-5 h-5" />
           Convertisseur de liens OneDrive
         </CardTitle>
         <CardDescription>
@@ -117,7 +117,7 @@ export const OneDriveShareLinkConverter = () => {
             disabled={converting || !shareUrl}
             className="w-full"
           >
-            <Convert className="w-4 h-4 mr-2" />
+            <ArrowRightLeft className="w-4 h-4 mr-2" />
             {converting ? 'Conversion...' : 'Convertir le lien'}
           </Button>
         </div>
