@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { storePermanentOneDriveLink, getPermanentOneDriveLink } from '@/utils/storage';
 import { getOneDriveSharedLink, checkFileExistsOnOneDrive } from '@/utils/oneDriveStorage';
+import { OneDriveShareLinkConverter } from './OneDriveShareLinkConverter';
 import { Trash2, Plus, ExternalLink, Clock, Zap, RefreshCw } from 'lucide-react';
 
 interface PermanentLink {
@@ -249,6 +249,9 @@ export const OneDrivePermanentLinksManager = () => {
 
   return (
     <div className="space-y-6">
+      {/* New converter component */}
+      <OneDriveShareLinkConverter />
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -304,7 +307,7 @@ export const OneDrivePermanentLinksManager = () => {
                 id="permanentUrl"
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
-                placeholder="https://1drv.ms/u/s!..."
+                placeholder="https://1drv.ms/u/s!... ou lien converti"
               />
             </div>
             <div>
