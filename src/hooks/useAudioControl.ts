@@ -79,6 +79,24 @@ export const useAudioControl = ({
         audio.preload = "auto";
         audio.src = audioUrl;
         
+        // Événements pour debug
+        audio.addEventListener('loadstart', () => console.log("📥 Début chargement audio"));
+        audio.addEventListener('canplay', () => console.log("✅ Audio prêt à jouer"));
+        audio.addEventListener('error', (e) => {
+          console.error("❌ Erreur audio element:", e);
+          const error = audio.error;
+          if (error) {
+            console.error("❌ Détails erreur audio:", {
+              code: error.code,
+              message: error.message,
+              MEDIA_ERR_ABORTED: error.MEDIA_ERR_ABORTED,
+              MEDIA_ERR_NETWORK: error.MEDIA_ERR_NETWORK,
+              MEDIA_ERR_DECODE: error.MEDIA_ERR_DECODE,
+              MEDIA_ERR_SRC_NOT_SUPPORTED: error.MEDIA_ERR_SRC_NOT_SUPPORTED
+            });
+          }
+        });
+        
         // Démarrage ultra-rapide
         console.log("🚀 Démarrage instantané...");
         const playStartTime = performance.now();
@@ -110,13 +128,8 @@ export const useAudioControl = ({
           console.log("⚠️ Lecture en attente d'activation utilisateur");
           setIsChangingSong(false);
           
-          const browserInfo = AutoplayManager.getBrowserInfo();
-          if (!browserInfo.supportsAutoplay) {
-            toast.info(`${browserInfo.name} bloque l'autoplay - cliquez pour activer`, {
-              duration: 3000,
-              position: "top-center"
-            });
-          }
+          // Ne pas afficher de toast, l'AutoplayManager s'en occupe automatiquement
+          console.log("🎵 Prompt d'activation sera affiché automatiquement");
         }
         
       } catch (error) {
@@ -146,12 +159,10 @@ export const useAudioControl = ({
   const handlePlayError = useCallback((error: any, song: Song | null) => {
     console.error("❌ Erreur lecture:", error);
     
+    // Gestion spécifique des erreurs d'autoplay - pas de toast si AutoplayManager gère
     if (error.name === 'NotAllowedError') {
-      const browserInfo = AutoplayManager.getBrowserInfo();
-      toast.error(`${browserInfo.name} bloque la lecture audio`, {
-        description: "Cliquez pour activer la lecture",
-        duration: 3000
-      });
+      console.log("🎵 Erreur autoplay - AutoplayManager va gérer");
+      // Pas de toast ici, l'AutoplayManager affiche déjà le prompt
     } else if (error.message?.includes('Timeout')) {
       toast.error("Connexion trop lente", {
         description: "Vérifiez votre connexion internet",
@@ -166,6 +177,11 @@ export const useAudioControl = ({
       toast.error("Fichier audio introuvable", {
         description: `"${song?.title || 'Chanson'}" n'est plus disponible`,
         duration: 5000
+      });
+    } else if (error.message?.includes('CORS') || error.message?.includes('Cross-Origin')) {
+      toast.error("Erreur de streaming", {
+        description: "Problème de configuration réseau",
+        duration: 3000
       });
     } else {
       toast.error("Erreur de lecture", {

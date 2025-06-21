@@ -7,6 +7,7 @@ export class AutoplayManager {
   private static hasUserInteracted = false;
   private static audioContext: AudioContext | null = null;
   private static pendingPlay: (() => void) | null = null;
+  private static activationOverlayVisible = false;
 
   /**
    * Initialise le gestionnaire d'autoplay
@@ -96,7 +97,7 @@ export class AutoplayManager {
   }
 
   /**
-   * Joue un audio en gérant l'autoplay
+   * Joue un audio en gérant l'autoplay avec prompt automatique
    */
   static async playAudio(audio: HTMLAudioElement): Promise<boolean> {
     try {
@@ -104,14 +105,14 @@ export class AutoplayManager {
       const canPlay = await this.canAutoplay();
       
       if (!canPlay && !this.hasUserInteracted) {
-        console.log("⚠️ Autoplay bloqué - en attente d'interaction");
+        console.log("⚠️ Autoplay bloqué - affichage prompt automatique");
         
         // Stocker la lecture en attente
         this.pendingPlay = () => {
           audio.play().catch(console.error);
         };
         
-        // Afficher un bouton d'activation
+        // Afficher automatiquement le prompt
         this.showActivationPrompt();
         return false;
       }
@@ -121,12 +122,27 @@ export class AutoplayManager {
         await this.audioContext.resume();
       }
 
-      // Tenter la lecture
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        await playPromise;
-        console.log("✅ Lecture démarrée");
-        return true;
+      // Tenter la lecture avec gestion d'erreur améliorée
+      try {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          console.log("✅ Lecture démarrée avec succès");
+          return true;
+        }
+      } catch (playError) {
+        console.error("❌ Erreur play():", playError);
+        
+        // Si c'est une erreur d'autoplay, afficher le prompt
+        if (playError.name === 'NotAllowedError') {
+          this.pendingPlay = () => {
+            audio.play().catch(console.error);
+          };
+          this.showActivationPrompt();
+          return false;
+        }
+        
+        throw playError;
       }
     } catch (error) {
       console.error("❌ Erreur lecture audio:", error);
@@ -140,29 +156,38 @@ export class AutoplayManager {
   }
 
   /**
-   * Affiche un prompt d'activation audio
+   * Affiche un prompt d'activation audio automatiquement
    */
   private static showActivationPrompt(): void {
+    // Éviter les doublons
+    if (this.activationOverlayVisible) {
+      console.log("👁️ Prompt déjà visible, ignoré");
+      return;
+    }
+    
+    this.activationOverlayVisible = true;
+    console.log("🎵 Affichage prompt d'activation automatique");
+    
     // Créer un overlay d'activation
     const overlay = document.createElement('div');
     overlay.id = 'audio-activation-overlay';
-    overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]';
+    overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-300';
     
     overlay.innerHTML = `
-      <div class="bg-spotify-dark border border-spotify-border rounded-lg p-6 text-center max-w-md mx-4">
+      <div class="bg-spotify-dark border border-spotify-border rounded-lg p-6 text-center max-w-md mx-4 animate-in zoom-in duration-300">
         <div class="w-16 h-16 bg-spotify-accent rounded-full flex items-center justify-center mx-auto mb-4">
           <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z"/>
           </svg>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">Activer l'audio</h3>
+        <h3 class="text-xl font-bold text-white mb-2">🎵 Activer l'audio</h3>
         <p class="text-spotify-neutral mb-6">
           Votre navigateur nécessite une interaction pour jouer de l'audio.
-          Cliquez sur le bouton ci-dessous pour commencer.
+          <br><strong>Cliquez sur le bouton ci-dessous pour commencer la lecture.</strong>
         </p>
         <button 
           id="activate-audio-btn"
-          class="bg-spotify-accent hover:bg-spotify-accent/80 text-white font-medium px-6 py-3 rounded-full transition-colors"
+          class="bg-spotify-accent hover:bg-spotify-accent/80 text-white font-medium px-6 py-3 rounded-full transition-colors transform hover:scale-105"
         >
           🎵 Activer la musique
         </button>
@@ -176,18 +201,30 @@ export class AutoplayManager {
     const activateBtn = overlay.querySelector('#activate-audio-btn');
     activateBtn?.addEventListener('click', () => {
       this.hasUserInteracted = true;
+      this.activationOverlayVisible = false;
       this.createAudioContext();
       
       // Exécuter la lecture en attente
       if (this.pendingPlay) {
+        console.log("🚀 Exécution lecture en attente");
         this.pendingPlay();
         this.pendingPlay = null;
       }
       
-      // Supprimer l'overlay
-      overlay.remove();
+      // Supprimer l'overlay avec animation
+      overlay.classList.add('animate-out', 'fade-out', 'duration-200');
+      setTimeout(() => {
+        overlay.remove();
+      }, 200);
       
-      console.log("🎵 Audio activé par l'utilisateur");
+      console.log("🎵 Audio activé par l'utilisateur - lecture démarrée");
+    });
+    
+    // Fermeture en cliquant en dehors
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        activateBtn?.click();
+      }
     });
   }
 
@@ -208,6 +245,15 @@ export class AutoplayManager {
     }
     
     return { name: 'Inconnu', supportsAutoplay: false };
+  }
+
+  /**
+   * Force l'activation pour les tests
+   */
+  static forceActivation(): void {
+    this.hasUserInteracted = true;
+    this.createAudioContext();
+    console.log("🎵 Activation forcée pour tests");
   }
 }
 
