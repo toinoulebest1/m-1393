@@ -338,33 +338,6 @@ export type Database = {
           },
         ]
       }
-      onedrive_files: {
-        Row: {
-          created_at: string
-          file_id: string | null
-          file_name: string | null
-          id: string
-          local_id: string
-          onedrive_path: string
-        }
-        Insert: {
-          created_at?: string
-          file_id?: string | null
-          file_name?: string | null
-          id?: string
-          local_id: string
-          onedrive_path: string
-        }
-        Update: {
-          created_at?: string
-          file_id?: string | null
-          file_name?: string | null
-          id?: string
-          local_id?: string
-          onedrive_path?: string
-        }
-        Relationships: []
-      }
       onedrive_permanent_links: {
         Row: {
           created_at: string

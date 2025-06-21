@@ -225,10 +225,53 @@ const PlaylistDetail = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
+
+  // Function to get the actual cover image URL with cache busting
+  const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
+    try {
+      console.log("=== GETTING COVER IMAGE URL ===");
+      console.log(`Playlist ID: ${playlistId}`);
+      
+      const fileName = `playlist-covers/${playlistId}.jpg`;
+      
+      // First check if file exists
+      const { data: fileList, error: listError } = await supabase.storage
+        .from('media')
+        .list('playlist-covers', {
+          search: `${playlistId}.jpg`
+        });
+      
+      if (listError) {
+        console.error("Error listing files:", listError);
+        return null;
+      }
+      
+      if (!fileList || fileList.length === 0) {
+        console.log("No cover file found in storage");
+        return null;
+      }
+      
+      console.log("Cover file found in storage:", fileList[0]);
+      
+      // Get public URL with timestamp to avoid cache
+      const timestamp = Date.now();
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(`${fileName}?t=${timestamp}`);
+      
+      console.log("Generated public URL:", publicUrl);
+      return publicUrl;
+      
+    } catch (error) {
+      console.error("Error getting cover image URL:", error);
+      return null;
+    }
+  };
 
   // Create or update playlist cover based on song images
   const updatePlaylistCover = async (forceUpdate = false) => {
@@ -239,12 +282,6 @@ const PlaylistDetail = () => {
     
     if (!playlistId) {
       console.log("Cannot update cover: missing playlistId");
-      return;
-    }
-
-    // Si on a déjà une couverture et qu'on ne force pas la mise à jour, ne rien faire
-    if (!forceUpdate && playlist?.cover_image_url) {
-      console.log("Playlist already has cover and not forcing update");
       return;
     }
     
@@ -281,31 +318,34 @@ const PlaylistDetail = () => {
       
       if (uploadError) throw uploadError;
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
+      console.log("Cover uploaded successfully");
       
-      console.log("Cover uploaded, public URL:", publicUrl);
+      // Get the new public URL
+      const newCoverUrl = await getCoverImageUrl(playlistId);
       
-      // Update playlist record
-      const { error: updateError } = await supabase
-        .from('playlists')
-        .update({ cover_image_url: publicUrl })
-        .eq('id', playlistId);
-      
-      if (updateError) {
-        console.error("Error updating playlist record:", updateError);
-        throw updateError;
+      if (newCoverUrl) {
+        console.log("New cover URL:", newCoverUrl);
+        
+        // Update playlist record
+        const { error: updateError } = await supabase
+          .from('playlists')
+          .update({ cover_image_url: newCoverUrl })
+          .eq('id', playlistId);
+        
+        if (updateError) {
+          console.error("Error updating playlist record:", updateError);
+          throw updateError;
+        }
+        
+        // Update local state
+        setPlaylist(prev => prev ? { ...prev, cover_image_url: newCoverUrl } : null);
+        setCoverImageUrl(newCoverUrl);
+        
+        console.log("Playlist cover updated successfully");
+        toast({
+          description: t('playlists.coverGenerated')
+        });
       }
-      
-      // Update local state
-      setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
-      
-      console.log("Playlist cover updated successfully");
-      toast({
-        description: t('playlists.coverGenerated')
-      });
       
       console.log("=== PLAYLIST COVER UPDATE COMPLETED ===");
     } catch (error) {
@@ -354,6 +394,15 @@ const PlaylistDetail = () => {
       
       setPlaylist(playlistData);
       setEditedName(playlistData.name);
+      
+      // Get the actual cover image URL
+      const actualCoverUrl = await getCoverImageUrl(playlistId);
+      if (actualCoverUrl) {
+        setCoverImageUrl(actualCoverUrl);
+        console.log("Cover image URL set:", actualCoverUrl);
+      } else {
+        setCoverImageUrl(playlistData.cover_image_url);
+      }
       
       // Fetch songs in the playlist
       const { data: songsData, error: songsError } = await supabase
@@ -411,14 +460,16 @@ const PlaylistDetail = () => {
   // Watch for changes in songs to trigger cover update
   useEffect(() => {
     if (songs.length > 0 && playlist && currentUserId === playlist.user_id) {
-      // Délai pour s'assurer que les données sont bien chargées
-      const timer = setTimeout(() => {
-        updatePlaylistCover(true); // Force update when songs change
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+      // Only auto-generate if no cover exists
+      if (!coverImageUrl) {
+        const timer = setTimeout(() => {
+          updatePlaylistCover(true);
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
     }
-  }, [songs.length, playlist?.id, currentUserId]);
+  }, [songs.length, playlist?.id, currentUserId, coverImageUrl]);
 
   const handleUpdateName = async () => {
     if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
@@ -470,24 +521,25 @@ const PlaylistDetail = () => {
       
       if (uploadError) throw uploadError;
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(fileName);
+      // Get the new public URL
+      const newCoverUrl = await getCoverImageUrl(playlistId);
       
-      // Update playlist record
-      const { error: updateError } = await supabase
-        .from('playlists')
-        .update({ cover_image_url: publicUrl })
-        .eq('id', playlistId);
-      
-      if (updateError) throw updateError;
-      
-      setPlaylist(prev => prev ? { ...prev, cover_image_url: publicUrl } : null);
-      
-      toast({
-        description: t('playlists.coverUpdated')
-      });
+      if (newCoverUrl) {
+        // Update playlist record
+        const { error: updateError } = await supabase
+          .from('playlists')
+          .update({ cover_image_url: newCoverUrl })
+          .eq('id', playlistId);
+        
+        if (updateError) throw updateError;
+        
+        setPlaylist(prev => prev ? { ...prev, cover_image_url: newCoverUrl } : null);
+        setCoverImageUrl(newCoverUrl);
+        
+        toast({
+          description: t('playlists.coverUpdated')
+        });
+      }
     } catch (error) {
       console.error("Error uploading playlist cover:", error);
       toast({
@@ -732,11 +784,15 @@ const PlaylistDetail = () => {
         <div className="container p-6 pb-32">
           <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
             <div className="relative group w-48 h-48 min-w-48 bg-spotify-card rounded-md overflow-hidden flex items-center justify-center">
-              {playlist?.cover_image_url ? (
+              {coverImageUrl ? (
                 <img 
-                  src={playlist.cover_image_url} 
+                  src={coverImageUrl} 
                   alt={playlist?.name} 
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Error loading cover image:", e);
+                    setCoverImageUrl(null);
+                  }}
                 />
               ) : (
                 <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
