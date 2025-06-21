@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { MetadataHeader } from "@/components/metadata/MetadataHeader";
 import { MetadataActions } from "@/components/metadata/MetadataActions";
 import { SongsTable } from "@/components/metadata/SongsTable";
-import { DeezerSearchDialog } from "@/components/DeezerSearchDialog";
+import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 
 const SongMetadataUpdate = () => {
   const [songs, setSongs] = useState<any[]>([]);
