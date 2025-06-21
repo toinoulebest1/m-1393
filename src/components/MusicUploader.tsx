@@ -301,6 +301,7 @@ export const MusicUploader = () => {
 
       let imageUrl = "https://picsum.photos/240/240";
       
+      // 1. Priorité à la pochette dans les métadonnées du fichier
       if (metadataResult?.picture) {
         try {
           const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
@@ -311,11 +312,17 @@ export const MusicUploader = () => {
         }
       }
 
-      if (imageUrl === "https://picsum.photos/240/240") {
+      // 2. Si pas de pochette dans les métadonnées, utiliser Deezer
+      if (imageUrl === "https://picsum.photos/240/240" && artist !== "Unknown Artist") {
+        console.log("Recherche de pochette sur Deezer...");
         const deezerCover = await searchDeezerTrack(`${artist} ${title}`);
         if (deezerCover) {
           console.log("Pochette Deezer trouvée:", deezerCover);
           imageUrl = deezerCover;
+          toast.success(`Pochette trouvée via Deezer pour "${title}"`);
+        } else {
+          console.log("Aucune pochette trouvée sur Deezer");
+          toast.info(`Aucune pochette trouvée pour "${title}"`);
         }
       }
 

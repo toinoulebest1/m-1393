@@ -111,10 +111,33 @@ export const getAudioFile = getAudioFileUrl;
 // Placeholder functions for missing exports
 export const storeAudioFile = uploadAudioFile;
 
-export const searchDeezerTrack = async (query: string): Promise<any> => {
-  // Placeholder - implement Deezer search functionality
-  console.warn('searchDeezerTrack not implemented yet');
-  return null;
+export const searchDeezerTrack = async (query: string): Promise<string | null> => {
+  try {
+    console.log(`Recherche Deezer pour: ${query}`);
+    
+    const { data, error } = await supabase.functions.invoke('deezer-search', {
+      body: { query }
+    });
+
+    if (error) {
+      console.error('Erreur recherche Deezer:', error);
+      return null;
+    }
+
+    if (data && data.data && data.data.length > 0) {
+      const track = data.data[0];
+      const coverUrl = track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || track.album?.cover;
+      
+      console.log(`Pochette Deezer trouvée: ${coverUrl}`);
+      return coverUrl;
+    }
+
+    console.log('Aucune pochette trouvée sur Deezer');
+    return null;
+  } catch (error) {
+    console.error('Erreur lors de la recherche Deezer:', error);
+    return null;
+  }
 };
 
 export const storePlaylistCover = async (playlistId: string, coverDataUrl: string): Promise<string> => {
