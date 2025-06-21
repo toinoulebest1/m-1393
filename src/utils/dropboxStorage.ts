@@ -26,6 +26,25 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
+// Fonction pour vérifier si le token est valide
+export const validateDropboxToken = async (token: string): Promise<boolean> => {
+  try {
+    const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(null)
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Error validating Dropbox token:', error);
+    return false;
+  }
+};
+
 // Fonction simplifiée pour convertir le chemin local vers le chemin Dropbox à la racine
 const getDropboxPath = (localPath: string): string => {
   console.log('🔍 Conversion chemin:', localPath);
@@ -71,6 +90,14 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   
   if (!config.accessToken) {
     console.error("Dropbox access token not configured");
+    return false;
+  }
+  
+  // Vérifier la validité du token avant de l'utiliser
+  const isTokenValid = await validateDropboxToken(config.accessToken);
+  if (!isTokenValid) {
+    console.error("Dropbox token is expired or invalid");
+    toast.error("Token Dropbox expiré ou invalide. Veuillez le renouveler.");
     return false;
   }
   
@@ -124,6 +151,79 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   }
 };
 
+// Fonction avec retry et gestion d'erreurs améliorée
+const uploadToDropboxWithRetry = async (
+  file: File,
+  dropboxPath: string,
+  accessToken: string,
+  maxRetries: number = 3
+): Promise<any> => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Tentative ${attempt}/${maxRetries} d'upload vers Dropbox: ${dropboxPath}`);
+      
+      // Attendre un délai croissant entre les tentatives
+      if (attempt > 1) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // Backoff exponentiel
+        console.log(`Attente de ${delay}ms avant la tentative ${attempt}...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            path: dropboxPath,
+            mode: 'overwrite',
+            autorename: true,
+            mute: false
+          })
+        },
+        body: file
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Upload réussi à la tentative ${attempt}:`, data);
+        return data;
+      }
+      
+      const errorText = await response.text();
+      console.error(`❌ Échec tentative ${attempt}:`, response.status, response.statusText, errorText);
+      
+      // Si c'est une erreur 429 (rate limit), attendre plus longtemps
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000;
+        console.log(`Rate limit atteint, attente de ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // Si c'est une erreur 401 (token expiré), arrêter immédiatement
+      if (response.status === 401) {
+        throw new Error('Token Dropbox expiré ou invalide');
+      }
+      
+      lastError = new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      
+    } catch (error) {
+      console.error(`❌ Erreur à la tentative ${attempt}:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Si c'est une erreur de réseau ou CORS, arrêter immédiatement
+      if (error instanceof TypeError && error.message.includes('NetworkError')) {
+        throw new Error('Erreur CORS ou réseau - impossible d\'accéder à Dropbox depuis le navigateur');
+      }
+    }
+  }
+  
+  throw lastError || new Error('Échec après plusieurs tentatives');
+};
+
 // Function to upload a file to Dropbox
 export const uploadFileToDropbox = async (
   file: File,
@@ -137,58 +237,29 @@ export const uploadFileToDropbox = async (
     throw new Error('Dropbox access token not configured');
   }
   
+  // Vérifier la validité du token avant de l'utiliser
+  const isTokenValid = await validateDropboxToken(config.accessToken);
+  if (!isTokenValid) {
+    console.error("Dropbox token is expired or invalid");
+    toast.error("Token Dropbox expiré ou invalide. Veuillez le renouveler.");
+    throw new Error('Dropbox token is expired or invalid');
+  }
+  
   // Convertir le chemin local vers le chemin Dropbox réel
   const dropboxPath = getDropboxPath(path);
   
-  console.log(`Uploading file to Dropbox: ${dropboxPath}`, file);
-  console.log(`File size: ${file.size} bytes, type: ${file.type}`);
+  console.log(`Upload vers Dropbox: ${dropboxPath}`, file);
+  console.log(`Taille fichier: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Using Dropbox API v2 with fetch
-    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: dropboxPath,
-          mode: 'overwrite',
-          autorename: true,
-          mute: false
-        })
-      },
-      body: file
-    });
+    // Utiliser la fonction avec retry
+    const data = await uploadToDropboxWithRetry(file, dropboxPath, config.accessToken);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox upload error status:', response.status, response.statusText);
-      console.error('Dropbox upload error details:', errorText);
-      
-      // More specific error messages based on status code
-      if (response.status === 400) {
-        toast.error("Erreur 400: Requête invalide. Vérifiez la taille du fichier et les permissions Dropbox.");
-        console.error("Possible causes: invalid file format, file too large, or incorrect parameters");
-      } else if (response.status === 401) {
-        toast.error("Erreur 401: Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
-      } else if (response.status === 403) {
-        toast.error("Erreur 403: Accès refusé. Vérifiez les permissions de votre app Dropbox.");
-      } else if (response.status === 429) {
-        toast.error("Erreur 429: Trop de requêtes. Veuillez réessayer plus tard.");
-      } else {
-        toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
-      }
-      
-      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Dropbox upload successful:', data);
+    console.log('✅ Upload Dropbox réussi:', data);
     toast.success("Fichier téléchargé avec succès vers Dropbox");
     
     // Store the reference in Supabase
     try {
-      // Insert using a raw query instead of the typed client
       const { error } = await supabase
         .from('dropbox_files')
         .upsert({
@@ -198,17 +269,27 @@ export const uploadFileToDropbox = async (
         
       if (error) {
         console.error('Error saving Dropbox reference:', error);
-        // Continue anyway since the upload succeeded
       }
     } catch (dbError) {
       console.error('Database error when saving reference:', dbError);
-      // Continue anyway since the upload succeeded
     }
     
     return data.path_display || dropboxPath;
   } catch (error) {
-    console.error('Error uploading to Dropbox:', error);
-    toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
+    console.error('❌ Échec final upload Dropbox:', error);
+    
+    // Messages d'erreur plus spécifiques
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('CORS') || errorMessage.includes('NetworkError')) {
+      toast.error("Erreur CORS - Dropbox ne peut pas être utilisé directement depuis le navigateur");
+    } else if (errorMessage.includes('429')) {
+      toast.error("Limite de taux Dropbox atteinte - veuillez réessayer plus tard");
+    } else if (errorMessage.includes('401') || errorMessage.includes('expiré')) {
+      toast.error("Token Dropbox expiré - veuillez le renouveler dans les paramètres");
+    } else {
+      toast.error(`Échec de l'upload Dropbox: ${errorMessage}`);
+    }
+    
     throw error;
   }
 };
