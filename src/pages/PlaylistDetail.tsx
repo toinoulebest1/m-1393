@@ -29,6 +29,7 @@ import { SongCard } from "@/components/SongCard";
 import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
+import { extractDominantColor } from "@/utils/colorExtractor";
 
 interface Song {
   id: string;
@@ -230,6 +231,27 @@ const PlaylistDetail = () => {
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
+
+  // Extract dominant colors for songs
+  const extractColorsForSongs = async (songsToProcess: PlaylistSong[]) => {
+    const newColors: Record<string, [number, number, number] | null> = {};
+    
+    for (const song of songsToProcess) {
+      if (song.songs.imageUrl && !dominantColors[song.songs.id]) {
+        try {
+          const color = await extractDominantColor(song.songs.imageUrl);
+          newColors[song.songs.id] = color;
+        } catch (error) {
+          console.error(`Error extracting color for song ${song.songs.id}:`, error);
+          newColors[song.songs.id] = null;
+        }
+      }
+    }
+    
+    if (Object.keys(newColors).length > 0) {
+      setDominantColors(prev => ({ ...prev, ...newColors }));
+    }
+  };
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -445,6 +467,11 @@ const PlaylistDetail = () => {
       
       setSongs(formattedSongs);
       console.log(`Fetched ${formattedSongs.length} songs for playlist`);
+      
+      // Extract dominant colors for the songs
+      if (formattedSongs.length > 0) {
+        await extractColorsForSongs(formattedSongs);
+      }
       
     } catch (error) {
       console.error("Error fetching playlist details:", error);
