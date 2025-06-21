@@ -57,13 +57,13 @@ export class InstantStreaming {
   }
 
   /**
-   * Fetch ultra-optimisé avec timeout court
+   * Fetch ultra-optimisé avec timeout plus long pour Dropbox
    */
   private static async ultraFastFetch(songUrl: string, startTime: number): Promise<string> {
     try {
-      // Timeout agressif de 3 secondes max
+      // Timeout plus généreux pour les URLs Dropbox (5 secondes)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 3000);
+        setTimeout(() => reject(new Error('Timeout')), 5000);
       });
       
       const fetchPromise = getAudioFileUrl(songUrl);
@@ -72,6 +72,24 @@ export class InstantStreaming {
       
       if (!audioUrl || typeof audioUrl !== 'string') {
         throw new Error('URL invalide');
+      }
+
+      // Vérifier que l'URL est valide avant de la mettre en cache
+      try {
+        // Test rapide de connectivité pour les URLs Dropbox
+        if (audioUrl.includes('dropboxusercontent.com')) {
+          const testResponse = await fetch(audioUrl, { 
+            method: 'HEAD',
+            signal: AbortSignal.timeout(2000) // 2 secondes pour le test HEAD
+          });
+          
+          if (!testResponse.ok) {
+            throw new Error(`URL Dropbox non accessible: ${testResponse.status}`);
+          }
+        }
+      } catch (testError) {
+        console.warn('⚠️ Test URL échoué, mais on continue:', testError);
+        // On continue quand même, le test peut échouer pour d'autres raisons
       }
       
       // Mise en cache immédiate
@@ -83,35 +101,43 @@ export class InstantStreaming {
       return audioUrl;
       
     } catch (error) {
+      // Ne pas marquer comme inexistant si c'est juste un timeout ou une erreur réseau
+      if (error instanceof Error && !error.message.includes('Timeout')) {
+        nonExistentFilesCache.markAsNonExistent(songUrl);
+      }
       throw new Error(`Impossible de charger: ${songUrl}`);
     }
   }
 
   /**
-   * Promotion L0 asynchrone
+   * Promotion L0 asynchrone améliorée
    */
   private static async promoteToL0Async(songUrl: string, audioUrl: string): Promise<void> {
     try {
+      // Pour les URLs Dropbox, vérifier d'abord avec HEAD
       const response = await fetch(audioUrl, { 
-        method: 'HEAD' // Juste pour vérifier l'URL
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000)
       });
       
       if (response.ok) {
         // Télécharger le blob complet en arrière-plan
         setTimeout(async () => {
           try {
-            const fullResponse = await fetch(audioUrl);
+            const fullResponse = await fetch(audioUrl, {
+              signal: AbortSignal.timeout(10000) // 10 secondes pour le téléchargement complet
+            });
             if (fullResponse.ok) {
               const blob = await fullResponse.blob();
               UltraFastCache.setL0(songUrl, audioUrl, blob);
             }
           } catch (error) {
-            // Ignorer silencieusement
+            // Ignorer silencieusement les erreurs de promotion L0
           }
         }, 100);
       }
     } catch (error) {
-      // Ignorer silencieusement
+      // Ignorer silencieusement les erreurs de promotion
     }
   }
 
@@ -137,11 +163,15 @@ export class InstantStreaming {
         return;
       }
       
-      // Précharger silencieusement
-      await this.getInstantAudioUrl(url);
+      // Précharger silencieusement avec timeout plus court
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Prefetch timeout')), 3000); // 3 secondes pour préchargement
+      });
+      
+      await Promise.race([this.getInstantAudioUrl(url), timeoutPromise]);
       
     } catch (error) {
-      // Ignorer silencieusement
+      // Ignorer complètement les erreurs de préchargement
     } finally {
       this.prefetchQueue.delete(url);
     }
