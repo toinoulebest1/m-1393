@@ -242,8 +242,8 @@ export const getDropboxSharedLink = async (filePath: string): Promise<string> =>
     if (createLinkResponse.ok) {
       const createData = await createLinkResponse.json();
       const url = createData.url;
-      // Convertir l'URL pour le streaming direct
-      const streamingUrl = url.replace('&dl=0', '&dl=1').replace('?dl=0', '?dl=1');
+      // Convertir vers le domaine dropboxusercontent.com pour éviter CORS
+      const streamingUrl = convertToDirectStreamingUrl(url);
       console.log('✅ Nouveau lien partagé créé:', streamingUrl);
       return streamingUrl;
     } else if (createLinkResponse.status === 409) {
@@ -266,8 +266,8 @@ export const getDropboxSharedLink = async (filePath: string): Promise<string> =>
         const listData = await listLinksResponse.json();
         if (listData.links && listData.links.length > 0) {
           const url = listData.links[0].url;
-          // S'assurer que l'URL est formatée pour le streaming direct
-          const streamingUrl = url.replace('&dl=0', '&dl=1').replace('?dl=0', '?dl=1');
+          // Convertir vers le domaine dropboxusercontent.com pour éviter CORS
+          const streamingUrl = convertToDirectStreamingUrl(url);
           console.log('✅ URL partagée Dropbox récupérée:', streamingUrl);
           return streamingUrl;
         }
@@ -278,6 +278,41 @@ export const getDropboxSharedLink = async (filePath: string): Promise<string> =>
   } catch (error) {
     console.error('❌ Erreur récupération lien partagé:', error);
     throw new Error(`Unable to get Dropbox shared link: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+/**
+ * Convertit une URL Dropbox standard vers une URL de streaming direct compatible CORS
+ */
+const convertToDirectStreamingUrl = (dropboxUrl: string): string => {
+  try {
+    // Exemple d'URL reçue: https://www.dropbox.com/scl/fi/xyz/file?rlkey=abc&dl=0
+    // URL cible: https://dl.dropboxusercontent.com/scl/fi/xyz/file?rlkey=abc&dl=1
+    
+    let url = dropboxUrl;
+    
+    // Remplacer le domaine pour éviter les problèmes CORS
+    if (url.includes('www.dropbox.com')) {
+      url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    } else if (url.includes('dropbox.com') && !url.includes('dropboxusercontent.com')) {
+      url = url.replace('dropbox.com', 'dl.dropboxusercontent.com');
+    }
+    
+    // S'assurer que dl=1 pour le téléchargement direct
+    if (url.includes('dl=0')) {
+      url = url.replace('dl=0', 'dl=1');
+    } else if (!url.includes('dl=1')) {
+      // Ajouter dl=1 si pas présent
+      const separator = url.includes('?') ? '&' : '?';
+      url += `${separator}dl=1`;
+    }
+    
+    console.log('🔄 URL convertie:', url);
+    return url;
+  } catch (error) {
+    console.error('❌ Erreur conversion URL:', error);
+    // Fallback vers l'URL originale si la conversion échoue
+    return dropboxUrl.replace('dl=0', 'dl=1');
   }
 };
 
