@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { isDropboxEnabled } from "@/utils/dropboxStorage";
 
 interface Song {
   id: string;
@@ -31,15 +31,12 @@ export const MusicUploader = () => {
   const [dragCounter, setDragCounter] = useState(0);
   const [storageProvider, setStorageProvider] = useState<string>("Supabase");
   const [currentUploadingSong, setCurrentUploadingSong] = useState<string | null>(null);
-  const [uploadQueue, setUploadQueue] = useState<File[]>([]);
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   // Référence pour stocker temporairement les fichiers LRC trouvés
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
-    // Vérifier le provider de stockage au démarrage
-    const dropboxEnabled = isDropboxEnabled();
-    setStorageProvider(dropboxEnabled ? "Dropbox" : "Supabase");
+    // Always use Supabase as storage provider since OneDrive is removed
+    setStorageProvider("Supabase");
   }, []);
 
   const formatDuration = (seconds: number) => {
@@ -210,44 +207,6 @@ export const MusicUploader = () => {
     }
   };
 
-  // Fonction pour gérer l'upload avec gestion d'erreurs améliorée
-  const safeUploadFile = async (file: File, fileId: string): Promise<boolean> => {
-    try {
-      console.log("Tentative d'upload vers le stockage configuré:", storageProvider);
-      await uploadAudioFile(file, fileId);
-      return true;
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error);
-      
-      // Si l'erreur contient des mots-clés CORS ou 429, basculer vers Supabase
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('CORS') || errorMessage.includes('429') || errorMessage.includes('NetworkError')) {
-        console.log("Erreur CORS/429 détectée, basculement vers Supabase...");
-        toast.info("Problème avec Dropbox, basculement vers Supabase...");
-        
-        try {
-          // Forcer l'utilisation de Supabase temporairement
-          const originalProvider = storageProvider;
-          setStorageProvider("Supabase");
-          
-          // Réessayer avec Supabase
-          await uploadAudioFile(file, fileId);
-          
-          toast.success("Fichier uploadé vers Supabase avec succès");
-          return true;
-        } catch (supabaseError) {
-          console.error("Erreur lors du fallback Supabase:", supabaseError);
-          setStorageProvider(originalProvider); // Restaurer le provider original
-          toast.error("Échec de l'upload vers Supabase également");
-          return false;
-        }
-      }
-      
-      toast.error(`Erreur d'upload: ${errorMessage}`);
-      return false;
-    }
-  };
-
   const processAudioFile = async (file: File) => {
     console.log("Début du traitement pour:", file.name);
     
@@ -288,20 +247,11 @@ export const MusicUploader = () => {
           }
           return prev + Math.random() * 15;
         });
-      }, 300); // Ralenti un peu pour éviter les spams
+      }, 200);
 
-      // Upload avec gestion d'erreurs améliorée
-      const uploadSuccess = await safeUploadFile(file, fileId);
+      await uploadAudioFile(file, fileId);
       
       clearInterval(progressInterval);
-      
-      if (!uploadSuccess) {
-        setIsUploading(false);
-        setUploadProgress(0);
-        setCurrentUploadingSong(null);
-        return null;
-      }
-      
       setUploadProgress(100);
 
       const audioUrl = URL.createObjectURL(file);
@@ -452,42 +402,6 @@ export const MusicUploader = () => {
     }
   };
 
-  // Nouvelle fonction pour traiter les fichiers un par un avec délai
-  const processFilesSequentially = async (files: File[]) => {
-    setIsProcessingQueue(true);
-    const processedSongs: any[] = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      console.log(`Traitement du fichier ${i + 1}/${files.length}: ${file.name}`);
-      
-      try {
-        const song = await processAudioFile(file);
-        if (song) {
-          processedSongs.push(song);
-        }
-        
-        // Délai entre chaque fichier pour éviter la limite de taux
-        if (i < files.length - 1) {
-          console.log("Attente de 2 secondes avant le prochain fichier...");
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      } catch (error) {
-        console.error(`Erreur lors du traitement de ${file.name}:`, error);
-        toast.error(`Erreur lors du traitement de ${file.name}`);
-      }
-    }
-    
-    setIsProcessingQueue(false);
-    
-    if (processedSongs.length > 0) {
-      processedSongs.forEach(song => addToQueue(song));
-      toast.success(`${processedSongs.length} fichiers traités avec succès`);
-    }
-    
-    return processedSongs;
-  };
-
   const processFiles = async (files: FileList | File[]) => {
     // Réinitialiser le cache des fichiers LRC
     lrcFilesRef.current.clear();
@@ -519,8 +433,21 @@ export const MusicUploader = () => {
     console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
     console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
     
-    // Traitement séquentiel des fichiers
-    await processFilesSequentially(audioFiles);
+    // Afficher les noms des fichiers LRC pour le débogage
+    if (lrcFilesRef.current.size > 0) {
+      console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
+    }
+
+    const processedSongs = await Promise.all(
+      audioFiles.map(processAudioFile)
+    );
+
+    const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
+    console.log("Chansons valides traitées:", validSongs);
+
+    if (validSongs.length > 0) {
+      validSongs.forEach(song => addToQueue(song));
+    }
     
     // Nettoyer le cache des fichiers LRC
     lrcFilesRef.current.clear();
@@ -544,7 +471,7 @@ export const MusicUploader = () => {
           const file = await new Promise<File>((resolve) => {
             (entry as FileSystemFileEntry).file(resolve);
           });
-          if (file.type.startsWith('audio/') || file.name.toLowerCase().endsWith('.lrc')) {
+          if (file.type.startsWith('audio/')) {
             files.push(file);
           }
         } else if (entry.isDirectory) {
@@ -639,7 +566,6 @@ export const MusicUploader = () => {
               multiple
               className="hidden"
               onChange={handleFileUpload}
-              disabled={isUploading || isProcessingQueue}
             />
           </label>
           
@@ -655,7 +581,6 @@ export const MusicUploader = () => {
               directory=""
               className="hidden"
               onChange={handleFileUpload}
-              disabled={isUploading || isProcessingQueue}
             />
           </label>
         </div>
@@ -665,26 +590,21 @@ export const MusicUploader = () => {
       </div>
 
       {/* Upload progress bar */}
-      {(isUploading || isProcessingQueue) && (
+      {isUploading && (
         <div className="mb-4 p-4 bg-spotify-dark/50 rounded-lg border border-border">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm text-foreground">
-              {isProcessingQueue ? "Traitement en cours..." : `Upload en cours: ${currentUploadingSong}`}
+              Upload en cours: {currentUploadingSong}
             </div>
             <div className="text-sm text-muted-foreground">
-              {isUploading ? `${Math.round(uploadProgress)}%` : "En attente..."}
+              {Math.round(uploadProgress)}%
             </div>
           </div>
           <Progress 
-            value={isUploading ? uploadProgress : 50} 
+            value={uploadProgress} 
             className="h-2"
             indicatorClassName="bg-spotify-accent transition-all duration-300"
           />
-          {isProcessingQueue && (
-            <div className="text-xs text-muted-foreground mt-2">
-              Les fichiers sont traités un par un pour éviter les erreurs
-            </div>
-          )}
         </div>
       )}
 
