@@ -1,4 +1,3 @@
-
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -54,7 +53,7 @@ export const Sidebar = () => {
   if (isAdmin) {
     links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
     links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
-    links.push({ to: "/onedrive-settings", icon: CloudUpload, label: "OneDrive" });
+    links.push({ to: "/dropbox-settings", icon: CloudUpload, label: "Dropbox" });
     links.push({ to: "/maintenance-admin", icon: Settings, label: "Maintenance" });
   }
 
