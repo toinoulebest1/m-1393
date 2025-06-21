@@ -37,8 +37,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <CastProvider>
-          <PlayerProvider>
+        <PlayerProvider>
+          <CastProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -61,8 +61,8 @@ function App() {
                 </Route>
               </Routes>
             </BrowserRouter>
-          </PlayerProvider>
-        </CastProvider>
+          </CastProvider>
+        </PlayerProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
