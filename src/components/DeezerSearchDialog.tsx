@@ -1,13 +1,11 @@
+
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LoaderIcon, Search, Music, User } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { usePlayerContext } from "@/contexts/PlayerContext";
+import { Loader2, Search, Music } from "lucide-react";
 
 interface DeezerSearchDialogProps {
   open: boolean;
@@ -17,17 +15,12 @@ interface DeezerSearchDialogProps {
 }
 
 const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSearchDialogProps) => {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { refreshCurrentSong } = usePlayerContext();
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<any[]>([]);
 
-  // Reset query and results when song changes or dialog opens
   useEffect(() => {
     if (open && song) {
-      // Create initial search query from song metadata
       const initialQuery = song.artist && song.artist !== "Unknown Artist" 
         ? `${song.artist} ${song.title}` 
         : song.title;
@@ -39,7 +32,7 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      toast.error(t("common.searchQueryRequired"));
+      toast.error("Veuillez saisir un terme de recherche");
       return;
     }
 
@@ -52,20 +45,20 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
       });
 
       if (error) {
-        console.error("Deezer search error:", error);
-        toast.error(t("common.searchError"));
+        console.error("Erreur de recherche Deezer:", error);
+        toast.error("Erreur lors de la recherche");
         return;
       }
 
       if (data && data.data) {
         setResults(data.data);
         if (data.data.length === 0) {
-          toast.info(t("common.noResultsFound"));
+          toast.info("Aucun résultat trouvé");
         }
       }
     } catch (error) {
-      console.error("Error during search:", error);
-      toast.error(t("common.searchError"));
+      console.error("Erreur lors de la recherche:", error);
+      toast.error("Erreur lors de la recherche");
     } finally {
       setLoading(false);
     }
@@ -77,7 +70,6 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
       
       const updates: any = {};
       
-      // Check what needs to be updated
       if (track.album?.cover_xl) {
         updates.image_url = track.album.cover_xl;
       }
@@ -107,86 +99,74 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
           .eq('id', song.id);
         
         if (updateError) {
-          console.error(`Error updating song ${song.id}:`, updateError);
-          toast.error(t("common.updateError"));
+          console.error(`Erreur lors de la mise à jour de la chanson ${song.id}:`, updateError);
+          toast.error("Erreur lors de la mise à jour");
           return;
         }
         
-        toast.success(t("common.metadataUpdated"));
-        
-        // Refresh current song if it's the one being updated
-        console.log("Explicitly calling refreshCurrentSong from DeezerSearchDialog");
-        refreshCurrentSong();
-        
-        // Call the callback to refresh the list
+        toast.success("Métadonnées mises à jour avec succès");
         onUpdateSuccess();
       } else {
-        toast.info(t("common.noChangesNeeded"));
+        toast.info("Aucune modification nécessaire");
       }
       
       onClose();
     } catch (error) {
-      console.error("Error applying metadata:", error);
-      toast.error(t("common.updateError"));
+      console.error("Erreur lors de l'application des métadonnées:", error);
+      toast.error("Erreur lors de la mise à jour");
     } finally {
       setLoading(false);
     }
   };
 
-  const viewArtistProfile = (artistId: number, artistName: string) => {
-    onClose();
-    navigate(`/artist/${artistId}`);
-  };
-
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-md md:max-w-xl bg-spotify-dark text-foreground border-border">
+      <DialogContent className="sm:max-w-md md:max-w-xl bg-spotify-dark text-white border-white/20">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {t("common.searchDeezer")}
+            Recherche Deezer
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            {t("common.searchDeezerDescription")}
+          <DialogDescription className="text-gray-400">
+            Recherchez et appliquez les métadonnées depuis Deezer
           </DialogDescription>
         </DialogHeader>
+        
         <div className="space-y-4">
           <div className="flex space-x-2">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("common.searchPlaceholder")}
-              className="flex-1 bg-spotify-dark/50 border-border"
+              placeholder="Rechercher un titre, artiste..."
+              className="flex-1 bg-spotify-dark/50 border-white/20 text-white"
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               autoFocus
             />
             <Button 
-              type="button"
               onClick={handleSearch}
               disabled={loading}
-              variant="default"
-              className="gap-2"
+              className="bg-spotify-accent hover:bg-spotify-accent/80"
             >
-              {loading ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {t("common.search")}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Rechercher
             </Button>
           </div>
 
           {loading && (
             <div className="flex items-center justify-center p-8">
-              <LoaderIcon className="h-8 w-8 animate-spin" />
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
             </div>
           )}
           
           {!loading && results.length > 0 && (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              <h4 className="text-sm font-medium text-muted-foreground">
-                {t("common.searchResults")}
+              <h4 className="text-sm font-medium text-gray-400">
+                Résultats de recherche
               </h4>
               <div className="grid gap-2">
                 {results.map((track) => (
                   <div
                     key={track.id}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-spotify-accent/10 border border-border cursor-pointer"
+                    className="flex items-center gap-3 p-3 rounded-md hover:bg-white/10 border border-white/20 cursor-pointer transition-colors"
                     onClick={() => handleApplyMetadata(track)}
                   >
                     {track.album?.cover_small ? (
@@ -196,47 +176,31 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
                         className="w-12 h-12 rounded object-cover"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded bg-spotify-accent/20 flex items-center justify-center">
-                        <Music className="w-6 h-6 text-spotify-accent/60" />
+                      <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center">
+                        <Music className="w-6 h-6 text-white/60" />
                       </div>
                     )}
                     <div className="flex-1 overflow-hidden">
-                      <p className="font-medium truncate">{track.title}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {track.artist?.name || t("common.noArtist")}
+                      <p className="font-medium truncate text-white">{track.title}</p>
+                      <p className="text-sm text-gray-400 truncate">
+                        {track.artist?.name || "Artiste inconnu"}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-gray-500">
                         {track.album?.title && `${track.album.title} • `}
                         {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
                       </p>
                     </div>
-                    <div className="flex gap-2">
-                      {track.artist && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            viewArtistProfile(track.artist.id, track.artist.name);
-                          }}
-                          className="shrink-0"
-                          title={`Voir le profil de ${track.artist.name}`}
-                        >
-                          <User className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApplyMetadata(track);
-                        }}
-                        className="shrink-0"
-                      >
-                        {t("common.apply")}
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="shrink-0 border-white/20 text-white hover:bg-white/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApplyMetadata(track);
+                      }}
+                    >
+                      Appliquer
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -244,8 +208,8 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
           )}
           
           {!loading && results.length === 0 && query !== "" && (
-            <div className="text-center py-8 text-muted-foreground">
-              {t("common.noResultsFound")}
+            <div className="text-center py-8 text-gray-400">
+              Aucun résultat trouvé
             </div>
           )}
         </div>
