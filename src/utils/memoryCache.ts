@@ -1,167 +1,200 @@
 
-/**
- * Cache mémoire ultra-rapide pour les URLs audio
- * Complète le cache IndexedDB pour des accès sub-milliseconde
- */
+import { isInCache, getFromCache, addToCache } from './audioCache';
 
-interface MemoryCacheEntry {
-  url: string;
-  timestamp: number;
-  lastAccessed: number;
-  accessCount: number;
-}
-
-class MemoryAudioCache {
+export class MemoryCache {
   private cache = new Map<string, string>();
-  private metadata = new Map<string, MemoryCacheEntry>();
-  private maxSize = 50; // Maximum 50 URLs en mémoire
-  private ttl = 30 * 60 * 1000; // 30 minutes TTL
+  private maxSize: number;
+  private currentSize = 0;
+  private accessOrder = new Map<string, number>();
+  private accessCounter = 0;
 
-  /**
-   * Vérification ultra-rapide (< 1ms)
-   */
-  has(songUrl: string): boolean {
-    const entry = this.metadata.get(songUrl);
-    if (!entry) return false;
-    
-    // Vérifier TTL
-    if (Date.now() - entry.timestamp > this.ttl) {
-      this.delete(songUrl);
-      return false;
-    }
-    
-    return this.cache.has(songUrl);
+  constructor(maxSize = 100) {
+    this.maxSize = maxSize;
   }
 
-  /**
-   * Récupération ultra-rapide (< 1ms)
-   */
-  get(songUrl: string): string | null {
-    if (!this.has(songUrl)) return null;
-    
-    const audioUrl = this.cache.get(songUrl);
-    if (!audioUrl) return null;
-    
-    // Mettre à jour les statistiques d'accès
-    const entry = this.metadata.get(songUrl);
-    if (entry) {
-      entry.lastAccessed = Date.now();
-      entry.accessCount++;
-      this.metadata.set(songUrl, entry);
-    }
-    
-    console.log("⚡ Cache mémoire HIT:", songUrl);
-    return audioUrl;
-  }
+  private evictLRU() {
+    if (this.cache.size <= this.maxSize) return;
 
-  /**
-   * Ajout avec éviction LRU intelligente
-   */
-  set(songUrl: string, audioUrl: string): void {
-    // Éviction si cache plein
-    if (this.cache.size >= this.maxSize && !this.cache.has(songUrl)) {
-      this.evictLeastUsed();
-    }
-    
-    this.cache.set(songUrl, audioUrl);
-    this.metadata.set(songUrl, {
-      url: songUrl,
-      timestamp: Date.now(),
-      lastAccessed: Date.now(),
-      accessCount: 1
-    });
-    
-    console.log("💾 Cache mémoire SET:", songUrl);
-  }
+    let oldestKey = '';
+    let oldestAccess = Infinity;
 
-  /**
-   * Éviction intelligente basée sur LRU + fréquence
-   */
-  private evictLeastUsed(): void {
-    let oldestEntry: [string, MemoryCacheEntry] | null = null;
-    let lowestScore = Infinity;
-    
-    for (const [key, entry] of this.metadata.entries()) {
-      // Score = fréquence × récence (plus élevé = plus important)
-      const recency = Date.now() - entry.lastAccessed;
-      const score = entry.accessCount / (1 + recency / 1000); // Normaliser par secondes
-      
-      if (score < lowestScore) {
-        lowestScore = score;
-        oldestEntry = [key, entry];
+    for (const [key, accessTime] of this.accessOrder.entries()) {
+      if (accessTime < oldestAccess) {
+        oldestAccess = accessTime;
+        oldestKey = key;
       }
     }
-    
-    if (oldestEntry) {
-      this.delete(oldestEntry[0]);
-      console.log("🗑️ Éviction cache mémoire:", oldestEntry[0]);
+
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+      this.accessOrder.delete(oldestKey);
+      this.currentSize--;
+      console.log(`🗑️ Éviction LRU: ${oldestKey}`);
     }
   }
 
-  /**
-   * Suppression
-   */
-  delete(songUrl: string): void {
-    this.cache.delete(songUrl);
-    this.metadata.delete(songUrl);
-  }
-
-  /**
-   * Nettoyage des entrées expirées
-   */
-  cleanup(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.metadata.entries()) {
-      if (now - entry.timestamp > this.ttl) {
-        this.delete(key);
-      }
+  set(key: string, value: string): void {
+    if (this.cache.has(key)) {
+      this.cache.set(key, value);
+      this.accessOrder.set(key, ++this.accessCounter);
+      return;
     }
+
+    this.evictLRU();
+    this.cache.set(key, value);
+    this.accessOrder.set(key, ++this.accessCounter);
+    this.currentSize++;
   }
 
-  /**
-   * Statistiques du cache
-   */
+  get(key: string): string | null {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      this.accessOrder.set(key, ++this.accessCounter);
+      return value;
+    }
+    return null;
+  }
+
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+
+  delete(key: string): boolean {
+    const deleted = this.cache.delete(key);
+    if (deleted) {
+      this.accessOrder.delete(key);
+      this.currentSize--;
+    }
+    return deleted;
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder.clear();
+    this.currentSize = 0;
+  }
+
+  size(): number {
+    return this.currentSize;
+  }
+
+  keys(): string[] {
+    return Array.from(this.cache.keys());
+  }
+
   getStats() {
     return {
-      size: this.cache.size,
+      size: this.currentSize,
       maxSize: this.maxSize,
-      entries: Array.from(this.metadata.values()).map(entry => ({
-        url: entry.url,
-        age: Date.now() - entry.timestamp,
-        accessCount: entry.accessCount,
-        lastAccessed: Date.now() - entry.lastAccessed
-      }))
+      utilization: (this.currentSize / this.maxSize * 100).toFixed(1) + '%'
     };
-  }
-
-  /**
-   * Préchargement en lot
-   */
-  async preloadBatch(songUrls: string[]): Promise<void> {
-    console.log("🚀 Préchargement batch:", songUrls.length, "URLs");
-    
-    const promises = songUrls.map(async (songUrl) => {
-      if (this.has(songUrl)) return; // Déjà en cache
-      
-      try {
-        const { getAudioFile } = await import('./storage');
-        const audioUrl = await getAudioFile(songUrl);
-        if (audioUrl && typeof audioUrl === 'string') {
-          this.set(songUrl, audioUrl);
-        }
-      } catch (error) {
-        console.warn("⚠️ Erreur préchargement:", songUrl, error);
-      }
-    });
-    
-    await Promise.allSettled(promises);
   }
 }
 
-// Instance singleton
-export const memoryCache = new MemoryAudioCache();
+export const memoryCache = new MemoryCache(100);
 
-// Nettoyage automatique toutes les 5 minutes
-setInterval(() => {
-  memoryCache.cleanup();
-}, 5 * 60 * 1000);
+// Smart cache avec préchargement automatique
+export class SmartCache {
+  private static instance: SmartCache;
+  private preloadQueue = new Set<string>();
+  private preloadingPromises = new Map<string, Promise<void>>();
+
+  static getInstance(): SmartCache {
+    if (!SmartCache.instance) {
+      SmartCache.instance = new SmartCache();
+    }
+    return SmartCache.instance;
+  }
+
+  async smartGet(key: string): Promise<string | null> {
+    // 1. Vérifier le cache mémoire d'abord
+    const memoryResult = memoryCache.get(key);
+    if (memoryResult) {
+      console.log("⚡ Cache mémoire hit:", key);
+      return memoryResult;
+    }
+
+    // 2. Vérifier le cache IndexedDB
+    try {
+      if (await isInCache(key)) {
+        const cachedUrl = await getFromCache(key);
+        if (cachedUrl && typeof cachedUrl === 'string') {
+          console.log("💾 Cache IndexedDB hit:", key);
+          // Ajouter au cache mémoire pour la prochaine fois
+          memoryCache.set(key, cachedUrl);
+          return cachedUrl;
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ Erreur cache IndexedDB:", error);
+    }
+
+    // 3. Récupération réseau en dernier recours
+    try {
+      console.log("📡 Récupération réseau:", key);
+      const { getAudioFileUrl } = await import('./storage');
+      const audioUrl = await getAudioFileUrl(key);
+      
+      if (typeof audioUrl === 'string') {
+        // Mettre en cache immédiatement
+        memoryCache.set(key, audioUrl);
+        
+        // Cache IndexedDB en arrière-plan
+        setTimeout(async () => {
+          try {
+            const response = await fetch(audioUrl);
+            if (response.ok) {
+              const blob = await response.blob();
+              await addToCache(key, blob);
+            }
+          } catch (error) {
+            console.warn("⚠️ Cache IndexedDB différé échoué:", error);
+          }
+        }, 100);
+        
+        return audioUrl;
+      }
+    } catch (error) {
+      console.error("❌ Erreur récupération réseau:", error);
+    }
+
+    return null;
+  }
+
+  // Préchargement intelligent avec priorité
+  async smartPreload(keys: string[], priority: 'high' | 'medium' | 'low' = 'medium'): Promise<void> {
+    const delay = priority === 'high' ? 0 : priority === 'medium' ? 50 : 200;
+    
+    const preloadPromises = keys.map(async (key, index) => {
+      if (this.preloadQueue.has(key) || memoryCache.has(key)) {
+        return;
+      }
+      
+      this.preloadQueue.add(key);
+      
+      // Délai échelonné pour éviter la surcharge
+      await new Promise(resolve => setTimeout(resolve, index * delay));
+      
+      try {
+        await this.smartGet(key);
+        console.log(`✅ Préchargement réussi (${priority}):`, key);
+      } catch (error) {
+        console.warn(`⚠️ Préchargement échoué (${priority}):`, key, error);
+      } finally {
+        this.preloadQueue.delete(key);
+      }
+    });
+    
+    await Promise.allSettled(preloadPromises);
+  }
+
+  getStats() {
+    return {
+      memory: memoryCache.getStats(),
+      preloadQueue: this.preloadQueue.size,
+      activePreloads: this.preloadingPromises.size
+    };
+  }
+}
+
+export const smartCache = SmartCache.getInstance();

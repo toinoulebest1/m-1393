@@ -1,4 +1,3 @@
-
 /**
  * Streaming Ultra-Agressif - Zéro timeout, maximum vitesse
  */
@@ -6,7 +5,7 @@
 import { UltraFastCache } from './ultraFastCache';
 import { memoryCache } from './memoryCache';
 import { isInCache, getFromCache } from './audioCache';
-import { getAudioFile } from './storage';
+import { getAudioFileUrl } from './storage';
 
 export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
@@ -121,7 +120,7 @@ export class UltraFastStreaming {
    */
   private static async tryNetwork(songUrl: string): Promise<string | null> {
     try {
-      const audioUrl = await getAudioFile(songUrl);
+      const audioUrl = await getAudioFileUrl(songUrl);
       if (typeof audioUrl === 'string') {
         console.log("📡 NETWORK HIT");
         return audioUrl;

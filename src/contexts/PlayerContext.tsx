@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
@@ -7,7 +8,7 @@ import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
-import { getAudioFile } from '@/utils/storage';
+import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 
