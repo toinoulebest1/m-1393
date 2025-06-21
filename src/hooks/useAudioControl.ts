@@ -6,6 +6,7 @@ import { Song } from '@/types/player';
 import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
 import { memoryCache } from '@/utils/memoryCache';
 import { AutoplayManager } from '@/utils/autoplayManager';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -44,7 +45,7 @@ export const useAudioControl = ({
     if (song && (!currentSong || song.id !== currentSong.id)) {
       setIsChangingSong(true);
       
-      console.log("🎵 === LECTURE ULTRA-INSTANTANÉE ===");
+      console.log("🎵 === LECTURE ULTRA-INSTANTANÉE SPOTIFY-LIKE ===");
       console.log("🎶 Chanson:", song.title, "par", song.artist);
       
       setCurrentSong(song);
@@ -62,137 +63,26 @@ export const useAudioControl = ({
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
         
-        console.log("🚀 Récupération URL instantanée...");
+        console.log("🚀 Streaming ultra-agressif...");
         const startTime = performance.now();
         
-        // 1. Cache mémoire ultra-rapide (< 1ms)
-        console.log("⚡ Cache mémoire...");
-        const memoryUrl = memoryCache.get(song.url);
-        if (memoryUrl) {
-          const elapsed = performance.now() - startTime;
-          console.log("⚡ CACHE MÉMOIRE:", elapsed.toFixed(1), "ms");
-          
-          audio.preload = "auto";
-          audio.src = memoryUrl;
-          
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              const totalElapsed = performance.now() - startTime;
-              console.log("✅ === SUCCÈS ULTRA-INSTANTANÉ ===");
-              console.log("🎵 Chanson:", song.title);
-              console.log("⚡ Total:", totalElapsed.toFixed(1), "ms");
-              console.log("🎯 Perf: EXCELLENT (cache mémoire)");
-              
-              setIsPlaying(true);
-              
-              // Préchargement différé ultra-court
-              setTimeout(() => preloadNextTracks(), 50);
-              
-              // Changement terminé ultra-rapide
-              changeTimeoutRef.current = window.setTimeout(() => {
-                setIsChangingSong(false);
-                changeTimeoutRef.current = null;
-              }, 25); // 25ms seulement
-              
-            }).catch(error => {
-              console.error("❌ Erreur play cache mémoire:", error.message);
-              handlePlayError(error, song);
-            });
-          }
-          return;
-        }
+        // Utiliser le système de streaming ultra-rapide
+        const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url);
         
-        // 2. Cache IndexedDB avec timeout ultra-court (2ms)
-        console.log("💾 Cache IndexedDB...");
-        const cacheCheck = Promise.race([
-          isInCache(song.url).then(async (inCache) => {
-            if (inCache) {
-              const cachedUrl = await getFromCache(song.url);
-              if (cachedUrl && typeof cachedUrl === 'string') {
-                const elapsed = performance.now() - startTime;
-                console.log("💾 CACHE INDEXEDDB:", elapsed.toFixed(1), "ms");
-                
-                // Ajouter au cache mémoire pour la prochaine fois
-                memoryCache.set(song.url, cachedUrl);
-                
-                return { url: cachedUrl, fromCache: true };
-              }
-            }
-            return null;
-          }),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 2)) // 2ms timeout
-        ]);
-        
-        // 3. Récupération réseau avec gestion d'erreur améliorée
-        const networkPromise = getAudioFileUrl(song.url).then(url => {
-          if (typeof url === 'string') {
-            return { url, fromCache: false };
-          }
-          throw new Error('URL invalide');
-        }).catch(error => {
-          console.error("❌ Erreur récupération réseau:", error.message);
-          
-          // Gestion spécifique des erreurs
-          if (error.message.includes('OneDrive') || error.message.includes('jeton')) {
-            throw new Error('OneDrive non configuré ou jeton expiré. Veuillez configurer OneDrive dans les paramètres.');
-          }
-          
-          if (error.message.includes('not found') || error.message.includes('File not found')) {
-            throw new Error(`Fichier audio introuvable: ${song.title}. Le fichier a peut-être été supprimé du stockage.`);
-          }
-          
-          throw error;
-        });
-        
-        // Prendre la première URL disponible
-        const audioData = await Promise.race([
-          cacheCheck.then(result => result || Promise.reject("No cache")),
-          networkPromise
-        ]).catch(async () => {
-          // Si le cache et le réseau échouent, essayer le réseau seul
-          console.log("⚠️ Cache indisponible, tentative réseau seule...");
-          return await networkPromise;
-        });
-        
-        const audioUrl = audioData.url;
         const elapsed = performance.now() - startTime;
-        
-        console.log("✅ URL en:", elapsed.toFixed(1), "ms", audioData.fromCache ? "(cache)" : "(réseau)");
+        console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
 
         if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error('URL audio non disponible');
         }
 
-        // Ajouter au cache mémoire si pas déjà présent
-        if (!audioData.fromCache) {
-          memoryCache.set(song.url, audioUrl);
-        }
-
         // Configuration streaming ultra-agressive
-        console.log("⚡ Streaming instantané");
+        console.log("⚡ Configuration audio instantanée");
         audio.preload = "auto";
         audio.src = audioUrl;
         
-        // Cache différé ultra-rapide
-        if (!audioData.fromCache) {
-          setTimeout(async () => {
-            try {
-              console.log("📡 Cache différé...");
-              const response = await fetch(audioUrl);
-              if (response.ok) {
-                const blob = await response.blob();
-                await addToCache(song.url, blob);
-                console.log("💾 Cache terminé:", (blob.size / 1024 / 1024).toFixed(1), "MB");
-              }
-            } catch (e) {
-              console.warn("⚠️ Cache différé échoué");
-            }
-          }, 25);
-        }
-        
         // Démarrage avec gestion autoplay
-        console.log("🚀 Play avec gestion autoplay...");
+        console.log("🚀 Démarrage ultra-rapide...");
         const playStartTime = performance.now();
         
         const success = await AutoplayManager.playAudio(audio);
@@ -201,22 +91,23 @@ export const useAudioControl = ({
           const playElapsed = performance.now() - playStartTime;
           const totalElapsed = performance.now() - startTime;
           
-          console.log("✅ === SUCCÈS ULTRA-RAPIDE ===");
+          console.log("✅ === SUCCÈS ULTRA-INSTANTANÉ ===");
           console.log("🎵 Chanson:", song.title);
           console.log("⚡ Play:", playElapsed.toFixed(1), "ms");
           console.log("⚡ Total:", totalElapsed.toFixed(1), "ms");
-          console.log("🎯 Perf:", totalElapsed < 100 ? "EXCELLENT" : totalElapsed < 200 ? "BON" : "LENT");
+          console.log("🎯 Perf:", totalElapsed < 50 ? "SPOTIFY-LIKE" : totalElapsed < 100 ? "EXCELLENT" : totalElapsed < 200 ? "BON" : "LENT");
           
           setIsPlaying(true);
           
           // Préchargement différé ultra-court
-          setTimeout(() => preloadNextTracks(), 50);
+          setTimeout(() => preloadNextTracks(), 25);
           
           // Changement terminé ultra-rapide
           changeTimeoutRef.current = window.setTimeout(() => {
             setIsChangingSong(false);
             changeTimeoutRef.current = null;
-          }, 25);
+          }, 10); // 10ms seulement pour un effet instantané
+          
         } else {
           console.log("⚠️ Lecture en attente d'activation utilisateur");
           setIsChangingSong(false);
@@ -232,18 +123,18 @@ export const useAudioControl = ({
         }
         
       } catch (error) {
-        console.error("💥 Erreur récupération:", error);
+        console.error("💥 Erreur streaming ultra-rapide:", error);
         handlePlayError(error as any, song);
       }
     } else if (audioRef.current) {
       // Reprise avec gestion autoplay
-      console.log("⚡ Reprise avec gestion autoplay");
+      console.log("⚡ Reprise ultra-rapide");
       try {
         audioRef.current.volume = volume / 100;
         const success = await AutoplayManager.playAudio(audioRef.current);
         
         if (success) {
-          console.log("✅ Reprise OK");
+          console.log("✅ Reprise instantanée");
           setIsPlaying(true);
         } else {
           console.log("⚠️ Reprise en attente d'activation");
