@@ -1,89 +1,96 @@
-
-import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType } from '@/types/player';
-import { useAudioControl } from '@/hooks/useAudioControl';
+import { usePlayerState } from '@/hooks/usePlayerState';
 import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { usePlayerQueue } from '@/hooks/usePlayerQueue';
-import { usePlayerState } from '@/hooks/usePlayerState';
+import { useAudioControl } from '@/hooks/useAudioControl';
+import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
-import { useInstantPlayer } from '@/hooks/useInstantPlayer';
-import { InstantStreaming } from '@/utils/instantStreaming';
+import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
+import { getAudioFileUrl } from '@/utils/storage';
+import { toast } from 'sonner';
+import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 
-const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
+// Contexte global et audio
+const PlayerContext = createContext<PlayerContextType | null>(null);
+const globalAudio = new Audio();
+globalAudio.crossOrigin = "anonymous";
+
+// Helper function to create next audio element
+const createNextAudio = () => {
+  const nextAudio = new Audio();
+  nextAudio.crossOrigin = "anonymous";
+  return nextAudio;
+};
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const audioRef = useRef<HTMLAudioElement>(new Audio());
-  const nextAudioRef = useRef<HTMLAudioElement>(new Audio());
-  const changeTimeoutRef = useRef<number | null>(null);
-
-  const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
-
-  const {
-    currentSong,
-    setCurrentSong,
-    isPlaying,
-    setIsPlaying,
-    progress,
-    setProgress,
-    volume,
-    setVolume,
-    playbackRate,
-    setPlaybackRate,
-    history,
-    setHistory,
-    isChangingSong,
-    setIsChangingSong,
-    searchQuery,
-    setSearchQuery
+  // Hooks personnalisés qui encapsulent la logique
+  const { 
+    currentSong, setCurrentSong,
+    isPlaying, setIsPlaying,
+    progress, setProgress, savedProgress, setSavedProgress,
+    volume, setVolume,
+    isChangingSong, setIsChangingSong,
+    history, setHistory,
+    searchQuery, setSearchQuery,
+    playbackRate, setPlaybackRate
   } = usePlayerState();
 
-  // Préchargement optimisé avec gestion d'erreur améliorée
-  const preloadNextTracks = useCallback(async () => {
-    if (!currentSong) return;
-
-    console.log("🚀 Préchargement optimisé avec gestion d'erreur");
-    
-    try {
-      const savedQueue = localStorage.getItem('queue');
-      if (!savedQueue) return;
-      
-      const queue = JSON.parse(savedQueue);
-      const currentIndex = queue.findIndex((s: Song) => s.id === currentSong.id);
-      const nextSongs: Song[] = [];
-      
-      if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-        // Précharger seulement les 3 prochaines chansons pour éviter la surcharge
-        for (let i = 1; i <= 3 && currentIndex + i < queue.length; i++) {
-          nextSongs.push(queue[currentIndex + i]);
-        }
-      }
-      
-      if (nextSongs.length > 0) {
-        console.log("🎯 Préchargement instantané optimisé:", nextSongs.map(s => s.title));
-        await InstantStreaming.prefetchNext(nextSongs.map(s => s.url));
-        setNextSongPreloaded(true);
-      }
-    } catch (error) {
-      console.warn("⚠️ Erreur préchargement (ignorée):", error);
-      // Ne pas faire échouer le processus à cause d'erreurs de préchargement
-    }
-  }, [currentSong]);
+  const {
+    favorites, setFavorites,
+    favoriteStats, setFavoriteStats,
+    toggleFavorite, removeFavorite
+  } = usePlayerFavorites();
 
   const {
-    play,
-    pause,
-    updateVolume,
-    updateProgress,
-    updatePlaybackRate,
+    preferences, 
+    overlapTimeRef,
+    fadingRef,
+    fadeIntervalRef,
+    preloadNextTracks
+  } = usePlayerPreferences();
+
+  // Refs audio
+  const audioRef = useRef<HTMLAudioElement>(globalAudio);
+  const nextAudioRef = useRef<HTMLAudioElement>(createNextAudio());
+  const changeTimeoutRef = useRef<number | null>(null);
+  const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+
+  // Hook d'égaliseur
+  const equalizer = useEqualizer({ audioElement: audioRef.current });
+
+  // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
+  const {
+    queue, setQueue,
+    shuffleMode, setShuffleMode,
+    repeatMode, setRepeatMode,
+    addToQueue, toggleShuffle, toggleRepeat,
+    nextSong, previousSong, getNextSong
+  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play: async () => {} });
+
+  // Hook ultra-rapide pour le préchargement intelligent - APRÈS usePlayerQueue
+  const { getCacheStats } = useUltraFastPlayer({
+    currentSong,
+    queue,
+    isPlaying
+  });
+
+  // Fonctions exposées à travers le contexte - définies après les hooks
+  const { 
+    play, 
+    pause, 
+    updateVolume, 
+    updateProgress, 
+    updatePlaybackRate, 
     stopCurrentSong,
     refreshCurrentSong,
     getCurrentAudioElement
-  } = useAudioControl({
+  } = useAudioControl({ 
     audioRef,
     nextAudioRef,
     currentSong,
     setCurrentSong,
-    isChangingSong,
+    isChangingSong, 
     setIsChangingSong,
     volume,
     setIsPlaying,
@@ -92,135 +99,258 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  const {
-    queue,
-    setQueue,
-    shuffleMode,
-    repeatMode,
-    toggleShuffle,
-    toggleRepeat,
-    addToQueue
-  } = usePlayerQueue({
-    currentSong,
-    isChangingSong,
-    setIsChangingSong,
-    play
-  });
+  // Restauration de la lecture au chargement
+  useEffect(() => {
+    const restorePlayback = async () => {
+      const savedSong = localStorage.getItem('currentSong');
+      const savedProgress = localStorage.getItem('audioProgress');
+      
+      if (savedSong) {
+        const song = JSON.parse(savedSong);
+        try {
+          const audioUrl = await getAudioFileUrl(song.url);
+          if (!audioUrl || typeof audioUrl !== 'string') return;
 
-  const {
-    favorites,
-    favoriteStats,
-    toggleFavorite,
-    removeFavorite
-  } = usePlayerFavorites();
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+          
+          if (savedProgress) {
+            audioRef.current.currentTime = parseFloat(savedProgress);
+          }
 
-  const {
-    settings: equalizerSettings,
-    presets: equalizerPresets,
-    currentPreset: currentEqualizerPreset,
-    isEnabled: isEqualizerEnabled,
-    isInitialized: isEqualizerInitialized,
-    updateBand: updateEqualizerBand,
-    applyPreset: applyEqualizerPreset,
-    toggleEnabled: toggleEqualizer,
-    resetEqualizer,
-    setPreAmp: setEqualizerPreAmp,
-    initializeAudioContext: initializeEqualizer
-  } = useEqualizer({ audioElement: audioRef.current });
-
-  // Hook pour le système instantané optimisé
-  const { getInstantAudioUrl, getStreamingStats, clearNotFoundCache } = useInstantPlayer({
-    currentSong,
-    queue,
-    isPlaying
-  });
-
-  // Navigation optimisée avec gestion d'erreur
-  const nextSong = useCallback(async () => {
-    const savedQueue = localStorage.getItem('queue');
-    if (!savedQueue || !currentSong) return;
-    
-    const queueArray = JSON.parse(savedQueue);
-    const currentIndex = queueArray.findIndex((s: Song) => s.id === currentSong.id);
-    
-    if (currentIndex !== -1 && currentIndex + 1 < queueArray.length) {
-      const next = queueArray[currentIndex + 1];
-      console.log("⏭️ Chanson suivante instantanée:", next.title);
-      try {
-        await play(next);
-      } catch (error) {
-        console.error("❌ Erreur lecture chanson suivante:", error);
-        // Essayer la chanson d'après si celle-ci échoue
-        if (currentIndex + 2 < queueArray.length) {
-          const nextNext = queueArray[currentIndex + 2];
-          console.log("🔄 Tentative chanson suivante:", nextNext.title);
-          await play(nextNext);
+          setCurrentSong(song);
+          const updatedQueue = [...queue];
+          if (!updatedQueue.some(s => s.id === song.id)) {
+            updatedQueue.unshift(song);
+          }
+          setQueue(updatedQueue);
+        } catch (error) {
+          console.error("Erreur lors de la restauration de la lecture:", error);
+          localStorage.removeItem('currentSong');
+          localStorage.removeItem('audioProgress');
         }
       }
-    }
-  }, [currentSong, play]);
+    };
 
-  const previousSong = useCallback(async () => {
-    const savedQueue = localStorage.getItem('queue');
-    if (!savedQueue || !currentSong) return;
-    
-    const queueArray = JSON.parse(savedQueue);
-    const currentIndex = queueArray.findIndex((s: Song) => s.id === currentSong.id);
-    
-    if (currentIndex > 0) {
-      const previous = queueArray[currentIndex - 1];
-      console.log("⏮️ Chanson précédente instantanée:", previous.title);
-      try {
-        await play(previous);
-      } catch (error) {
-        console.error("❌ Erreur lecture chanson précédente:", error);
-        // Essayer la chanson d'avant si celle-ci échoue
-        if (currentIndex > 1) {
-          const prevPrev = queueArray[currentIndex - 2];
-          console.log("🔄 Tentative chanson précédente:", prevPrev.title);
-          await play(prevPrev);
+    restorePlayback();
+  }, []);
+
+  // Persistance des données
+  useEffect(() => {
+    if (currentSong) {
+      localStorage.setItem('currentSong', JSON.stringify(currentSong));
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    localStorage.setItem('queue', JSON.stringify(queue));
+  }, [queue]);
+
+  // Logique de crossfade et de fin de piste
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (!audioRef.current || !currentSong || !preferences.crossfadeEnabled || fadingRef.current) {
+        return;
+      }
+
+      const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
+      
+      if (timeLeft <= overlapTimeRef.current && timeLeft > 0 && !fadingRef.current) {
+        console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${overlapTimeRef.current}s`);
+        
+        const nextSong = getNextSong();
+        if (!nextSong) {
+          console.log("Pas de chanson suivante disponible");
+          return;
+        }
+
+        fadingRef.current = true;
+        
+        const alertElement = document.getElementById('next-song-alert');
+        const titleElement = document.getElementById('next-song-title');
+        const artistElement = document.getElementById('next-song-artist');
+
+        if (alertElement && titleElement && artistElement) {
+          titleElement.textContent = nextSong.title;
+          artistElement.textContent = nextSong.artist;
+          alertElement.classList.remove('opacity-0', 'translate-y-2');
+          alertElement.classList.add('opacity-100', 'translate-y-0');
+
+          setTimeout(() => {
+            alertElement.classList.add('opacity-0', 'translate-y-2');
+            alertElement.classList.remove('opacity-100', 'translate-y-0');
+          }, 3000);
+        }
+
+        if (!nextAudioRef.current.src || !nextSongPreloaded) {
+          console.log("La prochaine chanson n'est pas préchargée correctement, préchargement forcé");
+          preloadNextTracks().then(() => {
+            startCrossfade(timeLeft, nextSong);
+          });
+        } else {
+          startCrossfade(timeLeft, nextSong);
         }
       }
-    }
-  }, [currentSong, play]);
+    };
+    
+    const startCrossfade = (timeLeft: number, nextSong: Song) => {
+      console.log(`Début du fondu enchaîné pour ${nextSong.title}`);
+      
+      nextAudioRef.current.volume = 0;
+      const playPromise = nextAudioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          console.log("Lecture de la prochaine chanson démarrée avec succès");
+          
+          const fadeDuration = Math.min(timeLeft * 1000, overlapTimeRef.current * 1000);
+          const steps = Math.max(50, fadeDuration / 20);
+          const intervalTime = fadeDuration / steps;
+          const volumeStep = (volume / 100) / steps;
+          
+          console.log(`Paramètres du fondu: durée=${fadeDuration}ms, étapes=${steps}, intervalleTemps=${intervalTime}ms, pas de volume=${volumeStep}`);
+          
+          let currentOutVolume = audioRef.current.volume;
+          let currentInVolume = 0;
+          let stepCount = 0;
+          
+          if (fadeIntervalRef.current) {
+            clearInterval(fadeIntervalRef.current);
+          }
+          
+          fadeIntervalRef.current = window.setInterval(() => {
+            stepCount++;
+            
+            if (currentOutVolume > 0 || currentInVolume < (volume / 100)) {
+              currentOutVolume = Math.max(0, currentOutVolume - volumeStep);
+              currentInVolume = Math.min(volume / 100, currentInVolume + volumeStep);
+              
+              if (audioRef.current) audioRef.current.volume = currentOutVolume;
+              if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
+              
+              if (stepCount % 10 === 0) {
+                console.log(`Progression du fondu: out=${Math.round(currentOutVolume*100)}%, in=${Math.round(currentInVolume*100)}%, étape=${stepCount}`);
+              }
+            } else {
+              console.log("Fondu enchaîné terminé, passage à la chanson suivante");
+              
+              if (fadeIntervalRef.current) {
+                clearInterval(fadeIntervalRef.current);
+                fadeIntervalRef.current = null;
+              }
+              
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+              }
+              
+              const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+              const nextTrack = queue[currentIndex + 1];
+              if (nextTrack) {
+                const tempAudio = audioRef.current;
+                audioRef.current = nextAudioRef.current;
+                nextAudioRef.current = tempAudio;
+                nextAudioRef.current.src = '';
+                setCurrentSong(nextTrack);
+                localStorage.setItem('currentSong', JSON.stringify(nextTrack));
+                setNextSongPreloaded(false);
+                fadingRef.current = false;
+                
+                if ('mediaSession' in navigator) {
+                  updateMediaSessionMetadata(nextTrack);
+                  console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
+                }
+                
+                setTimeout(() => preloadNextTracks(), 1000);
+              }
+            }
+          }, intervalTime);
+        }).catch(error => {
+          console.error("Erreur lors du démarrage du fondu:", error);
+          fadingRef.current = false;
+          toast.error("Erreur lors de la transition entre les pistes");
+        });
+      }
+    };
 
-  const handleVolumeChange = useCallback((newVolume: number) => {
-    setVolume(newVolume);
-    updateVolume(newVolume);
-  }, [setVolume, updateVolume]);
+    const handleEnded = () => {
+      console.log("Chanson terminée, fondu en cours:", fadingRef.current);
+      
+      if (!fadingRef.current) {
+        console.log("Lecture terminée naturellement sans crossfade");
+        setProgress(0);
+        
+        if (repeatMode === 'one') {
+          console.log("Répétition de la chanson actuelle");
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(err => console.error("Erreur lors de la répétition:", err));
+        } else {
+          const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+          const nextTrack = queue[currentIndex + 1];
+          
+          if (nextTrack) {
+            console.log("Passage à la chanson suivante:", nextTrack.title);
+            
+            if ('mediaSession' in navigator) {
+              updateMediaSessionMetadata(nextTrack);
+              console.log("Métadonnées MediaSession mises à jour lors du passage automatique:", nextTrack.title);
+            }
+            
+            play(nextTrack);
+          } else if (repeatMode === 'all' && queue.length > 0) {
+            console.log("Répétition de la playlist depuis le début");
+            
+            if ('mediaSession' in navigator) {
+              updateMediaSessionMetadata(queue[0]);
+              console.log("Métadonnées MediaSession mises à jour lors de la répétition de playlist:", queue[0].title);
+            }
+            
+            play(queue[0]);
+          } else {
+            console.log("Fin de la playlist");
+            setIsPlaying(false);
+          }
+        }
+      }
+    };
 
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+      
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+      }
+    };
+  }, [currentSong, nextSongPreloaded, queue, play, repeatMode, preferences.crossfadeEnabled, volume]);
+
+  // Fonction pour supprimer une chanson de toutes les listes
   const removeSong = useCallback((songId: string) => {
+    if (currentSong?.id === songId) {
+      stopCurrentSong();
+      setCurrentSong(null);
+      localStorage.removeItem('currentSong');
+    }
+    
     setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
-  }, [setQueue]);
-
-  // Préchargement automatique optimisé
-  useEffect(() => {
-    if (currentSong && isPlaying) {
-      // Délai ultra-court pour le préchargement
-      const timeout = setTimeout(() => {
-        preloadNextTracks();
-      }, 15); // 15ms seulement
-      
-      return () => clearTimeout(timeout);
+    setHistory(prevHistory => prevHistory.filter(song => song.id !== songId));
+    
+    if (favorites.some(song => song.id === songId)) {
+      removeFavorite(songId);
     }
-  }, [currentSong, isPlaying, preloadNextTracks]);
+    
+    toast.success("La chanson a été supprimée de votre bibliothèque");
+  }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // Préchargement de la queue optimisé et plus conservateur
-  useEffect(() => {
-    if (queue.length > 0 && currentSong) {
-      // Préchargement moins agressif de la queue visible
-      const timeout = setTimeout(async () => {
-        // Seulement 8 chansons pour éviter la surcharge
-        const visibleSongs = queue.slice(0, 8);
-        console.log("🎯 Préchargement queue conservateur:", visibleSongs.length);
-        await InstantStreaming.prefetchNext(visibleSongs.map(s => s.url));
-      }, 400); // 400ms pour laisser le temps à la lecture principale
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [queue, currentSong]);
-
-  const contextValue: PlayerContextType = {
+  // L'objet context complet avec l'égaliseur
+  const playerContext: PlayerContextType = {
     currentSong,
     isPlaying,
     progress,
@@ -234,46 +364,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playbackRate,
     history,
     isChangingSong,
-    play,
-    pause,
-    setVolume: handleVolumeChange,
-    setProgress: updateProgress,
-    nextSong,
-    previousSong,
-    addToQueue,
+    stopCurrentSong,
     removeSong,
     setQueue,
     setHistory,
+    play,
+    pause,
+    setVolume,
+    setProgress,
+    nextSong,
+    previousSong,
+    addToQueue,
     toggleShuffle,
     toggleRepeat,
     toggleFavorite,
     removeFavorite,
     setSearchQuery,
     setPlaybackRate: updatePlaybackRate,
-    stopCurrentSong,
     refreshCurrentSong,
     getCurrentAudioElement,
-    equalizerSettings,
-    equalizerPresets,
-    currentEqualizerPreset,
-    isEqualizerEnabled,
-    isEqualizerInitialized,
-    updateEqualizerBand,
-    applyEqualizerPreset,
-    toggleEqualizer,
-    resetEqualizer,
-    setEqualizerPreAmp,
-    initializeEqualizer
+    equalizerSettings: equalizer.settings,
+    equalizerPresets: equalizer.presets,
+    currentEqualizerPreset: equalizer.currentPreset,
+    isEqualizerEnabled: equalizer.isEnabled,
+    isEqualizerInitialized: equalizer.isInitialized,
+    updateEqualizerBand: equalizer.updateBand,
+    applyEqualizerPreset: equalizer.applyPreset,
+    toggleEqualizer: equalizer.toggleEnabled,
+    resetEqualizer: equalizer.resetEqualizer,
+    setEqualizerPreAmp: equalizer.setPreAmp,
+    initializeEqualizer: equalizer.initializeAudioContext
   };
 
   return (
-    <PlayerContext.Provider value={contextValue}>
+    <PlayerContext.Provider value={playerContext}>
       {children}
     </PlayerContext.Provider>
   );
 };
 
-export const usePlayer = (): PlayerContextType => {
+export const usePlayer = () => {
   const context = useContext(PlayerContext);
   if (!context) {
     throw new Error('usePlayer must be used within a PlayerProvider');
@@ -281,5 +411,12 @@ export const usePlayer = (): PlayerContextType => {
   return context;
 };
 
-// Export both for backward compatibility
-export const usePlayerContext = usePlayer;
+export const usePlayerContext = () => {
+  const context = useContext(PlayerContext);
+  if (!context) {
+    throw new Error("usePlayerContext must be used within a PlayerProvider");
+  }
+  return context;
+};
+
+export default PlayerProvider;
