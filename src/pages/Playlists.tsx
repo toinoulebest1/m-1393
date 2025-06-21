@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { Player } from "@/components/Player";
+import { Layout } from "@/components/Layout";
 import { formatRelativeTime } from "@/utils/dateUtils";
 
 interface Playlist {
@@ -490,140 +491,142 @@ const PlaylistsPage = () => {
   const sharedPlaylists = playlists.filter(p => p.user_id !== currentUserId);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-8 pb-32">
-          {/* Enhanced Header */}
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div className="space-y-2">
-                <h1 className="text-4xl font-bold text-white tracking-tight bg-gradient-to-r from-white to-spotify-accent bg-clip-text text-transparent">
-                  {t('playlists.title')}
-                </h1>
-                <p className="text-spotify-neutral text-lg">
-                  Organisez votre musique en collections personnalisées
-                </p>
+    <Layout>
+      <div className="w-full h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-8 pb-32">
+            {/* Enhanced Header */}
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-8">
+                <div className="space-y-2">
+                  <h1 className="text-4xl font-bold text-white tracking-tight bg-gradient-to-r from-white to-spotify-accent bg-clip-text text-transparent">
+                    {t('playlists.title')}
+                  </h1>
+                  <p className="text-spotify-neutral text-lg">
+                    Organisez votre musique en collections personnalisées
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <CreatePlaylistDialog onCreated={fetchPlaylists} />
+                  
+                  {playlists.length > 0 && (
+                    <Button
+                      variant="outline"
+                      className="border-spotify-border hover:bg-spotify-card text-white"
+                    >
+                      <Shuffle className="w-4 h-4 mr-2" />
+                      Lecture aléatoire
+                    </Button>
+                  )}
+                </div>
               </div>
               
-              <div className="flex items-center gap-4">
-                <CreatePlaylistDialog onCreated={fetchPlaylists} />
-                
-                {playlists.length > 0 && (
-                  <Button
-                    variant="outline"
-                    className="border-spotify-border hover:bg-spotify-card text-white"
-                  >
-                    <Shuffle className="w-4 h-4 mr-2" />
-                    Lecture aléatoire
-                  </Button>
-                )}
-              </div>
+              {/* Stats Section */}
+              {playlists.length > 0 && (
+                <div className="flex items-center gap-6 text-sm text-spotify-neutral bg-spotify-card/30 p-4 rounded-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-2">
+                    <Music2 className="w-4 h-4" />
+                    <span>{ownedPlaylists.length} {ownedPlaylists.length > 1 ? 'playlists créées' : 'playlist créée'}</span>
+                  </div>
+                  {sharedPlaylists.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>{sharedPlaylists.length} {sharedPlaylists.length > 1 ? 'playlists partagées' : 'playlist partagée'}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Play className="w-4 h-4" />
+                    <span>{playlists.reduce((total, playlist) => total + (playlist.song_count || 0), 0)} titres au total</span>
+                  </div>
+                </div>
+              )}
             </div>
             
-            {/* Stats Section */}
-            {playlists.length > 0 && (
-              <div className="flex items-center gap-6 text-sm text-spotify-neutral bg-spotify-card/30 p-4 rounded-lg backdrop-blur-sm">
-                <div className="flex items-center gap-2">
-                  <Music2 className="w-4 h-4" />
-                  <span>{ownedPlaylists.length} {ownedPlaylists.length > 1 ? 'playlists créées' : 'playlist créée'}</span>
-                </div>
-                {sharedPlaylists.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span>{sharedPlaylists.length} {sharedPlaylists.length > 1 ? 'playlists partagées' : 'playlist partagée'}</span>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="space-y-4 animate-pulse">
+                    <Skeleton className="h-56 w-full rounded-xl" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Mes Playlists */}
+                {ownedPlaylists.length > 0 && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-6">Mes playlists</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                      {ownedPlaylists.map((playlist, index) => (
+                        <div
+                          key={playlist.id}
+                          style={{ 
+                            animation: `fadeIn 0.3s ease-out forwards ${index * 100}ms`,
+                            opacity: 0,
+                          }}
+                        >
+                          <PlaylistCard 
+                            playlist={playlist} 
+                            onDeleted={handlePlaylistDeleted}
+                            currentUserId={currentUserId}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <Play className="w-4 h-4" />
-                  <span>{playlists.reduce((total, playlist) => total + (playlist.song_count || 0), 0)} titres au total</span>
-                </div>
+
+                {/* Playlists Partagées */}
+                {sharedPlaylists.length > 0 && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-6">Playlists partagées avec moi</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                      {sharedPlaylists.map((playlist, index) => (
+                        <div
+                          key={playlist.id}
+                          style={{ 
+                            animation: `fadeIn 0.3s ease-out forwards ${(ownedPlaylists.length + index) * 100}ms`,
+                            opacity: 0,
+                          }}
+                        >
+                          <PlaylistCard 
+                            playlist={playlist} 
+                            onDeleted={handlePlaylistDeleted}
+                            currentUserId={currentUserId}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {ownedPlaylists.length === 0 && sharedPlaylists.length === 0 && (
+                  <div className="text-center py-20">
+                    <div className="space-y-6 animate-fade-in p-8 rounded-2xl bg-gradient-to-br from-spotify-card/30 to-transparent backdrop-blur-sm border border-spotify-border/20">
+                      <div className="w-20 h-20 bg-gradient-to-br from-spotify-accent/20 to-spotify-accent/5 rounded-2xl flex items-center justify-center mx-auto">
+                        <Music2 className="w-10 h-10 text-spotify-accent" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-semibold text-white">{t('playlists.empty')}</h3>
+                        <p className="text-spotify-neutral max-w-md mx-auto">
+                          {t('playlists.createFirst')}
+                        </p>
+                      </div>
+                      <CreatePlaylistDialog onCreated={fetchPlaylists} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-          
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="space-y-4 animate-pulse">
-                  <Skeleton className="h-56 w-full rounded-xl" />
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* Mes Playlists */}
-              {ownedPlaylists.length > 0 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-6">Mes playlists</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                    {ownedPlaylists.map((playlist, index) => (
-                      <div
-                        key={playlist.id}
-                        style={{ 
-                          animation: `fadeIn 0.3s ease-out forwards ${index * 100}ms`,
-                          opacity: 0,
-                        }}
-                      >
-                        <PlaylistCard 
-                          playlist={playlist} 
-                          onDeleted={handlePlaylistDeleted}
-                          currentUserId={currentUserId}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Playlists Partagées */}
-              {sharedPlaylists.length > 0 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-6">Playlists partagées avec moi</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                    {sharedPlaylists.map((playlist, index) => (
-                      <div
-                        key={playlist.id}
-                        style={{ 
-                          animation: `fadeIn 0.3s ease-out forwards ${(ownedPlaylists.length + index) * 100}ms`,
-                          opacity: 0,
-                        }}
-                      >
-                        <PlaylistCard 
-                          playlist={playlist} 
-                          onDeleted={handlePlaylistDeleted}
-                          currentUserId={currentUserId}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Empty State */}
-              {ownedPlaylists.length === 0 && sharedPlaylists.length === 0 && (
-                <div className="text-center py-20">
-                  <div className="space-y-6 animate-fade-in p-8 rounded-2xl bg-gradient-to-br from-spotify-card/30 to-transparent backdrop-blur-sm border border-spotify-border/20">
-                    <div className="w-20 h-20 bg-gradient-to-br from-spotify-accent/20 to-spotify-accent/5 rounded-2xl flex items-center justify-center mx-auto">
-                      <Music2 className="w-10 h-10 text-spotify-accent" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-semibold text-white">{t('playlists.empty')}</h3>
-                      <p className="text-spotify-neutral max-w-md mx-auto">
-                        {t('playlists.createFirst')}
-                      </p>
-                    </div>
-                    <CreatePlaylistDialog onCreated={fetchPlaylists} />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
+        <Player />
       </div>
-      <Player />
-    </div>
+    </Layout>
   );
 };
 
