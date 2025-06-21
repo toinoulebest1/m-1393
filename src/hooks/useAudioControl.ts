@@ -1,5 +1,4 @@
-
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
@@ -34,6 +33,51 @@ export const useAudioControl = ({
   setNextSongPreloaded,
   preloadNextTracks
 }: UseAudioControlProps) => {
+
+  // S'assurer que l'élément audio est correctement initialisé et attaché au DOM
+  useEffect(() => {
+    const initializeAudio = () => {
+      // Vérifier si l'audio est déjà dans le DOM
+      let existingAudio = document.getElementById('main-audio-player') as HTMLAudioElement;
+      
+      if (!existingAudio) {
+        console.log("🎵 Création de l'élément audio principal");
+        
+        // Créer un nouvel élément audio et l'ajouter au DOM
+        const audio = document.createElement('audio');
+        audio.id = 'main-audio-player';
+        audio.preload = 'auto';
+        audio.crossOrigin = 'anonymous';
+        audio.style.display = 'none';
+        
+        // L'ajouter au DOM
+        document.body.appendChild(audio);
+        
+        // Mettre à jour la référence
+        audioRef.current = audio;
+        existingAudio = audio;
+      } else {
+        // Utiliser l'élément existant
+        audioRef.current = existingAudio;
+      }
+      
+      // Configuration de base
+      existingAudio.volume = volume / 100;
+      
+      console.log("✅ Élément audio principal initialisé:", existingAudio.id);
+    };
+
+    initializeAudio();
+    
+    // Nettoyage au démontage
+    return () => {
+      const audioElement = document.getElementById('main-audio-player');
+      if (audioElement && audioElement.parentNode) {
+        audioElement.parentNode.removeChild(audioElement);
+        console.log("🧹 Élément audio principal nettoyé");
+      }
+    };
+  }, [volume]);
 
   const play = useCallback(async (song?: Song) => {
     if (isChangingSong) {
