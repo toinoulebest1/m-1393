@@ -15,6 +15,7 @@ class MemoryCache {
   private metadata = new Map<string, MemoryCacheEntry>();
   private maxSize = 50; // Maximum 50 URLs en mémoire
   private ttl = 30 * 60 * 1000; // 30 minutes TTL
+  private preloadingUrls = new Set<string>(); // Suivi des URLs en cours de préchargement
 
   /**
    * Vérification ultra-rapide (< 1ms)
@@ -103,6 +104,7 @@ class MemoryCache {
   delete(songUrl: string): void {
     this.cache.delete(songUrl);
     this.metadata.delete(songUrl);
+    this.preloadingUrls.delete(songUrl);
   }
 
   /**
@@ -124,6 +126,7 @@ class MemoryCache {
     return {
       size: this.cache.size,
       maxSize: this.maxSize,
+      preloadingCount: this.preloadingUrls.size,
       entries: Array.from(this.metadata.values()).map(entry => ({
         url: entry.url,
         age: Date.now() - entry.timestamp,
@@ -134,63 +137,66 @@ class MemoryCache {
   }
 
   /**
-   * Préchargement en lot
+   * Préchargement en lot ultra-optimisé avec protection contre les doublons
    */
   async preloadBatch(urls: string[]): Promise<void> {
     if (urls.length === 0) return;
     
-    console.log("🎯 Préchargement batch optimisé:", urls.length, "URLs");
+    console.log("🎯 Préchargement batch ultra-optimisé:", urls.length, "URLs");
     
-    // Filtrer les URLs déjà en cache
-    const urlsToPreload = urls.filter(url => !this.cache.has(url));
+    // Filtrer les URLs déjà en cache ou en cours de préchargement
+    const urlsToPreload = urls.filter(url => 
+      !this.cache.has(url) && !this.preloadingUrls.has(url)
+    );
     
     if (urlsToPreload.length === 0) {
-      console.log("✅ Toutes les URLs sont déjà en cache");
+      console.log("✅ Toutes les URLs sont déjà en cache ou en cours de préchargement");
       return;
     }
     
     console.log("📦 URLs à précharger:", urlsToPreload.length);
     
-    // Traiter les URLs par petits batches pour éviter la surcharge
-    const batchSize = 2; // Réduire la taille des batches
-    const promises: Promise<void>[] = [];
+    // Marquer les URLs comme en cours de préchargement
+    urlsToPreload.forEach(url => this.preloadingUrls.add(url));
     
-    for (let i = 0; i < urlsToPreload.length; i += batchSize) {
-      const batch = urlsToPreload.slice(i, i + batchSize);
-      
-      const batchPromise = Promise.allSettled(
-        batch.map(async (url, index) => {
-          try {
-            // Délai échelonné plus long pour éviter les conflits
-            await new Promise(resolve => setTimeout(resolve, index * 500));
-            
-            // Vérifier si déjà en cache avant de précharger
-            if (this.cache.has(url)) {
-              console.log("⚡ Déjà en cache:", url);
-              return;
-            }
-            
-            const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
-            this.set(url, audioUrl);
-            console.log("✅ Préchargé:", url);
-          } catch (error) {
-            console.warn("⚠️ Échec préchargement:", url, error);
+    try {
+      // Traiter seulement 1 URL à la fois pour éviter la surcharge
+      for (let i = 0; i < urlsToPreload.length; i++) {
+        const url = urlsToPreload[i];
+        
+        try {
+          // Vérifier encore une fois si pas déjà en cache
+          if (this.cache.has(url)) {
+            console.log("⚡ Déjà en cache pendant le préchargement:", url);
+            continue;
           }
-        })
-      ).then(() => {
-        // Promise résolue sans valeur de retour
-      });
-      
-      promises.push(batchPromise);
-      
-      // Délai entre les batches
-      if (i + batchSize < urlsToPreload.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Délai progressif pour éviter la surcharge
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * i));
+          }
+          
+          const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
+          
+          // Vérifier si toujours pas en cache après le délai
+          if (!this.cache.has(url)) {
+            this.set(url, audioUrl);
+            console.log("✅ Préchargé avec succès:", url);
+          }
+        } catch (error) {
+          console.warn("⚠️ Échec préchargement (ignoré):", url, error);
+          // Ne pas loguer d'erreur pour éviter le spam console
+        } finally {
+          // Retirer de la liste des préchargements en cours
+          this.preloadingUrls.delete(url);
+        }
       }
+    } finally {
+      // Nettoyer toutes les URLs en cours de préchargement
+      urlsToPreload.forEach(url => this.preloadingUrls.delete(url));
     }
     
-    await Promise.allSettled(promises);
-    console.log("🎯 Préchargement batch terminé");
+    console.log("🎯 Préchargement batch terminé silencieusement");
   }
 }
 
