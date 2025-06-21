@@ -1,139 +1,100 @@
 
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { MusicUploader } from "./MusicUploader";
-import { ThemeToggle } from "./ThemeToggle";
-import { AdBanner } from "./AdBanner";
-import { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { 
+  Home, 
+  Upload, 
+  Library, 
+  Settings, 
+  ChevronLeft,
+  Shield,
+  Cloud
+} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
-export const Sidebar = () => {
+const Sidebar = () => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
-
-      setIsAdmin(userRole?.role === 'admin');
-    };
-
-    checkAdminStatus();
-  }, []);
-
-  const links = [
-    { to: "/", icon: Home, label: t('common.home') },
-    { to: "/search", icon: Search, label: t('common.search') },
-    { to: "/playlists", icon: ListMusic, label: t('common.playlists') },
-    { to: "/favorites", icon: Heart, label: t('common.favorites') },
-    { to: "/history", icon: History, label: t('common.history') },
-    { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
+  const menuItems = [
+    {
+      title: "Accueil",
+      icon: Home,
+      href: "/",
+    },
+    {
+      title: "Upload",
+      icon: Upload,
+      href: "/upload",
+    },
+    {
+      title: "Bibliothèque",
+      icon: Library,
+      href: "/library",
+    },
+    {
+      title: "Paramètres",
+      icon: Settings,
+      href: "/settings",
+    },
+    {
+      title: "Admin",
+      icon: Shield,
+      href: "/admin",
+    },
+    {
+      title: "Dropbox",
+      icon: Cloud,
+      href: "/dropbox",
+    },
   ];
 
-  if (isAdmin) {
-    links.push({ to: "/reports", icon: Flag, label: t('common.reports') });
-    links.push({ to: "/metadata-update", icon: Database, label: t('common.metadata') });
-    links.push({ to: "/onedrive-settings", icon: CloudUpload, label: "OneDrive" });
-    links.push({ to: "/maintenance-admin", icon: Settings, label: "Maintenance" });
-  }
-
-  const handleLanguageChange = (value: string) => {
-    i18n.changeLanguage(value);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-      toast.success(t('common.logoutSuccess'));
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-      toast.error(t('common.logoutError'));
-    }
-  };
-
   return (
-    <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
-      <div className="mb-8">
-        <div className="flex items-center gap-2">
-          <Music2 className="w-8 h-8 text-spotify-accent" />
-          <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
-        </div>
+    <div className={cn(
+      "relative flex flex-col h-full bg-card border-r transition-all duration-300",
+      isCollapsed ? "w-16" : "w-64"
+    )}>
+      <div className="flex items-center justify-between p-4">
+        {!isCollapsed && (
+          <h2 className="text-lg font-semibold">Menu</h2>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className={cn(
+            "h-8 w-8",
+            isCollapsed && "rotate-180"
+          )}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
       </div>
 
-      <nav className="space-y-2">
-        {links.map(({ to, icon: Icon, label }) => (
-          <Link
-            key={to}
-            to={to}
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors",
-              location.pathname === to
-                ? "bg-spotify-accent text-white"
-                : "text-spotify-neutral hover:text-white hover:bg-white/10"
-            )}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="font-medium">{label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="mt-8 space-y-4 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
-          <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
-            <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
-              <SelectValue placeholder={t('common.language')} />
-            </SelectTrigger>
-            <SelectContent className="bg-spotify-dark border-white/10">
-              <SelectItem value="fr" className="text-spotify-neutral hover:text-white cursor-pointer">
-                Français
-              </SelectItem>
-              <SelectItem value="en" className="text-spotify-neutral hover:text-white cursor-pointer">
-                English
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          <ThemeToggle />
-
-          <MusicUploader />
+      <nav className="flex-1 space-y-2 p-2">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.href;
           
-          <AdBanner />
-        </div>
-
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/5"
-            onClick={handleLogout}
-          >
-            <LogOut className="w-5 h-5 mr-2" />
-            <span>{t('common.logout')}</span>
-          </Button>
-        </div>
-      </div>
+          return (
+            <Link key={item.href} to={item.href}>
+              <Button
+                variant={isActive ? "secondary" : "ghost"}
+                className={cn(
+                  "w-full justify-start",
+                  isCollapsed && "px-2"
+                )}
+              >
+                <Icon className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                {!isCollapsed && item.title}
+              </Button>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 };
+
+export default Sidebar;
