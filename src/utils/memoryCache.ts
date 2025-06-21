@@ -1,6 +1,7 @@
+
 /**
  * Cache mémoire ultra-rapide pour les URLs audio
- * Complète le cache IndexedDB pour des accès sub-milliseconde
+ * Version ultra-conservatrice pour éviter les erreurs console
  */
 
 interface MemoryCacheEntry {
@@ -13,14 +14,20 @@ interface MemoryCacheEntry {
 class MemoryCache {
   private cache = new Map<string, string>();
   private metadata = new Map<string, MemoryCacheEntry>();
-  private maxSize = 50; // Maximum 50 URLs en mémoire
-  private ttl = 30 * 60 * 1000; // 30 minutes TTL
+  private maxSize = 20; // Réduit pour être plus conservateur
+  private ttl = 20 * 60 * 1000; // 20 minutes TTL
   private preloadingUrls = new Set<string>(); // Suivi des URLs en cours de préchargement
+  private failedUrls = new Set<string>(); // URLs qui ont échoué
 
   /**
    * Vérification ultra-rapide (< 1ms)
    */
   has(songUrl: string): boolean {
+    // Si l'URL a déjà échoué, retourner false immédiatement
+    if (this.failedUrls.has(songUrl)) {
+      return false;
+    }
+    
     const entry = this.metadata.get(songUrl);
     if (!entry) return false;
     
@@ -58,6 +65,9 @@ class MemoryCache {
    * Ajout avec éviction LRU intelligente
    */
   set(songUrl: string, audioUrl: string): void {
+    // Retirer des URLs échouées si succès
+    this.failedUrls.delete(songUrl);
+    
     // Éviction si cache plein
     if (this.cache.size >= this.maxSize && !this.cache.has(songUrl)) {
       this.evictLeastUsed();
@@ -108,6 +118,14 @@ class MemoryCache {
   }
 
   /**
+   * Marquer une URL comme échouée
+   */
+  markAsFailed(songUrl: string): void {
+    this.failedUrls.add(songUrl);
+    this.delete(songUrl); // Supprimer du cache principal
+  }
+
+  /**
    * Nettoyage des entrées expirées
    */
   cleanup(): void {
@@ -116,6 +134,11 @@ class MemoryCache {
       if (now - entry.timestamp > this.ttl) {
         this.delete(key);
       }
+    }
+    
+    // Nettoyer les URLs échouées si trop nombreuses
+    if (this.failedUrls.size > 50) {
+      this.failedUrls.clear();
     }
   }
 
@@ -127,6 +150,7 @@ class MemoryCache {
       size: this.cache.size,
       maxSize: this.maxSize,
       preloadingCount: this.preloadingUrls.size,
+      failedUrls: this.failedUrls.size,
       entries: Array.from(this.metadata.values()).map(entry => ({
         url: entry.url,
         age: Date.now() - entry.timestamp,
@@ -137,73 +161,55 @@ class MemoryCache {
   }
 
   /**
-   * Préchargement en lot ultra-optimisé avec protection contre les doublons
+   * Préchargement ultra-conservateur avec gestion silencieuse des erreurs
    */
   async preloadBatch(urls: string[]): Promise<void> {
     if (urls.length === 0) return;
     
-    console.log("🎯 Préchargement batch ultra-optimisé:", urls.length, "URLs");
-    
-    // Filtrer les URLs déjà en cache ou en cours de préchargement
+    // Filtrer les URLs déjà en cache ou échouées
     const urlsToPreload = urls.filter(url => 
-      !this.cache.has(url) && !this.preloadingUrls.has(url)
+      !this.cache.has(url) && 
+      !this.preloadingUrls.has(url) && 
+      !this.failedUrls.has(url)
     );
     
     if (urlsToPreload.length === 0) {
-      console.log("✅ Toutes les URLs sont déjà en cache ou en cours de préchargement");
-      return;
+      return; // Pas de log pour éviter le spam
     }
     
-    console.log("📦 URLs à précharger:", urlsToPreload.length);
-    
-    // Marquer les URLs comme en cours de préchargement
-    urlsToPreload.forEach(url => this.preloadingUrls.add(url));
-    
-    try {
-      // Traiter seulement 1 URL à la fois pour éviter la surcharge
-      for (let i = 0; i < urlsToPreload.length; i++) {
-        const url = urlsToPreload[i];
-        
-        try {
-          // Vérifier encore une fois si pas déjà en cache
-          if (this.cache.has(url)) {
-            console.log("⚡ Déjà en cache pendant le préchargement:", url);
-            continue;
-          }
-          
-          // Délai progressif pour éviter la surcharge
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * i));
-          }
-          
-          const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
-          
-          // Vérifier si toujours pas en cache après le délai
-          if (!this.cache.has(url)) {
-            this.set(url, audioUrl);
-            console.log("✅ Préchargé avec succès:", url);
-          }
-        } catch (error) {
-          console.warn("⚠️ Échec préchargement (ignoré):", url, error);
-          // Ne pas loguer d'erreur pour éviter le spam console
-        } finally {
-          // Retirer de la liste des préchargements en cours
-          this.preloadingUrls.delete(url);
-        }
+    // Traiter seulement 1 URL à la fois pour être ultra-conservateur
+    for (const url of urlsToPreload.slice(0, 1)) { // Seulement la première URL
+      if (this.preloadingUrls.has(url) || this.failedUrls.has(url)) {
+        continue;
       }
-    } finally {
-      // Nettoyer toutes les URLs en cours de préchargement
-      urlsToPreload.forEach(url => this.preloadingUrls.delete(url));
+      
+      this.preloadingUrls.add(url);
+      
+      try {
+        const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
+        
+        // Vérifier si toujours pas en cache après le délai
+        if (!this.cache.has(url)) {
+          this.set(url, audioUrl);
+        }
+      } catch (error) {
+        // Marquer comme échoué silencieusement
+        this.markAsFailed(url);
+        // Pas de log d'erreur pour éviter le spam console
+      } finally {
+        this.preloadingUrls.delete(url);
+      }
+      
+      // Une seule URL pour être ultra-conservateur
+      break;
     }
-    
-    console.log("🎯 Préchargement batch terminé silencieusement");
   }
 }
 
 // Instance singleton
 export const memoryCache = new MemoryCache();
 
-// Nettoyage automatique toutes les 5 minutes
+// Nettoyage automatique toutes les 10 minutes (plus conservateur)
 setInterval(() => {
   memoryCache.cleanup();
-}, 5 * 60 * 1000);
+}, 10 * 60 * 1000);
