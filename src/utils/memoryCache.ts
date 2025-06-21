@@ -1,4 +1,3 @@
-
 /**
  * Cache mémoire ultra-rapide pour les URLs audio
  * Complète le cache IndexedDB pour des accès sub-milliseconde
@@ -11,7 +10,7 @@ interface MemoryCacheEntry {
   accessCount: number;
 }
 
-class MemoryAudioCache {
+class MemoryCache {
   private cache = new Map<string, string>();
   private metadata = new Map<string, MemoryCacheEntry>();
   private maxSize = 50; // Maximum 50 URLs en mémoire
@@ -137,29 +136,66 @@ class MemoryAudioCache {
   /**
    * Préchargement en lot
    */
-  async preloadBatch(songUrls: string[]): Promise<void> {
-    console.log("🚀 Préchargement batch:", songUrls.length, "URLs");
+  async preloadBatch(urls: string[]): Promise<void> {
+    if (urls.length === 0) return;
     
-    const promises = songUrls.map(async (songUrl) => {
-      if (this.has(songUrl)) return; // Déjà en cache
+    console.log("🎯 Préchargement batch optimisé:", urls.length, "URLs");
+    
+    // Filtrer les URLs déjà en cache
+    const urlsToPreload = urls.filter(url => !this.cache.has(url));
+    
+    if (urlsToPreload.length === 0) {
+      console.log("✅ Toutes les URLs sont déjà en cache");
+      return;
+    }
+    
+    console.log("📦 URLs à précharger:", urlsToPreload.length);
+    
+    // Traiter les URLs par petits batches pour éviter la surcharge
+    const batchSize = 2; // Réduire la taille des batches
+    const promises: Promise<void>[] = [];
+    
+    for (let i = 0; i < urlsToPreload.length; i += batchSize) {
+      const batch = urlsToPreload.slice(i, i + batchSize);
       
-      try {
-        const { getAudioFileUrl } = await import('./storage');
-        const audioUrl = await getAudioFileUrl(songUrl);
-        if (audioUrl && typeof audioUrl === 'string') {
-          this.set(songUrl, audioUrl);
-        }
-      } catch (error) {
-        console.warn("⚠️ Erreur préchargement:", songUrl, error);
+      const batchPromise = Promise.allSettled(
+        batch.map(async (url, index) => {
+          try {
+            // Délai échelonné plus long pour éviter les conflits
+            await new Promise(resolve => setTimeout(resolve, index * 500));
+            
+            // Vérifier si déjà en cache avant de précharger
+            if (this.cache.has(url)) {
+              console.log("⚡ Déjà en cache:", url);
+              return;
+            }
+            
+            const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
+            this.set(url, audioUrl);
+            console.log("✅ Préchargé:", url);
+          } catch (error) {
+            console.warn("⚠️ Échec préchargement:", url, error);
+          }
+        })
+      ).then(() => {
+        // Promise résolue sans valeur de retour
+      });
+      
+      promises.push(batchPromise);
+      
+      // Délai entre les batches
+      if (i + batchSize < urlsToPreload.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-    });
+    }
     
     await Promise.allSettled(promises);
+    console.log("🎯 Préchargement batch terminé");
   }
 }
 
 // Instance singleton
-export const memoryCache = new MemoryAudioCache();
+export const memoryCache = new MemoryCache();
 
 // Nettoyage automatique toutes les 5 minutes
 setInterval(() => {
