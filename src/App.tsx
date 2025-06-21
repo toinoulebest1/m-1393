@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { PlayerProvider } from "@/contexts/PlayerContext";
+import { CastProvider } from "@/contexts/CastContext";
 import Index from "./pages/Index";
 import UploadMusic from "./pages/UploadMusic";
 import Library from "./pages/Library";
@@ -23,19 +24,21 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
           <PlayerProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/upload" element={<UploadMusic />} />
-                <Route path="/library" element={<Library />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/playlist/:id" element={<PlaylistDetail />} />
-                <Route path="/admin" element={<AdminPanel />} />
-                <Route path="/dropbox" element={<DropboxSettings />} />
-              </Routes>
-            </BrowserRouter>
+            <CastProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/upload" element={<UploadMusic />} />
+                  <Route path="/library" element={<Library />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/dropbox" element={<DropboxSettings />} />
+                </Routes>
+              </BrowserRouter>
+            </CastProvider>
           </PlayerProvider>
         </TooltipProvider>
       </ThemeProvider>
