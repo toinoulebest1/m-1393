@@ -218,7 +218,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 };
 
 const PlaylistDetail = () => {
-  const { playlistId } = useParams<{ playlistId: string }>();
+  const { id: playlistId } = useParams<{ id: string }>();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [songs, setSongs] = useState<PlaylistSong[]>([]);
   const [loading, setLoading] = useState(true);
