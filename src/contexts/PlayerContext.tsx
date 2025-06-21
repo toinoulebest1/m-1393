@@ -438,7 +438,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // L'objet context complet avec l'égaliseur - AJOUT isAudioReady
+  // L'objet context complet avec l'égaliseur - Fix type mapping
   const playerContext: PlayerContextType = {
     currentSong,
     isPlaying,
@@ -453,7 +453,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playbackRate,
     history,
     isChangingSong,
-    isAudioReady, // NOUVEAU
+    isAudioReady,
     stopCurrentSong,
     removeSong,
     setQueue,
@@ -473,8 +473,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setPlaybackRate: updatePlaybackRate,
     refreshCurrentSong,
     getCurrentAudioElement,
-    equalizerSettings: equalizer.settings,
-    equalizerPresets: equalizer.presets,
+    equalizerSettings: equalizer.settings.bands.map(band => band.gain),
+    equalizerPresets: Object.fromEntries(
+      Object.entries(equalizer.presets).map(([key, preset]) => [
+        key, 
+        Array.isArray(preset) ? preset : preset.settings.bands.map((band: any) => band.gain)
+      ])
+    ),
     currentEqualizerPreset: equalizer.currentPreset,
     isEqualizerEnabled: equalizer.isEnabled,
     isEqualizerInitialized: equalizer.isInitialized,

@@ -1,3 +1,4 @@
+
 export interface Song {
   id: string;
   title: string;
@@ -8,6 +9,19 @@ export interface Song {
   genre?: string;
   created_at?: string;
   user_id?: string;
+  bitrate?: string; // Add missing bitrate property
+}
+
+export interface FavoriteStat {
+  id: string;
+  songId: string;
+  count: number;
+  lastUpdated?: string;
+}
+
+export interface PlayerPreferences {
+  crossfadeEnabled: boolean;
+  crossfadeDuration: number;
 }
 
 export interface PlayerContextType {
@@ -24,7 +38,7 @@ export interface PlayerContextType {
   playbackRate: number;
   history: Song[];
   isChangingSong: boolean;
-  isAudioReady: boolean; // NOUVEAU
+  isAudioReady: boolean;
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (queue: Song[]) => void;
@@ -45,7 +59,7 @@ export interface PlayerContextType {
   refreshCurrentSong: () => void;
   getCurrentAudioElement: () => HTMLAudioElement;
   
-  // Equalizer properties
+  // Equalizer properties - Fix type mismatches
   equalizerSettings: number[];
   equalizerPresets: Record<string, number[]>;
   currentEqualizerPreset: string | null;
