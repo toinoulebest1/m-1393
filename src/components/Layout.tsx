@@ -1,6 +1,7 @@
 
-import { Sidebar } from "./Sidebar";
+import Sidebar from "./Sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,5 +25,3 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
     </div>
   );
 };
-
-import { cn } from "@/lib/utils";

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export const DropboxSettings = () => {
+const DropboxSettings = () => {
   const [config, setConfig] = useState(getDropboxConfig());
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState(0);
@@ -333,3 +332,5 @@ export const DropboxSettings = () => {
     </div>
   );
 };
+
+export default DropboxSettings;
