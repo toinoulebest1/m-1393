@@ -7,16 +7,25 @@ import { UltraFastCache } from './ultraFastCache';
 import { memoryCache } from './memoryCache';
 import { getAudioFileUrl } from './storage';
 
+// Cache des fichiers inexistants pour éviter les tentatives répétées
+const notFoundCache = new Set<string>();
+
 export class InstantStreaming {
   private static parallelFetches = new Map<string, Promise<string>>();
   private static prefetchQueue = new Set<string>();
   
   /**
-   * Récupération instantanée avec fetch parallèle optimisé
+   * Récupération instantanée avec gestion optimisée des erreurs
    */
   static async getInstantAudioUrl(songUrl: string): Promise<string> {
     const startTime = performance.now();
     console.log("⚡ === STREAMING INSTANTANÉ ===");
+    
+    // Vérifier d'abord si le fichier est connu comme inexistant
+    if (notFoundCache.has(songUrl)) {
+      console.log("🚫 Fichier connu comme inexistant, ignoré:", songUrl);
+      throw new Error(`Fichier inexistant: ${songUrl}`);
+    }
     
     // 1. Cache L0 ultra-rapide (< 0.1ms)
     const l0Result = UltraFastCache.getL0(songUrl);
@@ -50,20 +59,31 @@ export class InstantStreaming {
       return result;
     } catch (error) {
       this.parallelFetches.delete(songUrl);
+      
+      // Ajouter au cache des fichiers inexistants si c'est une erreur de fichier non trouvé
+      if (error instanceof Error && (
+        error.message.includes('not found') || 
+        error.message.includes('introuvable') ||
+        error.message.includes('File may not exist')
+      )) {
+        notFoundCache.add(songUrl);
+        console.log("🚫 Fichier ajouté au cache des inexistants:", songUrl);
+      }
+      
       throw error;
     }
   }
 
   /**
-   * Fetch ultra-optimisé avec timeout court
+   * Fetch ultra-optimisé avec timeout court et gestion d'erreur améliorée
    */
   private static async ultraFastFetch(songUrl: string, startTime: number): Promise<string> {
     console.log("🚀 Ultra-fast fetch:", songUrl);
     
     try {
-      // Timeout agressif de 3 secondes max
+      // Timeout encore plus agressif de 2 secondes max
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 3000);
+        setTimeout(() => reject(new Error('Timeout ultra-rapide')), 2000);
       });
       
       const fetchPromise = getAudioFileUrl(songUrl);
@@ -80,32 +100,36 @@ export class InstantStreaming {
       // Mise en cache immédiate
       memoryCache.set(songUrl, audioUrl);
       
-      // Promotion L0 en arrière-plan
+      // Promotion L0 en arrière-plan (plus rapide)
       setTimeout(() => this.promoteToL0Async(songUrl, audioUrl), 0);
       
       return audioUrl;
       
     } catch (error) {
       const elapsed = performance.now() - startTime;
-      console.error("❌ Fetch échoué:", elapsed.toFixed(1), "ms", error);
+      console.warn("⚠️ Fetch échoué rapidement:", elapsed.toFixed(1), "ms", songUrl);
       throw new Error(`Impossible de charger: ${songUrl}`);
     }
   }
 
   /**
-   * Promotion L0 asynchrone
+   * Promotion L0 asynchrone optimisée
    */
   private static async promoteToL0Async(songUrl: string, audioUrl: string): Promise<void> {
     try {
+      // Vérification plus rapide avec HEAD
       const response = await fetch(audioUrl, { 
-        method: 'HEAD' // Juste pour vérifier l'URL
+        method: 'HEAD',
+        signal: AbortSignal.timeout(1000) // 1 seconde max
       });
       
       if (response.ok) {
         // Télécharger le blob complet en arrière-plan
         setTimeout(async () => {
           try {
-            const fullResponse = await fetch(audioUrl);
+            const fullResponse = await fetch(audioUrl, {
+              signal: AbortSignal.timeout(5000) // 5 secondes max pour le téléchargement
+            });
             if (fullResponse.ok) {
               const blob = await fullResponse.blob();
               UltraFastCache.setL0(songUrl, audioUrl, blob);
@@ -114,7 +138,7 @@ export class InstantStreaming {
           } catch (error) {
             console.warn("⚠️ L0 promotion échouée:", error);
           }
-        }, 100);
+        }, 50); // Réduction du délai
       }
     } catch (error) {
       console.warn("⚠️ L0 check échoué:", error);
@@ -122,66 +146,104 @@ export class InstantStreaming {
   }
 
   /**
-   * Préchargement agressif des prochaines chansons
+   * Préchargement intelligent avec filtrage des fichiers inexistants
    */
   static async prefetchNext(songUrls: string[]): Promise<void> {
     if (songUrls.length === 0) return;
     
-    console.log("🎯 Préchargement agressif:", songUrls.length);
+    // Filtrer les fichiers connus comme inexistants
+    const validUrls = songUrls.filter(url => !notFoundCache.has(url));
     
-    // Traiter les URLs par priorité décroissante
-    const promises = songUrls.map(async (url, index) => {
-      // Éviter les doublons
-      if (this.prefetchQueue.has(url)) return;
-      this.prefetchQueue.add(url);
+    if (validUrls.length === 0) {
+      console.log("🚫 Tous les fichiers sont connus comme inexistants");
+      return;
+    }
+    
+    console.log("🎯 Préchargement intelligent:", validUrls.length, "fichiers valides");
+    
+    // Traiter les URLs par priorité décroissante avec limite de concurrence
+    const maxConcurrent = 3; // Limiter la concurrence pour éviter la surcharge
+    
+    for (let i = 0; i < validUrls.length; i += maxConcurrent) {
+      const batch = validUrls.slice(i, i + maxConcurrent);
       
-      try {
-        // Délai échelonné: 0ms, 50ms, 100ms, etc.
-        const delay = index * 50;
+      const promises = batch.map(async (url, batchIndex) => {
+        const globalIndex = i + batchIndex;
         
-        setTimeout(async () => {
-          try {
-            // Vérifier si déjà en cache
-            if (memoryCache.has(url) || UltraFastCache.hasL0(url)) {
-              return;
-            }
-            
-            // Précharger
-            await this.getInstantAudioUrl(url);
-            console.log("✅ Préchargé:", url);
-            
-          } catch (error) {
-            console.warn("⚠️ Préchargement échoué:", url, error);
-          } finally {
-            this.prefetchQueue.delete(url);
+        // Éviter les doublons
+        if (this.prefetchQueue.has(url)) return;
+        this.prefetchQueue.add(url);
+        
+        try {
+          // Délai échelonné réduit: 0ms, 20ms, 40ms, etc.
+          const delay = globalIndex * 20;
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Vérifier si déjà en cache
+          if (memoryCache.has(url) || UltraFastCache.hasL0(url)) {
+            return;
           }
-        }, delay);
-        
-      } catch (error) {
-        this.prefetchQueue.delete(url);
-        console.warn("⚠️ Setup préchargement échoué:", error);
+          
+          // Précharger avec timeout plus court
+          await Promise.race([
+            this.getInstantAudioUrl(url),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Préchargement timeout')), 1500)
+            )
+          ]);
+          
+          console.log("✅ Préchargé:", url);
+          
+        } catch (error) {
+          console.warn("⚠️ Préchargement échoué:", url);
+          // Ne pas loguer l'erreur complète pour éviter le spam
+        } finally {
+          this.prefetchQueue.delete(url);
+        }
+      });
+      
+      // Attendre que ce batch soit terminé avant de passer au suivant
+      await Promise.allSettled(promises);
+      
+      // Petit délai entre les batches pour éviter la surcharge
+      if (i + maxConcurrent < validUrls.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    });
-    
-    await Promise.allSettled(promises);
+    }
   }
 
   /**
-   * Nettoyage des ressources
+   * Nettoyage des ressources avec nettoyage du cache des inexistants
    */
   static cleanup(): void {
     this.parallelFetches.clear();
     this.prefetchQueue.clear();
+    notFoundCache.clear();
     console.log("🧹 InstantStreaming nettoyé");
   }
 
   /**
-   * Statistiques
+   * Supprimer un fichier du cache des inexistants (si re-uploadé par exemple)
+   */
+  static clearNotFoundCache(songUrl?: string): void {
+    if (songUrl) {
+      notFoundCache.delete(songUrl);
+      console.log("🔄 Fichier retiré du cache des inexistants:", songUrl);
+    } else {
+      notFoundCache.clear();
+      console.log("🔄 Cache des inexistants vidé complètement");
+    }
+  }
+
+  /**
+   * Statistiques améliorées
    */
   static getStats() {
     return {
       activeFetches: this.parallelFetches.size,
       prefetchQueue: this.prefetchQueue.size,
+      notFoundCache: notFoundCache.size,
       l0Cache: UltraFastCache.getStats(),
       memoryCache: memoryCache.getStats()
     };
