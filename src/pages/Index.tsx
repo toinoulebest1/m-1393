@@ -1,5 +1,5 @@
-
 import { Player } from "@/components/Player";
+import { Layout } from "@/components/Layout";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { BrowserCompatibilityNotice } from "@/components/BrowserCompatibilityNotice";
 import { useState, useEffect } from "react";
@@ -22,12 +22,10 @@ const Index = () => {
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
-
-  // Force re-render when currentSong changes
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
 
-  // Extract dominant color when song changes
+  // Force re-render when currentSong changes
   useEffect(() => {
     const extractColor = async () => {
       if (currentSong?.imageUrl) {
@@ -202,70 +200,72 @@ const Index = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <BrowserCompatibilityNotice />
-      
-      {!isMobile && (
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-          {username && (
-            <span className="text-spotify-neutral hover:text-white transition-colors">
-              {username}
-            </span>
-          )}
-          <button 
-            onClick={() => setShowCacheManager(!showCacheManager)}
-            className="text-spotify-neutral hover:text-white transition-colors text-sm px-2 py-1 rounded-md bg-spotify-dark/50 hover:bg-spotify-dark"
-          >
-            Cache Audio
-          </button>
-          <AccountSettingsDialog />
-        </div>
-      )}
-      
-      <div className="w-full text-center pt-6 pb-2">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full backdrop-blur-sm">
-          <Music className="w-5 h-5 text-spotify-accent animate-pulse" />
-          <h1 className="text-lg font-medium text-white">
-            {currentSong ? "Actuellement en cours de lecture" : "Aucune lecture en cours"}
-          </h1>
-        </div>
-      </div>
-      
-      <div className="flex-1 w-full flex items-center justify-center">
-        {currentSong ? (
-          <div className="text-center p-6 max-w-md mx-auto">
-            <div className="w-64 h-64 mx-auto mb-8 relative">
-              <img 
-                src={currentSong.imageUrl || "https://picsum.photos/300/300"} 
-                alt="Album art" 
-                className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300"
-                style={getGlowStyle()}
-              />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
-            <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
-            {currentSong.genre && (
-              <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
-                {currentSong.genre}
+    <Layout>
+      <div className="w-full h-full flex flex-col">
+        <BrowserCompatibilityNotice />
+        
+        {!isMobile && (
+          <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+            {username && (
+              <span className="text-spotify-neutral hover:text-white transition-colors">
+                {username}
               </span>
             )}
-          </div>
-        ) : (
-          <div className="text-center p-6">
-            <p className="text-gray-400">Aucune musique en cours de lecture</p>
+            <button 
+              onClick={() => setShowCacheManager(!showCacheManager)}
+              className="text-spotify-neutral hover:text-white transition-colors text-sm px-2 py-1 rounded-md bg-spotify-dark/50 hover:bg-spotify-dark"
+            >
+              Cache Audio
+            </button>
+            <AccountSettingsDialog />
           </div>
         )}
-      </div>
-      
-      {showCacheManager && (
-        <div className="absolute right-4 top-14 z-50 w-80">
-          <AudioCacheManager />
+        
+        <div className="w-full text-center pt-6 pb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full backdrop-blur-sm">
+            <Music className="w-5 h-5 text-spotify-accent animate-pulse" />
+            <h1 className="text-lg font-medium text-white">
+              {currentSong ? "Actuellement en cours de lecture" : "Aucune lecture en cours"}
+            </h1>
+          </div>
         </div>
-      )}
-      
-      <Player />
-      <Toaster />
-    </div>
+        
+        <div className="flex-1 w-full flex items-center justify-center">
+          {currentSong ? (
+            <div className="text-center p-6 max-w-md mx-auto">
+              <div className="w-64 h-64 mx-auto mb-8 relative">
+                <img 
+                  src={currentSong.imageUrl || "https://picsum.photos/300/300"} 
+                  alt="Album art" 
+                  className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300"
+                  style={getGlowStyle()}
+                />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
+              <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
+              {currentSong.genre && (
+                <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+                  {currentSong.genre}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="text-center p-6">
+              <p className="text-gray-400">Aucune musique en cours de lecture</p>
+            </div>
+          )}
+        </div>
+        
+        {showCacheManager && (
+          <div className="absolute right-4 top-14 z-50 w-80">
+            <AudioCacheManager />
+          </div>
+        )}
+        
+        <Player />
+        <Toaster />
+      </div>
+    </Layout>
   );
 };
 
