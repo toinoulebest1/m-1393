@@ -395,13 +395,14 @@ const PlaylistDetail = () => {
       setPlaylist(playlistData);
       setEditedName(playlistData.name);
       
-      // Get the actual cover image URL
+      // Get the actual cover image URL with cache busting
+      const timestamp = Date.now();
       const actualCoverUrl = await getCoverImageUrl(playlistId);
       if (actualCoverUrl) {
-        setCoverImageUrl(actualCoverUrl);
-        console.log("Cover image URL set:", actualCoverUrl);
+        setCoverImageUrl(`${actualCoverUrl}?t=${timestamp}`);
+        console.log("Cover image URL set with timestamp:", `${actualCoverUrl}?t=${timestamp}`);
       } else {
-        setCoverImageUrl(playlistData.cover_image_url);
+        setCoverImageUrl(playlistData.cover_image_url ? `${playlistData.cover_image_url}?t=${timestamp}` : null);
       }
       
       // Fetch songs in the playlist
@@ -460,16 +461,14 @@ const PlaylistDetail = () => {
   // Watch for changes in songs to trigger cover update
   useEffect(() => {
     if (songs.length > 0 && playlist && currentUserId === playlist.user_id) {
-      // Only auto-generate if no cover exists
-      if (!coverImageUrl) {
-        const timer = setTimeout(() => {
-          updatePlaylistCover(true);
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      }
+      console.log("Songs changed, triggering cover update...");
+      const timer = setTimeout(() => {
+        updatePlaylistCover(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
-  }, [songs.length, playlist?.id, currentUserId, coverImageUrl]);
+  }, [songs.length, playlist?.id, currentUserId]);
 
   const handleUpdateName = async () => {
     if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
@@ -592,6 +591,13 @@ const PlaylistDetail = () => {
         description: t('playlists.songRemoved')
       });
       
+      // Trigger cover update after song removal
+      if (updatedSongs.length > 0) {
+        setTimeout(() => {
+          updatePlaylistCover(true);
+        }, 500);
+      }
+      
     } catch (error) {
       console.error("Error removing song:", error);
       toast({
@@ -631,6 +637,11 @@ const PlaylistDetail = () => {
       toast({
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
       });
+      
+      // Trigger cover update after adding songs
+      setTimeout(() => {
+        updatePlaylistCover(true);
+      }, 1000);
       
     } catch (error) {
       console.error("Error adding songs to playlist:", error);
