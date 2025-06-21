@@ -28,8 +28,8 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <CastProvider>
-        <PlayerProvider>
+      <PlayerProvider>
+        <CastProvider>
           <TooltipProvider>
             <BrowserRouter>
               <Routes>
@@ -105,8 +105,8 @@ function App() {
             <Toaster />
             <Sonner />
           </TooltipProvider>
-        </PlayerProvider>
-      </CastProvider>
+        </CastProvider>
+      </PlayerProvider>
     </QueryClientProvider>
   );
 }
