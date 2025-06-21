@@ -197,8 +197,8 @@ export class AutoplayManager {
     // Ajouter l'overlay
     document.body.appendChild(overlay);
     
-    // Gérer le clic d'activation
-    const activateBtn = overlay.querySelector('#activate-audio-btn');
+    // Gérer le clic d'activation avec cast TypeScript
+    const activateBtn = overlay.querySelector('#activate-audio-btn') as HTMLButtonElement;
     activateBtn?.addEventListener('click', () => {
       this.hasUserInteracted = true;
       this.activationOverlayVisible = false;
