@@ -1,5 +1,3 @@
-
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -61,6 +59,64 @@
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
+  }
+  
+  /* Force dark theme colors for better contrast */
+  .bg-white, [class*="bg-white"] {
+    @apply !bg-spotify-dark !text-white;
+  }
+  
+  .text-black, [class*="text-black"] {
+    @apply !text-white;
+  }
+  
+  .text-gray-900, [class*="text-gray-900"] {
+    @apply !text-gray-100;
+  }
+  
+  .text-gray-800, [class*="text-gray-800"] {
+    @apply !text-gray-200;
+  }
+  
+  .text-gray-700, [class*="text-gray-700"] {
+    @apply !text-gray-300;
+  }
+  
+  /* Ensure dropdowns have proper background */
+  [data-radix-popper-content-wrapper] {
+    z-index: 9999 !important;
+  }
+  
+  [role="menu"], [role="listbox"], [role="dialog"] {
+    @apply !bg-spotify-dark !text-white border-white/10;
+  }
+  
+  /* Fix modal and dialog backgrounds */
+  .fixed.inset-0 {
+    @apply !bg-black/80;
+  }
+  
+  /* Ensure all cards have dark background */
+  .bg-card, [class*="bg-card"] {
+    @apply !bg-spotify-card !text-white;
+  }
+  
+  /* Fix input backgrounds */
+  input, textarea, select {
+    @apply !bg-spotify-input !text-white !border-white/20;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    @apply !text-gray-400;
+  }
+  
+  /* Fix button contrasts */
+  .bg-primary {
+    @apply !bg-spotify-accent !text-white;
+  }
+  
+  .bg-secondary {
+    @apply !bg-spotify-card !text-white;
   }
 }
 
