@@ -1,7 +1,10 @@
+
 /**
  * Cache mémoire ultra-rapide pour les URLs audio
  * Complète le cache IndexedDB pour des accès sub-milliseconde
  */
+
+import { nonExistentFilesCache } from './nonExistentFilesCache';
 
 interface MemoryCacheEntry {
   url: string;
@@ -20,6 +23,11 @@ class MemoryCache {
    * Vérification ultra-rapide (< 1ms)
    */
   has(songUrl: string): boolean {
+    // Vérifier d'abord le cache des fichiers inexistants
+    if (nonExistentFilesCache.isNonExistent(songUrl)) {
+      return false;
+    }
+    
     const entry = this.metadata.get(songUrl);
     if (!entry) return false;
     
@@ -49,7 +57,6 @@ class MemoryCache {
       this.metadata.set(songUrl, entry);
     }
     
-    console.log("⚡ Cache mémoire HIT:", songUrl);
     return audioUrl;
   }
 
@@ -69,8 +76,6 @@ class MemoryCache {
       lastAccessed: Date.now(),
       accessCount: 1
     });
-    
-    console.log("💾 Cache mémoire SET:", songUrl);
   }
 
   /**
@@ -93,7 +98,6 @@ class MemoryCache {
     
     if (oldestEntry) {
       this.delete(oldestEntry[0]);
-      console.log("🗑️ Éviction cache mémoire:", oldestEntry[0]);
     }
   }
 
@@ -134,63 +138,30 @@ class MemoryCache {
   }
 
   /**
-   * Préchargement en lot
+   * Préchargement en lot ultra-conservateur
    */
   async preloadBatch(urls: string[]): Promise<void> {
     if (urls.length === 0) return;
     
-    console.log("🎯 Préchargement batch optimisé:", urls.length, "URLs");
-    
-    // Filtrer les URLs déjà en cache
-    const urlsToPreload = urls.filter(url => !this.cache.has(url));
+    // Filtrer les URLs inexistantes ET déjà en cache
+    const urlsToPreload = urls.filter(url => 
+      !nonExistentFilesCache.isNonExistent(url) && 
+      !this.cache.has(url)
+    );
     
     if (urlsToPreload.length === 0) {
-      console.log("✅ Toutes les URLs sont déjà en cache");
       return;
     }
     
-    console.log("📦 URLs à précharger:", urlsToPreload.length);
+    // Traiter seulement 1 URL à la fois
+    const url = urlsToPreload[0];
     
-    // Traiter les URLs par petits batches pour éviter la surcharge
-    const batchSize = 2; // Réduire la taille des batches
-    const promises: Promise<void>[] = [];
-    
-    for (let i = 0; i < urlsToPreload.length; i += batchSize) {
-      const batch = urlsToPreload.slice(i, i + batchSize);
-      
-      const batchPromise = Promise.allSettled(
-        batch.map(async (url, index) => {
-          try {
-            // Délai échelonné plus long pour éviter les conflits
-            await new Promise(resolve => setTimeout(resolve, index * 500));
-            
-            // Vérifier si déjà en cache avant de précharger
-            if (this.cache.has(url)) {
-              console.log("⚡ Déjà en cache:", url);
-              return;
-            }
-            
-            const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
-            this.set(url, audioUrl);
-            console.log("✅ Préchargé:", url);
-          } catch (error) {
-            console.warn("⚠️ Échec préchargement:", url, error);
-          }
-        })
-      ).then(() => {
-        // Promise résolue sans valeur de retour
-      });
-      
-      promises.push(batchPromise);
-      
-      // Délai entre les batches
-      if (i + batchSize < urlsToPreload.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+    try {
+      const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
+      this.set(url, audioUrl);
+    } catch (error) {
+      // Ignorer COMPLÈTEMENT les erreurs - pas de logs
     }
-    
-    await Promise.allSettled(promises);
-    console.log("🎯 Préchargement batch terminé");
   }
 }
 
