@@ -7,7 +7,7 @@ import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
-import { getAudioFileUrl } from '@/utils/storage';
+import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 
@@ -108,7 +108,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (savedSong) {
         const song = JSON.parse(savedSong);
         try {
-          const audioUrl = await getAudioFileUrl(song.url);
+          const audioUrl = await getAudioFile(song.url);
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
           audioRef.current.src = audioUrl;

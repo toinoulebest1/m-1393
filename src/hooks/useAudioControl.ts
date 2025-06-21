@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { getAudioFileUrl } from '@/utils/storage';
+import { getAudioFile } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
@@ -125,7 +125,7 @@ export const useAudioControl = ({
         ]);
         
         // 3. Récupération réseau avec gestion d'erreur améliorée
-        const networkPromise = getAudioFileUrl(song.url).then(url => {
+        const networkPromise = getAudioFile(song.url).then(url => {
           if (typeof url === 'string') {
             return { url, fromCache: false };
           }

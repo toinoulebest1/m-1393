@@ -1,7 +1,8 @@
+
 import { useCallback, useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { memoryCache } from '@/utils/memoryCache';
-import { getAudioFileUrl } from '@/utils/storage';
+import { getAudioFile } from '@/utils/storage';
 import { addToCache, isInCache } from '@/utils/audioCache';
 
 interface ListeningPattern {
@@ -123,7 +124,7 @@ export const useIntelligentPreloader = () => {
             
             // Télécharger et mettre en cache
             console.log("📡 Préchargement:", song.title);
-            const audioUrl = await getAudioFileUrl(song.url);
+            const audioUrl = await getAudioFile(song.url);
             
             if (audioUrl && typeof audioUrl === 'string') {
               // Ajouter au cache mémoire

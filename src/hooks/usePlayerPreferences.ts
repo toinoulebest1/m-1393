@@ -68,8 +68,8 @@ export const usePlayerPreferences = () => {
           console.log(`Utilisation du fichier audio en cache: ${track.title}`);
         } else {
           console.log(`Préchargement de la piste: ${track.title}`);
-          const { getAudioFileUrl } = await import('@/utils/storage');
-          const audioUrl = await getAudioFileUrl(track.url);
+          const { getAudioFile } = await import('@/utils/storage');
+          const audioUrl = await getAudioFile(track.url);
           if (!audioUrl || typeof audioUrl !== 'string') continue;
           
           const response = await fetch(audioUrl);

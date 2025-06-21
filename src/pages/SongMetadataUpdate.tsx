@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import Sidebar from "@/components/Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
