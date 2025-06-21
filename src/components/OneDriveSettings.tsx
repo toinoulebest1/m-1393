@@ -21,7 +21,7 @@ export const OneDriveSettings = () => {
           <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">
             Service Discontinued
           </Badge>
-          <p className="text-sm text-muted-foregroun className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             OneDrive integration has been completely removed. The application now uses Dropbox (if configured) or Supabase storage as fallback.
           </p>
         </div>
