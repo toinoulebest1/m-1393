@@ -30,8 +30,8 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <CastProvider>
-            <PlayerProvider>
+          <PlayerProvider>
+            <CastProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -48,8 +48,8 @@ function App() {
                 <Route path="/dropbox-settings" element={<DropboxSettings />} />
                 <Route path="/metadata-update" element={<SongMetadataUpdate />} />
               </Routes>
-            </PlayerProvider>
-          </CastProvider>
+            </CastProvider>
+          </PlayerProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
