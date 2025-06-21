@@ -1,9 +1,10 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
-import { storeAudioFile, searchDeezerTrack } from "@/utils/storage";
+import { uploadAudioFile, searchDeezerTrack } from "@/utils/storage";
 import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -276,7 +277,7 @@ export const MusicUploader = () => {
         });
       }, 200);
 
-      await storeAudioFile(fileId, file);
+      await uploadAudioFile(file, fileId);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -311,7 +312,7 @@ export const MusicUploader = () => {
       }
 
       if (imageUrl === "https://picsum.photos/240/240") {
-        const deezerCover = await searchDeezerTrack(artist, title);
+        const deezerCover = await searchDeezerTrack(`${artist} ${title}`);
         if (deezerCover) {
           console.log("Pochette Deezer trouvée:", deezerCover);
           imageUrl = deezerCover;

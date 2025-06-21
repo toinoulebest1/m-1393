@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
-import { storePlaylistCover, generateImageFromSongs } from "@/utils/storage";
+import { generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
 import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
@@ -259,8 +260,26 @@ const PlaylistDetail = () => {
       
       console.log("Cover generated, uploading to storage...");
       
-      // Upload using the storage function
-      const publicUrl = await storePlaylistCover(pid, coverDataUrl);
+      // Convert data URL to File for upload
+      const coverFile = dataURLtoFile(coverDataUrl, `playlist-${pid}-cover.jpg`);
+      
+      // Upload using Supabase storage directly since storePlaylistCover expects different params
+      const fileName = `playlist-covers/${pid}.jpg`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, coverFile, {
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+      
       console.log("Cover uploaded, public URL:", publicUrl);
       
       // Update playlist record
