@@ -20,7 +20,6 @@ import Reports from "./pages/Reports";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
 import DropboxSettings from "./pages/DropboxSettings";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
-import SyncedLyricsView from "./pages/SyncedLyricsView";
 import { Layout } from "./components/Layout";
 
 const queryClient = new QueryClient();
@@ -38,11 +37,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
-          <PlayerProvider>
-            <CastProvider>
-              <Toaster />
-              <Sonner />
+        <PlayerProvider>
+          <CastProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<LayoutWrapper />}>
@@ -59,12 +58,11 @@ function App() {
                   <Route path="metadata-update" element={<SongMetadataUpdate />} />
                   <Route path="dropbox-settings" element={<DropboxSettings />} />
                   <Route path="maintenance-admin" element={<MaintenanceAdmin />} />
-                  <Route path="synced-lyrics" element={<SyncedLyricsView />} />
                 </Route>
               </Routes>
-            </CastProvider>
-          </PlayerProvider>
-        </BrowserRouter>
+            </BrowserRouter>
+          </CastProvider>
+        </PlayerProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

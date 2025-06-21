@@ -33,8 +33,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isChangingSong, setIsChangingSong,
     history, setHistory,
     searchQuery, setSearchQuery,
-    playbackRate, setPlaybackRate,
-    stopCurrentSong
+    playbackRate, setPlaybackRate
   } = usePlayerState();
 
   const {
@@ -83,6 +82,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateVolume, 
     updateProgress, 
     updatePlaybackRate, 
+    stopCurrentSong,
     refreshCurrentSong,
     getCurrentAudioElement
   } = useAudioControl({ 
@@ -99,20 +99,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  console.log('PlayerContext rendering, currentSong:', currentSong?.title || 'none');
-
   // Restauration de la lecture au chargement
   useEffect(() => {
     const restorePlayback = async () => {
-      console.log('Restoring playback...');
       const savedSong = localStorage.getItem('currentSong');
       const savedProgress = localStorage.getItem('audioProgress');
       
       if (savedSong) {
+        const song = JSON.parse(savedSong);
         try {
-          const song = JSON.parse(savedSong);
-          console.log('Restoring song:', song.title);
-          
           const audioUrl = await getAudioFileUrl(song.url);
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
@@ -129,7 +124,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             updatedQueue.unshift(song);
           }
           setQueue(updatedQueue);
-          console.log('Playback restored successfully');
         } catch (error) {
           console.error("Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');
@@ -144,7 +138,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Persistance des données
   useEffect(() => {
     if (currentSong) {
-      console.log('Saving current song to localStorage:', currentSong.title);
       localStorage.setItem('currentSong', JSON.stringify(currentSong));
     }
   }, [currentSong]);
@@ -403,8 +396,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     initializeEqualizer: equalizer.initializeAudioContext
   };
 
-  console.log('PlayerContext value created, context valid:', !!playerContext);
-
   return (
     <PlayerContext.Provider value={playerContext}>
       {children}
@@ -415,7 +406,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 export const usePlayer = () => {
   const context = useContext(PlayerContext);
   if (!context) {
-    console.error('usePlayer called outside PlayerProvider');
     throw new Error('usePlayer must be used within a PlayerProvider');
   }
   return context;
@@ -424,7 +414,6 @@ export const usePlayer = () => {
 export const usePlayerContext = () => {
   const context = useContext(PlayerContext);
   if (!context) {
-    console.error('usePlayerContext called outside PlayerProvider');
     throw new Error("usePlayerContext must be used within a PlayerProvider");
   }
   return context;
