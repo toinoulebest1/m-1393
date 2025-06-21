@@ -8,7 +8,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   if (isDropboxEnabled()) {
     console.log('Using Dropbox for file upload');
     return await uploadFileToDropbox(file, `audio/${fileName}`);
-  } else if (isOneDriveEnabled()) {
+  } else if (await isOneDriveEnabled()) {
     console.log('Using OneDrive for file upload');
     return await uploadFileToOneDrive(file, `audio/${fileName}`);
   } else {
@@ -35,7 +35,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
   
   // Priorité à Dropbox, puis OneDrive, puis Supabase
   if (isDropboxEnabled()) {
-    console.log('Getting file URL from Dropbox');
+    console.log('Using Dropbox for file retrieval');
     try {
       // Vérifier d'abord si le fichier existe sur Dropbox
       const exists = await checkFileExistsOnDropbox(filePath);
@@ -49,21 +49,25 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       return url;
     } catch (error) {
       console.error('❌ Erreur Dropbox pour', filePath, ':', error);
-      // Continuer vers le fallback
+      // Continuer vers le fallback Supabase directement
     }
-  } else if (isOneDriveEnabled()) {
-    console.log('Getting file URL from OneDrive');
+  } else {
+    // Vérifier OneDrive seulement si Dropbox n'est pas activé
     try {
-      const url = await getOneDriveSharedLink(filePath);
-      console.log('✅ URL OneDrive récupérée:', url);
-      return url;
+      const oneDriveEnabled = await isOneDriveEnabled();
+      if (oneDriveEnabled) {
+        console.log('Using OneDrive for file retrieval');
+        const url = await getOneDriveSharedLink(filePath);
+        console.log('✅ URL OneDrive récupérée:', url);
+        return url;
+      }
     } catch (error) {
       console.error('❌ Erreur OneDrive pour', filePath, ':', error);
-      // Continuer vers le fallback
+      // Continuer vers le fallback Supabase
     }
   }
   
-  console.log('Getting file URL from Supabase');
+  console.log('Using Supabase for file retrieval');
   try {
     // Vérifier d'abord si le fichier existe dans Supabase
     const { data: listData, error: listError } = await supabase.storage
@@ -107,8 +111,6 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
 
 // Legacy alias for backward compatibility
 export const getAudioFile = getAudioFileUrl;
-
-// Placeholder functions for missing exports
 export const storeAudioFile = uploadAudioFile;
 
 export const searchDeezerTrack = async (query: string): Promise<string | null> => {
