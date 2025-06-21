@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType, EqualizerSettings } from '@/types/player';
 import { useAudioControl } from '@/hooks/useAudioControl';
@@ -32,54 +33,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     history,
     setHistory,
     isChangingSong,
-    setIsChangingSong
-  } = usePlayerState(audioRef);
-
-  const {
-    queue,
-    setQueue,
-    shuffleMode,
-    repeatMode,
-    toggleShuffle,
-    toggleRepeat,
-    nextSong: getNextSong,
-    previousSong: getPreviousSong,
-    addToQueue,
-    removeSong
-  } = usePlayerQueue(currentSong);
-
-  const {
-    favorites,
-    favoriteStats,
+    setIsChangingSong,
     searchQuery,
-    setSearchQuery,
-    toggleFavorite,
-    removeFavorite
-  } = usePlayerFavorites();
-
-  const {
-    equalizerSettings,
-    equalizerPresets,
-    currentEqualizerPreset,
-    isEqualizerEnabled,
-    isEqualizerInitialized,
-    updateEqualizerBand,
-    applyEqualizerPreset,
-    toggleEqualizer,
-    resetEqualizer,
-    setEqualizerPreAmp,
-    initializeEqualizer
-  } = useEqualizer(audioRef);
+    setSearchQuery
+  } = usePlayerState();
 
   // Préchargement ultra-intelligent
   const preloadNextTracks = useCallback(async () => {
-    if (!currentSong || queue.length === 0) return;
+    if (!currentSong) return;
 
     console.log("🚀 Préchargement ultra-agressif démarré");
     
     try {
-      // Trouver les 3 prochaines chansons probables
-      const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+      // Trouver les 3 prochaines chansons probables depuis la queue
+      const savedQueue = localStorage.getItem('queue');
+      if (!savedQueue) return;
+      
+      const queue = JSON.parse(savedQueue);
+      const currentIndex = queue.findIndex((s: Song) => s.id === currentSong.id);
       const nextSongs: Song[] = [];
       
       if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
@@ -97,7 +68,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.warn("⚠️ Erreur préchargement:", error);
     }
-  }, [currentSong, queue]);
+  }, [currentSong]);
 
   const {
     play,
@@ -122,6 +93,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
+  const {
+    queue,
+    setQueue,
+    shuffleMode,
+    repeatMode,
+    toggleShuffle,
+    toggleRepeat,
+    addToQueue
+  } = usePlayerQueue({
+    currentSong,
+    isChangingSong,
+    setIsChangingSong,
+    play
+  });
+
+  const {
+    favorites,
+    favoriteStats,
+    toggleFavorite,
+    removeFavorite
+  } = usePlayerFavorites();
+
+  const {
+    settings: equalizerSettings,
+    presets: equalizerPresets,
+    currentPreset: currentEqualizerPreset,
+    isEnabled: isEqualizerEnabled,
+    isInitialized: isEqualizerInitialized,
+    updateBand: updateEqualizerBand,
+    applyPreset: applyEqualizerPreset,
+    toggleEnabled: toggleEqualizer,
+    resetEqualizer,
+    setPreAmp: setEqualizerPreAmp,
+    initializeAudioContext: initializeEqualizer
+  } = useEqualizer({ audioElement: audioRef.current });
+
   // Hook pour le système ultra-rapide
   const { getCacheStats } = useUltraFastPlayer({
     currentSong,
@@ -129,26 +136,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isPlaying
   });
 
-  const nextSong = useCallback(() => {
-    const next = getNextSong();
-    if (next) {
+  const nextSong = useCallback(async () => {
+    const savedQueue = localStorage.getItem('queue');
+    if (!savedQueue || !currentSong) return;
+    
+    const queueArray = JSON.parse(savedQueue);
+    const currentIndex = queueArray.findIndex((s: Song) => s.id === currentSong.id);
+    
+    if (currentIndex !== -1 && currentIndex + 1 < queueArray.length) {
+      const next = queueArray[currentIndex + 1];
       console.log("⏭️ Chanson suivante ultra-rapide:", next.title);
-      play(next);
+      await play(next);
     }
-  }, [getNextSong, play]);
+  }, [currentSong, play]);
 
-  const previousSong = useCallback(() => {
-    const previous = getPreviousSong();
-    if (previous) {
+  const previousSong = useCallback(async () => {
+    const savedQueue = localStorage.getItem('queue');
+    if (!savedQueue || !currentSong) return;
+    
+    const queueArray = JSON.parse(savedQueue);
+    const currentIndex = queueArray.findIndex((s: Song) => s.id === currentSong.id);
+    
+    if (currentIndex > 0) {
+      const previous = queueArray[currentIndex - 1];
       console.log("⏮️ Chanson précédente ultra-rapide:", previous.title);
-      play(previous);
+      await play(previous);
     }
-  }, [getPreviousSong, play]);
+  }, [currentSong, play]);
 
   const handleVolumeChange = useCallback((newVolume: number) => {
     setVolume(newVolume);
     updateVolume(newVolume);
   }, [setVolume, updateVolume]);
+
+  const removeSong = useCallback((songId: string) => {
+    setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
+  }, [setQueue]);
 
   // Préchargement automatique au changement de chanson
   useEffect(() => {
@@ -236,3 +259,6 @@ export const usePlayer = (): PlayerContextType => {
   }
   return context;
 };
+
+// Export both for backward compatibility
+export const usePlayerContext = usePlayer;

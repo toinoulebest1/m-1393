@@ -4,6 +4,7 @@ import { Song, FavoriteStat } from '@/types/player';
 
 export const usePlayerFavorites = () => {
   const [favorites, setFavorites] = useState<Song[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>(() => {
     const savedStats = localStorage.getItem('favoriteStats');
@@ -153,6 +154,8 @@ export const usePlayerFavorites = () => {
     setFavorites,
     favoriteStats,
     setFavoriteStats,
+    searchQuery,
+    setSearchQuery,
     toggleFavorite,
     removeFavorite
   };
