@@ -1,4 +1,3 @@
-
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
@@ -11,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { LyricsModal } from "@/components/LyricsModal";
 import { cn } from "@/lib/utils";
+import { extractDominantColor } from "@/utils/colorExtractor";
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
 
@@ -32,6 +32,7 @@ const Top100 = () => {
   const { play, currentSong, isPlaying, addToQueue } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
+  const [dominantColors, setDominantColors] = useState<{ [key: string]: [number, number, number] }>({});
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
@@ -219,6 +220,34 @@ const Top100 = () => {
     };
   }, [toast]);
 
+  // Extract dominant colors for images
+  useEffect(() => {
+    const extractColors = async () => {
+      const newColors: { [key: string]: [number, number, number] } = {};
+      
+      for (const stat of favoriteStats) {
+        if (stat.song.image_url && !dominantColors[stat.songId]) {
+          try {
+            const color = await extractDominantColor(stat.song.image_url);
+            if (color) {
+              newColors[stat.songId] = color;
+            }
+          } catch (error) {
+            console.error("Error extracting color for", stat.song.title, error);
+          }
+        }
+      }
+      
+      if (Object.keys(newColors).length > 0) {
+        setDominantColors(prev => ({ ...prev, ...newColors }));
+      }
+    };
+
+    if (favoriteStats.length > 0) {
+      extractColors();
+    }
+  }, [favoriteStats, dominantColors]);
+
   const handlePlay = async (song: any) => {
     try {
       console.log("Tentative de lecture de la chanson:", song);
@@ -359,6 +388,7 @@ const Top100 = () => {
             </p>
           </div>
         </div>
+        <Player />
       </Layout>
     );
   }
@@ -392,19 +422,37 @@ const Top100 = () => {
                 const isCurrentSong = currentSong?.id === stat.song.id;
                 const rankNumber = index + 1;
                 const isTop3 = rankNumber <= 3;
+                const dominantColor = dominantColors[stat.songId];
 
                 return (
                   <div
                     key={stat.songId}
                     className={cn(
-                      "group p-4 transition-all duration-300 cursor-pointer border-b border-white/5 last:border-b-0",
+                      "group p-4 transition-all duration-300 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
                       isCurrentSong 
                         ? "bg-spotify-accent/20" 
                         : "hover:bg-white/5"
                     )}
                     onClick={() => handlePlay(stat.song)}
+                    style={
+                      isCurrentSong && dominantColor
+                        ? {
+                            background: `linear-gradient(135deg, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.15) 0%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.05) 100%)`,
+                            borderColor: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)`,
+                          }
+                        : {}
+                    }
                   >
-                    <div className="flex items-center justify-between">
+                    {isCurrentSong && dominantColor && (
+                      <div 
+                        className="absolute inset-0 opacity-10"
+                        style={{
+                          background: `radial-gradient(circle at 20% 80%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4) 0%, transparent 50%)`
+                        }}
+                      />
+                    )}
+                    
+                    <div className="flex items-center justify-between relative z-10">
                       <div className="flex items-center space-x-4">
                         <div className={cn(
                           "w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm",
@@ -417,17 +465,32 @@ const Top100 = () => {
                           #{rankNumber}
                         </div>
                         
-                        <img
-                          src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                          alt={`Pochette de ${stat.song.title}`}
-                          className="w-12 h-12 rounded-lg object-cover"
-                          loading="lazy"
-                        />
+                        <div className="relative">
+                          <img
+                            src={stat.song.image_url || PLACEHOLDER_IMAGE}
+                            alt={`Pochette de ${stat.song.title}`}
+                            className={cn(
+                              "w-12 h-12 rounded-lg object-cover shadow-lg",
+                              isCurrentSong && "ring-2 ring-white/30"
+                            )}
+                            loading="lazy"
+                            style={
+                              isCurrentSong && dominantColor
+                                ? {
+                                    boxShadow: `0 4px 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)`
+                                  }
+                                : {}
+                            }
+                          />
+                          {isCurrentSong && (
+                            <div className="absolute inset-0 rounded-lg border-2 border-white/20 animate-pulse" />
+                          )}
+                        </div>
                         
                         <div className="min-w-0 flex-1">
                           <h3 className={cn(
                             "font-medium truncate",
-                            isCurrentSong ? "text-spotify-accent" : "text-white"
+                            isCurrentSong ? "text-white font-semibold" : "text-white"
                           )}>
                             {stat.song.title}
                           </h3>
@@ -504,6 +567,7 @@ const Top100 = () => {
           artist={selectedSong?.artist || ''}
         />
       </div>
+      <Player />
     </Layout>
   );
 };
