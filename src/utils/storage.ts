@@ -7,7 +7,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   // Priorité à Dropbox, puis OneDrive, puis Supabase
   if (isDropboxEnabled()) {
     console.log('Using Dropbox for file upload');
-    return await uploadFileToDropbox(file, `audio/${fileName}`);
+    return await uploadFileToDropbox(file, fileName);
   } else if (isOneDriveEnabled()) {
     console.log('Using OneDrive for file upload');
     return await uploadFileToOneDrive(file, `audio/${fileName}`);
@@ -59,7 +59,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       return url;
     } catch (error) {
       console.error('❌ Erreur OneDrive pour', filePath, ':', error);
-      // Continuer vers le fallback
+      // Si OneDrive échoue, on continue vers Supabase sans faire échouer complètement
+      console.log('OneDrive failed, trying Supabase as fallback...');
     }
   }
   
