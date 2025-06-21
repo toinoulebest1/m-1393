@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { useIntelligentPreloader } from './useIntelligentPreloader';
-import { memoryCache } from '@/utils/memoryCache';
+import { smartCache } from '@/utils/memoryCache';
 
 interface UseUltraFastPlayerProps {
   currentSong: Song | null;
@@ -53,7 +53,7 @@ export const useUltraFastPlayer = ({
         console.log("🎵 Préchargement queue:", nextInQueue.map(s => s.title));
         
         // Précharger en batch pour optimiser
-        await memoryCache.preloadBatch(nextInQueue.map(s => s.url));
+        await smartCache.smartPreload(nextInQueue.map(s => s.url));
       }
     }, 100); // 100ms pour laisser le temps à la chanson de démarrer
 
@@ -72,13 +72,13 @@ export const useUltraFastPlayer = ({
     const timeout = setTimeout(async () => {
       const firstSongs = queue.slice(0, 5);
       console.log("🎯 Préchargement queue initiale:", firstSongs.length, "chansons");
-      await memoryCache.preloadBatch(firstSongs.map(s => s.url));
+      await smartCache.smartPreload(firstSongs.map(s => s.url));
     }, 500); // Délai plus long pour ne pas interférer avec la lecture
 
     return () => clearTimeout(timeout);
   }, [queue]);
 
   return {
-    getCacheStats: () => memoryCache.getStats()
+    getCacheStats: () => smartCache.getStats()
   };
 };

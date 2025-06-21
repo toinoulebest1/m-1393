@@ -259,8 +259,11 @@ const PlaylistDetail = () => {
       
       console.log("Cover generated, uploading to storage...");
       
+      // Convert data URL to File object
+      const coverFile = dataURLtoFile(coverDataUrl, `playlist_${pid}_cover.jpg`);
+      
       // Upload using the storage function
-      const publicUrl = await storePlaylistCover(pid, coverDataUrl);
+      const publicUrl = await storePlaylistCover(pid, coverFile);
       console.log("Cover uploaded, public URL:", publicUrl);
       
       // Update playlist record
