@@ -1,3 +1,4 @@
+
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -26,25 +27,53 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
-// Fonction pour convertir le chemin local vers le chemin Dropbox réel
+// Fonction améliorée pour convertir le chemin local vers le chemin Dropbox réel
 const getDropboxPath = (localPath: string): string => {
+  console.log('🔍 Conversion chemin:', localPath);
+  
   // Si le chemin commence par 'audio/', on le convertit vers la structure réelle
   if (localPath.startsWith('audio/')) {
     const filename = localPath.replace('audio/', '');
-    return `/home/tux com/audio/${filename}`;
+    const dropboxPath = `/home/tux com/audio/${filename}`;
+    console.log('📂 Chemin audio converti:', dropboxPath);
+    return dropboxPath;
   }
   
   // Si le chemin commence par 'lyrics/', on le convertit également
   if (localPath.startsWith('lyrics/')) {
     const filename = localPath.replace('lyrics/', '');
-    return `/home/tux com/lyrics/${filename}`;
+    const dropboxPath = `/home/tux com/lyrics/${filename}`;
+    console.log('📝 Chemin lyrics converti:', dropboxPath);
+    return dropboxPath;
   }
   
-  // Si le chemin ne commence pas par '/', on l'ajoute
+  // Si c'est juste un ID (UUID format), on suppose que c'est un fichier audio
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(localPath)) {
+    const dropboxPath = `/home/tux com/audio/${localPath}`;
+    console.log('🎵 ID converti en chemin audio:', dropboxPath);
+    return dropboxPath;
+  }
+  
+  // Si le chemin ne commence pas par '/', on l'ajoute et on suppose que c'est dans audio
   if (!localPath.startsWith('/')) {
+    // Si ça ressemble à un UUID, c'est probablement un fichier audio
+    if (uuidRegex.test(localPath)) {
+      const dropboxPath = `/home/tux com/audio/${localPath}`;
+      console.log('🎶 UUID sans slash converti:', dropboxPath);
+      return dropboxPath;
+    }
+    // Sinon on ajoute juste le slash
     return `/${localPath}`;
   }
   
+  // Si le chemin commence déjà par /home/tux com/, on le retourne tel quel
+  if (localPath.startsWith('/home/tux com/')) {
+    console.log('✅ Chemin déjà correct:', localPath);
+    return localPath;
+  }
+  
+  console.log('🔄 Chemin utilisé tel quel:', localPath);
   return localPath;
 };
 
