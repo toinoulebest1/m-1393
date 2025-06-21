@@ -144,8 +144,8 @@ class MemoryAudioCache {
       if (this.has(songUrl)) return; // Déjà en cache
       
       try {
-        const { getAudioFile } = await import('./storage');
-        const audioUrl = await getAudioFile(songUrl);
+        const { getAudioFileUrl } = await import('./storage');
+        const audioUrl = await getAudioFileUrl(songUrl);
         if (audioUrl && typeof audioUrl === 'string') {
           this.set(songUrl, audioUrl);
         }

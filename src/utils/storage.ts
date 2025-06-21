@@ -62,3 +62,27 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
 
   return data.signedUrl;
 };
+
+// Legacy alias for backward compatibility
+export const getAudioFile = getAudioFileUrl;
+
+// Placeholder functions for missing exports
+export const storeAudioFile = uploadAudioFile;
+
+export const searchDeezerTrack = async (query: string): Promise<any> => {
+  // Placeholder - implement Deezer search functionality
+  console.warn('searchDeezerTrack not implemented yet');
+  return null;
+};
+
+export const storePlaylistCover = async (file: File, playlistId: string): Promise<string> => {
+  // Placeholder - implement playlist cover upload
+  console.warn('storePlaylistCover not implemented yet');
+  return '';
+};
+
+export const generateImageFromSongs = async (songs: any[]): Promise<string> => {
+  // Placeholder - implement image generation from songs
+  console.warn('generateImageFromSongs not implemented yet');
+  return '';
+};
