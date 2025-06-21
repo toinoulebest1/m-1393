@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
-import { isOneDriveEnabledSync } from './oneDriveStorage';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
@@ -9,14 +8,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
     return await uploadFileToDropbox(file, `audio/${fileName}`);
   }
   
-  // OneDrive seulement si Dropbox n'est pas activé ET OneDrive est configuré localement
-  if (!isDropboxEnabled() && isOneDriveEnabledSync()) {
-    console.log('Using OneDrive for file upload');
-    const { uploadFileToOneDrive } = await import('./oneDriveStorage');
-    return await uploadFileToOneDrive(file, `audio/${fileName}`);
-  }
-  
-  // Fallback vers Supabase
+  // Fallback vers Supabase (OneDrive complètement désactivé si Dropbox est configuré)
   console.log('Using Supabase for file upload');
   const { data, error } = await supabase.storage
     .from('audio')
@@ -54,22 +46,9 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       // Si Dropbox est activé mais échoue, aller directement vers Supabase
       // Ne pas essayer OneDrive si Dropbox est configuré
     }
-  } else {
-    // OneDrive seulement si Dropbox n'est PAS activé ET OneDrive est configuré localement
-    if (isOneDriveEnabledSync()) {
-      console.log('Using OneDrive for file retrieval (Dropbox not enabled)');
-      try {
-        const { getOneDriveSharedLink } = await import('./oneDriveStorage');
-        const url = await getOneDriveSharedLink(filePath);
-        console.log('✅ URL OneDrive récupérée:', url);
-        return url;
-      } catch (error) {
-        console.error('❌ Erreur OneDrive pour', filePath, ':', error);
-      }
-    }
   }
   
-  // Fallback vers Supabase
+  // Fallback vers Supabase (OneDrive complètement ignoré si Dropbox est configuré)
   console.log('Using Supabase for file retrieval');
   try {
     const { data: listData, error: listError } = await supabase.storage
