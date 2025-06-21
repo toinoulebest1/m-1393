@@ -55,6 +55,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nextAudioRef = useRef<HTMLAudioElement>(createNextAudio());
   const changeTimeoutRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
+  const [isAudioReady, setIsAudioReady] = useState(false);
 
   // Hook d'égaliseur
   const equalizer = useEqualizer({ audioElement: audioRef.current });
@@ -99,7 +100,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  // Restauration de la lecture au chargement - CORRIGÉ
+  // Restauration de la lecture au chargement - OPTIMISÉ
   useEffect(() => {
     const restorePlayback = async () => {
       const savedSong = localStorage.getItem('currentSong');
@@ -113,23 +114,48 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const song = JSON.parse(savedSong);
         try {
           console.log("🎵 Restauration de:", song.title);
+          setIsAudioReady(false);
+          
           const audioUrl = await getAudioFileUrl(song.url);
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
+          // Configuration audio avec gestion d'état
           audioRef.current.src = audioUrl;
+          audioRef.current.preload = "auto";
           
-          // Attendre que les métadonnées soient chargées avant de définir la position
-          const handleLoadedMetadata = () => {
+          // Gestionnaires d'événements pour le chargement
+          const handleCanPlay = () => {
+            console.log("🎵 Audio prêt à être lu");
+            setIsAudioReady(true);
+            
             if (savedProgressValue) {
               const savedTime = parseFloat(savedProgressValue);
               console.log("⏰ Restauration position à:", savedTime, "secondes");
               audioRef.current.currentTime = savedTime;
               setProgress((savedTime / audioRef.current.duration) * 100);
             }
-            audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            
+            // Nettoyer les event listeners
+            audioRef.current.removeEventListener('canplay', handleCanPlay);
+            audioRef.current.removeEventListener('error', handleError);
           };
 
-          audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+          const handleError = (error: any) => {
+            console.error("❌ Erreur chargement audio:", error);
+            setIsAudioReady(false);
+            localStorage.removeItem('currentSong');
+            localStorage.removeItem('audioProgress');
+            
+            // Nettoyer les event listeners
+            audioRef.current.removeEventListener('canplay', handleCanPlay);
+            audioRef.current.removeEventListener('error', handleError);
+          };
+
+          // Ajouter les event listeners
+          audioRef.current.addEventListener('canplay', handleCanPlay);
+          audioRef.current.addEventListener('error', handleError);
+          
+          // Démarrer le chargement
           audioRef.current.load();
           
           setCurrentSong(song);
@@ -139,28 +165,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
           setQueue(updatedQueue);
           
-          console.log("✅ Restauration terminée");
+          console.log("✅ Restauration initiée, attente du chargement...");
         } catch (error) {
           console.error("❌ Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');
           localStorage.removeItem('audioProgress');
+          setIsAudioReady(false);
         }
+      } else {
+        setIsAudioReady(true); // Prêt si pas de chanson à restaurer
       }
     };
 
     restorePlayback();
   }, []);
 
-  // Sauvegarde en temps réel de la position - AJOUTÉ
+  // Sauvegarde en temps réel de la position - OPTIMISÉ
   useEffect(() => {
     if (!audioRef.current) return;
 
     const handleTimeUpdate = () => {
       if (audioRef.current && currentSong && !isNaN(audioRef.current.currentTime)) {
         const currentTime = audioRef.current.currentTime;
-        localStorage.setItem('audioProgress', currentTime.toString());
         
-        // Mettre à jour le progress dans l'état aussi
+        // Sauvegarder seulement toutes les 2 secondes pour optimiser
+        if (Math.floor(currentTime) % 2 === 0) {
+          localStorage.setItem('audioProgress', currentTime.toString());
+        }
+        
+        // Mettre à jour le progress dans l'état
         if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
           const progressPercent = (currentTime / audioRef.current.duration) * 100;
           setProgress(progressPercent);
@@ -168,11 +201,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
+    const handleLoadStart = () => {
+      console.log("🔄 Début du chargement audio");
+      setIsAudioReady(false);
+    };
+
+    const handleCanPlay = () => {
+      console.log("✅ Audio prêt");
+      setIsAudioReady(true);
+    };
+
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('loadstart', handleLoadStart);
+    audioRef.current.addEventListener('canplay', handleCanPlay);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('loadstart', handleLoadStart);
+        audioRef.current.removeEventListener('canplay', handleCanPlay);
       }
     };
   }, [currentSong, setProgress]);
@@ -391,7 +438,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // L'objet context complet avec l'égaliseur
+  // L'objet context complet avec l'égaliseur - AJOUT isAudioReady
   const playerContext: PlayerContextType = {
     currentSong,
     isPlaying,
@@ -406,6 +453,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playbackRate,
     history,
     isChangingSong,
+    isAudioReady, // NOUVEAU
     stopCurrentSong,
     removeSong,
     setQueue,

@@ -1,5 +1,4 @@
-
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2 } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2, Loader2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -25,6 +24,7 @@ export const Player = () => {
     repeatMode,
     favorites,
     isChangingSong,
+    isAudioReady, // NOUVEAU
     isEqualizerInitialized,
     play,
     pause,
@@ -179,7 +179,7 @@ export const Player = () => {
 
   // Enhanced play/pause with audio verification
   const handlePlayPause = () => {
-    if (currentSong) {
+    if (currentSong && isAudioReady) {
       console.log("=== PLAY/PAUSE DEBUG ===");
       const audioElement = getCurrentAudioElement();
       if (audioElement) {
@@ -204,6 +204,10 @@ export const Player = () => {
       console.log("========================");
       
       isPlaying ? pause() : play();
+    } else if (!isAudioReady) {
+      toast.info("Chargement de l'audio en cours...", {
+        duration: 2000
+      });
     }
   };
 
@@ -246,11 +250,13 @@ export const Player = () => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
       {/* Overlay de chargement pour toute la longueur */}
-      {isChangingSong && (
+      {(isChangingSong || !isAudioReady) && (
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="flex items-center gap-3 bg-spotify-dark/80 px-4 py-2 rounded-full border border-spotify-border">
             <div className="w-4 h-4 border-2 border-spotify-accent border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-white font-medium">Chargement de la musique...</span>
+            <span className="text-sm text-white font-medium">
+              {isChangingSong ? "Chargement de la musique..." : "Préparation de l'audio..."}
+            </span>
           </div>
         </div>
       )}
@@ -287,20 +293,22 @@ export const Player = () => {
             <SkipBack
               className={cn(
                 "w-6 h-6 transition-colors cursor-pointer",
-                isChangingSong 
+                (isChangingSong || !isAudioReady)
                   ? "text-spotify-neutral/50 cursor-not-allowed" 
                   : "text-spotify-neutral hover:text-white"
               )}
-              onClick={isChangingSong ? undefined : previousSong}
+              onClick={(isChangingSong || !isAudioReady) ? undefined : previousSong}
             />
             <Button
               variant="ghost"
               size="icon"
               className="h-10 w-10 p-0 rounded-full bg-white hover:bg-white/10"
               onClick={handlePlayPause}
-              disabled={!currentSong}
+              disabled={!currentSong || (!isAudioReady && !isChangingSong)}
             >
-              {isPlaying ? (
+              {!isAudioReady && currentSong ? (
+                <Loader2 className="h-6 w-6 text-black animate-spin" />
+              ) : isPlaying ? (
                 <Pause className="h-6 w-6 text-black" />
               ) : (
                 <Play className="h-6 w-6 text-black" />
@@ -309,11 +317,11 @@ export const Player = () => {
             <SkipForward
               className={cn(
                 "w-6 h-6 transition-colors cursor-pointer",
-                isChangingSong 
+                (isChangingSong || !isAudioReady)
                   ? "text-spotify-neutral/50 cursor-not-allowed" 
                   : "text-spotify-neutral hover:text-white"
               )}
-              onClick={isChangingSong ? undefined : nextSong}
+              onClick={(isChangingSong || !isAudioReady) ? undefined : nextSong}
             />
             {repeatMode === 'none' && (
               <Repeat
@@ -345,7 +353,7 @@ export const Player = () => {
               step={0.1}
               className="flex-1"
               onValueChange={handleProgressChange}
-              disabled={isChangingSong || !currentSong}
+              disabled={isChangingSong || !currentSong || !isAudioReady}
             />
             <span className="text-xs text-spotify-neutral w-12">
               {formatTime(getCurrentAudioElement()?.duration || 0)}

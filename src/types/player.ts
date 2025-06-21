@@ -1,31 +1,13 @@
-
 export interface Song {
   id: string;
   title: string;
   artist: string;
-  duration: string;
+  duration?: string;
   url: string;
   imageUrl?: string;
-  bitrate?: string;
   genre?: string;
-}
-
-export interface FavoriteStat {
-  songId: string;
-  count: number;
-  lastUpdated: number;
-  song: Song;
-}
-
-export interface EqualizerSettings {
-  bands: Array<{
-    frequency: number;
-    gain: number;
-    type: BiquadFilterType;
-    Q?: number;
-  }>;
-  enabled: boolean;
-  preAmp: number;
+  created_at?: string;
+  user_id?: string;
 }
 
 export interface PlayerContextType {
@@ -35,17 +17,17 @@ export interface PlayerContextType {
   volume: number;
   queue: Song[];
   shuffleMode: boolean;
-  repeatMode: 'none' | 'one' | 'all';
+  repeatMode: 'none' | 'all' | 'one';
   favorites: Song[];
   searchQuery: string;
-  favoriteStats: FavoriteStat[];
+  favoriteStats: any;
   playbackRate: number;
   history: Song[];
   isChangingSong: boolean;
-  // Fonctions existantes
+  isAudioReady: boolean; // NOUVEAU
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
-  setQueue: (songs: Song[] | ((prevSongs: Song[]) => Song[])) => void;
+  setQueue: (queue: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
   pause: () => void;
@@ -61,22 +43,18 @@ export interface PlayerContextType {
   setSearchQuery: (query: string) => void;
   setPlaybackRate: (rate: number) => void;
   refreshCurrentSong: () => void;
-  getCurrentAudioElement: () => HTMLAudioElement | null;
-  // Nouvelles fonctions d'égaliseur
-  equalizerSettings: EqualizerSettings;
-  equalizerPresets: Array<{name: string; settings: EqualizerSettings}>;
+  getCurrentAudioElement: () => HTMLAudioElement;
+  
+  // Equalizer properties
+  equalizerSettings: number[];
+  equalizerPresets: Record<string, number[]>;
   currentEqualizerPreset: string | null;
   isEqualizerEnabled: boolean;
   isEqualizerInitialized: boolean;
-  updateEqualizerBand: (index: number, gain: number) => void;
+  updateEqualizerBand: (index: number, value: number) => void;
   applyEqualizerPreset: (presetName: string) => void;
   toggleEqualizer: () => void;
   resetEqualizer: () => void;
-  setEqualizerPreAmp: (gain: number) => void;
+  setEqualizerPreAmp: (value: number) => void;
   initializeEqualizer: () => void;
-}
-
-export interface PlayerPreferences {
-  crossfadeEnabled: boolean;
-  crossfadeDuration: number;
 }
