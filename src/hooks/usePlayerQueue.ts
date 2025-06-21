@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Song } from '@/types/player';
 import { toast } from 'sonner';
@@ -49,6 +50,14 @@ export const usePlayerQueue = ({
   const addToQueue = useCallback((song: Song) => {
     setQueueInternal(prevQueue => {
       const newQueue = [...prevQueue, song];
+      localStorage.setItem('queue', JSON.stringify(newQueue));
+      return newQueue;
+    });
+  }, []);
+
+  const removeSong = useCallback((songId: string) => {
+    setQueueInternal(prevQueue => {
+      const newQueue = prevQueue.filter(song => song.id !== songId);
       localStorage.setItem('queue', JSON.stringify(newQueue));
       return newQueue;
     });
@@ -195,6 +204,15 @@ export const usePlayerQueue = ({
     return queue[currentIndex + 1];
   }, [currentSong, queue]);
 
+  const getPreviousSong = useCallback((): Song | null => {
+    if (!currentSong || queue.length === 0) return null;
+    
+    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+    if (currentIndex <= 0) return null;
+    
+    return queue[currentIndex - 1];
+  }, [currentSong, queue]);
+
   return {
     queue,
     setQueue,
@@ -203,10 +221,12 @@ export const usePlayerQueue = ({
     repeatMode,
     setRepeatMode,
     addToQueue,
+    removeSong,
     toggleShuffle,
     toggleRepeat,
     nextSong,
     previousSong,
-    getNextSong
+    getNextSong,
+    getPreviousSong
   };
 };
