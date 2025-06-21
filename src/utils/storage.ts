@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
+import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
 import { isOneDriveEnabled, uploadFileToOneDrive, getOneDriveSharedLink } from './oneDriveStorage';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
@@ -31,36 +31,78 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 export const getAudioFileUrl = async (filePath: string): Promise<string> => {
+  console.log('🔍 Récupération URL pour:', filePath);
+  
   // Priorité à Dropbox, puis OneDrive, puis Supabase
   if (isDropboxEnabled()) {
     console.log('Getting file URL from Dropbox');
     try {
-      return await getDropboxSharedLink(filePath);
+      // Vérifier d'abord si le fichier existe sur Dropbox
+      const exists = await checkFileExistsOnDropbox(filePath);
+      if (!exists) {
+        console.warn('⚠️ Fichier non trouvé sur Dropbox:', filePath);
+        throw new Error('File not found on Dropbox');
+      }
+      
+      const url = await getDropboxSharedLink(filePath);
+      console.log('✅ URL Dropbox récupérée:', url);
+      return url;
     } catch (error) {
-      console.error('Error getting Dropbox shared link:', error);
-      // Fallback vers Supabase si Dropbox échoue
+      console.error('❌ Erreur Dropbox pour', filePath, ':', error);
+      // Continuer vers le fallback
     }
   } else if (isOneDriveEnabled()) {
     console.log('Getting file URL from OneDrive');
     try {
-      return await getOneDriveSharedLink(filePath);
+      const url = await getOneDriveSharedLink(filePath);
+      console.log('✅ URL OneDrive récupérée:', url);
+      return url;
     } catch (error) {
-      console.error('Error getting OneDrive shared link:', error);
-      // Fallback vers Supabase si OneDrive échoue
+      console.error('❌ Erreur OneDrive pour', filePath, ':', error);
+      // Continuer vers le fallback
     }
   }
   
   console.log('Getting file URL from Supabase');
-  // Fallback vers Supabase
-  const { data } = await supabase.storage
-    .from('audio')
-    .createSignedUrl(filePath, 3600);
+  try {
+    // Vérifier d'abord si le fichier existe dans Supabase
+    const { data: listData, error: listError } = await supabase.storage
+      .from('audio')
+      .list('', {
+        search: filePath
+      });
 
-  if (!data?.signedUrl) {
-    throw new Error('Failed to get file URL from Supabase');
+    if (listError) {
+      console.error('❌ Erreur liste Supabase:', listError);
+      throw new Error(`Supabase list error: ${listError.message}`);
+    }
+
+    if (!listData || listData.length === 0) {
+      console.warn('⚠️ Fichier non trouvé dans Supabase:', filePath);
+      throw new Error(`File not found in Supabase storage: ${filePath}`);
+    }
+
+    // Créer l'URL signée
+    const { data, error } = await supabase.storage
+      .from('audio')
+      .createSignedUrl(filePath, 3600);
+
+    if (error) {
+      console.error('❌ Erreur création URL signée:', error);
+      throw new Error(`Supabase signed URL error: ${error.message}`);
+    }
+
+    if (!data?.signedUrl) {
+      console.error('❌ URL signée vide');
+      throw new Error('Failed to get file URL from Supabase');
+    }
+
+    console.log('✅ URL Supabase récupérée');
+    return data.signedUrl;
+  } catch (error) {
+    console.error('❌ Erreur complète récupération URL:', error);
+    throw new Error(`Unable to retrieve file: ${filePath}. File may not exist in any storage system.`);
   }
-
-  return data.signedUrl;
 };
 
 // Legacy alias for backward compatibility

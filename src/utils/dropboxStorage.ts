@@ -1,4 +1,3 @@
-
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -69,7 +68,14 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
       })
     });
     
-    return response.ok;
+    if (response.ok) {
+      console.log('✅ Fichier existe sur Dropbox:', dropboxPath);
+      return true;
+    } else {
+      const errorData = await response.json();
+      console.warn('⚠️ Fichier non trouvé sur Dropbox:', dropboxPath, errorData);
+      return false;
+    }
   } catch (error) {
     console.error('Error checking if file exists on Dropbox:', error);
     return false;
@@ -223,9 +229,19 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
       
       if (!listResponse.ok) {
         const errorText = await listResponse.text();
-        console.error('Failed to list shared links:', errorText);
-        toast.error("Impossible de récupérer le lien de partage");
-        throw new Error('Failed to list shared links');
+        console.error('❌ Failed to list shared links:', errorText);
+        
+        // Parse l'erreur pour voir si c'est un fichier non trouvé
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error && errorData.error.path && errorData.error.path['.tag'] === 'not_found') {
+            throw new Error(`File not found on Dropbox: ${dropboxPath}`);
+          }
+        } catch (parseError) {
+          // Ignore parse error, throw original error
+        }
+        
+        throw new Error(`Failed to list shared links: ${listResponse.status} ${listResponse.statusText}`);
       }
       
       const listData = await listResponse.json();
@@ -236,17 +252,27 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
         url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
         url = url.replace('?dl=0', '');
         
+        console.log('✅ URL partagée Dropbox récupérée:', url);
         return url;
       }
       
-      toast.error("Aucun lien de partage trouvé");
-      throw new Error('No shared links found');
+      throw new Error('No shared links found for this file');
     }
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Dropbox shared link error:', errorText);
-      toast.error("Impossible de créer un lien de partage");
+      
+      // Parse l'erreur pour des messages plus clairs
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error && errorData.error.path && errorData.error.path['.tag'] === 'not_found') {
+          throw new Error(`File not found on Dropbox: ${dropboxPath}`);
+        }
+      } catch (parseError) {
+        // Ignore parse error, throw original error
+      }
+      
       throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
     }
     
@@ -257,10 +283,10 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
     url = url.replace('?dl=0', '');
     
+    console.log('✅ URL partagée Dropbox créée:', url);
     return url;
   } catch (error) {
     console.error('Error getting Dropbox shared link:', error);
-    toast.error("Impossible d'obtenir un lien de partage Dropbox");
     throw error;
   }
 };

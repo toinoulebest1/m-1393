@@ -133,9 +133,13 @@ export const useAudioControl = ({
         }).catch(error => {
           console.error("❌ Erreur récupération réseau:", error.message);
           
-          // Gestion spécifique des erreurs OneDrive
+          // Gestion spécifique des erreurs
           if (error.message.includes('OneDrive') || error.message.includes('jeton')) {
             throw new Error('OneDrive non configuré ou jeton expiré. Veuillez configurer OneDrive dans les paramètres.');
+          }
+          
+          if (error.message.includes('not found') || error.message.includes('File not found')) {
+            throw new Error(`Fichier audio introuvable: ${song.title}. Le fichier a peut-être été supprimé du stockage.`);
           }
           
           throw error;
@@ -277,6 +281,18 @@ export const useAudioControl = ({
           onClick: () => {
             // Rediriger vers les paramètres OneDrive
             window.location.href = '/onedrive-settings';
+          }
+        }
+      });
+    } else if (error.message?.includes('Fichier audio introuvable') || error.message?.includes('not found')) {
+      toast.error("Fichier audio introuvable", {
+        description: `La chanson "${song?.title || 'inconnue'}" n'est plus disponible dans le stockage`,
+        duration: 8000,
+        action: {
+          label: "Passer",
+          onClick: () => {
+            // Passer à la chanson suivante si possible
+            console.log("Passage à la chanson suivante...");
           }
         }
       });
