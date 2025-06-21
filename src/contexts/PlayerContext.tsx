@@ -99,33 +99,49 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
-  // Restauration de la lecture au chargement
+  // Restauration de la lecture au chargement - CORRIGÉ
   useEffect(() => {
     const restorePlayback = async () => {
       const savedSong = localStorage.getItem('currentSong');
-      const savedProgress = localStorage.getItem('audioProgress');
+      const savedProgressValue = localStorage.getItem('audioProgress');
+      
+      console.log("🔄 Restauration de la lecture...");
+      console.log("Chanson sauvegardée:", savedSong ? "OUI" : "NON");
+      console.log("Position sauvegardée:", savedProgressValue);
       
       if (savedSong) {
         const song = JSON.parse(savedSong);
         try {
+          console.log("🎵 Restauration de:", song.title);
           const audioUrl = await getAudioFileUrl(song.url);
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
           audioRef.current.src = audioUrl;
+          
+          // Attendre que les métadonnées soient chargées avant de définir la position
+          const handleLoadedMetadata = () => {
+            if (savedProgressValue) {
+              const savedTime = parseFloat(savedProgressValue);
+              console.log("⏰ Restauration position à:", savedTime, "secondes");
+              audioRef.current.currentTime = savedTime;
+              setProgress((savedTime / audioRef.current.duration) * 100);
+            }
+            audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          };
+
+          audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
           audioRef.current.load();
           
-          if (savedProgress) {
-            audioRef.current.currentTime = parseFloat(savedProgress);
-          }
-
           setCurrentSong(song);
           const updatedQueue = [...queue];
           if (!updatedQueue.some(s => s.id === song.id)) {
             updatedQueue.unshift(song);
           }
           setQueue(updatedQueue);
+          
+          console.log("✅ Restauration terminée");
         } catch (error) {
-          console.error("Erreur lors de la restauration de la lecture:", error);
+          console.error("❌ Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');
           localStorage.removeItem('audioProgress');
         }
@@ -134,6 +150,32 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     restorePlayback();
   }, []);
+
+  // Sauvegarde en temps réel de la position - AJOUTÉ
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (audioRef.current && currentSong && !isNaN(audioRef.current.currentTime)) {
+        const currentTime = audioRef.current.currentTime;
+        localStorage.setItem('audioProgress', currentTime.toString());
+        
+        // Mettre à jour le progress dans l'état aussi
+        if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+          const progressPercent = (currentTime / audioRef.current.duration) * 100;
+          setProgress(progressPercent);
+        }
+      }
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      }
+    };
+  }, [currentSong, setProgress]);
 
   // Persistance des données
   useEffect(() => {
