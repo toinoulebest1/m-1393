@@ -37,11 +37,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <PlayerProvider>
-          <CastProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+        <BrowserRouter>
+          <PlayerProvider>
+            <CastProvider>
+              <Toaster />
+              <Sonner />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<LayoutWrapper />}>
@@ -60,9 +60,9 @@ function App() {
                   <Route path="maintenance-admin" element={<MaintenanceAdmin />} />
                 </Route>
               </Routes>
-            </BrowserRouter>
-          </CastProvider>
-        </PlayerProvider>
+            </CastProvider>
+          </PlayerProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
