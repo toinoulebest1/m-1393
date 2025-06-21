@@ -37,6 +37,15 @@ export const SyncedLyricsView: React.FC = () => {
     accent: [75, 20, 95] as [number, number, number]
   };
 
+  // Debug log to check if currentSong is available
+  useEffect(() => {
+    console.log('SyncedLyricsView: currentSong =', currentSong);
+    if (currentSong) {
+      console.log('SyncedLyricsView: Song title =', currentSong.title);
+      console.log('SyncedLyricsView: Song artist =', currentSong.artist);
+    }
+  }, [currentSong]);
+
   // Utiliser un useEffect pour mettre à jour le temps actuel périodiquement
   useEffect(() => {
     // Nettoyer l'intervalle précédent si existant
@@ -151,24 +160,6 @@ export const SyncedLyricsView: React.FC = () => {
     }
   }, [currentSong, progress, isPlaying]);
 
-  // Animation effects setup
-  useEffect(() => {
-    setAnimationStage("entry");
-    
-    // Handle escape key to close
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-  
   // Extract colors from the album art
   useEffect(() => {
     const extractColors = async () => {
@@ -210,7 +201,8 @@ export const SyncedLyricsView: React.FC = () => {
   // Detect song change and show loading overlay if applicable
   useEffect(() => {
     if (currentSong && currentSong.id !== currentSongId) {
-      setIsChangingSong(true); // Début du changement de chanson
+      console.log('SyncedLyricsView: Song changed, loading lyrics for:', currentSong.title);
+      setIsChangingSong(true);
       setParsedLyrics(null);
       setLyricsText(null);
       setError(null);
@@ -218,57 +210,25 @@ export const SyncedLyricsView: React.FC = () => {
       setCurrentSongId(currentSong.id);
       fetchLyrics(currentSong.id);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id]);
 
-  // Lorsque les paroles (lyrics) sont chargées, enlever l'overlay de chargement
+  // Animation effects setup
   useEffect(() => {
-    // Retirer l'overlay si on arrête de loader ET qu'on a song et ses paroles (ou message d'erreur)
-    if (isChangingSong && !isLoadingLyrics) {
-      // Petite latence visuelle si besoin
-      setTimeout(() => setIsChangingSong(false), 350);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingLyrics]);
-
-  // Gérer l'état de chargement audio
-  useEffect(() => {
-    let audio: HTMLAudioElement | null = null;
-    let waitingHandler: (() => void) | null = null;
-    let playingHandler: (() => void) | null = null;
-
-    // Fonction pour attacher les handlers sur la nouvelle balise audio
-    const setupAudioHandlers = () => {
-      audio = document.querySelector('audio');
-      if (!audio) return;
-
-      // Toujours mettre isAudioLoading à true au début
-      setIsAudioLoading(true);
-
-      waitingHandler = () => {
-        setIsAudioLoading(true);
-      };
-      playingHandler = () => {
-        setIsAudioLoading(false); // Charger se termine quand la lecture démarre vraiment
-      };
-
-      audio.addEventListener('waiting', waitingHandler);
-      audio.addEventListener('playing', playingHandler);
-    };
-
-    // On attend un court moment pour laisser le DOM mettre le nouvel <audio>
-    const timeout = setTimeout(() => {
-      setupAudioHandlers();
-    }, 120);
-
-    return () => {
-      clearTimeout(timeout);
-      if (audio) {
-        if (waitingHandler) audio.removeEventListener('waiting', waitingHandler);
-        if (playingHandler) audio.removeEventListener('playing', playingHandler);
+    setAnimationStage("entry");
+    
+    // Handle escape key to close
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
       }
     };
-  }, [currentSong?.id]);
+
+    window.addEventListener("keydown", handleKeyDown);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
@@ -309,58 +269,18 @@ export const SyncedLyricsView: React.FC = () => {
       console.error('SyncedLyricsView: Error fetching lyrics', error);
     } finally {
       setIsLoadingLyrics(false);
+      setIsChangingSong(false);
     }
   };
 
   const handleClose = () => {
     setAnimationStage("exit");
     setTimeout(() => {
-      // Instead of navigate(-1), navigate to a specific route
-      // This ensures we always have a valid route to go back to
-      navigate("/search");
+      navigate("/");
     }, 150);
   };
 
-  // Format time for display
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds)) return "0:00";
-    
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  // Format duration for display
-  const formatDuration = (duration: string | undefined) => {
-    if (!duration) return "0:00";
-    
-    try {
-      if (duration.includes(':')) {
-        return duration;
-      }
-      
-      const durationInSeconds = parseFloat(duration);
-      if (isNaN(durationInSeconds)) return "0:00";
-      
-      const minutes = Math.floor(durationInSeconds / 60);
-      const seconds = Math.floor(durationInSeconds % 60);
-      
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } catch {
-      return "0:00";
-    }
-  };
-
-  // Function to handle play/pause
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      pause();
-    } else {
-      play();
-    }
-  };
-
+  // Generate lyrics function
   const generateLyrics = async () => {
     if (!currentSong?.artist) {
       setError("Impossible de récupérer les paroles sans le nom de l'artiste.");
@@ -419,72 +339,85 @@ export const SyncedLyricsView: React.FC = () => {
     }
   };
 
+  // Format time for display
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return "0:00";
+    
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Format duration for display
+  const formatDuration = (duration: string | undefined) => {
+    if (!duration) return "0:00";
+    
+    try {
+      if (duration.includes(':')) {
+        return duration;
+      }
+      
+      const durationInSeconds = parseFloat(duration);
+      if (isNaN(durationInSeconds)) return "0:00";
+      
+      const minutes = Math.floor(durationInSeconds / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } catch {
+      return "0:00";
+    }
+  };
+
+  // Function to handle play/pause
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  };
+
+  // If no current song, show message to start music
   if (!currentSong) {
+    console.log('SyncedLyricsView: No current song, showing fallback message');
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-b from-spotify-dark to-black p-4">
-        <div className="text-center">
-          <Mic className="w-12 h-12 text-spotify-accent mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Pas de chanson en cours</h2>
-          <p className="text-spotify-neutral mb-6">Lancez une chanson pour voir les paroles synchronisées</p>
-          <Button onClick={() => navigate("/search")} variant="outline" className="gap-2">
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-b from-spotify-dark to-black p-4">
+        <div className="text-center max-w-md">
+          <Mic className="w-16 h-16 text-spotify-accent mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-white mb-4">Pas de chanson en cours</h2>
+          <p className="text-spotify-neutral mb-8 text-lg">
+            Lancez une chanson depuis la page principale pour voir les paroles synchronisées
+          </p>
+          <Button onClick={() => navigate("/")} variant="outline" className="gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Retour
+            Retour à l'accueil
           </Button>
         </div>
       </div>
     );
   }
 
-  // Ajout de la définition de bgStyle
+  // Background style with color extraction
   const bgStyle = dominantColor ? {
     background: `radial-gradient(circle at center, 
       rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.8) 0%, 
       rgba(0, 0, 0, 0.95) 100%)`,
-    willChange: 'transform',
-    transform: 'translateZ(0)',
   } : {};
-
-  // Calculer la durée en secondes pour le formatage
-  const getDurationInSeconds = () => {
-    if (!currentSong?.duration) return 0;
-    
-    try {
-      if (typeof currentSong.duration === 'string' && currentSong.duration.includes(':')) {
-        const [minutes, seconds] = currentSong.duration.split(':').map(Number);
-        return minutes * 60 + seconds;
-      } else {
-        return parseFloat(String(currentSong.duration));
-      }
-    } catch {
-      return 0;
-    }
-  };
-  
-  // Obtenir le temps actuel de l'audio
-  const getCurrentAudioTime = () => {
-    const audio = getCurrentAudioElement();
-    return audio ? audio.currentTime : 0;
-  };
 
   return (
     <div className={cn(
       "fixed inset-0 z-[100] flex flex-col",
       animationStage === "entry" ? "animate-fade-in" : "opacity-0 transition-opacity duration-200"
     )}>
-      {/* === Overlay de chargement de la chanson (flux audio) === */}
+      {/* Loading overlay for song changes */}
       {(isChangingSong || isAudioLoading) && (
         <div className="absolute z-50 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all animate-fade-in">
           <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-background/80 shadow-lg border border-white/10">
             <Loader2 className="h-8 w-8 text-spotify-accent animate-spin" />
             <span className="text-lg font-semibold text-white">
-              {isAudioLoading
-                ? "Chargement de la musique en cours..."
-                : "Changement de chanson..."}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {isAudioLoading
-                ? "Veuillez patienter, la lecture démarre bientôt"
-                : "Veuillez patienter pendant le chargement des nouvelles paroles."}
+              Chargement des paroles...
             </span>
           </div>
         </div>
@@ -495,7 +428,6 @@ export const SyncedLyricsView: React.FC = () => {
         className="absolute inset-0 z-0"
         style={bgStyle}
       >
-        {/* Blur overlay */}
         <div 
           className="absolute inset-0 z-1 bg-black bg-opacity-40"
           style={{
@@ -503,20 +435,9 @@ export const SyncedLyricsView: React.FC = () => {
             WebkitBackdropFilter: "blur(30px)",
           }}
         />
-
-        {/* Light spot */}
-        {accentColor && (
-          <div
-            className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full opacity-10 blur-[100px]"
-            style={{
-              background: `radial-gradient(circle at center, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.6) 0%, rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0) 70%)`,
-              willChange: 'transform',
-            }}
-          />
-        )}
       </div>
 
-      {/* Content */}
+      {/* Main content */}
       <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden relative z-10">
         {/* Left side - Song information */}
         <div className="flex flex-col items-center md:items-start justify-center md:w-1/3 h-[30%] md:h-full md:pr-8">
@@ -532,16 +453,15 @@ export const SyncedLyricsView: React.FC = () => {
                   boxShadow: accentColor ? `0 0 20px 2px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.4)` : undefined,
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-spotify-accent/30 to-transparent rounded-lg" />
             </div>
           )}
           
-          {/* Player Controls - Added below image and above title/artist */}
-          <div className="w-full mb-4 transition-all duration-200">
+          {/* Player Controls */}
+          <div className="w-full mb-4">
             {/* Progress display */}
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-spotify-neutral">
-                {formatTime(getCurrentAudioTime())}
+                {formatTime(currentTime)}
               </span>
               <span className="text-spotify-neutral">
                 {formatDuration(currentSong?.duration)}
@@ -549,26 +469,18 @@ export const SyncedLyricsView: React.FC = () => {
             </div>
             
             {/* Progress bar */}
-            <div className="flex items-center">
+            <div className="flex items-center mb-4">
               <Slider
-                value={[displayedProgress]}
+                value={[progress]}
                 max={100}
                 step={0.1}
                 className="flex-grow"
-                onValueChange={(value) => {
-                  const audio = getCurrentAudioElement();
-                  if (audio && currentSong?.duration) {
-                    const durationInSeconds = getDurationInSeconds();
-                    const newTime = (value[0] / 100) * durationInSeconds;
-                    audio.currentTime = newTime;
-                    setDisplayedProgress(value[0]);
-                  }
-                }}
+                onValueChange={(value) => setProgress(value[0])}
               />
             </div>
             
             {/* Playback controls */}
-            <div className="flex items-center justify-center space-x-4 mt-4">
+            <div className="flex items-center justify-center space-x-4">
               <Button 
                 variant="ghost"
                 size="icon"
@@ -611,7 +523,7 @@ export const SyncedLyricsView: React.FC = () => {
             </p>
           </div>
           
-          {/* Generate lyrics button (only shown when no lyrics) */}
+          {/* Generate lyrics button */}
           {!lyricsText && !isGenerating && (
             <Button
               onClick={generateLyrics}
@@ -642,12 +554,7 @@ export const SyncedLyricsView: React.FC = () => {
         {/* Right side - Lyrics content */}
         <div className="flex-grow h-[70%] md:h-full md:max-h-full overflow-hidden md:w-2/3 md:pl-8 md:border-l border-white/10">
           <div className="h-full w-full flex flex-col">
-            {isGenerating ? (
-              <div className="flex-grow flex flex-col items-center justify-center text-center">
-                <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
-                <span className="text-lg text-spotify-neutral">Génération des paroles en cours...</span>
-              </div>
-            ) : isLoadingLyrics ? (
+            {isLoadingLyrics ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
@@ -708,41 +615,31 @@ export const SyncedLyricsView: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Mic className="w-12 h-12 text-spotify-accent mb-4" />
                   <h2 className="text-xl font-bold text-white mb-2">
-                    Pas de paroles synchronisées disponibles
+                    Pas de paroles disponibles
                   </h2>
-                  <p className="text-spotify-neutral max-w-md">
-                    Cette chanson n'a pas de paroles synchronisées ou le format n'est pas pris en charge
+                  <p className="text-spotify-neutral max-w-md mb-6">
+                    Cette chanson n'a pas de paroles synchronisées
                   </p>
+                  
+                  <Button
+                    onClick={generateLyrics}
+                    disabled={isGenerating || !currentSong.artist}
+                    variant="outline"
+                    className="mx-auto"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Music className="h-4 w-4 mr-2" />
+                    )}
+                    Récupérer les paroles
+                  </Button>
                 </div>
-                
-                <Button
-                  onClick={generateLyrics}
-                  disabled={isGenerating || !currentSong.artist}
-                  variant="outline"
-                  className="mt-6 mx-auto"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Music className="h-4 w-4 mr-2" />
-                  )}
-                  Récupérer les paroles
-                </Button>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Styles fixes */}
-      <style>
-        {`
-        @keyframes fadeIn {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        `}
-      </style>
     </div>
   );
 };
