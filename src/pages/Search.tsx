@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -414,248 +415,157 @@ const Search = () => {
   ];
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-6xl mx-auto p-8 pb-32">
-          <style>
-            {`
-            @keyframes pulse-glow {
-              0%, 100% {
-                transform: scale(1);
-                box-shadow: none;
+    <Layout>
+      <div className="w-full h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto w-full">
+          <div className="max-w-6xl mx-auto p-8 pb-32">
+            <style>
+              {`
+              @keyframes pulse-glow {
+                0%, 100% {
+                  transform: scale(1);
+                  box-shadow: none;
+                }
+                50% {
+                  transform: scale(1.02);
+                  box-shadow: var(--glow-shadow);
+                }
               }
-              50% {
-                transform: scale(1.02);
-                box-shadow: var(--glow-shadow);
+
+              @keyframes gradient {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
               }
-            }
 
-            @keyframes gradient {
-              0% { background-position: 0% 50%; }
-              50% { background-position: 100% 50%; }
-              100% { background-position: 0% 50%; }
-            }
+              .animate-gradient {
+                background-size: 200% 200%;
+                animation: gradient 3s linear infinite;
+              }
 
-            .animate-gradient {
-              background-size: 200% 200%;
-              animation: gradient 3s linear infinite;
-            }
+              .animate-pulse-glow {
+                animation: pulse-glow 3s ease-in-out infinite;
+              }
+            `}
+            </style>
 
-            .animate-pulse-glow {
-              animation: pulse-glow 3s ease-in-out infinite;
-            }
-          `}
-          </style>
-
-          <div className="mb-8">
-            <div className="flex gap-4 mb-6">
-              <div className="relative flex-1 group">
-                <SearchIcon className={cn(
-                  "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 transition-all duration-300",
-                  "group-focus-within:text-primary group-hover:text-primary",
-                  "group-focus-within:scale-110 group-hover:scale-110"
-                )} />
-                <Input
-                  type="text"
-                  placeholder={
-                    searchFilter === "playlist" ? "Rechercher une playlist..." :
-                    searchFilter === "genre" ? "Sélectionnez un genre..." : 
-                    "Rechercher une chanson ou un artiste (ou * pour tout afficher)"
-                  }
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className={cn(
-                    "pl-10 transition-all duration-300",
-                    "border-2 focus:border-primary",
-                    "shadow-sm hover:shadow-md focus:shadow-lg",
-                    "transform-gpu",
-                    "animate-fade-in",
-                    "bg-gradient-to-r from-transparent via-transparent to-transparent",
-                    "hover:bg-gradient-to-r hover:from-purple-50 hover:via-indigo-50 hover:to-purple-50",
-                    "focus:bg-gradient-to-r focus:from-purple-50 focus:via-indigo-50 focus:to-purple-50",
-                    "dark:hover:from-purple-900/10 dark:hover:via-indigo-900/10 dark:hover:to-purple-900/10",
-                    "dark:focus:from-purple-900/10 dark:focus:via-indigo-900/10 dark:focus:to-purple-900/10"
-                  )}
-                  style={{
-                    backgroundSize: '200% 100%',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.backgroundPosition = '100% 0';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.backgroundPosition = '0 0';
-                  }}
-                  disabled={searchFilter === "genre"}
-                />
-                <div className={cn(
-                  "absolute inset-0 pointer-events-none",
-                  "opacity-0 group-focus-within:opacity-100",
-                  "transition-all duration-500",
-                  "rounded-md",
-                  "bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10",
-                  "animate-gradient",
-                  "group-focus-within:animate-[glow_1.5s_ease-in-out_infinite]"
-                )} />
-              </div>
-
-              <VoiceSearchButton onVoiceResult={handleVoiceResult} />
-
-              {searchFilter === "genre" && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Music className="h-4 w-4" />
-                      <span className="text-sm">
-                        {selectedGenre || "Sélectionner un genre"}
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {GENRES.map((genre) => (
-                      <DropdownMenuItem 
-                        key={genre}
-                        onClick={() => setSelectedGenre(genre)}
-                      >
-                        {genre}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-
-            {/* New Tab Filter System */}
-            <Tabs 
-              value={searchFilter} 
-              onValueChange={(value) => {
-                setSearchFilter(value as typeof searchFilter);
-                setSelectedGenre("");
-              }}
-              className="w-full mb-6"
-            >
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="all" className="flex items-center gap-2">
-                  <SearchIcon className="h-4 w-4" />
-                  Tout
-                </TabsTrigger>
-                <TabsTrigger value="title" className="flex items-center gap-2">
-                  <Music className="h-4 w-4" />
-                  Titre
-                </TabsTrigger>
-                <TabsTrigger value="artist" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Artiste
-                </TabsTrigger>
-                <TabsTrigger value="playlist" className="flex items-center gap-2">
-                  <List className="h-4 w-4" />
-                  Playlist
-                </TabsTrigger>
-                <TabsTrigger value="genre" className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Genre
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-              </div>
-            ) : searchFilter === "playlist" ? (
-              // Show only playlists for playlist filter
-              playlistResults.length > 0 ? (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {playlistResults.map((playlist, index) => (
-                      <div
-                        key={playlist.id}
-                        style={{ 
-                          animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                          opacity: 0,
-                        }}
-                        onClick={() => handlePlaylistClick(playlist)}
-                        className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          {playlist.cover_image_url ? (
-                            <img 
-                              src={playlist.cover_image_url} 
-                              alt={playlist.name}
-                              className="w-16 h-16 rounded object-cover"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
-                              <List className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium truncate">{playlist.name}</h4>
-                            {playlist.description && (
-                              <p className="text-sm text-muted-foreground truncate">
-                                {playlist.description}
-                              </p>
-                            )}
-                            {playlist.isSharedByFriend && playlist.profiles?.username && (
-                              <p className="text-xs text-blue-400 font-medium">
-                                Partagée par {playlist.profiles.username}
-                              </p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              Mise à jour {formatRelativeTime(playlist.updated_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            <div className="mb-8">
+              <div className="flex gap-4 mb-6">
+                <div className="relative flex-1 group">
+                  <SearchIcon className={cn(
+                    "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 transition-all duration-300",
+                    "group-focus-within:text-primary group-hover:text-primary",
+                    "group-focus-within:scale-110 group-hover:scale-110"
+                  )} />
+                  <Input
+                    type="text"
+                    placeholder={
+                      searchFilter === "playlist" ? "Rechercher une playlist..." :
+                      searchFilter === "genre" ? "Sélectionnez un genre..." : 
+                      "Rechercher une chanson ou un artiste (ou * pour tout afficher)"
+                    }
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className={cn(
+                      "pl-10 transition-all duration-300",
+                      "border-2 focus:border-primary",
+                      "shadow-sm hover:shadow-md focus:shadow-lg",
+                      "transform-gpu",
+                      "animate-fade-in",
+                      "bg-gradient-to-r from-transparent via-transparent to-transparent",
+                      "hover:bg-gradient-to-r hover:from-purple-50 hover:via-indigo-50 hover:to-purple-50",
+                      "focus:bg-gradient-to-r focus:from-purple-50 focus:via-indigo-50 focus:to-purple-50",
+                      "dark:hover:from-purple-900/10 dark:hover:via-indigo-900/10 dark:hover:to-purple-900/10",
+                      "dark:focus:from-purple-900/10 dark:focus:via-indigo-900/10 dark:focus:to-purple-900/10"
+                    )}
+                    style={{
+                      backgroundSize: '200% 100%',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.backgroundPosition = '100% 0';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.backgroundPosition = '0 0';
+                    }}
+                    disabled={searchFilter === "genre"}
+                  />
+                  <div className={cn(
+                    "absolute inset-0 pointer-events-none",
+                    "opacity-0 group-focus-within:opacity-100",
+                    "transition-all duration-500",
+                    "rounded-md",
+                    "bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10",
+                    "animate-gradient",
+                    "group-focus-within:animate-[glow_1.5s_ease-in-out_infinite]"
+                  )} />
                 </div>
-              ) : searchQuery ? (
-                <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                  Aucune playlist trouvée pour "{searchQuery}"
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                  Commencez à taper pour rechercher des playlists...
-                </div>
-              )
-            ) : searchFilter === "all" && (results.length > 0 || playlistResults.length > 0) ? (
-              // Show both songs and playlists for "all" filter
-              <div className="space-y-6">
-                {results.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Chansons</h3>
-                    <div className="space-y-2">
-                      {results.map((song, index) => {
-                        const isFavorite = favorites.some(s => s.id === song.id);
-                        const isCurrentSong = currentSong?.id === song.id;
-                        
-                        return (
-                          <div
-                            key={song.id}
-                            style={{ 
-                              animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                              opacity: 0,
-                            }}
-                            onClick={() => handlePlay(song)}
-                          >
-                            <SongCard
-                              song={song}
-                              isCurrentSong={isCurrentSong}
-                              isFavorite={isFavorite}
-                              dominantColor={dominantColor}
-                              onLyricsClick={handleLyricsNavigation}
-                              onReportClick={() => setSongToReport(song)}
-                              contextMenuItems={songCardContextMenu(song)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+
+                <VoiceSearchButton onVoiceResult={handleVoiceResult} />
+
+                {searchFilter === "genre" && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <Music className="h-4 w-4" />
+                        <span className="text-sm">
+                          {selectedGenre || "Sélectionner un genre"}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {GENRES.map((genre) => (
+                        <DropdownMenuItem 
+                          key={genre}
+                          onClick={() => setSelectedGenre(genre)}
+                        >
+                          {genre}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
-                
-                {playlistResults.length > 0 && (
+              </div>
+
+              {/* New Tab Filter System */}
+              <Tabs 
+                value={searchFilter} 
+                onValueChange={(value) => {
+                  setSearchFilter(value as typeof searchFilter);
+                  setSelectedGenre("");
+                }}
+                className="w-full mb-6"
+              >
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="all" className="flex items-center gap-2">
+                    <SearchIcon className="h-4 w-4" />
+                    Tout
+                  </TabsTrigger>
+                  <TabsTrigger value="title" className="flex items-center gap-2">
+                    <Music className="h-4 w-4" />
+                    Titre
+                  </TabsTrigger>
+                  <TabsTrigger value="artist" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Artiste
+                  </TabsTrigger>
+                  <TabsTrigger value="playlist" className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    Playlist
+                  </TabsTrigger>
+                  <TabsTrigger value="genre" className="flex items-center gap-2">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Genre
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                </div>
+              ) : searchFilter === "playlist" ? (
+                // Show only playlists for playlist filter
+                playlistResults.length > 0 ? (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -663,7 +573,7 @@ const Search = () => {
                         <div
                           key={playlist.id}
                           style={{ 
-                            animation: `fadeIn 0.3s ease-out forwards ${(results.length + index) * 50}ms`,
+                            animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
                             opacity: 0,
                           }}
                           onClick={() => handlePlaylistClick(playlist)}
@@ -702,55 +612,148 @@ const Search = () => {
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            ) : results.length > 0 ? (
-              // Show only songs for other filters
-              <div className="space-y-2">
-                {results.map((song, index) => {
-                  const isFavorite = favorites.some(s => s.id === song.id);
-                  const isCurrentSong = currentSong?.id === song.id;
-                  
-                  return (
-                    <div
-                      key={song.id}
-                      style={{ 
-                        animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                        opacity: 0,
-                      }}
-                      onClick={() => handlePlay(song)}
-                    >
-                      <SongCard
-                        song={song}
-                        isCurrentSong={isCurrentSong}
-                        isFavorite={isFavorite}
-                        dominantColor={dominantColor}
-                        onLyricsClick={handleLyricsNavigation}
-                        onReportClick={() => setSongToReport(song)}
-                        contextMenuItems={songCardContextMenu(song)}
-                      />
+                ) : searchQuery ? (
+                  <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                    Aucune playlist trouvée pour "{searchQuery}"
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                    Commencez à taper pour rechercher des playlists...
+                  </div>
+                )
+              ) : searchFilter === "all" && (results.length > 0 || playlistResults.length > 0) ? (
+                // Show both songs and playlists for "all" filter
+                <div className="space-y-6">
+                  {results.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Chansons</h3>
+                      <div className="space-y-2">
+                        {results.map((song, index) => {
+                          const isFavorite = favorites.some(s => s.id === song.id);
+                          const isCurrentSong = currentSong?.id === song.id;
+                          
+                          return (
+                            <div
+                              key={song.id}
+                              style={{ 
+                                animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                                opacity: 0,
+                              }}
+                              onClick={() => handlePlay(song)}
+                            >
+                              <SongCard
+                                song={song}
+                                isCurrentSong={isCurrentSong}
+                                isFavorite={isFavorite}
+                                dominantColor={dominantColor}
+                                onLyricsClick={handleLyricsNavigation}
+                                onReportClick={() => setSongToReport(song)}
+                                contextMenuItems={songCardContextMenu(song)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : searchQuery ? (
-              <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                Aucun résultat trouvé pour "{searchQuery}"
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground animate-fade-in">
-                Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
-              </div>
-            )}
+                  )}
+                  
+                  {playlistResults.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {playlistResults.map((playlist, index) => (
+                          <div
+                            key={playlist.id}
+                            style={{ 
+                              animation: `fadeIn 0.3s ease-out forwards ${(results.length + index) * 50}ms`,
+                              opacity: 0,
+                            }}
+                            onClick={() => handlePlaylistClick(playlist)}
+                            className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              {playlist.cover_image_url ? (
+                                <img 
+                                  src={playlist.cover_image_url} 
+                                  alt={playlist.name}
+                                  className="w-16 h-16 rounded object-cover"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
+                                  <List className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium truncate">{playlist.name}</h4>
+                                {playlist.description && (
+                                  <p className="text-sm text-muted-foreground truncate">
+                                    {playlist.description}
+                                  </p>
+                                )}
+                                {playlist.isSharedByFriend && playlist.profiles?.username && (
+                                  <p className="text-xs text-blue-400 font-medium">
+                                    Partagée par {playlist.profiles.username}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  Mise à jour {formatRelativeTime(playlist.updated_at)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : results.length > 0 ? (
+                // Show only songs for other filters
+                <div className="space-y-2">
+                  {results.map((song, index) => {
+                    const isFavorite = favorites.some(s => s.id === song.id);
+                    const isCurrentSong = currentSong?.id === song.id;
+                    
+                    return (
+                      <div
+                        key={song.id}
+                        style={{ 
+                          animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
+                          opacity: 0,
+                        }}
+                        onClick={() => handlePlay(song)}
+                      >
+                        <SongCard
+                          song={song}
+                          isCurrentSong={isCurrentSong}
+                          isFavorite={isFavorite}
+                          dominantColor={dominantColor}
+                          onLyricsClick={handleLyricsNavigation}
+                          onReportClick={() => setSongToReport(song)}
+                          contextMenuItems={songCardContextMenu(song)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : searchQuery ? (
+                <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  Aucun résultat trouvé pour "{searchQuery}"
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        <Player />
+        <ReportSongDialog
+          song={songToReport}
+          onClose={() => setSongToReport(null)}
+        />
       </div>
-      <Player />
-      <ReportSongDialog
-        song={songToReport}
-        onClose={() => setSongToReport(null)}
-      />
-    </div>
+    </Layout>
   );
 };
 
