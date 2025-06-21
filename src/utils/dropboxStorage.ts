@@ -26,6 +26,28 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
+// Fonction pour convertir le chemin local vers le chemin Dropbox réel
+const getDropboxPath = (localPath: string): string => {
+  // Si le chemin commence par 'audio/', on le convertit vers la structure réelle
+  if (localPath.startsWith('audio/')) {
+    const filename = localPath.replace('audio/', '');
+    return `/home/tux com/audio/${filename}`;
+  }
+  
+  // Si le chemin commence par 'lyrics/', on le convertit également
+  if (localPath.startsWith('lyrics/')) {
+    const filename = localPath.replace('lyrics/', '');
+    return `/home/tux com/lyrics/${filename}`;
+  }
+  
+  // Si le chemin ne commence pas par '/', on l'ajoute
+  if (!localPath.startsWith('/')) {
+    return `/${localPath}`;
+  }
+  
+  return localPath;
+};
+
 // Function to check if a file exists on Dropbox
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
   const config = getDropboxConfig();
@@ -36,9 +58,10 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
   }
   
   try {
-    // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
+    // Convertir le chemin local vers le chemin Dropbox réel
+    let dropboxPath = getDropboxPath(path);
     
+    // Vérifier d'abord si nous avons ce chemin sauvegardé dans notre base de données
     try {
       const { data: fileRef, error } = await supabase
         .from('dropbox_files')
@@ -55,6 +78,8 @@ export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> =
     } catch (dbError) {
       console.error('Database error when fetching reference:', dbError);
     }
+    
+    console.log(`🔍 Vérification existence fichier Dropbox: ${dropboxPath}`);
     
     // Check if the file exists on Dropbox using the get_metadata API
     const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
@@ -95,7 +120,10 @@ export const uploadFileToDropbox = async (
     throw new Error('Dropbox access token not configured');
   }
   
-  console.log(`Uploading file to Dropbox: ${path}`, file);
+  // Convertir le chemin local vers le chemin Dropbox réel
+  const dropboxPath = getDropboxPath(path);
+  
+  console.log(`Uploading file to Dropbox: ${dropboxPath}`, file);
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
@@ -106,7 +134,7 @@ export const uploadFileToDropbox = async (
         'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/octet-stream',
         'Dropbox-API-Arg': JSON.stringify({
-          path: `/${path}`,
+          path: dropboxPath,
           mode: 'overwrite',
           autorename: true,
           mute: false
@@ -146,9 +174,9 @@ export const uploadFileToDropbox = async (
       // Insert using a raw query instead of the typed client
       const { error } = await supabase
         .from('dropbox_files')
-        .insert({
+        .upsert({
           local_id: path,
-          dropbox_path: data.path_display || `/${path}`
+          dropbox_path: data.path_display || dropboxPath
         });
         
       if (error) {
@@ -160,7 +188,7 @@ export const uploadFileToDropbox = async (
       // Continue anyway since the upload succeeded
     }
     
-    return data.path_display || `/${path}`;
+    return data.path_display || dropboxPath;
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
     toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
@@ -179,9 +207,10 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
   }
   
   try {
-    // First check if we have this file path saved in our database
-    let dropboxPath = `/${path}`;
+    // Convertir le chemin local vers le chemin Dropbox réel
+    let dropboxPath = getDropboxPath(path);
     
+    // Vérifier d'abord si nous avons ce chemin sauvegardé dans notre base de données
     try {
       const { data: fileRef, error } = await supabase
         .from('dropbox_files')
@@ -198,6 +227,8 @@ export const getDropboxSharedLink = async (path: string): Promise<string> => {
     } catch (dbError) {
       console.error('Database error when fetching reference:', dbError);
     }
+    
+    console.log(`🔗 Récupération lien partagé pour: ${dropboxPath}`);
     
     const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
@@ -316,6 +347,7 @@ export const migrateFilesToDropbox = async (
   // Vérifier si le fichier existe déjà dans Dropbox
   const checkFileExistsInDropbox = async (path: string): Promise<boolean> => {
     try {
+      const dropboxPath = getDropboxPath(`audio/${path}`);
       const response = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
         method: 'POST',
         headers: {
@@ -323,7 +355,7 @@ export const migrateFilesToDropbox = async (
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          path: `/${path}`
+          path: dropboxPath
         })
       });
       
@@ -346,17 +378,18 @@ export const migrateFilesToDropbox = async (
       console.log(`Processing file ${processedCount}/${files.length}: ${file.id}`);
       
       // Vérifier si le fichier existe déjà dans Dropbox
-      const fileExists = await checkFileExistsInDropbox(`audio/${file.id}`);
+      const fileExists = await checkFileExistsInDropbox(file.id);
       
       if (fileExists) {
         console.log(`File already exists in Dropbox: ${file.id}`);
         
-        // Enregistrer la référence dans la base de données
+        // Enregistrer la référence dans la base de données avec le bon chemin
+        const dropboxPath = getDropboxPath(`audio/${file.id}`);
         await supabase
           .from('dropbox_files')
           .upsert({
             local_id: `audio/${file.id}`,
-            dropbox_path: `/audio/${file.id}`
+            dropbox_path: dropboxPath
           });
         
         successCount++;
@@ -429,8 +462,6 @@ export const migrateFilesToDropbox = async (
   };
 };
 
-// Nouvelles fonctions pour gérer les paroles dans Dropbox
-
 /**
  * Télécharge les paroles d'une chanson vers Dropbox
  * @param songId ID de la chanson
@@ -453,7 +484,7 @@ export const uploadLyricsToDropbox = async (songId: string, lyricsContent: strin
     const lyricsBlob = new Blob([lyricsContent], { type: 'text/plain' });
     const lyricsFile = new File([lyricsBlob], `${songId}_lyrics.txt`, { type: 'text/plain' });
     
-    // Chemin Dropbox pour les paroles
+    // Chemin local pour les paroles
     const path = `lyrics/${songId}`;
     
     // Utiliser la fonction existante pour télécharger le fichier
@@ -464,7 +495,7 @@ export const uploadLyricsToDropbox = async (songId: string, lyricsContent: strin
       const { error } = await supabase
         .from('dropbox_files')
         .upsert({
-          local_id: `lyrics/${songId}`,
+          local_id: path,
           dropbox_path: dropboxPath
         });
         
@@ -497,9 +528,10 @@ export const getLyricsFromDropbox = async (songId: string): Promise<string | nul
   }
   
   try {
-    // Vérifier d'abord si nous avons déjà une référence dans la base de données
-    let dropboxPath = `/lyrics/${songId}`;
+    // Convertir le chemin local vers le chemin Dropbox réel
+    let dropboxPath = getDropboxPath(`lyrics/${songId}`);
     
+    // Vérifier d'abord si nous avons déjà une référence dans la base de données
     try {
       const { data: fileRef, error } = await supabase
         .from('dropbox_files')
