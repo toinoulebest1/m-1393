@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { BrowserCompatibilityNotice } from "@/components/BrowserCompatibilityNotice";
@@ -9,7 +10,6 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { updateMediaSessionMetadata } from "@/utils/mediaSession";
 import { AudioCacheManager } from "@/components/AudioCacheManager";
-import { checkFileExistsOnOneDrive, isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
 import { Music } from "lucide-react";
@@ -21,8 +21,6 @@ const Index = () => {
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying, stopCurrentSong, removeSong } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
-  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [unavailableSong, setUnavailableSong] = useState<Song | null>(null);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
 
   // Force re-render when currentSong changes
@@ -64,34 +62,6 @@ const Index = () => {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
-
-  // Check if the current song's audio file is available
-  useEffect(() => {
-    const checkCurrentSongAvailability = async () => {
-      if (currentSong && await isOneDriveEnabled() && !isCheckingAvailability) {
-        setIsCheckingAvailability(true);
-        try {
-          const exists = await checkFileExistsOnOneDrive(`audio/${currentSong.id}`);
-          if (!exists) {
-            toast.error(`La chanson "${currentSong.title}" n'est plus disponible sur OneDrive`, {
-              duration: 5000,
-              position: "top-center"
-            });
-            stopCurrentSong();
-            setUnavailableSong(currentSong);
-          } else {
-            setUnavailableSong(null);
-          }
-        } catch (error) {
-          console.error("Erreur lors de la vérification de disponibilité:", error);
-        } finally {
-          setIsCheckingAvailability(false);
-        }
-      }
-    };
-
-    checkCurrentSongAvailability();
-  }, [currentSong, stopCurrentSong]);
 
   useEffect(() => {
     if (currentSong) {
@@ -249,15 +219,6 @@ const Index = () => {
             Cache Audio
           </button>
           <AccountSettingsDialog />
-        </div>
-      )}
-      
-      {unavailableSong && (
-        <div className="fixed top-16 right-4 z-50 w-80">
-          <div className="p-3 bg-black/60 backdrop-blur-md rounded-lg border border-red-500/30">
-            <h3 className="text-sm font-medium text-white mb-2">Fichier audio manquant</h3>
-            <UnavailableSongCard song={unavailableSong} />
-          </div>
         </div>
       )}
       

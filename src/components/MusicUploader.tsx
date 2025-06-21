@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
 import { uploadAudioFile, searchDeezerTrack } from "@/utils/storage";
-import { isOneDriveEnabled } from "@/utils/oneDriveStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -36,23 +35,8 @@ export const MusicUploader = () => {
   const lrcFilesRef = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
-    // Check which storage provider is active
-    const checkStorageProvider = () => {
-      const useOneDrive = isOneDriveEnabled();
-      setStorageProvider(useOneDrive ? "OneDrive" : "Supabase");
-    };
-    
-    checkStorageProvider();
-    
-    // Re-check when the window gets focus
-    const handleFocus = () => {
-      checkStorageProvider();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
+    // Always use Supabase as storage provider since OneDrive is removed
+    setStorageProvider("Supabase");
   }, []);
 
   const formatDuration = (seconds: number) => {
@@ -152,18 +136,6 @@ export const MusicUploader = () => {
       if (error) {
         console.error("Erreur lors de l'enregistrement des paroles:", error);
         return false;
-      }
-      
-      // Si OneDrive est activé, sauvegarder également les paroles brutes sur OneDrive
-      if (isOneDriveEnabled()) {
-        try {
-          const { uploadLyricsToOneDrive } = await import('@/utils/oneDriveStorage');
-          await uploadLyricsToOneDrive(songId, lrcContent);
-          console.log("Contenu LRC brut téléchargé vers OneDrive");
-        } catch (oneDriveError) {
-          console.error("Erreur lors de l'upload du fichier LRC vers OneDrive:", oneDriveError);
-          // Ne pas échouer complètement si l'upload OneDrive échoue
-        }
       }
       
       console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);

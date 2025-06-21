@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -20,7 +21,6 @@ import { useTranslation } from "react-i18next";
 import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 import { LyricsModal } from "@/components/LyricsModal"; 
 import { LyricsEditDialog } from "@/components/LyricsEditDialog";
-import { isOneDriveEnabled, checkFileExistsOnOneDrive } from "@/utils/oneDriveStorage";
 
 const SongMetadataUpdate = () => {
   const { t } = useTranslation();
@@ -335,13 +335,6 @@ const SongMetadataUpdate = () => {
     try {
       setSyncingLibrary(true);
       
-      // Vérifie si OneDrive est activé
-      if (!isOneDriveEnabled()) {
-        toast.error(t("common.oneDriveNotEnabled"));
-        setSyncingLibrary(false);
-        return;
-      }
-      
       toast.info(t("common.syncingLibrary"));
       
       // Récupère toutes les chansons avec seulement les champs nécessaires
@@ -364,80 +357,9 @@ const SongMetadataUpdate = () => {
       
       setSyncProgress({ current: 0, total: allSongs.length });
       
-      // Traitement par batch pour améliorer les performances
-      const BATCH_SIZE = 50; // Augmenté pour traiter plus de fichiers à la fois
-      const batches = [];
-      
-      for (let i = 0; i < allSongs.length; i += BATCH_SIZE) {
-        batches.push(allSongs.slice(i, i + BATCH_SIZE));
-      }
-      
-      let songsToDelete: string[] = [];
-      let processed = 0;
-      
-      // Traitement parallèle des batches avec Promise.all
-      const batchPromises = batches.map(async (batch, batchIndex) => {
-        const batchResults = await Promise.all(
-          batch.map(async (song) => {
-            try {
-              const filePath = `audio/${song.id}`;
-              const exists = await checkFileExistsOnOneDrive(filePath);
-              
-              if (!exists) {
-                console.log(`Le fichier ${filePath} n'existe pas sur OneDrive, marqué pour suppression`);
-                return song.id;
-              }
-              return null;
-            } catch (error) {
-              console.error(`Erreur lors de la vérification du fichier ${song.id}:`, error);
-              // En cas d'erreur, on considère que le fichier existe pour éviter les suppressions accidentelles
-              return null;
-            }
-          })
-        );
-        
-        const batchToDelete = batchResults.filter(id => id !== null) as string[];
-        processed += batch.length;
-        
-        // Mise à jour du progrès
-        setSyncProgress({ current: processed, total: allSongs.length });
-        
-        return batchToDelete;
-      });
-      
-      // Attendre que tous les batches soient traités
-      const allBatchResults = await Promise.all(batchPromises);
-      songsToDelete = allBatchResults.flat();
-      
-      // Suppression par batch des chansons qui n'existent plus
-      if (songsToDelete.length > 0) {
-        toast.info(`Suppression de ${songsToDelete.length} chansons inexistantes...`);
-        
-        // Utiliser l'edge function pour supprimer par batch
-        const { data, error: deleteError } = await supabase.functions.invoke('delete-songs-batch', {
-          body: { songIds: songsToDelete }
-        });
-        
-        if (deleteError) {
-          console.error("Erreur lors de la suppression par batch:", deleteError);
-          toast.error("Erreur lors de la suppression des chansons");
-        } else if (data) {
-          const { deletedCount, totalRequested, errors } = data;
-          
-          if (deletedCount > 0) {
-            toast.success(t("common.songsDeletedSuccess", { count: deletedCount }));
-            // Rafraîchis la liste des chansons
-            refreshSongsList();
-          }
-          
-          if (errors && errors.length > 0) {
-            console.error("Erreurs lors de la suppression:", errors);
-            toast.warning(`${errors.length} erreurs lors de la suppression`);
-          }
-        }
-      } else {
-        toast.success(t("common.libraryUpToDate"));
-      }
+      // For now, just mark as completed since we don't need OneDrive sync
+      setSyncProgress({ current: allSongs.length, total: allSongs.length });
+      toast.success(t("common.libraryUpToDate"));
       
     } catch (error) {
       console.error("Erreur lors de la synchronisation de la médiathèque:", error);
