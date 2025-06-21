@@ -1,7 +1,6 @@
 
 import { Sidebar } from "./Sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,16 +11,18 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-spotify-dark text-white">
+    <div className="flex h-screen overflow-hidden bg-spotify-base text-white">
       {!hideNavbar && <Sidebar />}
       <div className={cn(
-        "relative flex-1 flex flex-col overflow-hidden bg-spotify-dark text-white",
+        "relative flex-1 flex flex-col overflow-hidden",
         hideNavbar ? "w-full" : "md:ml-60 w-full"
       )}>
-        <main className="flex-1 overflow-y-auto pb-24 bg-spotify-dark text-white">
+        <main className="flex-1 overflow-y-auto pb-24">
           {children}
         </main>
       </div>
     </div>
   );
 };
+
+import { cn } from "@/lib/utils";

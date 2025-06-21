@@ -1,3 +1,4 @@
+
 import { Player } from "@/components/Player";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 import { BrowserCompatibilityNotice } from "@/components/BrowserCompatibilityNotice";
@@ -98,17 +99,17 @@ const Index = () => {
               className="w-12 h-12 rounded-md" 
             />
             <div>
-              <h3 className="font-medium text-sm text-white">{currentSong.title}</h3>
+              <h3 className="font-medium text-sm">{currentSong.title}</h3>
               <div className="flex items-center justify-between w-full">
-                <p className="text-xs text-gray-300">{currentSong.artist}</p>
-                <p className="text-xs text-gray-300 ml-2">{formatDuration(currentSong.duration)}</p>
+                <p className="text-xs text-muted-foreground">{currentSong.artist}</p>
+                <p className="text-xs text-muted-foreground ml-2">{formatDuration(currentSong.duration)}</p>
               </div>
             </div>
           </div>,
           {
             duration: 3000,
             position: "top-center",
-            className: "bg-spotify-dark border border-white/10 text-white"
+            className: "bg-spotify-dark border border-white/10"
           }
         );
         
@@ -201,19 +202,19 @@ const Index = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-spotify-dark text-white">
+    <div className="w-full h-full flex flex-col">
       <BrowserCompatibilityNotice />
       
       {!isMobile && (
         <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
           {username && (
-            <span className="text-white hover:text-spotify-accent transition-colors">
+            <span className="text-spotify-neutral hover:text-white transition-colors">
               {username}
             </span>
           )}
           <button 
             onClick={() => setShowCacheManager(!showCacheManager)}
-            className="text-white hover:text-spotify-accent transition-colors text-sm px-2 py-1 rounded-md bg-spotify-card hover:bg-spotify-card/80"
+            className="text-spotify-neutral hover:text-white transition-colors text-sm px-2 py-1 rounded-md bg-spotify-dark/50 hover:bg-spotify-dark"
           >
             Cache Audio
           </button>
@@ -230,7 +231,7 @@ const Index = () => {
         </div>
       </div>
       
-      <div className="flex-1 w-full flex items-center justify-center bg-spotify-dark">
+      <div className="flex-1 w-full flex items-center justify-center">
         {currentSong ? (
           <div className="text-center p-6 max-w-md mx-auto">
             <div className="w-64 h-64 mx-auto mb-8 relative">
@@ -241,10 +242,10 @@ const Index = () => {
                 style={getGlowStyle()}
               />
             </div>
-            <h2 className="text-2xl font-bold mb-2 text-white">{currentSong.title}</h2>
+            <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
             <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
             {currentSong.genre && (
-              <span className="inline-block bg-spotify-card px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+              <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
                 {currentSong.genre}
               </span>
             )}
