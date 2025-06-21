@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import { Song, PlayerContextType, EqualizerSettings } from '@/types/player';
 import { useAudioControl } from '@/hooks/useAudioControl';
@@ -8,6 +7,8 @@ import { usePlayerState } from '@/hooks/usePlayerState';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
+import { useInstantPlayer } from '@/hooks/useInstantPlayer';
+import { InstantStreaming } from '@/utils/instantStreaming';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -38,14 +39,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSearchQuery
   } = usePlayerState();
 
-  // Préchargement ultra-intelligent
+  // Préchargement ultra-agressif optimisé
   const preloadNextTracks = useCallback(async () => {
     if (!currentSong) return;
 
-    console.log("🚀 Préchargement ultra-agressif démarré");
+    console.log("🚀 Préchargement ultra-agressif optimisé");
     
     try {
-      // Trouver les 3 prochaines chansons probables depuis la queue
       const savedQueue = localStorage.getItem('queue');
       if (!savedQueue) return;
       
@@ -54,15 +54,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const nextSongs: Song[] = [];
       
       if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-        // Ajouter les 3 chansons suivantes dans la queue
-        for (let i = 1; i <= 3 && currentIndex + i < queue.length; i++) {
+        // Précharger les 5 prochaines chansons
+        for (let i = 1; i <= 5 && currentIndex + i < queue.length; i++) {
           nextSongs.push(queue[currentIndex + i]);
         }
       }
       
       if (nextSongs.length > 0) {
-        console.log("🎯 Préchargement batch:", nextSongs.map(s => s.title));
-        await UltraFastStreaming.preloadBatch(nextSongs.map(s => s.url));
+        console.log("🎯 Préchargement instantané:", nextSongs.map(s => s.title));
+        await InstantStreaming.prefetchNext(nextSongs.map(s => s.url));
         setNextSongPreloaded(true);
       }
     } catch (error) {
@@ -129,13 +129,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     initializeAudioContext: initializeEqualizer
   } = useEqualizer({ audioElement: audioRef.current });
 
-  // Hook pour le système ultra-rapide
+  // Hook pour le système instantané
+  const { getInstantAudioUrl, getStreamingStats } = useInstantPlayer({
+    currentSong,
+    queue,
+    isPlaying
+  });
+
+  // Hook pour le système ultra-rapide (garder pour compatibilité)
   const { getCacheStats } = useUltraFastPlayer({
     currentSong,
     queue,
     isPlaying
   });
 
+  // Navigation optimisée
   const nextSong = useCallback(async () => {
     const savedQueue = localStorage.getItem('queue');
     if (!savedQueue || !currentSong) return;
@@ -145,7 +153,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (currentIndex !== -1 && currentIndex + 1 < queueArray.length) {
       const next = queueArray[currentIndex + 1];
-      console.log("⏭️ Chanson suivante ultra-rapide:", next.title);
+      console.log("⏭️ Chanson suivante instantanée:", next.title);
       await play(next);
     }
   }, [currentSong, play]);
@@ -159,7 +167,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (currentIndex > 0) {
       const previous = queueArray[currentIndex - 1];
-      console.log("⏮️ Chanson précédente ultra-rapide:", previous.title);
+      console.log("⏮️ Chanson précédente instantanée:", previous.title);
       await play(previous);
     }
   }, [currentSong, play]);
@@ -173,27 +181,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
   }, [setQueue]);
 
-  // Préchargement automatique au changement de chanson
+  // Préchargement automatique ultra-agressif
   useEffect(() => {
     if (currentSong && isPlaying) {
       // Délai ultra-court pour le préchargement
       const timeout = setTimeout(() => {
         preloadNextTracks();
-      }, 100); // 100ms après le début de la lecture
+      }, 25); // 25ms seulement
       
       return () => clearTimeout(timeout);
     }
   }, [currentSong, isPlaying, preloadNextTracks]);
 
-  // Préchargement de la queue au changement
+  // Préchargement de la queue optimisé
   useEffect(() => {
     if (queue.length > 0 && currentSong) {
-      // Préchargement différé de toute la queue visible
+      // Préchargement agressif de la queue visible
       const timeout = setTimeout(async () => {
-        const visibleSongs = queue.slice(0, 10); // Précharger les 10 premières
-        console.log("🎯 Préchargement queue visible:", visibleSongs.length);
-        await UltraFastStreaming.preloadBatch(visibleSongs.map(s => s.url));
-      }, 2000); // 2 secondes après
+        const visibleSongs = queue.slice(0, 15); // 15 chansons
+        console.log("🎯 Préchargement queue optimisé:", visibleSongs.length);
+        await InstantStreaming.prefetchNext(visibleSongs.map(s => s.url));
+      }, 200); // 200ms seulement
       
       return () => clearTimeout(timeout);
     }
