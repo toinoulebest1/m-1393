@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { useIntelligentPreloader } from './useIntelligentPreloader';
 import { memoryCache } from '@/utils/memoryCache';
+import { checkFileExistsOnDropbox, isDropboxEnabled } from '@/utils/dropboxStorage';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseUltraFastPlayerProps {
   currentSong: Song | null;
@@ -10,17 +12,54 @@ interface UseUltraFastPlayerProps {
   isPlaying: boolean;
 }
 
-// Cache ultra-conservateur pour les fichiers inexistants
+// Cache pour les fichiers non existants
 const nonExistentFiles = new Set<string>();
-const verificationAttempts = new Map<string, number>();
-const MAX_ATTEMPTS = 1; // Une seule tentative maximum
+
+// Fonction pour vérifier si un fichier existe
+const checkFileExists = async (songUrl: string): Promise<boolean> => {
+  // Vérifier d'abord le cache des fichiers inexistants
+  if (nonExistentFiles.has(songUrl)) {
+    console.log("⚠️ Fichier marqué comme inexistant:", songUrl);
+    return false;
+  }
+
+  try {
+    if (isDropboxEnabled()) {
+      const exists = await checkFileExistsOnDropbox(songUrl);
+      if (!exists) {
+        nonExistentFiles.add(songUrl);
+        console.log("❌ Fichier non trouvé sur Dropbox, ajouté au cache:", songUrl);
+      }
+      return exists;
+    } else {
+      // Vérifier dans Supabase
+      const { data, error } = await supabase.storage
+        .from('audio')
+        .list('', {
+          search: songUrl,
+          limit: 1
+        });
+
+      if (error || !data || data.length === 0) {
+        nonExistentFiles.add(songUrl);
+        console.log("❌ Fichier non trouvé sur Supabase, ajouté au cache:", songUrl);
+        return false;
+      }
+      return true;
+    }
+  } catch (error) {
+    console.warn("⚠️ Erreur vérification existence fichier:", songUrl, error);
+    nonExistentFiles.add(songUrl);
+    return false;
+  }
+};
 
 export const useUltraFastPlayer = ({
   currentSong,
   queue,
   isPlaying
 }: UseUltraFastPlayerProps) => {
-  const { recordTransition, predictNextSongs } = useIntelligentPreloader();
+  const { recordTransition, predictNextSongs, preloadPredictedSongs } = useIntelligentPreloader();
   const previousSongRef = useRef<Song | null>(null);
   const preloadTimeoutRef = useRef<number | null>(null);
 
@@ -33,42 +72,7 @@ export const useUltraFastPlayer = ({
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Fonction ultra-conservatrice pour vérifier si on doit précharger
-  const shouldAttemptPreload = (songUrl: string): boolean => {
-    // Si déjà marqué comme inexistant, ne pas réessayer
-    if (nonExistentFiles.has(songUrl)) {
-      return false;
-    }
-    
-    // Vérifier le nombre de tentatives
-    const attempts = verificationAttempts.get(songUrl) || 0;
-    if (attempts >= MAX_ATTEMPTS) {
-      nonExistentFiles.add(songUrl);
-      return false;
-    }
-    
-    return true;
-  };
-
-  // Marquer une tentative
-  const markAttempt = (songUrl: string, success: boolean) => {
-    if (success) {
-      // Réinitialiser les compteurs en cas de succès
-      verificationAttempts.delete(songUrl);
-      nonExistentFiles.delete(songUrl);
-    } else {
-      // Incrémenter les tentatives en cas d'échec
-      const attempts = verificationAttempts.get(songUrl) || 0;
-      verificationAttempts.set(songUrl, attempts + 1);
-      
-      if (attempts + 1 >= MAX_ATTEMPTS) {
-        nonExistentFiles.add(songUrl);
-        console.log("🚫 Fichier marqué comme inexistant définitivement:", songUrl);
-      }
-    }
-  };
-
-  // Préchargement ultra-minimal (seulement si en cours de lecture)
+  // Préchargement intelligent avec vérification d'existence
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
 
@@ -77,56 +81,99 @@ export const useUltraFastPlayer = ({
       clearTimeout(preloadTimeoutRef.current);
     }
 
-    // Préchargement très conservateur après un long délai
+    // Démarrer le préchargement après un délai
     preloadTimeoutRef.current = window.setTimeout(async () => {
-      console.log("🎯 Préchargement ultra-minimal conservateur");
+      console.log("🚀 Démarrage préchargement intelligent avec vérification");
       
-      // Seulement 1 chanson suivante dans la queue
-      const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-      if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-        const nextSong = queue[currentIndex + 1];
-        
-        // Vérifier si on peut précharger
-        if (shouldAttemptPreload(nextSong.url)) {
-          // Vérifier d'abord si déjà en cache
-          if (memoryCache.has(nextSong.url)) {
-            console.log("⚡ Déjà en cache:", nextSong.title);
-            return;
+      try {
+        // 1. Prédictions intelligentes
+        const predictions = predictNextSongs(currentSong, queue);
+        if (predictions.length > 0) {
+          // Filtrer les prédictions qui existent
+          const validPredictions: Song[] = [];
+          for (const song of predictions.slice(0, 3)) { // Limiter à 3 prédictions
+            const exists = await checkFileExists(song.url);
+            if (exists) {
+              validPredictions.push(song);
+            }
           }
           
-          try {
-            console.log("🎵 Tentative préchargement silencieux:", nextSong.title);
-            await memoryCache.preloadBatch([nextSong.url]);
-            markAttempt(nextSong.url, true);
-            console.log("✅ Préchargement réussi:", nextSong.title);
-          } catch (error) {
-            // Erreur silencieuse
-            markAttempt(nextSong.url, false);
-            // Ne pas loguer l'erreur pour éviter le spam console
+          if (validPredictions.length > 0) {
+            console.log("🎯 Préchargement prédictions validées:", validPredictions.length);
+            await preloadPredictedSongs(validPredictions);
           }
         }
+        
+        // 2. Précharger les 2 chansons suivantes dans la queue
+        const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+        if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
+          const nextSongs = queue.slice(currentIndex + 1, currentIndex + 3); // Seulement 2 chansons
+          
+          const validNextSongs: Song[] = [];
+          for (const song of nextSongs) {
+            const exists = await checkFileExists(song.url);
+            if (exists) {
+              validNextSongs.push(song);
+            }
+          }
+          
+          if (validNextSongs.length > 0) {
+            console.log("🎵 Préchargement queue validée:", validNextSongs.length, "chansons");
+            await memoryCache.preloadBatch(validNextSongs.map(s => s.url));
+          }
+        }
+      } catch (error) {
+        console.warn("⚠️ Erreur préchargement intelligent:", error);
       }
-    }, 2000); // Délai de 2 secondes
+    }, 1000); // Délai de 1 seconde pour éviter les conflits
 
     return () => {
       if (preloadTimeoutRef.current) {
         clearTimeout(preloadTimeoutRef.current);
       }
     };
-  }, [currentSong, isPlaying, queue]);
+  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs]);
 
-  // Nettoyage périodique des caches (très conservateur)
+  // Préchargement initial de la queue avec vérification
+  useEffect(() => {
+    if (queue.length === 0) return;
+
+    const timeout = setTimeout(async () => {
+      console.log("🎯 Préchargement queue initiale avec vérification");
+      
+      try {
+        const firstSongs = queue.slice(0, 3); // Réduire à 3 chansons seulement
+        const validSongs: Song[] = [];
+        
+        for (const song of firstSongs) {
+          const exists = await checkFileExists(song.url);
+          if (exists) {
+            validSongs.push(song);
+          }
+        }
+        
+        if (validSongs.length > 0) {
+          console.log("✅ Préchargement queue initiale:", validSongs.length, "chansons validées");
+          await memoryCache.preloadBatch(validSongs.map(s => s.url));
+        } else {
+          console.log("⚠️ Aucune chanson valide trouvée pour le préchargement initial");
+        }
+      } catch (error) {
+        console.warn("⚠️ Erreur préchargement queue initiale:", error);
+      }
+    }, 2000); // Délai plus long pour l'initialisation
+
+    return () => clearTimeout(timeout);
+  }, [queue]);
+
+  // Nettoyer le cache des fichiers inexistants périodiquement
   useEffect(() => {
     const cleanup = setInterval(() => {
-      // Nettoyer seulement si les caches deviennent énormes
-      if (nonExistentFiles.size > 100) {
-        console.log("🧹 Nettoyage cache ultra-conservateur");
-        const oldSize = nonExistentFiles.size;
+      if (nonExistentFiles.size > 100) { // Si le cache devient trop gros
+        console.log("🧹 Nettoyage cache fichiers inexistants");
         nonExistentFiles.clear();
-        verificationAttempts.clear();
-        console.log(`🧹 ${oldSize} entrées nettoyées`);
       }
-    }, 15 * 60 * 1000); // Toutes les 15 minutes
+    }, 5 * 60 * 1000); // Toutes les 5 minutes
 
     return () => clearInterval(cleanup);
   }, []);
@@ -134,8 +181,7 @@ export const useUltraFastPlayer = ({
   return {
     getCacheStats: () => ({
       ...memoryCache.getStats(),
-      nonExistentFiles: nonExistentFiles.size,
-      verificationAttempts: verificationAttempts.size
+      nonExistentFiles: nonExistentFiles.size
     })
   };
 };
