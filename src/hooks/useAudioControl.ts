@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -58,6 +59,14 @@ export const useAudioControl = ({
       try {
         console.log("⚡ Configuration audio instantanée");
         const audio = audioRef.current;
+        
+        // S'assurer que l'élément audio est correctement configuré
+        if (!audio) {
+          console.error("❌ Élément audio non disponible");
+          setIsChangingSong(false);
+          return;
+        }
+        
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
         
@@ -79,10 +88,15 @@ export const useAudioControl = ({
         audio.preload = "auto";
         audio.src = audioUrl;
         
+        // Nettoyer les anciens listeners pour éviter les doublons
+        audio.removeEventListener('loadstart', () => {});
+        audio.removeEventListener('canplay', () => {});
+        audio.removeEventListener('error', () => {});
+        
         // Événements pour debug
-        audio.addEventListener('loadstart', () => console.log("📥 Début chargement audio"));
-        audio.addEventListener('canplay', () => console.log("✅ Audio prêt à jouer"));
-        audio.addEventListener('error', (e) => {
+        const handleLoadStart = () => console.log("📥 Début chargement audio");
+        const handleCanPlay = () => console.log("✅ Audio prêt à jouer");
+        const handleError = (e: Event) => {
           console.error("❌ Erreur audio element:", e);
           const error = audio.error;
           if (error) {
@@ -95,7 +109,11 @@ export const useAudioControl = ({
               MEDIA_ERR_SRC_NOT_SUPPORTED: error.MEDIA_ERR_SRC_NOT_SUPPORTED
             });
           }
-        });
+        };
+        
+        audio.addEventListener('loadstart', handleLoadStart);
+        audio.addEventListener('canplay', handleCanPlay);
+        audio.addEventListener('error', handleError);
         
         // Démarrage ultra-rapide
         console.log("🚀 Démarrage instantané...");
@@ -140,8 +158,16 @@ export const useAudioControl = ({
       // Reprise instantanée
       console.log("⚡ Reprise instantanée");
       try {
-        audioRef.current.volume = volume / 100;
-        const success = await AutoplayManager.playAudio(audioRef.current);
+        const audio = audioRef.current;
+        
+        // Vérifier que l'élément audio est disponible
+        if (!audio) {
+          console.error("❌ Élément audio non disponible pour la reprise");
+          return;
+        }
+        
+        audio.volume = volume / 100;
+        const success = await AutoplayManager.playAudio(audio);
         
         if (success) {
           console.log("✅ Reprise instantanée réussie");
@@ -197,6 +223,7 @@ export const useAudioControl = ({
   const pause = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
+      console.log("⏸️ Lecture mise en pause");
     }
     setIsPlaying(false);
   }, [audioRef, setIsPlaying]);
@@ -204,6 +231,7 @@ export const useAudioControl = ({
   const updateVolume = useCallback((newVolume: number) => {
     if (audioRef.current) {
       audioRef.current.volume = newVolume / 100;
+      console.log("🔊 Volume mis à jour:", newVolume);
     }
     return newVolume;
   }, [audioRef]);
@@ -212,6 +240,7 @@ export const useAudioControl = ({
     if (audioRef.current) {
       const time = (newProgress / 100) * audioRef.current.duration;
       audioRef.current.currentTime = time;
+      console.log("⏭️ Position mise à jour:", time);
     }
     return newProgress;
   }, [audioRef]);
@@ -219,6 +248,7 @@ export const useAudioControl = ({
   const updatePlaybackRate = useCallback((rate: number) => {
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
+      console.log("⚡ Vitesse de lecture:", rate);
     }
     return rate;
   }, [audioRef]);
@@ -227,7 +257,7 @@ export const useAudioControl = ({
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      console.log("Chanson arrêtée immédiatement");
+      console.log("⏹️ Chanson arrêtée immédiatement");
     }
   }, [audioRef]);
 
@@ -272,7 +302,11 @@ export const useAudioControl = ({
   }, [currentSong, setCurrentSong]);
 
   const getCurrentAudioElement = useCallback(() => {
-    return audioRef.current;
+    const audio = audioRef.current;
+    if (!audio) {
+      console.warn("⚠️ Élément audio non disponible dans getCurrentAudioElement");
+    }
+    return audio;
   }, [audioRef]);
 
   return {
