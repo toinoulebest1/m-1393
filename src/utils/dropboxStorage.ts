@@ -214,105 +214,128 @@ export const uploadFileToDropbox = async (
 };
 
 // Function to get a shared link for a file on Dropbox
-export const getDropboxSharedLink = async (filePath: string): Promise<string> => {
-  const accessToken = getDropboxConfig().accessToken;
+export const getDropboxSharedLink = async (path: string): Promise<string> => {
+  const config = getDropboxConfig();
   
-  if (!filePath.startsWith('/')) {
-    filePath = '/' + filePath;
+  if (!config.accessToken) {
+    console.error("Dropbox access token not configured");
+    toast.error("Token d'accès Dropbox non configuré");
+    throw new Error('Dropbox access token not configured');
   }
   
-  console.log('🔗 Récupération lien partagé pour:', filePath);
-  
   try {
-    // D'abord essayer de créer un nouveau lien partagé
-    const createLinkResponse = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+    // Convertir le chemin local vers le chemin Dropbox réel
+    let dropboxPath = getDropboxPath(path);
+    
+    // Vérifier d'abord si nous avons ce chemin sauvegardé dans notre base de données
+    try {
+      const { data: fileRef, error } = await supabase
+        .from('dropbox_files')
+        .select('dropbox_path')
+        .eq('local_id', path)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching Dropbox file reference:', error);
+      } else if (fileRef) {
+        dropboxPath = fileRef.dropbox_path;
+        console.log('Found stored Dropbox path:', dropboxPath);
+      }
+    } catch (dbError) {
+      console.error('Database error when fetching reference:', dbError);
+    }
+    
+    console.log(`🔗 Récupération lien partagé pour: ${dropboxPath}`);
+    
+    const response = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${config.accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        path: filePath,
+        path: dropboxPath,
         settings: {
-          requested_visibility: 'public'
+          requested_visibility: "public"
         }
       })
     });
-
-    if (createLinkResponse.ok) {
-      const createData = await createLinkResponse.json();
-      const url = createData.url;
-      // Convertir vers le domaine dropboxusercontent.com pour éviter CORS
-      const streamingUrl = convertToDirectStreamingUrl(url);
-      console.log('✅ Nouveau lien partagé créé:', streamingUrl);
-      return streamingUrl;
-    } else if (createLinkResponse.status === 409) {
-      // Le lien existe déjà, le récupérer
+    
+    // If link already exists, fetch it
+    if (response.status === 409) {
       console.log('Shared link already exists, fetching it');
-      
-      const listLinksResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+      const listResponse = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${config.accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          path: filePath,
-          direct_only: true
+          path: dropboxPath
         })
       });
-
-      if (listLinksResponse.ok) {
-        const listData = await listLinksResponse.json();
-        if (listData.links && listData.links.length > 0) {
-          const url = listData.links[0].url;
-          // Convertir vers le domaine dropboxusercontent.com pour éviter CORS
-          const streamingUrl = convertToDirectStreamingUrl(url);
-          console.log('✅ URL partagée Dropbox récupérée:', streamingUrl);
-          return streamingUrl;
+      
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error('❌ Failed to list shared links:', errorText);
+        
+        // Parse l'erreur pour voir si c'est un fichier non trouvé
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error && errorData.error.path && errorData.error.path['.tag'] === 'not_found') {
+            throw new Error(`File not found on Dropbox: ${dropboxPath}`);
+          }
+        } catch (parseError) {
+          // Ignore parse error, throw original error
         }
+        
+        throw new Error(`Failed to list shared links: ${listResponse.status} ${listResponse.statusText}`);
       }
+      
+      const listData = await listResponse.json();
+      
+      if (listData.links && listData.links.length > 0) {
+        // Convert the shared link to a direct download link
+        let url = listData.links[0].url;
+        url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+        url = url.replace('?dl=0', '');
+        
+        console.log('✅ URL partagée Dropbox récupérée:', url);
+        return url;
+      }
+      
+      throw new Error('No shared links found for this file');
     }
     
-    throw new Error(`Failed to get shared link for ${filePath}`);
-  } catch (error) {
-    console.error('❌ Erreur récupération lien partagé:', error);
-    throw new Error(`Unable to get Dropbox shared link: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
-
-/**
- * Convertit une URL Dropbox standard vers une URL de streaming direct compatible CORS
- */
-const convertToDirectStreamingUrl = (dropboxUrl: string): string => {
-  try {
-    // Exemple d'URL reçue: https://www.dropbox.com/scl/fi/xyz/file?rlkey=abc&dl=0
-    // URL cible: https://dl.dropboxusercontent.com/scl/fi/xyz/file?rlkey=abc&dl=1
-    
-    let url = dropboxUrl;
-    
-    // Remplacer le domaine pour éviter les problèmes CORS
-    if (url.includes('www.dropbox.com')) {
-      url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-    } else if (url.includes('dropbox.com') && !url.includes('dropboxusercontent.com')) {
-      url = url.replace('dropbox.com', 'dl.dropboxusercontent.com');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Dropbox shared link error:', errorText);
+      
+      // Parse l'erreur pour des messages plus clairs
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error && errorData.error.path && errorData.error.path['.tag'] === 'not_found') {
+          throw new Error(`File not found on Dropbox: ${dropboxPath}`);
+        }
+      } catch (parseError) {
+        // Ignore parse error, throw original error
+      }
+      
+      throw new Error(`Failed to create shared link: ${response.status} ${response.statusText}`);
     }
     
-    // S'assurer que dl=1 pour le téléchargement direct
-    if (url.includes('dl=0')) {
-      url = url.replace('dl=0', 'dl=1');
-    } else if (!url.includes('dl=1')) {
-      // Ajouter dl=1 si pas présent
-      const separator = url.includes('?') ? '&' : '?';
-      url += `${separator}dl=1`;
-    }
+    const data = await response.json();
     
-    console.log('🔄 URL convertie:', url);
+    // Convert the shared link to a direct download link
+    let url = data.url;
+    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    url = url.replace('?dl=0', '');
+    
+    console.log('✅ URL partagée Dropbox créée:', url);
     return url;
   } catch (error) {
-    console.error('❌ Erreur conversion URL:', error);
-    // Fallback vers l'URL originale si la conversion échoue
-    return dropboxUrl.replace('dl=0', 'dl=1');
+    console.error('Error getting Dropbox shared link:', error);
+    throw error;
   }
 };
 

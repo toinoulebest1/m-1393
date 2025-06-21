@@ -1,15 +1,15 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
-import { nonExistentFilesCache } from './nonExistentFilesCache';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
   if (isDropboxEnabled()) {
+    console.log('Using Dropbox for file upload');
     return await uploadFileToDropbox(file, `audio/${fileName}`);
   }
   
   // Fallback vers Supabase (OneDrive complètement désactivé si Dropbox est configuré)
+  console.log('Using Supabase for file upload');
   const { data, error } = await supabase.storage
     .from('audio')
     .upload(fileName, file, {
@@ -18,6 +18,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
     });
 
   if (error) {
+    console.error('Error uploading to Supabase:', error);
     throw error;
   }
 
@@ -25,32 +26,30 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 export const getAudioFileUrl = async (filePath: string): Promise<string> => {
-  // Vérification cache des fichiers inexistants AVANT tout traitement
-  if (nonExistentFilesCache.isNonExistent(filePath)) {
-    throw new Error(`File marked as non-existent: ${filePath}`);
-  }
+  console.log('🔍 Récupération URL pour:', filePath);
   
   // Priorité stricte à Dropbox d'abord
   if (isDropboxEnabled()) {
+    console.log('Using Dropbox for file retrieval');
     try {
       const exists = await checkFileExistsOnDropbox(filePath);
       if (!exists) {
-        // Marquer comme inexistant SANS log
-        nonExistentFilesCache.markAsNonExistent(filePath);
-        throw new Error(`File not found on Dropbox: ${filePath}`);
+        console.warn('⚠️ Fichier non trouvé sur Dropbox:', filePath);
+        throw new Error('File not found on Dropbox');
       }
       
       const url = await getDropboxSharedLink(filePath);
+      console.log('✅ URL Dropbox récupérée:', url);
       return url;
     } catch (error) {
-      // Marquer comme inexistant SANS log
-      nonExistentFilesCache.markAsNonExistent(filePath);
+      console.error('❌ Erreur Dropbox pour', filePath, ':', error);
       // Si Dropbox est activé mais échoue, aller directement vers Supabase
       // Ne pas essayer OneDrive si Dropbox est configuré
     }
   }
   
   // Fallback vers Supabase (OneDrive complètement ignoré si Dropbox est configuré)
+  console.log('Using Supabase for file retrieval');
   try {
     const { data: listData, error: listError } = await supabase.storage
       .from('audio')
@@ -59,12 +58,12 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       });
 
     if (listError) {
-      nonExistentFilesCache.markAsNonExistent(filePath);
+      console.error('❌ Erreur liste Supabase:', listError);
       throw new Error(`Supabase list error: ${listError.message}`);
     }
 
     if (!listData || listData.length === 0) {
-      nonExistentFilesCache.markAsNonExistent(filePath);
+      console.warn('⚠️ Fichier non trouvé dans Supabase:', filePath);
       throw new Error(`File not found in Supabase storage: ${filePath}`);
     }
 
@@ -73,18 +72,19 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       .createSignedUrl(filePath, 3600);
 
     if (error) {
-      nonExistentFilesCache.markAsNonExistent(filePath);
+      console.error('❌ Erreur création URL signée:', error);
       throw new Error(`Supabase signed URL error: ${error.message}`);
     }
 
     if (!data?.signedUrl) {
-      nonExistentFilesCache.markAsNonExistent(filePath);
+      console.error('❌ URL signée vide');
       throw new Error('Failed to get file URL from Supabase');
     }
 
+    console.log('✅ URL Supabase récupérée');
     return data.signedUrl;
   } catch (error) {
-    nonExistentFilesCache.markAsNonExistent(filePath);
+    console.error('❌ Erreur complète récupération URL:', error);
     throw new Error(`Unable to retrieve file: ${filePath}. File may not exist in any storage system.`);
   }
 };
@@ -95,11 +95,14 @@ export const storeAudioFile = uploadAudioFile;
 
 export const searchDeezerTrack = async (query: string): Promise<string | null> => {
   try {
+    console.log(`Recherche Deezer pour: ${query}`);
+    
     const { data, error } = await supabase.functions.invoke('deezer-search', {
       body: { query }
     });
 
     if (error) {
+      console.error('Erreur recherche Deezer:', error);
       return null;
     }
 
@@ -107,11 +110,14 @@ export const searchDeezerTrack = async (query: string): Promise<string | null> =
       const track = data.data[0];
       const coverUrl = track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || track.album?.cover;
       
+      console.log(`Pochette Deezer trouvée: ${coverUrl}`);
       return coverUrl;
     }
 
+    console.log('Aucune pochette trouvée sur Deezer');
     return null;
   } catch (error) {
+    console.error('Erreur lors de la recherche Deezer:', error);
     return null;
   }
 };
@@ -151,5 +157,6 @@ export const storePlaylistCover = async (playlistId: string, coverDataUrl: strin
 
 export const generateImageFromSongs = async (songs: any[]): Promise<string> => {
   // Placeholder - implement image generation from songs
+  console.warn('generateImageFromSongs not implemented yet');
   return '';
 };

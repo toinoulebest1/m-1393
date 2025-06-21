@@ -4,8 +4,6 @@
  * Complète le cache IndexedDB pour des accès sub-milliseconde
  */
 
-import { nonExistentFilesCache } from './nonExistentFilesCache';
-
 interface MemoryCacheEntry {
   url: string;
   timestamp: number;
@@ -13,7 +11,7 @@ interface MemoryCacheEntry {
   accessCount: number;
 }
 
-class MemoryCache {
+class MemoryAudioCache {
   private cache = new Map<string, string>();
   private metadata = new Map<string, MemoryCacheEntry>();
   private maxSize = 50; // Maximum 50 URLs en mémoire
@@ -23,11 +21,6 @@ class MemoryCache {
    * Vérification ultra-rapide (< 1ms)
    */
   has(songUrl: string): boolean {
-    // Vérifier d'abord le cache des fichiers inexistants
-    if (nonExistentFilesCache.isNonExistent(songUrl)) {
-      return false;
-    }
-    
     const entry = this.metadata.get(songUrl);
     if (!entry) return false;
     
@@ -57,6 +50,7 @@ class MemoryCache {
       this.metadata.set(songUrl, entry);
     }
     
+    console.log("⚡ Cache mémoire HIT:", songUrl);
     return audioUrl;
   }
 
@@ -76,6 +70,8 @@ class MemoryCache {
       lastAccessed: Date.now(),
       accessCount: 1
     });
+    
+    console.log("💾 Cache mémoire SET:", songUrl);
   }
 
   /**
@@ -98,6 +94,7 @@ class MemoryCache {
     
     if (oldestEntry) {
       this.delete(oldestEntry[0]);
+      console.log("🗑️ Éviction cache mémoire:", oldestEntry[0]);
     }
   }
 
@@ -138,35 +135,31 @@ class MemoryCache {
   }
 
   /**
-   * Préchargement en lot ultra-conservateur
+   * Préchargement en lot
    */
-  async preloadBatch(urls: string[]): Promise<void> {
-    if (urls.length === 0) return;
+  async preloadBatch(songUrls: string[]): Promise<void> {
+    console.log("🚀 Préchargement batch:", songUrls.length, "URLs");
     
-    // Filtrer les URLs inexistantes ET déjà en cache
-    const urlsToPreload = urls.filter(url => 
-      !nonExistentFilesCache.isNonExistent(url) && 
-      !this.cache.has(url)
-    );
+    const promises = songUrls.map(async (songUrl) => {
+      if (this.has(songUrl)) return; // Déjà en cache
+      
+      try {
+        const { getAudioFileUrl } = await import('./storage');
+        const audioUrl = await getAudioFileUrl(songUrl);
+        if (audioUrl && typeof audioUrl === 'string') {
+          this.set(songUrl, audioUrl);
+        }
+      } catch (error) {
+        console.warn("⚠️ Erreur préchargement:", songUrl, error);
+      }
+    });
     
-    if (urlsToPreload.length === 0) {
-      return;
-    }
-    
-    // Traiter seulement 1 URL à la fois
-    const url = urlsToPreload[0];
-    
-    try {
-      const audioUrl = await import('@/utils/storage').then(m => m.getAudioFileUrl(url));
-      this.set(url, audioUrl);
-    } catch (error) {
-      // Ignorer COMPLÈTEMENT les erreurs - pas de logs
-    }
+    await Promise.allSettled(promises);
   }
 }
 
 // Instance singleton
-export const memoryCache = new MemoryCache();
+export const memoryCache = new MemoryAudioCache();
 
 // Nettoyage automatique toutes les 5 minutes
 setInterval(() => {

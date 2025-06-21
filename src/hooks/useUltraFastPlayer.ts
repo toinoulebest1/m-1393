@@ -3,7 +3,6 @@ import { useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { useIntelligentPreloader } from './useIntelligentPreloader';
 import { memoryCache } from '@/utils/memoryCache';
-import { nonExistentFilesCache } from '@/utils/nonExistentFilesCache';
 
 interface UseUltraFastPlayerProps {
   currentSong: Song | null;
@@ -23,12 +22,13 @@ export const useUltraFastPlayer = ({
   // Enregistrer les transitions entre chansons
   useEffect(() => {
     if (currentSong && previousSongRef.current && currentSong.id !== previousSongRef.current.id) {
+      console.log("🔄 Transition détectée:", previousSongRef.current.title, "→", currentSong.title);
       recordTransition(previousSongRef.current, currentSong);
     }
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Préchargement ultra-conservateur - seulement la chanson suivante
+  // Préchargement intelligent quand une chanson commence
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
 
@@ -37,39 +37,48 @@ export const useUltraFastPlayer = ({
       clearTimeout(preloadTimeoutRef.current);
     }
 
-    // Préchargement minimal après un délai
+    // Démarrer le préchargement après un délai ultra-court
     preloadTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        // Seulement la chanson suivante dans la queue
-        const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-        if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-          const nextSong = queue[currentIndex + 1];
-          
-          // Vérifier le cache des fichiers inexistants AVANT de tenter quoi que ce soit
-          if (!nonExistentFilesCache.isNonExistent(nextSong.url)) {
-            // Vérifier si déjà en cache mémoire
-            if (!memoryCache.has(nextSong.url)) {
-              // Précharger SILENCIEUSEMENT seulement cette chanson
-              await memoryCache.preloadBatch([nextSong.url]);
-            }
-          }
-        }
-      } catch (error) {
-        // Ignorer TOUTES les erreurs silencieusement
+      console.log("🚀 Démarrage préchargement intelligent");
+      
+      const predictions = predictNextSongs(currentSong, queue);
+      if (predictions.length > 0) {
+        await preloadPredictedSongs(predictions);
       }
-    }, 3000); // Délai de 3 secondes
+      
+      // Précharger aussi les 3 chansons suivantes dans la queue
+      const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+      if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
+        const nextInQueue = queue.slice(currentIndex + 1, currentIndex + 4);
+        console.log("🎵 Préchargement queue:", nextInQueue.map(s => s.title));
+        
+        // Précharger en batch pour optimiser
+        await memoryCache.preloadBatch(nextInQueue.map(s => s.url));
+      }
+    }, 100); // 100ms pour laisser le temps à la chanson de démarrer
 
     return () => {
       if (preloadTimeoutRef.current) {
         clearTimeout(preloadTimeoutRef.current);
       }
     };
-  }, [currentSong, isPlaying, queue]);
+  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs]);
+
+  // Préchargement agressif au changement de queue
+  useEffect(() => {
+    if (queue.length === 0) return;
+
+    // Précharger les 5 premières chansons de la queue
+    const timeout = setTimeout(async () => {
+      const firstSongs = queue.slice(0, 5);
+      console.log("🎯 Préchargement queue initiale:", firstSongs.length, "chansons");
+      await memoryCache.preloadBatch(firstSongs.map(s => s.url));
+    }, 500); // Délai plus long pour ne pas interférer avec la lecture
+
+    return () => clearTimeout(timeout);
+  }, [queue]);
 
   return {
-    getCacheStats: () => ({
-      ...memoryCache.getStats(),
-      nonExistentFiles: nonExistentFilesCache.getStats()
-    })
+    getCacheStats: () => memoryCache.getStats()
   };
 };
