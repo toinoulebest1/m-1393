@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { CastProvider } from "@/contexts/CastContext";
 import Index from "./pages/Index";
@@ -24,6 +24,15 @@ import { Layout } from "./components/Layout";
 
 const queryClient = new QueryClient();
 
+// Wrapper component to provide children to Layout
+const LayoutWrapper = () => {
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -35,7 +44,7 @@ function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/" element={<Layout />}>
+                <Route path="/" element={<LayoutWrapper />}>
                   <Route index element={<Index />} />
                   <Route path="favorites" element={<Favorites />} />
                   <Route path="playlists" element={<Playlists />} />
