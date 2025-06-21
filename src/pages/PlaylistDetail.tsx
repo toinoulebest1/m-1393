@@ -464,7 +464,7 @@ const PlaylistDetail = () => {
       console.log("Songs changed, triggering cover update...");
       const timer = setTimeout(() => {
         updatePlaylistCover(true);
-      }, 1000);
+      }, 2000); // Increased delay to 2 seconds
       
       return () => clearTimeout(timer);
     }
@@ -595,7 +595,7 @@ const PlaylistDetail = () => {
       if (updatedSongs.length > 0) {
         setTimeout(() => {
           updatePlaylistCover(true);
-        }, 500);
+        }, 2000); // Increased delay to 2 seconds
       }
       
     } catch (error) {
@@ -641,7 +641,7 @@ const PlaylistDetail = () => {
       // Trigger cover update after adding songs
       setTimeout(() => {
         updatePlaylistCover(true);
-      }, 1000);
+      }, 2000); // Increased delay to 2 seconds
       
     } catch (error) {
       console.error("Error adding songs to playlist:", error);
