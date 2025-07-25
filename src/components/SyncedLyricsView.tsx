@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement, favorites, toggleFavorite } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement, favorites, toggleFavorite, volume } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -573,6 +573,137 @@ export const SyncedLyricsView: React.FC = () => {
             </p>
           </div>
           
+          {/* Useful controls section */}
+          <div className="w-full space-y-3 mb-4">
+            {/* Volume and playback speed controls */}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 flex-1">
+                <span className="text-xs text-white/60">Vol</span>
+                <Slider
+                  value={[volume]}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                  onValueChange={(value) => {
+                    const audioElement = getCurrentAudioElement();
+                    if (audioElement) {
+                      audioElement.volume = value[0] / 100;
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-white/60">1x</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const audioElement = getCurrentAudioElement();
+                    if (audioElement) {
+                      const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+                      const currentIndex = speeds.indexOf(audioElement.playbackRate);
+                      const nextIndex = (currentIndex + 1) % speeds.length;
+                      audioElement.playbackRate = speeds[nextIndex];
+                    }
+                  }}
+                  className="text-white/70 hover:text-white text-xs px-2"
+                >
+                  Speed
+                </Button>
+              </div>
+            </div>
+
+            {/* Loop and shuffle controls */}
+            <div className="flex items-center justify-center space-x-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const audioElement = getCurrentAudioElement();
+                  if (audioElement) {
+                    audioElement.loop = !audioElement.loop;
+                  }
+                }}
+                className="text-white/70 hover:text-white"
+              >
+                <span className="text-xs">🔁</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/history')}
+                className="text-white/70 hover:text-white"
+              >
+                <span className="text-xs">📜</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: currentSong.title,
+                      text: `Écoute "${currentSong.title}" de ${currentSong.artist}`,
+                      url: window.location.href
+                    });
+                  } else {
+                    navigator.clipboard.writeText(`${currentSong.title} - ${currentSong.artist}`);
+                    toast.success("Copié dans le presse-papier!");
+                  }
+                }}
+                className="text-white/70 hover:text-white"
+              >
+                <span className="text-xs">📤</span>
+              </Button>
+            </div>
+
+            {/* Quick actions */}
+            <div className="flex items-center justify-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/artist/name/${encodeURIComponent(currentSong.artist)}`)}
+                className="text-xs"
+              >
+                Voir l'artiste
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Open add to playlist dialog (you'd implement this)
+                  toast.info("Fonctionnalité à venir!");
+                }}
+                className="text-xs"
+              >
+                + Playlist
+              </Button>
+            </div>
+
+            {/* Sleep timer */}
+            <div className="flex items-center justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const minutes = prompt("Arrêt automatique dans combien de minutes ?");
+                  if (minutes && !isNaN(Number(minutes))) {
+                    setTimeout(() => {
+                      pause();
+                      toast.info("Lecture arrêtée automatiquement");
+                    }, Number(minutes) * 60 * 1000);
+                    toast.success(`Arrêt programmé dans ${minutes} minutes`);
+                  }
+                }}
+                className="text-white/70 hover:text-white text-xs"
+              >
+                ⏰ Timer
+              </Button>
+            </div>
+          </div>
           {/* Generate lyrics button */}
           {!lyricsText && !isGenerating && (
             <Button
