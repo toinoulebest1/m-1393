@@ -77,7 +77,7 @@ export const getPreGeneratedDropboxLink = async (localId: string): Promise<strin
       .from('dropbox_files')
       .select('shared_link')
       .eq('local_id', localId)
-      .single();
+      .maybeSingle();
 
     if (error || !data?.shared_link) {
       return null;
