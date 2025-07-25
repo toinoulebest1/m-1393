@@ -3,7 +3,7 @@ import { Player } from "@/components/Player";
 import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +33,8 @@ const Top100 = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
   const [dominantColors, setDominantColors] = useState<{ [key: string]: [number, number, number] }>({});
+  const [previousPositions, setPreviousPositions] = useState<{ [key: string]: number }>({});
+  const [animatingItems, setAnimatingItems] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const navigate = useNavigate();
   const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
@@ -174,7 +176,32 @@ const Top100 = () => {
           .slice(0, 100);
 
         console.log("Formatted and grouped stats:", formattedStats);
+        
+        // Détecter les changements de position pour les animations
+        const newPositions: { [key: string]: number } = {};
+        const newAnimatingItems = new Set<string>();
+        
+        formattedStats.forEach((stat, index) => {
+          const songKey = stat.songId;
+          newPositions[songKey] = index;
+          
+          // Si la chanson existait avant et a changé de position
+          if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
+            newAnimatingItems.add(songKey);
+          }
+        });
+        
+        // Mettre à jour les positions et déclencher les animations
+        setPreviousPositions(newPositions);
+        setAnimatingItems(newAnimatingItems);
         setFavoriteStats(formattedStats);
+        
+        // Nettoyer les animations après un délai
+        if (newAnimatingItems.size > 0) {
+          setTimeout(() => {
+            setAnimatingItems(new Set());
+          }, 800);
+        }
       } catch (error) {
         console.error("Error in fetchFavoriteStats:", error);
       }
@@ -424,14 +451,22 @@ const Top100 = () => {
                 const isTop3 = rankNumber <= 3;
                 const dominantColor = dominantColors[stat.songId];
 
+                const isAnimating = animatingItems.has(stat.songId);
+                const previousPos = previousPositions[stat.songId];
+                const hasMovedUp = previousPos !== undefined && previousPos > index;
+                const hasMovedDown = previousPos !== undefined && previousPos < index;
+
                 return (
                   <div
                     key={stat.songId}
                     className={cn(
-                      "group p-4 transition-all duration-300 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
+                      "group p-4 transition-all duration-500 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
                       isCurrentSong 
                         ? "bg-spotify-accent/20" 
-                        : "hover:bg-white/5"
+                        : "hover:bg-white/5",
+                      isAnimating && "animate-scale-in",
+                      hasMovedUp && isAnimating && "animate-slide-in-right",
+                      hasMovedDown && isAnimating && "animate-fade-in"
                     )}
                     onClick={() => handlePlay(stat.song)}
                     style={
@@ -455,23 +490,28 @@ const Top100 = () => {
                     <div className="flex items-center justify-between relative z-10">
                       <div className="flex items-center space-x-4">
                         <div className={cn(
-                          "w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm",
+                          "w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition-all duration-500",
                           isTop3 ? "bg-gradient-to-br" : "bg-white/10",
                           rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
                           rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
                           rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
-                          !isTop3 && "text-spotify-neutral"
+                          !isTop3 && "text-spotify-neutral",
+                          isAnimating && "animate-pulse"
                         )}>
                           #{rankNumber}
                         </div>
                         
-                        <div className="relative">
+                        <div className={cn(
+                          "relative transition-transform duration-500",
+                          isAnimating && "hover-scale"
+                        )}>
                           <img
                             src={stat.song.image_url || PLACEHOLDER_IMAGE}
                             alt={`Pochette de ${stat.song.title}`}
                             className={cn(
-                              "w-12 h-12 rounded-lg object-cover shadow-lg",
-                              isCurrentSong && "ring-2 ring-white/30"
+                              "w-12 h-12 rounded-lg object-cover shadow-lg transition-all duration-500",
+                              isCurrentSong && "ring-2 ring-white/30",
+                              isAnimating && "animate-scale-in"
                             )}
                             loading="lazy"
                             style={
@@ -485,16 +525,28 @@ const Top100 = () => {
                           {isCurrentSong && (
                             <div className="absolute inset-0 rounded-lg border-2 border-white/20 animate-pulse" />
                           )}
+                          {isAnimating && (
+                            <div className="absolute inset-0 rounded-lg border-2 border-spotify-accent/50 animate-pulse" />
+                          )}
                         </div>
                         
-                        <div className="min-w-0 flex-1">
+                        <div className={cn(
+                          "min-w-0 flex-1 transition-all duration-500",
+                          isAnimating && "animate-fade-in"
+                        )}>
                           <h3 className={cn(
-                            "font-medium truncate",
-                            isCurrentSong ? "text-white font-semibold" : "text-white"
+                            "font-medium truncate transition-all duration-300",
+                            isCurrentSong ? "text-white font-semibold" : "text-white",
+                            isAnimating && "text-spotify-accent"
                           )}>
                             {stat.song.title}
                           </h3>
-                          <p className="text-sm text-spotify-neutral truncate">{stat.song.artist}</p>
+                          <p className={cn(
+                            "text-sm text-spotify-neutral truncate transition-all duration-300",
+                            isAnimating && "text-white/80"
+                          )}>
+                            {stat.song.artist}
+                          </p>
                         </div>
                       </div>
 
