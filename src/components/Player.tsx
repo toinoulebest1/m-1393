@@ -69,6 +69,7 @@ export const Player = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const isSeekingRef = useRef(false);
   const playerRef = useRef<HTMLDivElement>(null);
 
   // Update progress in real-time
@@ -77,6 +78,9 @@ export const Player = () => {
     if (!audioElement) return;
 
     const updateProgress = () => {
+      // Don't update progress if user is seeking
+      if (isSeekingRef.current) return;
+      
       if (audioElement.duration && !isNaN(audioElement.duration)) {
         const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
         setProgress(progressPercent);
@@ -144,9 +148,17 @@ export const Player = () => {
     const newProgress = value[0];
     const audioElement = getCurrentAudioElement();
     if (audioElement && audioElement.duration) {
+      // Set seeking flag to prevent auto-update conflicts
+      isSeekingRef.current = true;
+      
       const newTime = (newProgress / 100) * audioElement.duration;
       audioElement.currentTime = newTime;
       setProgress(newProgress);
+      
+      // Clear seeking flag after a short delay
+      setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 200);
     }
   };
 
