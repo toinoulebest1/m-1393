@@ -9,6 +9,7 @@ import { MetadataHeader } from "@/components/metadata/MetadataHeader";
 import { MetadataActions } from "@/components/metadata/MetadataActions";
 import { SongsTable } from "@/components/metadata/SongsTable";
 import DeezerSearchDialog from "@/components/DeezerSearchDialog";
+import { DropboxChangesDialog } from "@/components/DropboxChangesDialog";
 
 const SongMetadataUpdate = () => {
   const [songs, setSongs] = useState<any[]>([]);
@@ -19,6 +20,7 @@ const SongMetadataUpdate = () => {
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState<any>(null);
+  const [dropboxChangesOpen, setDropboxChangesOpen] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -201,7 +203,7 @@ const SongMetadataUpdate = () => {
           onUpdateMetadata={handleUpdateMetadata}
           onSelectAll={handleSelectAll}
           onSelectWithoutImages={handleSelectWithoutImages}
-          onViewDropboxChanges={() => console.log("Voir changements Dropbox")}
+          onViewDropboxChanges={() => setDropboxChangesOpen(true)}
           allSelected={selectedSongs.length === songs.length && songs.length > 0}
         />
 
@@ -221,6 +223,11 @@ const SongMetadataUpdate = () => {
             onUpdateSuccess={refreshSongsList}
           />
         )}
+
+        <DropboxChangesDialog
+          open={dropboxChangesOpen}
+          onOpenChange={setDropboxChangesOpen}
+        />
       </div>
     </Layout>
   );
