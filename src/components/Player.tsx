@@ -280,14 +280,14 @@ export const Player = () => {
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {currentSong ? (
           <div className="flex items-center space-x-4 w-56 overflow-hidden">
-            <div className="w-16 h-16 rounded overflow-hidden shadow-md">
+            <div className="w-16 h-16 rounded overflow-hidden shadow-md flex-shrink-0">
               <img
                 src={currentSong.imageUrl || 'https://picsum.photos/100'}
                 alt="Current Song"
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="flex flex-col overflow-hidden">
+            <div className="flex flex-col overflow-hidden min-w-0 flex-1">
               <span className="text-sm font-semibold text-white truncate">{currentSong.title}</span>
               <span className="text-xs text-spotify-neutral truncate">{currentSong.artist || 'Unknown Artist'}</span>
             </div>
