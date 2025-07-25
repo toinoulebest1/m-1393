@@ -87,7 +87,7 @@ serve(async (req) => {
     // Convert to direct download URL
     const directUrl = sharedLink.replace('dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
 
-    // Save to database
+    // Save to database avec upsert corrigé
     const { data, error } = await supabase
       .from('dropbox_files')
       .upsert({
@@ -98,7 +98,8 @@ serve(async (req) => {
         // Links don't expire for personal Dropbox accounts
         link_expires_at: null
       }, {
-        onConflict: 'local_id'
+        onConflict: 'local_id',
+        ignoreDuplicates: false
       });
 
     if (error) {

@@ -4,9 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Loader2, Link, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { getDropboxConfig } from '@/utils/dropboxStorage';
-import { batchGenerateDropboxLinks } from '@/utils/dropboxLinkGenerator';
+import { batchGenerateLinksForExistingSongs } from '@/utils/dropboxLinkGenerator';
 
 interface DropboxLinkPreGeneratorProps {
   className?: string;
@@ -15,63 +13,44 @@ interface DropboxLinkPreGeneratorProps {
 export const DropboxLinkPreGenerator: React.FC<DropboxLinkPreGeneratorProps> = ({ className }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [stats, setStats] = useState({ total: 0, generated: 0, existing: 0 });
+  const [currentFile, setCurrentFile] = useState<string>('');
+  const [stats, setStats] = useState({ total: 0, success: 0, errors: 0 });
 
   const generateMissingLinks = async () => {
     try {
       setIsGenerating(true);
       setProgress(0);
+      setCurrentFile('');
+      setStats({ total: 0, success: 0, errors: 0 });
       
-      const config = getDropboxConfig();
-      if (!config.accessToken) {
-        toast.error('Token Dropbox non configuré');
-        return;
+      toast.info('🔍 Recherche des musiques sans liens partagés...');
+
+      const result = await batchGenerateLinksForExistingSongs(
+        (current, total, currentFileName) => {
+          setProgress(Math.round((current / total) * 100));
+          setCurrentFile(currentFileName || '');
+          setStats(prev => ({ ...prev, total }));
+        }
+      );
+
+      setStats({
+        total: result.success + result.errors,
+        success: result.success,
+        errors: result.errors
+      });
+
+      if (result.success > 0) {
+        toast.success(`✅ ${result.success} liens partagés générés avec succès !`);
+      }
+      
+      if (result.errors > 0) {
+        toast.warning(`⚠️ ${result.errors} erreurs lors de la génération`);
       }
 
-      toast.info('🔍 Recherche des fichiers sans liens pré-générés...');
-
-      // Récupérer tous les fichiers Dropbox sans lien partagé
-      const { data: filesWithoutLinks, error } = await supabase
-        .from('dropbox_files')
-        .select('local_id, dropbox_path')
-        .is('shared_link', null);
-
-      if (error) {
-        throw new Error(`Erreur base de données: ${error.message}`);
+      if (result.success === 0 && result.errors === 0) {
+        toast.info('ℹ️ Toutes les musiques ont déjà leurs liens partagés');
       }
 
-      if (!filesWithoutLinks || filesWithoutLinks.length === 0) {
-        toast.success('✅ Tous les fichiers ont déjà leurs liens pré-générés !');
-        return;
-      }
-
-      const totalFiles = filesWithoutLinks.length;
-      setStats({ total: totalFiles, generated: 0, existing: 0 });
-
-      toast.info(`📝 Génération de ${totalFiles} liens partagés...`);
-
-      // Générer les liens en batch avec mise à jour du progrès
-      const BATCH_SIZE = 5;
-      let processed = 0;
-
-      for (let i = 0; i < filesWithoutLinks.length; i += BATCH_SIZE) {
-        const batch = filesWithoutLinks.slice(i, i + BATCH_SIZE);
-        
-        await batchGenerateDropboxLinks(
-          batch.map(file => ({
-            localId: file.local_id,
-            dropboxPath: file.dropbox_path
-          })),
-          config.accessToken
-        );
-
-        processed += batch.length;
-        const progressPercent = Math.round((processed / totalFiles) * 100);
-        setProgress(progressPercent);
-        setStats(prev => ({ ...prev, generated: processed }));
-      }
-
-      toast.success(`✅ ${totalFiles} liens partagés générés avec succès !`);
       setProgress(100);
 
     } catch (error) {
@@ -79,51 +58,19 @@ export const DropboxLinkPreGenerator: React.FC<DropboxLinkPreGeneratorProps> = (
       toast.error(`❌ Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setIsGenerating(false);
+      setCurrentFile('');
     }
   };
-
-  const checkExistingLinks = async () => {
-    try {
-      const { data: withLinks, error: withLinksError } = await supabase
-        .from('dropbox_files')
-        .select('local_id')
-        .not('shared_link', 'is', null);
-
-      const { data: withoutLinks, error: withoutLinksError } = await supabase
-        .from('dropbox_files')
-        .select('local_id')
-        .is('shared_link', null);
-
-      if (withLinksError || withoutLinksError) {
-        throw new Error('Erreur lors de la vérification');
-      }
-
-      setStats({
-        total: (withLinks?.length || 0) + (withoutLinks?.length || 0),
-        generated: withLinks?.length || 0,
-        existing: withoutLinks?.length || 0
-      });
-
-      toast.info(`📊 ${withLinks?.length || 0} liens générés, ${withoutLinks?.length || 0} manquants`);
-    } catch (error) {
-      console.error('Erreur vérification:', error);
-      toast.error('❌ Erreur lors de la vérification');
-    }
-  };
-
-  React.useEffect(() => {
-    checkExistingLinks();
-  }, []);
 
   return (
     <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5" />
-          Pré-génération des liens Dropbox
+          Génération automatique des liens Dropbox
         </CardTitle>
         <CardDescription>
-          Génère en avance les liens partagés Dropbox pour accélérer le chargement des musiques
+          Génère automatiquement les liens partagés Dropbox pour toutes vos musiques existantes
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -131,15 +78,15 @@ export const DropboxLinkPreGenerator: React.FC<DropboxLinkPreGeneratorProps> = (
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div className="text-center">
             <div className="font-semibold text-lg">{stats.total}</div>
-            <div className="text-muted-foreground">Total fichiers</div>
+            <div className="text-muted-foreground">Total traité</div>
           </div>
           <div className="text-center">
-            <div className="font-semibold text-lg text-green-600">{stats.generated}</div>
-            <div className="text-muted-foreground">Liens générés</div>
+            <div className="font-semibold text-lg text-green-600">{stats.success}</div>
+            <div className="text-muted-foreground">Succès</div>
           </div>
           <div className="text-center">
-            <div className="font-semibold text-lg text-orange-600">{stats.existing}</div>
-            <div className="text-muted-foreground">Manquants</div>
+            <div className="font-semibold text-lg text-red-600">{stats.errors}</div>
+            <div className="text-muted-foreground">Erreurs</div>
           </div>
         </div>
 
@@ -148,38 +95,38 @@ export const DropboxLinkPreGenerator: React.FC<DropboxLinkPreGeneratorProps> = (
           <div className="space-y-2">
             <Progress value={progress} className="w-full" />
             <div className="text-sm text-muted-foreground text-center">
-              {progress}% - Génération en cours...
+              {progress}% - {currentFile || 'Préparation...'}
             </div>
           </div>
         )}
 
-        {/* Boutons d'action */}
-        <div className="flex gap-2">
-          <Button 
-            onClick={generateMissingLinks}
-            disabled={isGenerating || stats.existing === 0}
-            className="flex-1"
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Link className="h-4 w-4 mr-2" />
-            )}
-            Générer les liens manquants
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={checkExistingLinks}
-            disabled={isGenerating}
-          >
-            Actualiser
-          </Button>
-        </div>
+        {/* Bouton d'action */}
+        <Button 
+          onClick={generateMissingLinks}
+          disabled={isGenerating}
+          className="w-full"
+          size="lg"
+        >
+          {isGenerating ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Link className="h-4 w-4 mr-2" />
+          )}
+          {isGenerating ? 'Génération en cours...' : 'Générer les liens manquants'}
+        </Button>
 
-        {stats.existing === 0 && stats.total > 0 && (
-          <div className="text-sm text-green-600 text-center">
-            ✅ Tous les liens sont déjà pré-générés !
+        {!isGenerating && stats.total > 0 && (
+          <div className="text-sm text-center space-y-1">
+            {stats.success > 0 && (
+              <div className="text-green-600">
+                ✅ {stats.success} liens générés avec succès
+              </div>
+            )}
+            {stats.errors > 0 && (
+              <div className="text-red-600">
+                ❌ {stats.errors} erreurs rencontrées
+              </div>
+            )}
           </div>
         )}
       </CardContent>

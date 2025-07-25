@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
-import { getPreGeneratedDropboxLink, generateAndSaveDropboxLink } from './dropboxLinkGenerator';
+import { getPreGeneratedDropboxLink, generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
 import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
 
@@ -15,7 +15,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
       const config = getDropboxConfig();
       if (config.accessToken) {
         console.log('🔗 Génération immédiate du lien partagé...');
-        await generateAndSaveDropboxLink(fileName, dropboxPath, config.accessToken);
+        await generateAndSaveDropboxLinkAdvanced(fileName, dropboxPath, config.accessToken);
         console.log('✅ Lien partagé pré-généré avec succès');
       }
     } catch (error) {
