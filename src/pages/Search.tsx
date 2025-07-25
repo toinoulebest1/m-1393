@@ -20,11 +20,7 @@ import { formatRelativeTime } from "@/utils/dateUtils";
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState(() => {
-    const savedSearch = localStorage.getItem('lastSearch') || "";
-    if (savedSearch) {
-      setTimeout(() => handleSearch(savedSearch), 0);
-    }
-    return savedSearch;
+    return localStorage.getItem('lastSearch') || "";
   });
   const [results, setResults] = useState<any[]>([]);
   const [playlistResults, setPlaylistResults] = useState<any[]>([]);
@@ -48,6 +44,16 @@ const Search = () => {
   } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
+  
+  // Trigger saved search on component mount
+  useEffect(() => {
+    const savedSearch = localStorage.getItem('lastSearch');
+    if (savedSearch && savedSearch.trim()) {
+      handleSearch(savedSearch);
+    }
+  }, []); // Run only once on mount
+
+  // Handle filter changes
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
     // Trigger search when filter changes and there's a query
