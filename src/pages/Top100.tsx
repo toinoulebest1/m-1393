@@ -187,11 +187,18 @@ const Top100 = () => {
           
           // Si la chanson existait avant et a changé de position
           if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
+            const previousPos = previousPositions[songKey];
+            const movement = previousPos > index ? 'up' : 'down';
+            console.log(`🎵 Animation détectée: ${stat.song.title} - Position ${previousPos} → ${index} (${movement})`);
             newAnimatingItems.add(songKey);
           }
         });
         
         // Mettre à jour les positions et déclencher les animations
+        if (newAnimatingItems.size > 0) {
+          console.log(`🎬 Déclenchement de ${newAnimatingItems.size} animations`);
+        }
+        
         setPreviousPositions(newPositions);
         setAnimatingItems(newAnimatingItems);
         setFavoriteStats(formattedStats);
@@ -199,8 +206,9 @@ const Top100 = () => {
         // Nettoyer les animations après un délai
         if (newAnimatingItems.size > 0) {
           setTimeout(() => {
+            console.log("🧹 Nettoyage des animations");
             setAnimatingItems(new Set());
-          }, 800);
+          }, 1200);
         }
       } catch (error) {
         console.error("Error in fetchFavoriteStats:", error);
@@ -441,6 +449,38 @@ const Top100 = () => {
               <h1 className="text-3xl font-bold text-white">Top 100</h1>
               <p className="text-spotify-neutral">{favoriteStats.length} morceaux les plus aimés</p>
             </div>
+            
+            {/* Bouton de test pour voir les animations */}
+            <Button
+              onClick={() => {
+                console.log("🧪 Test d'animation - simulation de changements");
+                // Simuler des changements de position en mélangeant l'ordre
+                const shuffledStats = [...favoriteStats].sort(() => Math.random() - 0.5);
+                const newPositions: { [key: string]: number } = {};
+                const newAnimatingItems = new Set<string>();
+                
+                shuffledStats.forEach((stat, index) => {
+                  const songKey = stat.songId;
+                  newPositions[songKey] = index;
+                  
+                  if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
+                    console.log(`🎬 Animation test: ${stat.song.title} - ${previousPositions[songKey]} → ${index}`);
+                    newAnimatingItems.add(songKey);
+                  }
+                });
+                
+                setPreviousPositions(newPositions);
+                setAnimatingItems(newAnimatingItems);
+                setFavoriteStats(shuffledStats);
+                
+                setTimeout(() => {
+                  setAnimatingItems(new Set());
+                }, 1200);
+              }}
+              className="bg-spotify-accent hover:bg-spotify-accent/80 text-white"
+            >
+              Test Animations 🎭
+            </Button>
           </div>
 
           <div className="bg-white/5 rounded-lg overflow-hidden">
@@ -455,28 +495,36 @@ const Top100 = () => {
                 const previousPos = previousPositions[stat.songId];
                 const hasMovedUp = previousPos !== undefined && previousPos > index;
                 const hasMovedDown = previousPos !== undefined && previousPos < index;
+                
+                if (isAnimating) {
+                  console.log(`🎭 Animation active pour: ${stat.song.title} (position ${index})`);
+                }
 
                 return (
                   <div
                     key={stat.songId}
                     className={cn(
-                      "group p-4 transition-all duration-500 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
+                      "group p-4 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
+                      "transition-all duration-700 ease-out",
                       isCurrentSong 
                         ? "bg-spotify-accent/20" 
                         : "hover:bg-white/5",
-                      isAnimating && "animate-scale-in",
-                      hasMovedUp && isAnimating && "animate-slide-in-right",
-                      hasMovedDown && isAnimating && "animate-fade-in"
+                      // Animations plus visibles pour les changements de position
+                      isAnimating && hasMovedUp && "animate-[slideUp_0.7s_ease-out] bg-green-500/10 border-green-400/30",
+                      isAnimating && hasMovedDown && "animate-[slideDown_0.7s_ease-out] bg-red-500/10 border-red-400/30",
+                      isAnimating && "shadow-2xl ring-2 ring-spotify-accent/50"
                     )}
-                    onClick={() => handlePlay(stat.song)}
-                    style={
-                      isCurrentSong && dominantColor
+                    style={{
+                      transform: isAnimating ? 'scale(1.02)' : 'scale(1)',
+                      zIndex: isAnimating ? 10 : 1,
+                      ...(isCurrentSong && dominantColor
                         ? {
                             background: `linear-gradient(135deg, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.15) 0%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.05) 100%)`,
                             borderColor: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)`,
                           }
-                        : {}
-                    }
+                        : {})
+                    }}
+                    onClick={() => handlePlay(stat.song)}
                   >
                     {isCurrentSong && dominantColor && (
                       <div 
