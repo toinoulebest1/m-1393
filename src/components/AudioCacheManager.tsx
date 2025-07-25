@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getAudioCacheStats, clearAudioCache } from '@/utils/audioCache';
+import { clearAllAudioCaches } from '@/utils/clearAllCaches';
 import { toast } from 'sonner';
 
 interface CacheStats {
@@ -30,15 +31,15 @@ export const AudioCacheManager: React.FC = () => {
   };
 
   const handleClearCache = async () => {
-    if (window.confirm("Êtes-vous sûr de vouloir vider le cache audio ? Cette action ne peut pas être annulée.")) {
+    if (window.confirm("Êtes-vous sûr de vouloir vider TOUS les caches audio ? Cette action ne peut pas être annulée.")) {
       setIsClearing(true);
       try {
-        await clearAudioCache();
-        toast.success("Cache audio vidé avec succès");
+        await clearAllAudioCaches();
+        toast.success("Tous les caches audio ont été vidés avec succès");
         loadStats();
       } catch (error) {
-        console.error("Erreur lors du vidage du cache:", error);
-        toast.error("Erreur lors du vidage du cache audio");
+        console.error("Erreur lors du vidage des caches:", error);
+        toast.error("Erreur lors du vidage des caches audio");
       } finally {
         setIsClearing(false);
       }

@@ -119,6 +119,14 @@ class MemoryAudioCache {
   }
 
   /**
+   * Vide complètement le cache
+   */
+  clear(): void {
+    this.cache.clear();
+    this.metadata.clear();
+  }
+
+  /**
    * Statistiques du cache
    */
   getStats() {
