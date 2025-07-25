@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Heart } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement, favorites, toggleFavorite } = usePlayer();
   const navigate = useNavigate();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -525,6 +525,56 @@ export const SyncedLyricsView: React.FC = () => {
             </div>
           </div>
 
+          {/* Song metadata */}
+          <div className="w-full mb-4 space-y-3">
+            {/* Genre and duration */}
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+              {currentSong.genre && (
+                <span className="px-3 py-1 bg-white/10 text-white/80 text-xs rounded-full backdrop-blur-sm">
+                  {currentSong.genre}
+                </span>
+              )}
+              <span className="px-3 py-1 bg-white/10 text-white/80 text-xs rounded-full backdrop-blur-sm">
+                {formatDuration(currentSong?.duration)}
+              </span>
+              <span className="px-3 py-1 bg-white/10 text-white/80 text-xs rounded-full backdrop-blur-sm">
+                320 kbps
+              </span>
+            </div>
+
+            {/* Audio visualization bars */}
+            <div className="flex items-center justify-center md:justify-start space-x-1 opacity-70">
+              {Array.from({ length: 40 }, (_, i) => (
+                <div
+                  key={i}
+                  className="w-0.5 bg-gradient-to-t from-white/30 to-white/60 rounded-full animate-pulse"
+                  style={{
+                    height: `${Math.random() * 20 + 8}px`,
+                    animationDelay: `${i * 0.1}s`,
+                    animationDuration: `${1 + Math.random()}s`
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Favorite button */}
+            <div className="flex justify-center md:justify-start">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => toggleFavorite(currentSong)}
+                className="text-white/70 hover:text-white group"
+              >
+                <Heart
+                  className={cn(
+                    "h-4 w-4 mr-2 transition-colors",
+                    favorites.some(fav => fav.id === currentSong.id) ? "fill-red-500 text-red-500" : "group-hover:text-red-400"
+                  )}
+                />
+                {favorites.some(fav => fav.id === currentSong.id) ? "Retiré des favoris" : "Ajouter aux favoris"}
+              </Button>
+            </div>
+          </div>
           <div className="text-center md:text-left w-full px-4 md:px-0">
             <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
               {currentSong.title}
