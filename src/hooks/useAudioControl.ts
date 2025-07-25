@@ -164,8 +164,8 @@ export const useAudioControl = ({
           
           setIsPlaying(true);
           
-          // Préchargement différé ultra-court
-          setTimeout(() => preloadNextTracks(), 50);
+          // Préchargement DÉSACTIVÉ pour éviter les chargements multiples
+          // setTimeout(() => preloadNextTracks(), 50);
           
           // Changement terminé ultra-rapide
           changeTimeoutRef.current = window.setTimeout(() => {
