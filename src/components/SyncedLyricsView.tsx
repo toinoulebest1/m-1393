@@ -542,20 +542,6 @@ export const SyncedLyricsView: React.FC = () => {
               </span>
             </div>
 
-            {/* Audio visualization bars */}
-            <div className="flex items-center justify-center md:justify-start space-x-1 opacity-70">
-              {Array.from({ length: 40 }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-0.5 bg-gradient-to-t from-white/30 to-white/60 rounded-full animate-pulse"
-                  style={{
-                    height: `${Math.random() * 20 + 8}px`,
-                    animationDelay: `${i * 0.1}s`,
-                    animationDuration: `${1 + Math.random()}s`
-                  }}
-                />
-              ))}
-            </div>
 
             {/* Favorite button */}
             <div className="flex justify-center md:justify-start">
