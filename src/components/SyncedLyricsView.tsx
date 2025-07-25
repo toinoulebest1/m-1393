@@ -379,6 +379,17 @@ export const SyncedLyricsView: React.FC = () => {
     }
   };
 
+  // Handle progress change with proper audio seeking
+  const handleProgressChange = (value: number[]) => {
+    const newProgress = value[0];
+    const audioElement = getCurrentAudioElement();
+    if (audioElement && audioElement.duration) {
+      const newTime = (newProgress / 100) * audioElement.duration;
+      audioElement.currentTime = newTime;
+      setProgress(newProgress);
+    }
+  };
+
   // If no current song, show message to start music
   if (!currentSong) {
     console.log('SyncedLyricsView: No current song, showing fallback message');
@@ -475,7 +486,7 @@ export const SyncedLyricsView: React.FC = () => {
                 max={100}
                 step={0.1}
                 className="flex-grow"
-                onValueChange={(value) => setProgress(value[0])}
+                onValueChange={handleProgressChange}
               />
             </div>
             
