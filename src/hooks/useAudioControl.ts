@@ -105,17 +105,27 @@ export const useAudioControl = ({
 
         // Configuration streaming ultra-agressive
         console.log("⚡ Streaming instantané");
-        audio.preload = "metadata"; // Plus léger que "auto"
+        audio.preload = "none"; // Pas de preload pour démarrage plus rapide
         audio.src = audioUrl;
         
-        // Forcer le chargement immédiat du début du fichier
-        audio.load();
-        
-        // Démarrage avec gestion autoplay optimisée
-        console.log("🚀 Play avec gestion autoplay...");
+        // Démarrage immédiat dès que possible
+        console.log("🚀 Play instantané...");
         const playStartTime = performance.now();
         
-        const success = await AutoplayManager.playAudio(audio);
+        // Lancer play() immédiatement sans attendre
+        const playPromise = audio.play();
+        
+        // Gérer la promesse de play
+        const success = await playPromise.then(() => {
+          console.log("✅ Lecture démarrée");
+          return true;
+        }).catch(async (error) => {
+          if (error.name === 'NotAllowedError') {
+            // Fallback avec AutoplayManager si nécessaire
+            return await AutoplayManager.playAudio(audio);
+          }
+          throw error;
+        });
         
         if (success) {
           const playElapsed = performance.now() - playStartTime;
