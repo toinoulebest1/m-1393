@@ -280,7 +280,7 @@ export const Player = () => {
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {currentSong ? (
           <div className="flex items-center space-x-4 w-48 overflow-hidden">
-            <div className="w-12 h-12 rounded overflow-hidden shadow-md">
+            <div className="w-16 h-16 rounded overflow-hidden shadow-md">
               <img
                 src={currentSong.imageUrl || 'https://picsum.photos/100'}
                 alt="Current Song"
