@@ -8,6 +8,7 @@ interface MetadataActionsProps {
   onUpdateMetadata: () => void;
   onSelectAll: () => void;
   onSelectWithoutImages: () => void;
+  onViewDropboxChanges: () => void;
   allSelected: boolean;
 }
 
@@ -17,6 +18,7 @@ export const MetadataActions = ({
   onUpdateMetadata,
   onSelectAll,
   onSelectWithoutImages,
+  onViewDropboxChanges,
   allSelected
 }: MetadataActionsProps) => {
   return (
@@ -35,6 +37,14 @@ export const MetadataActions = ({
         className="bg-spotify-dark/50 border-white/20 text-white hover:bg-white/10"
       >
         {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+      </Button>
+      
+      <Button
+        variant="outline"
+        onClick={onViewDropboxChanges}
+        className="bg-spotify-dark/50 border-white/20 text-white hover:bg-white/10"
+      >
+        Voir changements Dropbox
       </Button>
       
       <Button

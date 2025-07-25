@@ -201,6 +201,7 @@ const SongMetadataUpdate = () => {
           onUpdateMetadata={handleUpdateMetadata}
           onSelectAll={handleSelectAll}
           onSelectWithoutImages={handleSelectWithoutImages}
+          onViewDropboxChanges={() => console.log("Voir changements Dropbox")}
           allSelected={selectedSongs.length === songs.length && songs.length > 0}
         />
 
