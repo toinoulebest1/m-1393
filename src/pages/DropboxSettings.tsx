@@ -1,6 +1,7 @@
 
 import { Layout } from "@/components/Layout";
 import { DropboxSettings } from '@/components/DropboxSettings';
+import { DropboxLinkPreGenerator } from '@/components/DropboxLinkPreGenerator';
 
 const DropboxSettingsPage = () => {
   return (
@@ -17,6 +18,8 @@ const DropboxSettingsPage = () => {
           </div>
           
           <DropboxSettings />
+          
+          <DropboxLinkPreGenerator />
         </div>
       </div>
     </Layout>

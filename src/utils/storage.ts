@@ -1,11 +1,29 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
+import { getPreGeneratedDropboxLink, generateAndSaveDropboxLink } from './dropboxLinkGenerator';
+import { memoryCache } from './memoryCache';
+import { getDropboxConfig } from './dropboxStorage';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
   if (isDropboxEnabled()) {
     console.log('Using Dropbox for file upload');
-    return await uploadFileToDropbox(file, `audio/${fileName}`);
+    const dropboxPath = await uploadFileToDropbox(file, `audio/${fileName}`);
+    
+    // Générer immédiatement le lien partagé pour éviter les délais futurs
+    try {
+      const config = getDropboxConfig();
+      if (config.accessToken) {
+        console.log('🔗 Génération immédiate du lien partagé...');
+        await generateAndSaveDropboxLink(fileName, dropboxPath, config.accessToken);
+        console.log('✅ Lien partagé pré-généré avec succès');
+      }
+    } catch (error) {
+      console.warn('⚠️ Échec génération lien partagé immédiat:', error);
+      // Ne pas faire échouer l'upload, juste loguer l'erreur
+    }
+    
+    return dropboxPath;
   }
   
   // Fallback vers Supabase (OneDrive complètement désactivé si Dropbox est configuré)
@@ -28,7 +46,24 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 export const getAudioFileUrl = async (filePath: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath);
   
-  // Priorité stricte à Dropbox d'abord
+  // 1. Vérifier le cache mémoire d'abord
+  const cachedUrl = memoryCache.get(filePath);
+  if (cachedUrl) {
+    console.log('💾 Cache mémoire HIT:', filePath);
+    return cachedUrl;
+  }
+
+  // 2. Vérifier s'il y a un lien pré-généré dans la base de données (pour Dropbox)
+  if (isDropboxEnabled()) {
+    const preGeneratedLink = await getPreGeneratedDropboxLink(filePath);
+    if (preGeneratedLink) {
+      console.log('⚡ Lien pré-généré trouvé:', filePath);
+      memoryCache.set(filePath, preGeneratedLink);
+      return preGeneratedLink;
+    }
+  }
+  
+  // 3. Priorité stricte à Dropbox d'abord (génération classique si pas de lien pré-généré)
   if (isDropboxEnabled()) {
     console.log('Using Dropbox for file retrieval');
     try {
@@ -40,6 +75,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       
       const url = await getDropboxSharedLink(filePath);
       console.log('✅ URL Dropbox récupérée:', url);
+      memoryCache.set(filePath, url);
       return url;
     } catch (error) {
       console.error('❌ Erreur Dropbox pour', filePath, ':', error);
@@ -48,7 +84,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     }
   }
   
-  // Fallback vers Supabase (OneDrive complètement ignoré si Dropbox est configuré)
+  // 4. Fallback vers Supabase (OneDrive complètement ignoré si Dropbox est configuré)
   console.log('Using Supabase for file retrieval');
   try {
     const { data: listData, error: listError } = await supabase.storage
@@ -82,6 +118,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     }
 
     console.log('✅ URL Supabase récupérée');
+    memoryCache.set(filePath, data.signedUrl);
     return data.signedUrl;
   } catch (error) {
     console.error('❌ Erreur complète récupération URL:', error);
