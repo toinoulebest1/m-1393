@@ -79,8 +79,17 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       
       const url = await getDropboxSharedLink(filePath);
       console.log('✅ URL Dropbox récupérée:', url);
-      // Cache mémoire DÉSACTIVÉ
-      // memoryCache.set(filePath, url);
+      
+      // Sauvegarder le lien pour la prochaine fois (en arrière-plan)
+      const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
+      if (localId) {
+        setTimeout(() => {
+          generateAndSaveDropboxLinkAdvanced(localId, filePath, getDropboxConfig().accessToken).catch(err => 
+            console.warn('⚠️ Erreur sauvegarde lien:', err)
+          );
+        }, 0);
+      }
+      
       return url;
     } catch (error) {
       console.error('❌ Erreur Dropbox pour', filePath, ':', error);
