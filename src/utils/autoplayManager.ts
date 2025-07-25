@@ -96,37 +96,53 @@ export class AutoplayManager {
   }
 
   /**
-   * Joue un audio en gérant l'autoplay
+   * Joue un audio en gérant l'autoplay (optimisé)
    */
   static async playAudio(audio: HTMLAudioElement): Promise<boolean> {
     try {
-      // Vérifier si l'autoplay est possible
-      const canPlay = await this.canAutoplay();
-      
-      if (!canPlay && !this.hasUserInteracted) {
-        console.log("⚠️ Autoplay bloqué - en attente d'interaction");
-        
-        // Stocker la lecture en attente
-        this.pendingPlay = () => {
-          audio.play().catch(console.error);
-        };
-        
-        // Afficher un bouton d'activation
-        this.showActivationPrompt();
-        return false;
-      }
+      // Si on a déjà une interaction, lancer directement
+      if (this.hasUserInteracted) {
+        // Démarrer AudioContext si nécessaire (non-bloquant)
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          this.audioContext.resume().catch(console.warn);
+        }
 
-      // Démarrer AudioContext si nécessaire
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+        // Lecture directe
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          console.log("✅ Lecture démarrée");
+          return true;
+        }
+      } else {
+        // Seulement tester l'autoplay si pas d'interaction précédente
+        const canPlay = await this.canAutoplay();
+        
+        if (!canPlay) {
+          console.log("⚠️ Autoplay bloqué - en attente d'interaction");
+          
+          // Stocker la lecture en attente
+          this.pendingPlay = () => {
+            audio.play().catch(console.error);
+          };
+          
+          // Afficher un bouton d'activation
+          this.showActivationPrompt();
+          return false;
+        }
 
-      // Tenter la lecture
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        await playPromise;
-        console.log("✅ Lecture démarrée");
-        return true;
+        // Démarrer AudioContext si nécessaire
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+
+        // Tenter la lecture
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          console.log("✅ Lecture démarrée");
+          return true;
+        }
       }
     } catch (error) {
       console.error("❌ Erreur lecture audio:", error);
