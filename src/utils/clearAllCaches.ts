@@ -2,7 +2,7 @@
  * Utilitaire pour vider complètement tous les caches audio
  */
 
-import { clearAudioCache } from './audioCache';
+// import { clearAudioCache } from './audioCache'; // DÉSACTIVÉ
 import { UltraFastCache } from './ultraFastCache';
 // import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
 
@@ -13,9 +13,9 @@ export const clearAllAudioCaches = async (): Promise<void> => {
   try {
     console.log('🧹 Début du nettoyage de tous les caches audio...');
     
-    // 1. Vider le cache IndexedDB
-    await clearAudioCache();
-    console.log('✅ Cache IndexedDB vidé');
+    // Cache IndexedDB DÉSACTIVÉ
+    // await clearAudioCache();
+    console.log('✅ Cache IndexedDB désactivé');
     
     // Cache mémoire DÉSACTIVÉ
     // memoryCache.clear();

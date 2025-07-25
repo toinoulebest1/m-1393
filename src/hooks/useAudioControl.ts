@@ -3,7 +3,7 @@ import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
-import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
+// import { isInCache, getFromCache, addToCache } from '@/utils/audioCache'; // DÉSACTIVÉ
 // import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { AutoplayManager } from '@/utils/autoplayManager';
 
@@ -65,24 +65,10 @@ export const useAudioControl = ({
         console.log("🚀 Récupération URL instantanée...");
         const startTime = performance.now();
         
-        // Cache mémoire DÉSACTIVÉ - on passe directement au cache IndexedDB
-        console.log("💾 Cache IndexedDB...");
-        const cacheCheck = Promise.race([
-          isInCache(song.url).then(async (inCache) => {
-            if (inCache) {
-              const cachedUrl = await getFromCache(song.url);
-              if (cachedUrl && typeof cachedUrl === 'string') {
-                const elapsed = performance.now() - startTime;
-                console.log("💾 CACHE INDEXEDDB:", elapsed.toFixed(1), "ms");
-                return { url: cachedUrl, fromCache: true };
-              }
-            }
-            return null;
-          }),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 2)) // 2ms timeout
-        ]);
+        // Cache IndexedDB DÉSACTIVÉ
+        console.log("🚀 Récupération directe depuis les liens pré-générés...");
         
-        // Récupération réseau avec gestion d'erreur améliorée
+        // Récupération réseau directe
         const networkPromise = getAudioFileUrl(song.url).then(url => {
           if (typeof url === 'string') {
             return { url, fromCache: false };
@@ -103,48 +89,27 @@ export const useAudioControl = ({
           throw error;
         });
         
-        // Prendre la première URL disponible
-        const audioData = await Promise.race([
-          cacheCheck.then(result => result || Promise.reject("No cache")),
-          networkPromise
-        ]).catch(async () => {
-          // Si le cache et le réseau échouent, essayer le réseau seul
-          console.log("⚠️ Cache indisponible, tentative réseau seule...");
-          return await networkPromise;
-        });
+        // Prendre directement l'URL réseau
+        const audioData = await networkPromise;
         
         const audioUrl = audioData.url;
         const elapsed = performance.now() - startTime;
         
-        console.log("✅ URL en:", elapsed.toFixed(1), "ms", audioData.fromCache ? "(cache)" : "(réseau)");
+        console.log("✅ URL en:", elapsed.toFixed(1), "ms", "(réseau direct)");
 
         if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error('URL audio non disponible');
         }
 
-        // Cache mémoire DÉSACTIVÉ
+        // Cache mémoire et IndexedDB DÉSACTIVÉS
 
         // Configuration streaming ultra-agressive
         console.log("⚡ Streaming instantané");
         audio.preload = "auto";
         audio.src = audioUrl;
         
-        // Cache différé ultra-rapide
-        if (!audioData.fromCache) {
-          setTimeout(async () => {
-            try {
-              console.log("📡 Cache différé...");
-              const response = await fetch(audioUrl);
-              if (response.ok) {
-                const blob = await response.blob();
-                await addToCache(song.url, blob);
-                console.log("💾 Cache terminé:", (blob.size / 1024 / 1024).toFixed(1), "MB");
-              }
-            } catch (e) {
-              console.warn("⚠️ Cache différé échoué");
-            }
-          }, 25);
-        }
+        // Cache différé DÉSACTIVÉ - plus de mise en cache
+        // Plus de cache IndexedDB différé
         
         // Démarrage avec gestion autoplay
         console.log("🚀 Play avec gestion autoplay...");

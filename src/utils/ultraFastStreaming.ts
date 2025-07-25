@@ -6,7 +6,7 @@
 import { getAudioFileUrl } from './storage';
 import { UltraFastCache } from './ultraFastCache';
 // import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
-import { isInCache, getFromCache } from './audioCache';
+// import { isInCache, getFromCache } from './audioCache'; // DÉSACTIVÉ
 
 export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
@@ -48,7 +48,7 @@ export class UltraFastStreaming {
     }
 
     // 4. Streaming ultra-agressif avec parallélisation
-    const promise = this.ultraAggressiveStreaming(songUrl, startTime);
+    const promise = this.streamingDirectOnly(songUrl, startTime);
     this.promisePool.set(songUrl, promise);
 
     try {
@@ -64,68 +64,33 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Streaming ultra-agressif avec parallélisation IndexedDB + réseau
+   * Streaming direct sans IndexedDB
    */
-  private static async ultraAggressiveStreaming(songUrl: string, startTime: number): Promise<string> {
-    console.log("🚀 Démarrage streaming agressif");
+  private static async streamingDirectOnly(songUrl: string, startTime: number): Promise<string> {
+    console.log("🚀 Streaming direct sans cache");
 
-    // Lancer IndexedDB et réseau en parallèle
-    const indexedDBPromise = this.tryIndexedDB(songUrl);
-    const networkPromise = this.tryNetwork(songUrl);
-
-    // Course entre IndexedDB et réseau
+    // Directement le réseau
     try {
-      const result = await Promise.race([
-        indexedDBPromise.then(result => {
-          if (result) {
-            const elapsed = performance.now() - startTime;
-            console.log("💾 INDEXEDDB WIN:", elapsed.toFixed(2), "ms");
-            return result;
-          }
-          return Promise.reject("No IndexedDB result");
-        }),
-        networkPromise.then(result => {
-          if (result) {
-            const elapsed = performance.now() - startTime;
-            console.log("🌐 NETWORK WIN:", elapsed.toFixed(2), "ms");
-            return result;
-          }
-          return Promise.reject("No network result");
-        })
-      ]);
-
-      return result;
-    } catch (raceError) {
-      // Si la course échoue, attendre le réseau
-      console.log("⚠️ Course échouée, attente réseau...");
-      const networkResult = await networkPromise;
-      if (networkResult) {
+      const result = await this.tryNetwork(songUrl);
+      if (result) {
         const elapsed = performance.now() - startTime;
-        console.log("🌐 NETWORK FALLBACK:", elapsed.toFixed(2), "ms");
-        return networkResult;
+        console.log("🌐 NETWORK DIRECT:", elapsed.toFixed(2), "ms");
+        return result;
       }
       
       throw new Error("Aucune source disponible");
+    } catch (error) {
+      console.error("❌ Erreur streaming direct:", error);
+      throw error;
     }
   }
 
   /**
-   * Tentative IndexedDB ultra-rapide
+   * Tentative IndexedDB DÉSACTIVÉE
    */
   private static async tryIndexedDB(songUrl: string): Promise<string | null> {
-    try {
-      const inCache = await isInCache(songUrl);
-      if (inCache) {
-        const cachedUrl = await getFromCache(songUrl);
-        if (cachedUrl && typeof cachedUrl === 'string') {
-          return cachedUrl;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.warn("⚠️ IndexedDB error:", error);
-      return null;
-    }
+    // IndexedDB désactivé
+    return null;
   }
 
   /**
