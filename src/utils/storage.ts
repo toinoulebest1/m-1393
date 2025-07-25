@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
+import { isDropboxEnabled, isDropboxEnabledForReading, uploadFileToDropbox, getDropboxSharedLink, checkFileExistsOnDropbox } from './dropboxStorage';
 import { getPreGeneratedDropboxLink, generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
 import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
@@ -54,7 +54,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
   }
 
   // 2. Vérifier s'il y a un lien pré-généré dans la base de données (pour Dropbox)
-  if (isDropboxEnabled()) {
+  if (isDropboxEnabledForReading()) {
     // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
     const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
     console.log('🔍 Recherche lien pré-généré pour ID:', localId);
@@ -62,14 +62,17 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     const preGeneratedLink = await getPreGeneratedDropboxLink(localId || filePath);
     if (preGeneratedLink) {
       console.log('⚡ Lien pré-généré trouvé:', preGeneratedLink);
+      // Mettre en cache et retourner
+      memoryCache.set(filePath, preGeneratedLink);
       return preGeneratedLink;
     }
     console.log('❌ Aucun lien pré-généré trouvé pour:', localId);
   }
   
   // 3. Priorité stricte à Dropbox d'abord (génération classique si pas de lien pré-généré)
+  // Mais seulement si l'utilisateur a un token (admin)
   if (isDropboxEnabled()) {
-    console.log('Using Dropbox for file retrieval');
+    console.log('Using Dropbox for file retrieval with admin token');
     try {
       const exists = await checkFileExistsOnDropbox(filePath);
       if (!exists) {
@@ -90,6 +93,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
         }, 0);
       }
       
+      // Mettre en cache et retourner
+      memoryCache.set(filePath, url);
       return url;
     } catch (error) {
       console.error('❌ Erreur Dropbox pour', filePath, ':', error);
@@ -132,8 +137,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     }
 
     console.log('✅ URL Supabase récupérée');
-    // Cache mémoire DÉSACTIVÉ
-    // memoryCache.set(filePath, data.signedUrl);
+    // Réactiver le cache mémoire pour les URL Supabase
+    memoryCache.set(filePath, data.signedUrl);
     return data.signedUrl;
   } catch (error) {
     console.error('❌ Erreur complète récupération URL:', error);

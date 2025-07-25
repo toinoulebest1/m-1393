@@ -26,6 +26,13 @@ export const isDropboxEnabled = (): boolean => {
   return config.isEnabled && !!config.accessToken;
 };
 
+// Nouvelle fonction pour vérifier si Dropbox est activé pour la lecture uniquement
+export const isDropboxEnabledForReading = (): boolean => {
+  const config = getDropboxConfig();
+  // Pour la lecture, on accepte si Dropbox est activé même sans token (utilisation des liens pré-générés)
+  return config.isEnabled;
+};
+
 // Fonction simplifiée pour convertir le chemin local vers le chemin Dropbox à la racine
 const getDropboxPath = (localPath: string): string => {
   console.log('🔍 Conversion chemin:', localPath);
@@ -69,9 +76,22 @@ const getDropboxPath = (localPath: string): string => {
 export const checkFileExistsOnDropbox = async (path: string): Promise<boolean> => {
   const config = getDropboxConfig();
   
+  // Pour les utilisateurs sans token, on vérifie d'abord s'il y a un lien pré-généré
   if (!config.accessToken) {
-    console.error("Dropbox access token not configured");
-    return false;
+    console.log("Pas de token Dropbox, vérification via liens pré-générés");
+    try {
+      const localId = path.includes('/') ? path.split('/').pop() : path;
+      const { data: fileRef } = await supabase
+        .from('dropbox_files')
+        .select('shared_link')
+        .eq('local_id', localId || path)
+        .maybeSingle();
+      
+      return !!fileRef?.shared_link;
+    } catch (error) {
+      console.error("Erreur vérification lien pré-généré:", error);
+      return false;
+    }
   }
   
   try {
