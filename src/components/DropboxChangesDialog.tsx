@@ -26,6 +26,7 @@ interface DropboxChangesDialogProps {
 
 export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [changes, setChanges] = useState<DropboxChanges | null>(null);
 
   const listDropboxFiles = async (): Promise<DropboxFile[]> => {
@@ -111,6 +112,51 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
       toast.error(error instanceof Error ? error.message : "Erreur lors de l'analyse");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteOrphanedSongs = async () => {
+    if (!changes || changes.deleted.length === 0) {
+      toast.error("Aucune chanson à supprimer");
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // Convertir les IDs en UUIDs pour la fonction de suppression
+      const songIds = changes.deleted.map(id => id);
+      
+      // Appeler la fonction Supabase pour supprimer les chansons
+      const { data, error } = await supabase.rpc('delete_songs_batch', {
+        song_ids: songIds
+      });
+
+      if (error) {
+        console.error('Erreur lors de la suppression:', error);
+        toast.error(`Erreur lors de la suppression: ${error.message}`);
+        return;
+      }
+
+      const result = data[0]; // La fonction retourne un tableau avec un seul élément
+      const { deleted_count, errors } = result;
+      
+      if (errors && errors.length > 0) {
+        console.error('Erreurs lors de la suppression:', errors);
+        toast.error(`Erreurs: ${errors.join(', ')}`);
+      }
+
+      if (deleted_count > 0) {
+        toast.success(`${deleted_count} chanson(s) supprimée(s) avec succès`);
+        // Rafraîchir les changements après suppression
+        await detectChanges();
+      } else {
+        toast.warning("Aucune chanson n'a pu être supprimée");
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -204,14 +250,27 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
                 <Button 
                   variant="outline" 
                   onClick={detectChanges}
-                  disabled={loading}
+                  disabled={loading || deleting}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Actualiser
                 </Button>
+                
+                {changes.deleted.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    onClick={deleteOrphanedSongs}
+                    disabled={loading || deleting}
+                  >
+                    {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    {deleting ? "Suppression..." : `Supprimer ${changes.deleted.length} chanson(s) orpheline(s)`}
+                  </Button>
+                )}
+                
                 <Button 
                   variant="outline" 
                   onClick={() => onOpenChange(false)}
+                  disabled={deleting}
                 >
                   Fermer
                 </Button>
