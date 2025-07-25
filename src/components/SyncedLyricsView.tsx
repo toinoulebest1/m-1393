@@ -562,16 +562,19 @@ export const SyncedLyricsView: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => toggleFavorite(currentSong)}
+                onClick={() => {
+                  console.log("Favorite button clicked for song:", currentSong);
+                  toggleFavorite(currentSong);
+                }}
                 className="text-white/70 hover:text-white group"
               >
                 <Heart
                   className={cn(
                     "h-4 w-4 mr-2 transition-colors",
-                    favorites.some(fav => fav.id === currentSong.id) ? "fill-red-500 text-red-500" : "group-hover:text-red-400"
+                    favorites && favorites.some(fav => fav.id === currentSong.id) ? "fill-red-500 text-red-500" : "group-hover:text-red-400"
                   )}
                 />
-                {favorites.some(fav => fav.id === currentSong.id) ? "Retiré des favoris" : "Ajouter aux favoris"}
+                {favorites && favorites.some(fav => fav.id === currentSong.id) ? "Retiré des favoris" : "Ajouter aux favoris"}
               </Button>
             </div>
           </div>
