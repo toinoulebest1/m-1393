@@ -58,7 +58,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     const preGeneratedLink = await getPreGeneratedDropboxLink(filePath);
     if (preGeneratedLink) {
       console.log('⚡ Lien pré-généré trouvé:', filePath);
-      memoryCache.set(filePath, preGeneratedLink);
+      // Cache mémoire DÉSACTIVÉ
+      // memoryCache.set(filePath, preGeneratedLink);
       return preGeneratedLink;
     }
   }
@@ -75,7 +76,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
       
       const url = await getDropboxSharedLink(filePath);
       console.log('✅ URL Dropbox récupérée:', url);
-      memoryCache.set(filePath, url);
+      // Cache mémoire DÉSACTIVÉ
+      // memoryCache.set(filePath, url);
       return url;
     } catch (error) {
       console.error('❌ Erreur Dropbox pour', filePath, ':', error);
@@ -118,7 +120,8 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     }
 
     console.log('✅ URL Supabase récupérée');
-    memoryCache.set(filePath, data.signedUrl);
+    // Cache mémoire DÉSACTIVÉ
+    // memoryCache.set(filePath, data.signedUrl);
     return data.signedUrl;
   } catch (error) {
     console.error('❌ Erreur complète récupération URL:', error);

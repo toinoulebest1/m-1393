@@ -4,7 +4,7 @@
 
 import { clearAudioCache } from './audioCache';
 import { UltraFastCache } from './ultraFastCache';
-import { memoryCache } from './memoryCache';
+// import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
 
 /**
  * Vide tous les caches audio (IndexedDB, mémoire, L0, et preload worker)
@@ -17,9 +17,9 @@ export const clearAllAudioCaches = async (): Promise<void> => {
     await clearAudioCache();
     console.log('✅ Cache IndexedDB vidé');
     
-    // 2. Vider le cache mémoire
-    memoryCache.clear();
-    console.log('✅ Cache mémoire vidé');
+    // Cache mémoire DÉSACTIVÉ
+    // memoryCache.clear();
+    console.log('✅ Cache mémoire désactivé');
     
     // 3. Vider le cache L0 ultra-rapide
     UltraFastCache.cleanup();

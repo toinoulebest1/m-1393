@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
-import { memoryCache } from '@/utils/memoryCache';
+// import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { getAudioFileUrl } from '@/utils/storage';
 import { addToCache, isInCache } from '@/utils/audioCache';
 
@@ -109,11 +109,11 @@ export const useIntelligentPreloader = () => {
         
         setTimeout(async () => {
           try {
-            // Vérifier cache mémoire d'abord
-            if (memoryCache.has(song.url)) {
-              console.log("⚡ Déjà en cache mémoire:", song.title);
-              return;
-            }
+            // Cache mémoire DÉSACTIVÉ
+            // if (memoryCache.has(song.url)) {
+            //   console.log("⚡ Déjà en cache mémoire:", song.title);
+            //   return;
+            // }
             
             // Vérifier cache IndexedDB
             if (await isInCache(song.url)) {
@@ -126,8 +126,8 @@ export const useIntelligentPreloader = () => {
             const audioUrl = await getAudioFileUrl(song.url);
             
             if (audioUrl && typeof audioUrl === 'string') {
-              // Ajouter au cache mémoire
-              memoryCache.set(song.url, audioUrl);
+              // Cache mémoire DÉSACTIVÉ
+              // memoryCache.set(song.url, audioUrl);
               
               // Télécharger le blob pour IndexedDB en arrière-plan
               setTimeout(async () => {

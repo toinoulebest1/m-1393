@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
-import { memoryCache } from '@/utils/memoryCache';
+// import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { AutoplayManager } from '@/utils/autoplayManager';
 
 interface UseAudioControlProps {
@@ -65,45 +65,7 @@ export const useAudioControl = ({
         console.log("🚀 Récupération URL instantanée...");
         const startTime = performance.now();
         
-        // 1. Cache mémoire ultra-rapide (< 1ms)
-        console.log("⚡ Cache mémoire...");
-        const memoryUrl = memoryCache.get(song.url);
-        if (memoryUrl) {
-          const elapsed = performance.now() - startTime;
-          console.log("⚡ CACHE MÉMOIRE:", elapsed.toFixed(1), "ms");
-          
-          audio.preload = "auto";
-          audio.src = memoryUrl;
-          
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              const totalElapsed = performance.now() - startTime;
-              console.log("✅ === SUCCÈS ULTRA-INSTANTANÉ ===");
-              console.log("🎵 Chanson:", song.title);
-              console.log("⚡ Total:", totalElapsed.toFixed(1), "ms");
-              console.log("🎯 Perf: EXCELLENT (cache mémoire)");
-              
-              setIsPlaying(true);
-              
-              // Préchargement différé ultra-court
-              setTimeout(() => preloadNextTracks(), 50);
-              
-              // Changement terminé ultra-rapide
-              changeTimeoutRef.current = window.setTimeout(() => {
-                setIsChangingSong(false);
-                changeTimeoutRef.current = null;
-              }, 25); // 25ms seulement
-              
-            }).catch(error => {
-              console.error("❌ Erreur play cache mémoire:", error.message);
-              handlePlayError(error, song);
-            });
-          }
-          return;
-        }
-        
-        // 2. Cache IndexedDB avec timeout ultra-court (2ms)
+        // Cache mémoire DÉSACTIVÉ - on passe directement au cache IndexedDB
         console.log("💾 Cache IndexedDB...");
         const cacheCheck = Promise.race([
           isInCache(song.url).then(async (inCache) => {
@@ -112,10 +74,6 @@ export const useAudioControl = ({
               if (cachedUrl && typeof cachedUrl === 'string') {
                 const elapsed = performance.now() - startTime;
                 console.log("💾 CACHE INDEXEDDB:", elapsed.toFixed(1), "ms");
-                
-                // Ajouter au cache mémoire pour la prochaine fois
-                memoryCache.set(song.url, cachedUrl);
-                
                 return { url: cachedUrl, fromCache: true };
               }
             }
@@ -124,7 +82,7 @@ export const useAudioControl = ({
           new Promise<null>(resolve => setTimeout(() => resolve(null), 2)) // 2ms timeout
         ]);
         
-        // 3. Récupération réseau avec gestion d'erreur améliorée
+        // Récupération réseau avec gestion d'erreur améliorée
         const networkPromise = getAudioFileUrl(song.url).then(url => {
           if (typeof url === 'string') {
             return { url, fromCache: false };
@@ -164,10 +122,7 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Ajouter au cache mémoire si pas déjà présent
-        if (!audioData.fromCache) {
-          memoryCache.set(song.url, audioUrl);
-        }
+        // Cache mémoire DÉSACTIVÉ
 
         // Configuration streaming ultra-agressive
         console.log("⚡ Streaming instantané");
