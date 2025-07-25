@@ -73,11 +73,21 @@ export const generateAndSaveDropboxLinkAdvanced = async (
  */
 export const getPreGeneratedDropboxLink = async (localId: string): Promise<string | null> => {
   try {
-    const { data, error } = await supabase
+    // Essayer d'abord avec l'ID exact
+    let { data, error } = await supabase
       .from('dropbox_files')
       .select('shared_link')
       .eq('local_id', localId)
       .maybeSingle();
+
+    // Si pas trouvé, essayer avec le préfixe "audio/"
+    if (!data?.shared_link && !localId.includes('/')) {
+      ({ data, error } = await supabase
+        .from('dropbox_files')
+        .select('shared_link')
+        .eq('local_id', `audio/${localId}`)
+        .maybeSingle());
+    }
 
     if (error || !data?.shared_link) {
       return null;
