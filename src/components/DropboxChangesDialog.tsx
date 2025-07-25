@@ -121,14 +121,35 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
       return;
     }
 
+    // Demander confirmation avant suppression
+    const confirmDelete = window.confirm(
+      `Êtes-vous sûr de vouloir supprimer définitivement ${changes.deleted.length} chanson(s) de la base de données ?\n\n` +
+      `Cette action est irréversible et supprimera toutes les métadonnées associées (playlists, favoris, etc.).`
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
     setDeleting(true);
     try {
-      // Convertir les IDs en UUIDs pour la fonction de suppression
-      const songIds = changes.deleted.map(id => id);
-      
+      // Récupérer les détails des chansons avant suppression pour logging
+      const { data: songsToDelete, error: fetchError } = await supabase
+        .from('songs')
+        .select('id, title, artist')
+        .in('id', changes.deleted);
+
+      if (fetchError) {
+        console.error('Erreur lors de la récupération des chansons:', fetchError);
+        toast.error(`Erreur: ${fetchError.message}`);
+        return;
+      }
+
+      console.log('Chansons à supprimer:', songsToDelete);
+
       // Appeler la fonction Supabase pour supprimer les chansons
       const { data, error } = await supabase.rpc('delete_songs_batch', {
-        song_ids: songIds
+        song_ids: changes.deleted
       });
 
       if (error) {
@@ -218,11 +239,17 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
 
               {/* Fichiers supprimés */}
               {changes.deleted.length > 0 && (
-                <div className="space-y-2">
+                  <div className="space-y-2">
                   <h3 className="flex items-center gap-2 font-semibold text-red-600">
                     <Minus className="h-4 w-4" />
-                    Fichiers supprimés de Dropbox ({changes.deleted.length})
+                    Chansons absentes de Dropbox ({changes.deleted.length})
                   </h3>
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-2">
+                      ⚠️ Ces chansons sont présentes en base de données mais absentes de votre Dropbox.
+                      La suppression effacera définitivement toutes les métadonnées (playlists, favoris, historique).
+                    </p>
+                  </div>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {changes.deleted.map((fileName, index) => (
                       <div key={index} className="p-2 bg-red-50 dark:bg-red-900/20 rounded border-l-4 border-red-500">
@@ -261,9 +288,10 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
                     variant="destructive"
                     onClick={deleteOrphanedSongs}
                     disabled={loading || deleting}
+                    className="bg-red-600 hover:bg-red-700"
                   >
                     {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    {deleting ? "Suppression..." : `Supprimer ${changes.deleted.length} chanson(s) orpheline(s)`}
+                    {deleting ? "Suppression..." : `⚠️ Supprimer définitivement ${changes.deleted.length} chanson(s)`}
                   </Button>
                 )}
                 
