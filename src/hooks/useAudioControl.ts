@@ -105,13 +105,13 @@ export const useAudioControl = ({
 
         // Configuration streaming ultra-agressive
         console.log("⚡ Streaming instantané");
-        audio.preload = "auto";
+        audio.preload = "metadata"; // Plus léger que "auto"
         audio.src = audioUrl;
         
-        // Cache différé DÉSACTIVÉ - plus de mise en cache
-        // Plus de cache IndexedDB différé
+        // Forcer le chargement immédiat du début du fichier
+        audio.load();
         
-        // Démarrage avec gestion autoplay
+        // Démarrage avec gestion autoplay optimisée
         console.log("🚀 Play avec gestion autoplay...");
         const playStartTime = performance.now();
         
