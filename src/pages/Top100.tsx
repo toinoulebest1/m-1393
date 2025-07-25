@@ -450,37 +450,111 @@ const Top100 = () => {
               <p className="text-spotify-neutral">{favoriteStats.length} morceaux les plus aimés</p>
             </div>
             
-            {/* Bouton de test pour voir les animations */}
-            <Button
-              onClick={() => {
-                console.log("🧪 Test d'animation - simulation de changements");
-                // Simuler des changements de position en mélangeant l'ordre
-                const shuffledStats = [...favoriteStats].sort(() => Math.random() - 0.5);
-                const newPositions: { [key: string]: number } = {};
-                const newAnimatingItems = new Set<string>();
-                
-                shuffledStats.forEach((stat, index) => {
-                  const songKey = stat.songId;
-                  newPositions[songKey] = index;
+            <div className="flex gap-3">
+              {/* Simulation d'activité pour rendre les animations visibles */}
+              <Button
+                onClick={() => {
+                  console.log("🎲 Simulation d'activité naturelle");
+                  const statsToUpdate = [...favoriteStats];
                   
-                  if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
-                    console.log(`🎬 Animation test: ${stat.song.title} - ${previousPositions[songKey]} → ${index}`);
-                    newAnimatingItems.add(songKey);
+                  // Simuler des changements réalistes (quelques musiques bougent légèrement)
+                  for (let i = 0; i < Math.min(3, statsToUpdate.length - 1); i++) {
+                    const randomIndex = Math.floor(Math.random() * (statsToUpdate.length - 1));
+                    
+                    // Échanger avec l'élément suivant (mouvement naturel)
+                    if (randomIndex < statsToUpdate.length - 1) {
+                      [statsToUpdate[randomIndex], statsToUpdate[randomIndex + 1]] = 
+                      [statsToUpdate[randomIndex + 1], statsToUpdate[randomIndex]];
+                    }
                   }
-                });
-                
-                setPreviousPositions(newPositions);
-                setAnimatingItems(newAnimatingItems);
-                setFavoriteStats(shuffledStats);
-                
-                setTimeout(() => {
-                  setAnimatingItems(new Set());
-                }, 1200);
-              }}
-              className="bg-spotify-accent hover:bg-spotify-accent/80 text-white"
-            >
-              Test Animations 🎭
-            </Button>
+                  
+                  // Appliquer la logique de détection d'animation
+                  const newPositions: { [key: string]: number } = {};
+                  const newAnimatingItems = new Set<string>();
+                  
+                  statsToUpdate.forEach((stat, index) => {
+                    const songKey = stat.songId;
+                    newPositions[songKey] = index;
+                    
+                    if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
+                      const movement = previousPositions[songKey] > index ? 'up' : 'down';
+                      console.log(`✨ Mouvement naturel: ${stat.song.title} - Position ${previousPositions[songKey]} → ${index} (${movement})`);
+                      newAnimatingItems.add(songKey);
+                    }
+                  });
+                  
+                  if (newAnimatingItems.size > 0) {
+                    console.log(`🎬 ${newAnimatingItems.size} changements détectés`);
+                    setPreviousPositions(newPositions);
+                    setAnimatingItems(newAnimatingItems);
+                    setFavoriteStats(statsToUpdate);
+                    
+                    setTimeout(() => {
+                      setAnimatingItems(new Set());
+                    }, 1200);
+                  }
+                }}
+                variant="outline"
+                className="border-spotify-accent/30 text-spotify-accent hover:bg-spotify-accent/10"
+              >
+                🎵 Simuler Activité
+              </Button>
+              
+              {/* Bouton pour rotation automatique */}
+              <Button
+                onClick={() => {
+                  console.log("🔄 Rotation automatique activée");
+                  let rotationCount = 0;
+                  const maxRotations = 5;
+                  
+                  const rotationInterval = setInterval(() => {
+                    if (rotationCount >= maxRotations) {
+                      clearInterval(rotationInterval);
+                      console.log("🛑 Rotation automatique terminée");
+                      return;
+                    }
+                    
+                    setFavoriteStats(currentStats => {
+                      const newStats = [...currentStats];
+                      
+                      // Mouvement circulaire plus naturel
+                      for (let i = 0; i < 2; i++) {
+                        const randomIdx = Math.floor(Math.random() * (newStats.length - 2));
+                        if (randomIdx < newStats.length - 1) {
+                          [newStats[randomIdx], newStats[randomIdx + 1]] = 
+                          [newStats[randomIdx + 1], newStats[randomIdx]];
+                        }
+                      }
+                      
+                      // Détecter et animer
+                      const newPositions: { [key: string]: number } = {};
+                      const newAnimatingItems = new Set<string>();
+                      
+                      newStats.forEach((stat, index) => {
+                        newPositions[stat.songId] = index;
+                        if (previousPositions[stat.songId] !== undefined && 
+                            previousPositions[stat.songId] !== index) {
+                          newAnimatingItems.add(stat.songId);
+                        }
+                      });
+                      
+                      setPreviousPositions(newPositions);
+                      setAnimatingItems(newAnimatingItems);
+                      
+                      setTimeout(() => setAnimatingItems(new Set()), 1200);
+                      
+                      rotationCount++;
+                      console.log(`🔄 Rotation ${rotationCount}/${maxRotations}`);
+                      
+                      return newStats;
+                    });
+                  }, 2000);
+                }}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                🔄 Auto-Rotation
+              </Button>
+            </div>
           </div>
 
           <div className="bg-white/5 rounded-lg overflow-hidden">
