@@ -89,6 +89,13 @@ const Search = () => {
         }
       } = await supabase.auth.getUser();
       
+      console.log("=== SEARCH DEBUG ===");
+      console.log("Current user:", user);
+      console.log("User ID:", user?.id);
+      console.log("Search filter:", searchFilter);
+      console.log("Search query:", query);
+      console.log("Is wildcard search:", isWildcardSearch);
+      
       // For song searches, we don't need to require authentication
       // Only playlist searches require authentication
       if (!user && searchFilter === "playlist") {
@@ -181,6 +188,7 @@ const Search = () => {
         if (!isWildcardSearch) {
           songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
         }
+        console.log("Song query built for search filter 'all'");
         promises.push(songQuery);
 
         // Search playlists - first get playlists, then get owner info separately
@@ -190,6 +198,9 @@ const Search = () => {
         }
         promises.push(playlistQuery);
         const [songResult, playlistResult] = await Promise.all(promises);
+        console.log("Song query result:", songResult);
+        console.log("Song data length:", songResult.data?.length);
+        console.log("Song error:", songResult.error);
         if (songResult.error) {
           throw songResult.error;
         }
