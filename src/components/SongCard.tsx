@@ -13,6 +13,7 @@ import {
 import { Song } from "@/types/player";
 import { rgbToClass } from "@/utils/colorExtractor";
 import { useNavigate } from "react-router-dom";
+import { AutoplayManager } from "@/utils/autoplayManager";
 
 interface ContextMenuItem {
   label: string;
@@ -52,6 +53,10 @@ export const SongCard = ({
 
   const handlePlay = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    
+    // Enregistrer l'interaction utilisateur pour débloquer l'autoplay
+    AutoplayManager.registerUserInteraction();
+    
     if (isCurrentSong) {
       isPlaying ? pause() : play();
     } else {

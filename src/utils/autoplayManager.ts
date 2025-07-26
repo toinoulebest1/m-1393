@@ -15,9 +15,9 @@ export class AutoplayManager {
     // Écouter les premières interactions utilisateur
     const interactionEvents = ['click', 'touchstart', 'keydown', 'mousedown'];
     
-    const handleInteraction = () => {
+    const handleInteraction = (event: Event) => {
       this.hasUserInteracted = true;
-      console.log("🎵 Interaction utilisateur détectée - autoplay autorisé");
+      console.log("🎵 Interaction utilisateur détectée - autoplay autorisé", event.type);
       
       // Créer l'AudioContext après interaction
       this.createAudioContext();
@@ -26,6 +26,12 @@ export class AutoplayManager {
       if (this.pendingPlay) {
         this.pendingPlay();
         this.pendingPlay = null;
+      }
+      
+      // Supprimer l'overlay d'activation s'il existe
+      const overlay = document.getElementById('audio-activation-overlay');
+      if (overlay) {
+        overlay.remove();
       }
       
       // Nettoyer les listeners
@@ -100,56 +106,40 @@ export class AutoplayManager {
    */
   static async playAudio(audio: HTMLAudioElement): Promise<boolean> {
     try {
-      // Si on a déjà une interaction, lancer directement
-      if (this.hasUserInteracted) {
-        // Démarrer AudioContext si nécessaire (non-bloquant)
-        if (this.audioContext && this.audioContext.state === 'suspended') {
-          this.audioContext.resume().catch(console.warn);
-        }
-
-        // Lecture directe
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-          console.log("✅ Lecture démarrée");
-          return true;
-        }
-      } else {
-        // Seulement tester l'autoplay si pas d'interaction précédente
-        const canPlay = await this.canAutoplay();
-        
-        if (!canPlay) {
-          console.log("⚠️ Autoplay bloqué - en attente d'interaction");
-          
-          // Stocker la lecture en attente
-          this.pendingPlay = () => {
-            audio.play().catch(console.error);
-          };
-          
-          // Afficher un bouton d'activation
-          this.showActivationPrompt();
-          return false;
-        }
-
-        // Démarrer AudioContext si nécessaire
-        if (this.audioContext && this.audioContext.state === 'suspended') {
+      // Démarrer AudioContext si nécessaire
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        try {
           await this.audioContext.resume();
+        } catch (error) {
+          console.warn("⚠️ Erreur reprise AudioContext:", error);
         }
+      }
 
-        // Tenter la lecture
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-          console.log("✅ Lecture démarrée");
-          return true;
-        }
+      // Tenter la lecture directe
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        await playPromise;
+        console.log("✅ Lecture démarrée");
+        this.hasUserInteracted = true; // Marquer comme interagit si la lecture réussit
+        return true;
       }
     } catch (error) {
       console.error("❌ Erreur lecture audio:", error);
       
       if (error.name === 'NotAllowedError') {
+        console.log("⚠️ Autoplay bloqué - en attente d'interaction");
+        
+        // Stocker la lecture en attente
+        this.pendingPlay = () => {
+          audio.play().catch(console.error);
+        };
+        
+        // Afficher un bouton d'activation
         this.showActivationPrompt();
+        return false;
       }
+      
+      throw error;
     }
     
     return false;
@@ -224,6 +214,24 @@ export class AutoplayManager {
     }
     
     return { name: 'Inconnu', supportsAutoplay: false };
+  }
+
+  /**
+   * Force l'enregistrement d'une interaction utilisateur
+   * À utiliser quand l'utilisateur clique sur une chanson
+   */
+  static registerUserInteraction(): void {
+    if (!this.hasUserInteracted) {
+      this.hasUserInteracted = true;
+      this.createAudioContext();
+      console.log("🎵 Interaction utilisateur enregistrée manuellement");
+      
+      // Supprimer l'overlay d'activation s'il existe
+      const overlay = document.getElementById('audio-activation-overlay');
+      if (overlay) {
+        overlay.remove();
+      }
+    }
   }
 }
 
