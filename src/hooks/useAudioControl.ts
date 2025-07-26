@@ -112,20 +112,29 @@ export const useAudioControl = ({
         console.log("🚀 Play instantané...");
         const playStartTime = performance.now();
         
-        // Lancer play() immédiatement sans attendre
-        const playPromise = audio.play();
+        // Détecter Edge et utiliser AutoplayManager dès le début
+        const isEdge = navigator.userAgent.includes('Edge') || navigator.userAgent.includes('Edg');
+        let success = false;
         
-        // Gérer la promesse de play
-        const success = await playPromise.then(() => {
-          console.log("✅ Lecture démarrée");
-          return true;
-        }).catch(async (error) => {
-          if (error.name === 'NotAllowedError') {
-            // Fallback avec AutoplayManager si nécessaire
-            return await AutoplayManager.playAudio(audio);
-          }
-          throw error;
-        });
+        if (isEdge) {
+          console.log("🔍 Edge détecté - utilisation AutoplayManager");
+          success = await AutoplayManager.playAudio(audio);
+        } else {
+          // Lancer play() immédiatement sans attendre pour les autres navigateurs
+          const playPromise = audio.play();
+          
+          // Gérer la promesse de play
+          success = await playPromise.then(() => {
+            console.log("✅ Lecture démarrée");
+            return true;
+          }).catch(async (error) => {
+            if (error.name === 'NotAllowedError') {
+              // Fallback avec AutoplayManager si nécessaire
+              return await AutoplayManager.playAudio(audio);
+            }
+            throw error;
+          });
+        }
         
         if (success) {
           const playElapsed = performance.now() - playStartTime;
