@@ -88,7 +88,10 @@ const Search = () => {
           user
         }
       } = await supabase.auth.getUser();
-      if (!user) {
+      
+      // For song searches, we don't need to require authentication
+      // Only playlist searches require authentication
+      if (!user && searchFilter === "playlist") {
         console.log("No user found, cannot search for playlists");
         setResults([]);
         setPlaylistResults([]);
@@ -96,7 +99,7 @@ const Search = () => {
         return;
       }
       console.log("=== PLAYLIST SEARCH DEBUG ===");
-      console.log("Current user ID:", user.id);
+      console.log("Current user ID:", user?.id);
       console.log("Search filter:", searchFilter);
       console.log("Search query:", query);
       if (searchFilter === "playlist") {
@@ -115,9 +118,9 @@ const Search = () => {
           throw playlistError;
         }
 
-        // Filter playlists that the current user can view
+        // Filter playlists that the current user can view (only if user is authenticated)
         const visiblePlaylists = [];
-        if (playlistData) {
+        if (playlistData && user) {
           console.log("Checking visibility for", playlistData.length, "playlists");
           for (const playlist of playlistData) {
             console.log(`Checking playlist: ${playlist.name} (owner: ${playlist.user_id})`);
@@ -203,9 +206,9 @@ const Search = () => {
           bitrate: '320 kbps'
         }));
 
-        // Filter playlists that the current user can view
+        // Filter playlists that the current user can view (only if user is authenticated)
         const visiblePlaylists = [];
-        if (playlistResult.data) {
+        if (playlistResult.data && user) {
           for (const playlist of playlistResult.data) {
             // Check if user is owner
             if (playlist.user_id === user.id) {
