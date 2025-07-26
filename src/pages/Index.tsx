@@ -1,7 +1,7 @@
 import { Player } from "@/components/Player";
 import { Layout } from "@/components/Layout";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
-import { BrowserCompatibilityNotice } from "@/components/BrowserCompatibilityNotice";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
@@ -202,7 +202,7 @@ const Index = () => {
   return (
     <Layout>
       <div className="w-full h-full flex flex-col">
-        <BrowserCompatibilityNotice />
+        
         
         {!isMobile && (
           <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
