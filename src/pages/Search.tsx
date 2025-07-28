@@ -316,23 +316,21 @@ const Search = () => {
       }
       return;
     }
-    console.log("=== QUEUE DEBUG ===");
+    
+    console.log("=== SEARCH QUEUE DEBUG ===");
     console.log("Setting queue with results:", results.length, "songs");
     console.log("Playing song:", song.title, "with ID:", song.id);
-    console.log("Song exists in results:", results.some(r => r.id === song.id));
-
-    // S'assurer que la queue contient tous les résultats
-    setQueue(results);
-
-    // Vérifier que la chanson est bien dans les résultats
-    const songInResults = results.find(r => r.id === song.id);
-    if (!songInResults) {
-      console.error("Song not found in results, adding it");
-      const updatedResults = [song, ...results];
-      setQueue(updatedResults);
-    }
-    console.log("==================");
-    play(song);
+    
+    // Mettre la queue avec tous les résultats AVANT de jouer la chanson
+    setQueue([...results]);
+    
+    // Attendre un peu pour que la queue soit mise à jour
+    setTimeout(() => {
+      play(song);
+    }, 50);
+    
+    console.log("Queue set with", results.length, "songs");
+    console.log("=====================");
   };
   const handlePlaylistClick = (playlist: any) => {
     navigate(`/playlist/${playlist.id}`);
