@@ -61,13 +61,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const equalizer = useEqualizer({ audioElement: audioRef.current });
 
   // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
+  const queueHook = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play: async () => {} });
   const {
     queue, setQueue,
     shuffleMode, setShuffleMode,
     repeatMode, setRepeatMode,
     addToQueue, toggleShuffle, toggleRepeat,
     nextSong, previousSong, getNextSong
-  } = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play: async () => {} });
+  } = queueHook;
 
   // Hook ultra-rapide pour le préchargement intelligent - APRÈS usePlayerQueue
   const { getCacheStats } = useUltraFastPlayer({
@@ -99,6 +100,121 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNextSongPreloaded,
     preloadNextTracks
   });
+
+  // Mettre à jour les fonctions du hook queue avec la vraie fonction play
+  useEffect(() => {
+    queueHook.nextSong = async () => {
+      if (isChangingSong) {
+        console.log("Changement de chanson déjà en cours, ignorer nextSong()");
+        return;
+      }
+      
+      console.log("=== NEXT SONG DEBUG ===");
+      console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
+      console.log("Queue length:", queue.length);
+      
+      if (!currentSong || queue.length === 0) {
+        console.log("No current song or queue is empty");
+        return;
+      }
+      
+      const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+      console.log("Current index in queue:", currentIndex);
+      
+      if (currentIndex === -1) {
+        console.log("Current song not found in queue");
+        const fallbackIndex = queue.findIndex(song => 
+          song.title === currentSong.title && song.artist === currentSong.artist
+        );
+        
+        if (fallbackIndex !== -1) {
+          console.log("Found song by title/artist at index:", fallbackIndex);
+          const nextIndex = fallbackIndex + 1;
+          if (nextIndex < queue.length) {
+            console.log(`Playing next song: ${queue[nextIndex].title}`);
+            await play(queue[nextIndex]);
+            return;
+          }
+        }
+        
+        console.log("Could not find current song in queue, playing first song");
+        if (queue.length > 0) {
+          await play(queue[0]);
+        }
+        return;
+      }
+      
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < queue.length) {
+        console.log(`Playing next song: ${queue[nextIndex].title}`);
+        await play(queue[nextIndex]);
+      } else {
+        console.log("End of queue reached");
+        if (repeatMode === 'all' && queue.length > 0) {
+          console.log("Repeating playlist from beginning");
+          await play(queue[0]);
+        } else {
+          toast.info("Fin de la playlist");
+        }
+      }
+      console.log("=====================");
+    };
+
+    queueHook.previousSong = async () => {
+      if (isChangingSong) {
+        console.log("Changement de chanson déjà en cours, ignorer previousSong()");
+        return;
+      }
+      
+      console.log("=== PREVIOUS SONG DEBUG ===");
+      console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
+      console.log("Queue length:", queue.length);
+      
+      if (!currentSong || queue.length === 0) {
+        console.log("No current song or queue is empty");
+        return;
+      }
+      
+      const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+      console.log("Current index in queue:", currentIndex);
+      
+      if (currentIndex === -1) {
+        console.log("Current song not found in queue");
+        const fallbackIndex = queue.findIndex(song => 
+          song.title === currentSong.title && song.artist === currentSong.artist
+        );
+        
+        if (fallbackIndex !== -1) {
+          console.log("Found song by title/artist at index:", fallbackIndex);
+          if (fallbackIndex > 0) {
+            console.log(`Playing previous song: ${queue[fallbackIndex - 1].title}`);
+            await play(queue[fallbackIndex - 1]);
+            return;
+          }
+        }
+        
+        console.log("Could not find current song in queue, playing last song");
+        if (queue.length > 0) {
+          await play(queue[queue.length - 1]);
+        }
+        return;
+      }
+      
+      if (currentIndex > 0) {
+        console.log(`Playing previous song: ${queue[currentIndex - 1].title}`);
+        await play(queue[currentIndex - 1]);
+      } else {
+        console.log("Already at first track");
+        if (repeatMode === 'all' && queue.length > 0) {
+          console.log("Going to last song in playlist");
+          await play(queue[queue.length - 1]);
+        } else {
+          toast.info("Déjà au début de la playlist");
+        }
+      }
+      console.log("=========================");
+    };
+  }, [play, currentSong, queue, isChangingSong, repeatMode]);
 
   // Restauration de la lecture au chargement - OPTIMISÉ
   useEffect(() => {
@@ -365,7 +481,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleEnded = () => {
-      console.log("Chanson terminée, fondu en cours:", fadingRef.current);
+      console.log("=== SONG ENDED DEBUG ===");
+      console.log("Chanson terminée:", currentSong?.title);
+      console.log("Fondu en cours:", fadingRef.current);
+      console.log("Queue length:", queue.length);
+      console.log("Current song in queue:", queue.some(s => s.id === currentSong?.id));
       
       if (!fadingRef.current) {
         console.log("Lecture terminée naturellement sans crossfade");
@@ -377,7 +497,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRef.current.play().catch(err => console.error("Erreur lors de la répétition:", err));
         } else {
           const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+          console.log("Current index in queue:", currentIndex);
           const nextTrack = queue[currentIndex + 1];
+          console.log("Next track:", nextTrack?.title);
           
           if (nextTrack) {
             console.log("Passage à la chanson suivante:", nextTrack.title);
@@ -403,6 +525,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }
       }
+      console.log("========================");
     };
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
