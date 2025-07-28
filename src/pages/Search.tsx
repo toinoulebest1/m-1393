@@ -320,16 +320,24 @@ const Search = () => {
     console.log("=== SEARCH QUEUE DEBUG ===");
     console.log("Setting queue with results:", results.length, "songs");
     console.log("Playing song:", song.title, "with ID:", song.id);
+    console.log("Current results:", results.map(r => `${r.title} - ${r.artist}`));
     
-    // Mettre la queue avec tous les résultats AVANT de jouer la chanson
-    setQueue([...results]);
+    // Vider d'abord la queue actuelle pour éviter toute confusion
+    setQueue([]);
     
-    // Attendre un peu pour que la queue soit mise à jour
+    // Attendre un cycle pour être sûr que la queue est vidée
     setTimeout(() => {
-      play(song);
+      // Mettre la nouvelle queue avec tous les résultats
+      setQueue([...results]);
+      
+      // Attendre encore un peu pour que la queue soit mise à jour
+      setTimeout(() => {
+        console.log("Playing song after queue update:", song.title);
+        play(song);
+      }, 100);
     }, 50);
     
-    console.log("Queue set with", results.length, "songs");
+    console.log("Queue will be set with", results.length, "songs");
     console.log("=====================");
   };
   const handlePlaylistClick = (playlist: any) => {
