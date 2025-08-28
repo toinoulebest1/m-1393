@@ -118,76 +118,118 @@ const Index = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
 
-      setUserId(session.user.id);
+        setUserId(session.user.id);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', session.user.id)
-        .single();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', session.user.id)
+          .single();
 
-      if (profile) {
-        setUsername(profile.username);
+        if (profile) {
+          setUsername(profile.username);
+        }
+      } catch (error) {
+        console.log("Profile fetch error (non-critical):", error);
       }
     };
 
     fetchProfile();
 
-    // Abonnement aux changements en temps réel pour le profil
-    const profileChannel = supabase
-      .channel('profiles-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-        },
-        (payload: any) => {
-          // Ne mettre à jour que si le changement concerne l'utilisateur actuel
-          if (payload.new.id === userId && payload.new.username !== username) {
-            setUsername(payload.new.username);
-          }
-        }
-      )
-      .subscribe();
+    // Variables pour stocker les channels
+    let profileChannel: any = null;
+    let songsChannel: any = null;
 
-    // Abonnement aux changements en temps réel pour les chansons
-    const songsChannel = supabase
-      .channel('songs-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'songs',
-        },
-        (payload: any) => {
-          console.log("Song change detected:", payload);
-          // Actualiser la chanson courante si ses métadonnées ont été mises à jour
-          if (refreshCurrentSong) {
-            console.log("Refreshing current song from Index.tsx");
-            refreshCurrentSong();
-            // Force re-render after metadata update
-            setTimeout(() => {
-              setForceUpdate(prev => prev + 1);
-              toast.info("Métadonnées mises à jour", {
-                duration: 2000,
-                position: "top-center"
-              });
-            }, 500);
-          }
-        }
-      )
-      .subscribe();
+    // Setup realtime subscriptions with error handling
+    const setupRealtimeSubscriptions = () => {
+      try {
+        // Abonnement aux changements en temps réel pour le profil
+        profileChannel = supabase
+          .channel('profiles-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'profiles',
+            },
+            (payload: any) => {
+              // Ne mettre à jour que si le changement concerne l'utilisateur actuel
+              if (payload.new.id === userId && payload.new.username !== username) {
+                setUsername(payload.new.username);
+              }
+            }
+          )
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Profile realtime subscription active');
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              console.log('⚠️ Profile realtime subscription failed:', status, '- App will work without realtime updates');
+            }
+          });
+
+        // Abonnement aux changements en temps réel pour les chansons
+        songsChannel = supabase
+          .channel('songs-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+              schema: 'public',
+              table: 'songs',
+            },
+            (payload: any) => {
+              console.log("Song change detected:", payload);
+              // Actualiser la chanson courante si ses métadonnées ont été mises à jour
+              if (refreshCurrentSong) {
+                console.log("Refreshing current song from Index.tsx");
+                refreshCurrentSong();
+                // Force re-render after metadata update
+                setTimeout(() => {
+                  setForceUpdate(prev => prev + 1);
+                  toast.info("Métadonnées mises à jour", {
+                    duration: 2000,
+                    position: "top-center"
+                  });
+                }, 500);
+              }
+            }
+          )
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Songs realtime subscription active');
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              console.log('⚠️ Songs realtime subscription failed:', status, '- App will work without realtime updates');
+            }
+          });
+
+        console.log('🔄 Setting up realtime subscriptions...');
+      } catch (error) {
+        console.log('⚠️ Realtime subscriptions blocked (content blocker) - App will work without realtime updates');
+        console.log('Error details:', error);
+      }
+    };
+
+    // Setup subscriptions with a small delay to ensure proper initialization
+    const timer = setTimeout(setupRealtimeSubscriptions, 100);
 
     // Nettoyage des abonnements
     return () => {
-      supabase.removeChannel(profileChannel);
-      supabase.removeChannel(songsChannel);
+      clearTimeout(timer);
+      try {
+        if (profileChannel) {
+          supabase.removeChannel(profileChannel);
+        }
+        if (songsChannel) {
+          supabase.removeChannel(songsChannel);
+        }
+      } catch (error) {
+        console.log('Cleanup error (non-critical):', error);
+      }
     };
   }, [userId, username, refreshCurrentSong]);
 
