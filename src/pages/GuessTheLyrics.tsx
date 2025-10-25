@@ -254,10 +254,20 @@ export default function GuessTheLyrics() {
       
       await playerPlay(playerSong);
       
-      // Wait a bit for the song to load then seek to the timestamp
-      setTimeout(() => {
-        setProgress(excerptStartTime);
-      }, 500);
+      // Wait for song to load and convert seconds to percentage
+      // Parse duration string (MM:SS) to total seconds
+      if (currentSong.duration && excerptStartTime > 0) {
+        const durationParts = currentSong.duration.split(':');
+        const totalSeconds = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
+        
+        // Convert excerpt time (seconds) to percentage
+        const progressPercentage = (excerptStartTime / totalSeconds) * 100;
+        
+        // Wait for audio to be ready before seeking
+        setTimeout(() => {
+          setProgress(progressPercentage);
+        }, 1000);
+      }
     }
   };
 
