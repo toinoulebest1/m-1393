@@ -91,10 +91,27 @@ export default function GuessTheLyrics() {
     if (!gameState.isAnswered && gameState.isGameStarted) {
       const audioElement = getCurrentAudioElement();
       if (audioElement) {
+        let lastWarningTime = 0;
+        const funnyMessages = [
+          "Non non non, petit chenapan ! 😏",
+          "Pas de triche ici ! 🚫",
+          "On valide d'abord, on écoute après ! 🎵",
+          "Eh oh, pas si vite ! 😄",
+          "Tu croyais pouvoir tricher ? Raté ! 😎",
+          "Valide ta réponse d'abord, coquin ! 😜"
+        ];
+
         const preventPlay = () => {
           if (!audioElement.paused) {
             audioElement.pause();
-            toast.error("Validez d'abord votre réponse !");
+            
+            // Afficher un message seulement toutes les 2 secondes
+            const now = Date.now();
+            if (now - lastWarningTime > 2000) {
+              const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+              toast.error(randomMessage);
+              lastWarningTime = now;
+            }
           }
         };
 
@@ -610,12 +627,10 @@ export default function GuessTheLyrics() {
         )}
       </div>
       
-      {/* Player en bas de page - visible seulement après validation */}
-      {gameState.isAnswered && (
-        <div className="fixed bottom-0 left-0 right-0 z-50">
-          <Player />
-        </div>
-      )}
+      {/* Player en bas de page */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        <Player />
+      </div>
     </Layout>
   );
 }
