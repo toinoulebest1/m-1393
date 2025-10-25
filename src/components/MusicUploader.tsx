@@ -472,7 +472,7 @@ export const MusicUploader = () => {
           const file = await new Promise<File>((resolve) => {
             (entry as FileSystemFileEntry).file(resolve);
           });
-          if (file.type.startsWith('audio/')) {
+          if (file.type.startsWith('audio/') || file.name.toLowerCase().endsWith('.lrc')) {
             files.push(file);
           }
         } else if (entry.isDirectory) {
