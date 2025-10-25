@@ -47,7 +47,7 @@ export const Sidebar = () => {
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
+    { to: "/blind-test", icon: Gamepad2, label: t('common.games') }
   ];
 
   if (isAdmin) {
