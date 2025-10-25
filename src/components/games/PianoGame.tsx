@@ -136,30 +136,6 @@ export const PianoGame = () => {
         lastSpawnRef.current = now;
       }
 
-      // Vérifier les tuiles ratées (tombées en bas)
-      setTiles(prev => {
-        const updated = prev.filter(tile => {
-          if (!tile.clicked && tile.position >= 100) {
-            // Tuile ratée
-            setMisses(m => {
-              const newMisses = m + 1;
-              if (newMisses >= 3) {
-                setGameOver(true);
-                setSoundEffect("gameover");
-                stopGameLoop();
-              } else {
-                setSoundEffect("wrong");
-              }
-              return newMisses;
-            });
-            setCombo(0);
-            return false;
-          }
-          return true;
-        });
-        return updated;
-      });
-
       gameLoopRef.current = requestAnimationFrame(loop);
     };
 
@@ -186,8 +162,8 @@ export const PianoGame = () => {
 
     const lowestTile = columnTiles[0];
 
-    // Vérifier si la tuile est dans la zone de clic (80-100%)
-    if (lowestTile.position >= 75 && lowestTile.position <= 100) {
+    // Vérifier si la tuile est dans la zone de clic (70-100%)
+    if (lowestTile.position >= 70 && lowestTile.position <= 105) {
       // Bon clic !
       setTiles(prev => prev.map(t => 
         t.id === lowestTile.id ? { ...t, clicked: true } : t
@@ -201,10 +177,6 @@ export const PianoGame = () => {
       setTimeout(() => {
         setTiles(prev => prev.filter(t => t.id !== lowestTile.id));
       }, 100);
-    } else {
-      // Clic trop tôt
-      setSoundEffect("wrong");
-      setCombo(0);
     }
   }, [tiles, isPlaying, gameOver, combo]);
 
@@ -333,9 +305,28 @@ export const PianoGame = () => {
                         // Mettre à jour la position du tile
                         const topValue = latest.top as string;
                         const percentage = parseFloat(topValue);
-                        setTiles(prev => prev.map(t => 
-                          t.id === tile.id ? { ...t, position: percentage } : t
-                        ));
+                        setTiles(prev => prev.map(t => {
+                          if (t.id === tile.id) {
+                            // Vérifier si la tuile est ratée (dépasse 100%)
+                            if (!t.clicked && percentage >= 100) {
+                              // Tuile ratée - incrémenter les erreurs
+                              setMisses(m => {
+                                const newMisses = m + 1;
+                                if (newMisses >= 3) {
+                                  setGameOver(true);
+                                  setSoundEffect("gameover");
+                                  stopGameLoop();
+                                }
+                                return newMisses;
+                              });
+                              setCombo(0);
+                              // Retirer la tuile
+                              return null;
+                            }
+                            return { ...t, position: percentage };
+                          }
+                          return t;
+                        }).filter(Boolean) as Tile[]);
                       }}
                     >
                       <div className="w-full h-full bg-gradient-to-b from-primary/80 to-primary rounded-md" />
