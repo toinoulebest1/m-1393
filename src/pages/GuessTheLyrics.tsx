@@ -37,7 +37,7 @@ type Difficulty = "easy" | "hard";
 
 export default function GuessTheLyrics() {
   const navigate = useNavigate();
-  const { play: playerPlay, setProgress, pause } = usePlayer();
+  const { play: playerPlay, setProgress, pause, getCurrentAudioElement } = usePlayer();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -259,21 +259,26 @@ export default function GuessTheLyrics() {
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
     }
 
-    // La musique est déjà chargée, on la positionne et on la démarre
+    // Positionner l'audio directement au bon timestamp puis démarrer
     const currentSong = songs[gameState.currentSongIndex];
-    if (currentSong && currentSong.duration && excerptStartTime > 0) {
-      // Parse duration string (MM:SS) to total seconds
-      const durationParts = currentSong.duration.split(':');
-      const totalSeconds = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
+    if (excerptStartTime > 0) {
+      console.log(`📍 Positionnement direct à ${excerptStartTime}s`);
       
-      // Convert excerpt time (seconds) to percentage
-      const progressPercentage = (excerptStartTime / totalSeconds) * 100;
-      
-      // Positionner et démarrer immédiatement
-      setProgress(progressPercentage);
-      setTimeout(() => {
-        playerPlay();
-      }, 100);
+      // Accéder directement à l'élément audio pour le positionner
+      const audioElement = getCurrentAudioElement();
+      if (audioElement) {
+        // Positionner d'abord
+        audioElement.currentTime = excerptStartTime;
+        console.log(`✅ Audio positionné à ${audioElement.currentTime}s`);
+        
+        // Puis démarrer la lecture
+        setTimeout(() => {
+          playerPlay();
+        }, 100);
+      }
+    } else {
+      // Pas de timestamp, on démarre juste au début
+      playerPlay();
     }
   };
 
