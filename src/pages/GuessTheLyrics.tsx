@@ -86,6 +86,26 @@ export default function GuessTheLyrics() {
     return () => clearInterval(interval);
   }, [getCurrentAudioElement, gameState.isAnswered, excerptStartTime, syncOffsetMs]);
 
+  // Bloquer la lecture audio avant validation (anti-triche)
+  useEffect(() => {
+    if (!gameState.isAnswered && gameState.isGameStarted) {
+      const audioElement = getCurrentAudioElement();
+      if (audioElement) {
+        const preventPlay = () => {
+          if (!audioElement.paused) {
+            audioElement.pause();
+            toast.error("Validez d'abord votre réponse !");
+          }
+        };
+
+        // Vérifier toutes les 100ms si l'audio est en lecture
+        const checkInterval = setInterval(preventPlay, 100);
+
+        return () => clearInterval(checkInterval);
+      }
+    }
+  }, [gameState.isAnswered, gameState.isGameStarted, getCurrentAudioElement]);
+
   useEffect(() => {
     fetchSongsWithLyrics();
   }, []);
@@ -590,10 +610,12 @@ export default function GuessTheLyrics() {
         )}
       </div>
       
-      {/* Player en bas de page */}
-      <div className="fixed bottom-0 left-0 right-0 z-50">
-        <Player />
-      </div>
+      {/* Player en bas de page - visible seulement après validation */}
+      {gameState.isAnswered && (
+        <div className="fixed bottom-0 left-0 right-0 z-50">
+          <Player />
+        </div>
+      )}
     </Layout>
   );
 }
