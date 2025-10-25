@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,6 @@ import { Music, Trophy, RotateCcw, Play, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Player } from "@/components/Player";
 import type { Song as PlayerSong } from "@/types/player";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +34,7 @@ interface GameState {
 
 type Difficulty = "easy" | "hard";
 
-export default function GuessTheLyrics() {
+export function GuessTheLyricsGame() {
   const navigate = useNavigate();
   const { play: playerPlay, setProgress, pause, getCurrentAudioElement, progress: playerProgress } = usePlayer();
   const [songs, setSongs] = useState<Song[]>([]);
@@ -58,7 +56,7 @@ export default function GuessTheLyrics() {
   const [correctAnswers, setCorrectAnswers] = useState<{ [key: number]: boolean }>({});
   const [currentAudioTime, setCurrentAudioTime] = useState<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0); // +/- décalage manuel
+  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
   const [isPreloading, setIsPreloading] = useState<boolean>(false);
 
   // Mettre à jour le temps de lecture en temps réel et gérer le compte à rebours
@@ -69,7 +67,6 @@ export default function GuessTheLyrics() {
         const time = audioElement.currentTime;
         setCurrentAudioTime(time);
 
-        // Calculer le compte à rebours jusqu'aux paroles (avec offset)
         const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
         if (time < effectiveStart) {
           const timeUntilLyrics = Math.ceil(effectiveStart - time);
@@ -198,7 +195,6 @@ export default function GuessTheLyrics() {
       
       const handleLyricsClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        // Vérifier si c'est le bouton paroles en utilisant le data-attribute
         const lyricsButton = target.closest('button[data-lyrics-button="true"]');
         if (lyricsButton) {
           e.preventDefault();
@@ -215,7 +211,6 @@ export default function GuessTheLyrics() {
         }
       };
       
-      // Bloquer les clics sur tous les boutons pour intercepter celui des paroles
       document.addEventListener('click', handleLyricsClick, true);
       
       return () => {
@@ -356,9 +351,8 @@ export default function GuessTheLyrics() {
         const preventPlay = (e: Event) => {
           e.preventDefault();
           audioElement.pause();
-          audioElement.currentTime = 0; // Remettre à zéro pour éviter tout son
+          audioElement.currentTime = 0;
           
-          // Afficher un message seulement toutes les 2 secondes
           const now = Date.now();
           if (now - lastWarningTime > 2000) {
             const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
@@ -369,10 +363,8 @@ export default function GuessTheLyrics() {
           }
         };
 
-        // Intercepter l'événement play immédiatement
         audioElement.addEventListener('play', preventPlay);
 
-        // Aussi vérifier périodiquement au cas où
         const checkInterval = setInterval(() => {
           if (!audioElement.paused) {
             audioElement.pause();
@@ -413,12 +405,10 @@ export default function GuessTheLyrics() {
 
       const songsWithLyrics = (data || [])
         .filter((song: any) => {
-          // Handle both array and object formats for lyrics
           const lyrics = Array.isArray(song.lyrics) ? song.lyrics[0] : song.lyrics;
           return lyrics && lyrics.content && lyrics.content.trim().length > 0;
         })
         .map((song: any) => {
-          // Normalize lyrics to always be an object
           const lyrics = Array.isArray(song.lyrics) ? song.lyrics[0] : song.lyrics;
           return {
             id: song.id,
@@ -475,10 +465,9 @@ export default function GuessTheLyrics() {
     const currentSong = songs[songIndex];
     const lyricsContent = currentSong.lyrics!.content;
     
-    // Try to parse as LRC to get timestamps
     let plainText = lyricsContent;
     let excerptTime = 0;
-    let excerptDuration = 5; // Durée par défaut de l'extrait
+    let excerptDuration = 5;
     let lrcLines: Array<{ time: number; text: string }> = [];
     
     if (lyricsContent.includes("[")) {
@@ -487,31 +476,26 @@ export default function GuessTheLyrics() {
       plainText = parsed.lines.map(line => line.text).join("\n");
     }
 
-    // Split into lines and filter out empty ones
     const lines = plainText.split("\n").filter(line => line.trim().length > 0);
     
     if (lines.length === 0) {
-      // Skip to next song if no valid lyrics
       handleNextQuestion();
       return;
     }
 
-    // Select a random excerpt (1-3 lines depending on difficulty)
     const excerptLength = difficulty === "easy" ? 2 : 1;
     const startIndex = Math.floor(Math.random() * Math.max(0, lines.length - excerptLength));
     const excerpt = lines.slice(startIndex, startIndex + excerptLength).join(" ");
 
-    // Get timestamp for this excerpt if LRC is available
     if (lrcLines.length > 0 && startIndex < lrcLines.length) {
       excerptTime = lrcLines[startIndex].time;
       setExcerptStartTime(excerptTime);
       
-      // Calculer la fin de l'extrait
       const endIndex = Math.min(startIndex + excerptLength, lrcLines.length - 1);
       if (endIndex < lrcLines.length - 1) {
         excerptDuration = lrcLines[endIndex + 1].time - excerptTime;
       } else {
-        excerptDuration = 5; // Durée par défaut si dernier extrait
+        excerptDuration = 5;
       }
       setExcerptEndTime(excerptTime + excerptDuration);
     } else {
@@ -519,20 +503,16 @@ export default function GuessTheLyrics() {
       setExcerptEndTime(5);
     }
 
-    // Split into words
     const words = excerpt.split(/\s+/).filter(word => word.length > 0);
     
     if (words.length < 4) {
-      // Skip if not enough words
       handleNextQuestion();
       return;
     }
 
-    // Hide words based on difficulty
-    const hideRatio = difficulty === "easy" ? 0.3 : 0.5; // 30% for easy, 50% for hard
+    const hideRatio = difficulty === "easy" ? 0.3 : 0.5;
     const numWordsToHide = Math.max(1, Math.floor(words.length * hideRatio));
     
-    // Select random words to hide
     const indicesToHide: number[] = [];
     while (indicesToHide.length < numWordsToHide) {
       const randomIndex = Math.floor(Math.random() * words.length);
@@ -550,7 +530,6 @@ export default function GuessTheLyrics() {
 
     setHiddenWords(hiddenWordsList);
 
-    // Create displayed lyrics with blanks
     const displayed = words
       .map((word, idx) => {
         if (indicesToHide.includes(idx)) {
@@ -564,9 +543,8 @@ export default function GuessTheLyrics() {
     setUserInputs({});
     setCorrectAnswers({});
 
-    // Précharger la musique en pause
     if (currentSong.filePath) {
-      setIsPreloading(true); // Désactiver anti-triche pendant préchargement
+      setIsPreloading(true);
       
       const playerSong: PlayerSong = {
         id: currentSong.id,
@@ -578,10 +556,9 @@ export default function GuessTheLyrics() {
       };
       
       await playerPlay(playerSong);
-      // Mettre en pause immédiatement après le chargement
       setTimeout(() => {
         pause();
-        setIsPreloading(false); // Réactiver anti-triche
+        setIsPreloading(false);
       }, 100);
     }
   };
@@ -614,20 +591,14 @@ export default function GuessTheLyrics() {
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
     }
 
-    // Positionner l'audio 5 secondes avant le timestamp des paroles pour le compte à rebours (avec offset)
     const audioElement = getCurrentAudioElement();
     if (audioElement && excerptStartTime > 0) {
       const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
-      // Démarrer 5 secondes avant les paroles (ou au début si moins de 5s)
       const startTime = Math.max(0, effectiveStart - 5);
-      console.log(`📍 Positionnement direct à ${startTime}s (paroles à ${effectiveStart}s, offset ${syncOffsetMs}ms)`);
       
       const onSeeked = () => {
         audioElement.removeEventListener('seeked', onSeeked);
-        console.log('▶️ Lecture après seeked');
-        // Démarrer directement l'élément audio pour ne pas recharger la source
         audioElement.play().catch(() => {
-          // Fallback si le navigateur bloque, utiliser le contrôleur
           playerPlay();
         });
       };
@@ -636,7 +607,6 @@ export default function GuessTheLyrics() {
       audioElement.currentTime = startTime;
       setCurrentAudioTime(startTime);
     } else {
-      // Pas de timestamp, on démarre juste au début
       playerPlay();
     }
   };
@@ -645,7 +615,6 @@ export default function GuessTheLyrics() {
     const nextIndex = gameState.currentSongIndex + 1;
     
     if (nextIndex >= gameState.totalQuestions) {
-      // Game over
       setGameState(prev => ({ ...prev, isGameStarted: false }));
       toast.success(`Jeu terminé ! Score: ${gameState.score}/${gameState.totalQuestions}`);
     } else {
@@ -726,11 +695,9 @@ export default function GuessTheLyrics() {
     const currentSong = songs[gameState.currentSongIndex];
     if (!currentSong) return null;
     
-    // Fenêtre d'affichage (avec offset manuel)
     const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
     const effectiveEnd = Math.max(effectiveStart, excerptEndTime + syncOffsetMs / 1000);
 
-    // Vérifier si on est dans la période de l'extrait
     const isInExcerptTime = gameState.isAnswered && 
                            currentAudioTime >= effectiveStart && 
                            currentAudioTime <= effectiveEnd;
@@ -767,7 +734,6 @@ export default function GuessTheLyrics() {
             )}
 
             <div className="bg-secondary/30 p-6 rounded-lg relative">
-              {/* Compte à rebours */}
               {countdown !== null && countdown > 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg z-10">
                   <div className="text-center animate-pulse">
@@ -874,8 +840,8 @@ export default function GuessTheLyrics() {
               <RotateCcw className="mr-2 w-5 h-5" />
               Rejouer
             </Button>
-            <Button onClick={() => navigate("/")} variant="outline" className="flex-1" size="lg">
-              Retour à l'accueil
+            <Button onClick={() => navigate("/blind-test")} variant="outline" className="flex-1" size="lg">
+              Retour aux jeux
             </Button>
           </div>
         </CardContent>
@@ -884,21 +850,14 @@ export default function GuessTheLyrics() {
   );
 
   return (
-    <Layout>
-      <div className="p-8 pb-32">
-        {loading ? (
-          <div className="text-center">Chargement...</div>
-        ) : !gameState.isGameStarted ? (
-          gameState.currentSongIndex > 0 ? renderGameOver() : renderGameSetup()
-        ) : (
-          renderGame()
-        )}
-      </div>
-      
-      {/* Player en bas de page */}
-      <div className="fixed bottom-0 left-0 right-0 z-50">
-        <Player />
-      </div>
-    </Layout>
+    <div className="p-8 pb-32">
+      {loading ? (
+        <div className="text-center">Chargement...</div>
+      ) : !gameState.isGameStarted ? (
+        gameState.currentSongIndex > 0 ? renderGameOver() : renderGameSetup()
+      ) : (
+        renderGame()
+      )}
+    </div>
   );
 }
