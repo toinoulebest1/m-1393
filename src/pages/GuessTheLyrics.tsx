@@ -187,7 +187,9 @@ export default function GuessTheLyrics() {
           const now = Date.now();
           if (now - lastWarningTime > 2000) {
             const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
-            toast.error(`🛡️ Système anti-triche :\n${randomMessage}`);
+            toast.error("🛡️ Système anti-triche :", {
+              description: randomMessage
+            });
             lastWarningTime = now;
           }
         };
