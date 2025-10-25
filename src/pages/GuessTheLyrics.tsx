@@ -57,18 +57,32 @@ export default function GuessTheLyrics() {
   const [excerptEndTime, setExcerptEndTime] = useState<number>(0);
   const [correctAnswers, setCorrectAnswers] = useState<{ [key: number]: boolean }>({});
   const [currentAudioTime, setCurrentAudioTime] = useState<number>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Mettre à jour le temps de lecture en temps réel
+  // Mettre à jour le temps de lecture en temps réel et gérer le compte à rebours
   useEffect(() => {
     const interval = setInterval(() => {
       const audioElement = getCurrentAudioElement();
       if (audioElement && gameState.isAnswered) {
-        setCurrentAudioTime(audioElement.currentTime);
+        const time = audioElement.currentTime;
+        setCurrentAudioTime(time);
+        
+        // Calculer le compte à rebours jusqu'aux paroles
+        if (time < excerptStartTime) {
+          const timeUntilLyrics = Math.ceil(excerptStartTime - time);
+          if (timeUntilLyrics <= 5 && timeUntilLyrics > 0) {
+            setCountdown(timeUntilLyrics);
+          } else if (timeUntilLyrics <= 0) {
+            setCountdown(null);
+          }
+        } else {
+          setCountdown(null);
+        }
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [getCurrentAudioElement, gameState.isAnswered]);
+  }, [getCurrentAudioElement, gameState.isAnswered, excerptStartTime]);
 
   useEffect(() => {
     fetchSongsWithLyrics();
@@ -437,7 +451,21 @@ export default function GuessTheLyrics() {
               </div>
             )}
 
-            <div className="bg-secondary/30 p-6 rounded-lg">
+            <div className="bg-secondary/30 p-6 rounded-lg relative">
+              {/* Compte à rebours */}
+              {countdown !== null && countdown > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg z-10">
+                  <div className="text-center animate-pulse">
+                    <div className="text-6xl font-bold text-primary mb-2">
+                      {countdown}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Les paroles arrivent...
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               <p className={cn(
                 "text-lg leading-relaxed font-medium text-center whitespace-pre-wrap transition-all duration-300",
                 isInExcerptTime && "font-bold text-primary scale-105"
