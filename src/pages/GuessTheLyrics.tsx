@@ -10,12 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { Music, Trophy, RotateCcw, Play, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { Player } from "@/components/Player";
+import type { Song as PlayerSong } from "@/types/player";
 
 interface Song {
   id: string;
   title: string;
   artist: string;
   imageUrl?: string;
+  filePath?: string;
+  duration?: string;
   lyrics?: { content: string };
 }
 
@@ -32,6 +37,7 @@ type Difficulty = "easy" | "hard";
 
 export default function GuessTheLyrics() {
   const navigate = useNavigate();
+  const { play: playerPlay, setProgress, pause } = usePlayer();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -46,6 +52,7 @@ export default function GuessTheLyrics() {
   const [hiddenWords, setHiddenWords] = useState<{ word: string; index: number }[]>([]);
   const [displayedLyrics, setDisplayedLyrics] = useState<string>("");
   const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
+  const [excerptStartTime, setExcerptStartTime] = useState<number>(0);
 
   useEffect(() => {
     fetchSongsWithLyrics();
@@ -60,6 +67,8 @@ export default function GuessTheLyrics() {
           title,
           artist,
           image_url,
+          file_path,
+          duration,
           lyrics!inner (
             content
           )
@@ -82,6 +91,8 @@ export default function GuessTheLyrics() {
             title: song.title,
             artist: song.artist,
             imageUrl: song.image_url,
+            filePath: song.file_path,
+            duration: song.duration,
             lyrics: lyrics,
           };
         });
@@ -129,10 +140,14 @@ export default function GuessTheLyrics() {
 
     const lyricsContent = songs[songIndex].lyrics!.content;
     
-    // Try to parse as LRC, fallback to plain text
+    // Try to parse as LRC to get timestamps
     let plainText = lyricsContent;
+    let excerptTime = 0;
+    let lrcLines: Array<{ time: number; text: string }> = [];
+    
     if (lyricsContent.includes("[")) {
       const parsed = parseLrc(lyricsContent);
+      lrcLines = parsed.lines;
       plainText = parsed.lines.map(line => line.text).join("\n");
     }
 
@@ -149,6 +164,14 @@ export default function GuessTheLyrics() {
     const excerptLength = difficulty === "easy" ? 2 : 1;
     const startIndex = Math.floor(Math.random() * Math.max(0, lines.length - excerptLength));
     const excerpt = lines.slice(startIndex, startIndex + excerptLength).join(" ");
+
+    // Get timestamp for this excerpt if LRC is available
+    if (lrcLines.length > 0 && startIndex < lrcLines.length) {
+      excerptTime = lrcLines[startIndex].time;
+      setExcerptStartTime(excerptTime);
+    } else {
+      setExcerptStartTime(0);
+    }
 
     // Split into words
     const words = excerpt.split(/\s+/).filter(word => word.length > 0);
@@ -195,7 +218,7 @@ export default function GuessTheLyrics() {
     setUserInputs({});
   };
 
-  const checkAnswer = () => {
+  const checkAnswer = async () => {
     let correctCount = 0;
     
     hiddenWords.forEach(({ word, index }) => {
@@ -215,6 +238,26 @@ export default function GuessTheLyrics() {
     } else {
       setGameState(prev => ({ ...prev, isAnswered: true }));
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
+    }
+
+    // Play the song at the excerpt timestamp
+    const currentSong = songs[gameState.currentSongIndex];
+    if (currentSong && currentSong.filePath) {
+      const playerSong: PlayerSong = {
+        id: currentSong.id,
+        title: currentSong.title,
+        artist: currentSong.artist || "Artiste inconnu",
+        url: currentSong.filePath,
+        imageUrl: currentSong.imageUrl,
+        duration: currentSong.duration,
+      };
+      
+      await playerPlay(playerSong);
+      
+      // Wait a bit for the song to load then seek to the timestamp
+      setTimeout(() => {
+        setProgress(excerptStartTime);
+      }, 500);
     }
   };
 
@@ -429,7 +472,7 @@ export default function GuessTheLyrics() {
 
   return (
     <Layout>
-      <div className="p-8">
+      <div className="p-8 pb-32">
         {loading ? (
           <div className="text-center">Chargement...</div>
         ) : !gameState.isGameStarted ? (
@@ -437,6 +480,11 @@ export default function GuessTheLyrics() {
         ) : (
           renderGame()
         )}
+      </div>
+      
+      {/* Player en bas de page */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        <Player />
       </div>
     </Layout>
   );
