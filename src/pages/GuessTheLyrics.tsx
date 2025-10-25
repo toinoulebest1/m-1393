@@ -87,6 +87,146 @@ export default function GuessTheLyrics() {
     return () => clearInterval(interval);
   }, [getCurrentAudioElement, gameState.isAnswered, excerptStartTime, syncOffsetMs]);
 
+  // Bloquer le bouton paroles avant validation (anti-triche)
+  useEffect(() => {
+    if (!gameState.isAnswered && gameState.isGameStarted && !isPreloading) {
+      let lastLyricsWarningTime = 0;
+      
+      const lyricsMessages = [
+        "Ah non ! Les paroles c'est de la triche ! 📜",
+        "On n'affiche pas les paroles avant de valider ! 🙈",
+        "Tu veux vraiment les voir ? Valide d'abord ! 👀",
+        "Les paroles ? Après validation mon ami ! 🎤",
+        "Non non non, pas les paroles maintenant ! 🚫",
+        "Tu crois que je vais te montrer les paroles ? 😏",
+        "Interdit d'afficher les paroles avant ! ⛔",
+        "Les paroles restent cachées pour l'instant ! 🔒",
+        "Pas de paroles sans validation ! 📝",
+        "Tu essaies de lire les paroles ? Malin ! 🦊",
+        "Les paroles c'est interdit pour le moment ! 🙅",
+        "Valide ta réponse pour voir les paroles ! ✅",
+        "Pas touche aux paroles ! 🚷",
+        "Les paroles sont en mode secret ! 🤫",
+        "Tu voulais copier les paroles hein ? 📋",
+        "Les paroles restent mystérieuses pour l'instant ! 🎭",
+        "On ne lit pas les paroles avant de jouer ! 📖",
+        "Alors, on veut tricher avec les paroles ? 🤨",
+        "Même pas en rêve les paroles ! 💭",
+        "Les paroles sont verrouillées ! 🔐",
+        "Tu me prends pour qui ? Pas de paroles ! 🤷",
+        "Les paroles c'est après le jeu ! 🎮",
+        "Patience ! Les paroles viendront après ! ⏰",
+        "Non mais tu crois quoi ? Pas de paroles ! 😄",
+        "Les paroles sont sous clé ! 🔑",
+        "Retourne jouer sans les paroles ! 🎵",
+        "On ne spoile pas avec les paroles ! 🙊",
+        "Les paroles sont bloquées champion ! 🏆",
+        "Tu veux vraiment les paroles ? Valide d'abord ! 🎯",
+        "Accès aux paroles refusé ! ❌",
+        "Les paroles sont en pause ! ⏸️",
+        "Pas de lecture des paroles avant validation ! 🚫",
+        "Tu pensais voir les paroles ? Raté ! 😎",
+        "Les paroles c'est pour plus tard ! 🕐",
+        "Non non, les paroles restent cachées ! 🙈",
+        "Tu veux les paroles ? Joue d'abord ! 🎲",
+        "Les paroles sont en mode ninja ! 🥷",
+        "Accès paroles : REFUSÉ ! 🚧",
+        "Les paroles ? C'est non ! 🙅‍♂️",
+        "Tu tentes les paroles ? Bien essayé ! 👏",
+        "Les paroles sont confidentielles ! 🤐",
+        "Pas de triche avec les paroles ! 🎪",
+        "Les paroles attendent ta validation ! ✋",
+        "Tu croyais pouvoir voir les paroles ? 🤭",
+        "Les paroles sont hors service ! 🛑",
+        "On ne consulte pas les paroles pendant le jeu ! ⚠️",
+        "Les paroles sont en vacances ! 🏖️",
+        "Tu voulais lire les paroles ? Coquin ! 😜",
+        "Les paroles ne sont pas disponibles ! 📵",
+        "Bloquer sur les paroles ! 🔴",
+        "Les paroles sont interdites pour toi ! 🚷",
+        "Tu essaies d'ouvrir les paroles ? Tss tss ! 👆",
+        "Les paroles sont réservées ! 🎫",
+        "Pas d'accès aux paroles sans validation ! 🎟️",
+        "Les paroles sont ultra-secrètes ! 🕵️",
+        "Tu voulais tricher avec les paroles hein ? 🧐",
+        "Les paroles restent invisibles ! 👻",
+        "Non mais tu rigoles ? Pas de paroles ! 😂",
+        "Les paroles sont sous surveillance ! 👁️",
+        "Tu n'auras pas les paroles comme ça ! 💪",
+        "Les paroles sont en mode Ghost ! 👤",
+        "Valide pour débloquer les paroles ! 🔓",
+        "Les paroles ? Dans tes rêves ! 💤",
+        "Tu pensais que j'allais te les montrer ? 😏",
+        "Les paroles sont classées top secret ! 🔒",
+        "Pas de spoil avec les paroles ! 🎬",
+        "Les paroles sont hors de portée ! 🙅",
+        "Tu veux les paroles ? Trop facile ! 🎯",
+        "Les paroles sont en quarantaine ! 🚨",
+        "Accès paroles temporairement fermé ! 🚪",
+        "Les paroles sont en mode avion ! ✈️",
+        "Tu n'as pas accès aux paroles ! 🔐",
+        "Les paroles sont protégées ! 🛡️",
+        "On ne regarde pas les paroles ! 👓",
+        "Les paroles sont bloquées par le système ! 💻",
+        "Tu voulais les paroles ? Bien tenté ! 🎭",
+        "Les paroles sont en pause café ! ☕",
+        "Pas de paroles pour les tricheurs ! 🦹",
+        "Les paroles sont en mode silencieux ! 🔇",
+        "Tu ne verras pas les paroles ! 🙈",
+        "Les paroles sont gelées ! ❄️",
+        "Accès aux paroles interdit ! 🔞",
+        "Les paroles sont invisibles pour toi ! 🥷",
+        "Tu croyais voir les paroles ? Perdu ! 😅",
+        "Les paroles sont sous embargo ! 📦",
+        "Pas de consultation des paroles ! 📚",
+        "Les paroles sont fermées à clé ! 🗝️",
+        "Tu veux tricher avec les paroles ? Jamais ! 💯",
+        "Les paroles sont en mode incognito ! 🕶️",
+        "Non aux paroles avant validation ! 🚫",
+        "Les paroles sont inaccessibles ! 🏔️",
+        "Tu pensais lire les paroles tranquille ? 😆",
+        "Les paroles sont dans un coffre-fort ! 💰",
+        "Valide avant d'espérer voir les paroles ! ✨",
+        "Les paroles sont en mode fantôme ! 👻",
+        "Tu n'auras pas les paroles maintenant ! ⏱️",
+        "Les paroles sont protégées par un dragon ! 🐉",
+        "Pas de paroles pour toi champion ! 🥇",
+        "Les paroles sont en stand-by ! ⏯️",
+        "Tu voulais les paroles ? C'est raté ! 🎪",
+        "Les paroles sont cachées ! 🗺️"
+      ];
+      
+      const handleLyricsClick = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        // Vérifier si c'est le bouton paroles (icône Mic ou son parent)
+        const lyricsButton = target.closest('button[class*="ghost"]');
+        if (lyricsButton) {
+          const micIcon = lyricsButton.querySelector('svg');
+          if (micIcon && micIcon.parentElement === lyricsButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const now = Date.now();
+            if (now - lastLyricsWarningTime > 2000) {
+              const randomMessage = lyricsMessages[Math.floor(Math.random() * lyricsMessages.length)];
+              toast.error("🛡️ Système anti-triche :", {
+                description: randomMessage
+              });
+              lastLyricsWarningTime = now;
+            }
+          }
+        }
+      };
+      
+      // Bloquer les clics sur tous les boutons pour intercepter celui des paroles
+      document.addEventListener('click', handleLyricsClick, true);
+      
+      return () => {
+        document.removeEventListener('click', handleLyricsClick, true);
+      };
+    }
+  }, [gameState.isAnswered, gameState.isGameStarted, isPreloading]);
+
   // Bloquer la lecture audio avant validation (anti-triche)
   useEffect(() => {
     if (!gameState.isAnswered && gameState.isGameStarted && !isPreloading) {
