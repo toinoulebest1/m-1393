@@ -13,6 +13,7 @@ import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Player } from "@/components/Player";
 import type { Song as PlayerSong } from "@/types/player";
+import { cn } from "@/lib/utils";
 
 interface Song {
   id: string;
@@ -37,7 +38,7 @@ type Difficulty = "easy" | "hard";
 
 export default function GuessTheLyrics() {
   const navigate = useNavigate();
-  const { play: playerPlay, setProgress, pause, getCurrentAudioElement } = usePlayer();
+  const { play: playerPlay, setProgress, pause, getCurrentAudioElement, progress: playerProgress } = usePlayer();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -53,6 +54,21 @@ export default function GuessTheLyrics() {
   const [displayedLyrics, setDisplayedLyrics] = useState<string>("");
   const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
   const [excerptStartTime, setExcerptStartTime] = useState<number>(0);
+  const [excerptEndTime, setExcerptEndTime] = useState<number>(0);
+  const [correctAnswers, setCorrectAnswers] = useState<{ [key: number]: boolean }>({});
+  const [currentAudioTime, setCurrentAudioTime] = useState<number>(0);
+
+  // Mettre à jour le temps de lecture en temps réel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const audioElement = getCurrentAudioElement();
+      if (audioElement && gameState.isAnswered) {
+        setCurrentAudioTime(audioElement.currentTime);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [getCurrentAudioElement, gameState.isAnswered]);
 
   useEffect(() => {
     fetchSongsWithLyrics();
@@ -144,6 +160,7 @@ export default function GuessTheLyrics() {
     // Try to parse as LRC to get timestamps
     let plainText = lyricsContent;
     let excerptTime = 0;
+    let excerptDuration = 5; // Durée par défaut de l'extrait
     let lrcLines: Array<{ time: number; text: string }> = [];
     
     if (lyricsContent.includes("[")) {
@@ -170,8 +187,18 @@ export default function GuessTheLyrics() {
     if (lrcLines.length > 0 && startIndex < lrcLines.length) {
       excerptTime = lrcLines[startIndex].time;
       setExcerptStartTime(excerptTime);
+      
+      // Calculer la fin de l'extrait
+      const endIndex = Math.min(startIndex + excerptLength, lrcLines.length - 1);
+      if (endIndex < lrcLines.length - 1) {
+        excerptDuration = lrcLines[endIndex + 1].time - excerptTime;
+      } else {
+        excerptDuration = 5; // Durée par défaut si dernier extrait
+      }
+      setExcerptEndTime(excerptTime + excerptDuration);
     } else {
       setExcerptStartTime(0);
+      setExcerptEndTime(5);
     }
 
     // Split into words
@@ -217,6 +244,7 @@ export default function GuessTheLyrics() {
 
     setDisplayedLyrics(displayed);
     setUserInputs({});
+    setCorrectAnswers({});
 
     // Précharger la musique en pause
     if (currentSong.filePath) {
@@ -238,16 +266,22 @@ export default function GuessTheLyrics() {
   };
 
   const checkAnswer = () => {
+    const answers: { [key: number]: boolean } = {};
     let correctCount = 0;
     
     hiddenWords.forEach(({ word, index }) => {
       const userAnswer = (userInputs[index] || "").trim().toLowerCase();
       const correctAnswer = word.toLowerCase().replace(/[.,!?;:]/g, "");
       
-      if (userAnswer === correctAnswer) {
+      const isCorrect = userAnswer === correctAnswer;
+      answers[index] = isCorrect;
+      
+      if (isCorrect) {
         correctCount++;
       }
     });
+
+    setCorrectAnswers(answers);
 
     const isCorrect = correctCount === hiddenWords.length;
     
@@ -366,6 +400,11 @@ export default function GuessTheLyrics() {
   const renderGame = () => {
     const currentSong = songs[gameState.currentSongIndex];
     if (!currentSong) return null;
+    
+    // Vérifier si on est dans la période de l'extrait
+    const isInExcerptTime = gameState.isAnswered && 
+                           currentAudioTime >= excerptStartTime && 
+                           currentAudioTime <= excerptEndTime;
 
     return (
       <div className="max-w-3xl mx-auto space-y-6">
@@ -399,11 +438,17 @@ export default function GuessTheLyrics() {
             )}
 
             <div className="bg-secondary/30 p-6 rounded-lg">
-              <p className="text-lg leading-relaxed font-medium text-center whitespace-pre-wrap">
+              <p className={cn(
+                "text-lg leading-relaxed font-medium text-center whitespace-pre-wrap transition-all duration-300",
+                isInExcerptTime && "font-bold text-primary scale-105"
+              )}>
                 {displayedLyrics.split(/(\[___\d+___\])/).map((part, idx) => {
                   const match = part.match(/\[___(\d+)___\]/);
                   if (match) {
                     const wordIndex = parseInt(match[1]);
+                    const isCorrect = correctAnswers[wordIndex];
+                    const hasAnswer = gameState.isAnswered;
+                    
                     return (
                       <Input
                         key={idx}
@@ -413,7 +458,11 @@ export default function GuessTheLyrics() {
                           setUserInputs(prev => ({ ...prev, [wordIndex]: e.target.value }))
                         }
                         disabled={gameState.isAnswered}
-                        className="inline-block w-32 mx-1 text-center"
+                        className={cn(
+                          "inline-block w-32 mx-1 text-center",
+                          hasAnswer && isCorrect && "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300",
+                          hasAnswer && !isCorrect && "border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
+                        )}
                         placeholder="..."
                       />
                     );
