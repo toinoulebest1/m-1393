@@ -3,11 +3,12 @@ import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gamepad2, Music, ArrowLeft } from "lucide-react";
+import { Gamepad2, Music, ArrowLeft, RotateCcw } from "lucide-react";
 import { BlindTestGame } from "@/components/games/BlindTestGame";
 import { GuessTheLyricsGame } from "@/components/games/GuessTheLyricsGame";
+import { RewindQuizGame } from "@/components/games/RewindQuizGame";
 
-type GameType = "blind-test" | "guess-lyrics" | null;
+type GameType = "blind-test" | "guess-lyrics" | "rewind-quiz" | null;
 
 const BlindTest = () => {
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
@@ -20,7 +21,7 @@ const BlindTest = () => {
           Choisissez votre jeu
         </h1>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <Card 
             className="bg-spotify-dark border-white/10 cursor-pointer hover:border-spotify-accent transition-all hover:scale-105"
             onClick={() => setSelectedGame("blind-test")}
@@ -72,6 +73,32 @@ const BlindTest = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <Card 
+            className="bg-spotify-dark border-white/10 cursor-pointer hover:border-spotify-accent transition-all hover:scale-105"
+            onClick={() => setSelectedGame("rewind-quiz")}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <RotateCcw className="w-8 h-8 text-purple-500" />
+                Rewind Quiz
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-spotify-neutral">
+                Écoutez les chansons à l'envers et devinez le titre !
+              </p>
+              <ul className="space-y-2 text-sm text-spotify-neutral">
+                <li>✓ Audio inversé en temps réel</li>
+                <li>✓ Difficulté accrue</li>
+                <li>✓ Questions multiples</li>
+                <li>✓ Défie tes oreilles !</li>
+              </ul>
+              <Button className="w-full mt-4" variant="default">
+                Jouer au Rewind Quiz
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -95,10 +122,15 @@ const BlindTest = () => {
                 <Gamepad2 className="w-8 h-8 text-spotify-accent" />
                 Blind Test
               </>
-            ) : (
+            ) : selectedGame === "guess-lyrics" ? (
               <>
                 <Music className="w-8 h-8 text-primary" />
                 Devine les Paroles
+              </>
+            ) : (
+              <>
+                <RotateCcw className="w-8 h-8 text-purple-500" />
+                Rewind Quiz
               </>
             )}
           </h1>
@@ -106,6 +138,7 @@ const BlindTest = () => {
 
         {selectedGame === "blind-test" && <BlindTestGame />}
         {selectedGame === "guess-lyrics" && <GuessTheLyricsGame />}
+        {selectedGame === "rewind-quiz" && <RewindQuizGame />}
       </div>
     </div>
   );
