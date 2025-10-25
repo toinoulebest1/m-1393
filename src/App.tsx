@@ -14,7 +14,6 @@ import History from "./pages/History";
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import BlindTest from "./pages/BlindTest";
-import GuessTheLyrics from "./pages/GuessTheLyrics";
 import Top100 from "./pages/Top100";
 import ArtistProfile from "./pages/ArtistProfile";
 import Reports from "./pages/Reports";
@@ -43,7 +42,6 @@ function App() {
                 <Route path="/playlists" element={<Playlists />} />
                 <Route path="/playlist/:id" element={<PlaylistDetail />} />
                 <Route path="/blind-test" element={<BlindTest />} />
-                <Route path="/guess-lyrics" element={<GuessTheLyrics />} />
                 <Route path="/top100" element={<Top100 />} />
                 <Route path="/artist/:id" element={<ArtistProfile />} />
                 <Route path="/reports" element={<Reports />} />
