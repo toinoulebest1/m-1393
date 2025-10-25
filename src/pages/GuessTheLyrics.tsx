@@ -60,24 +60,31 @@ export default function GuessTheLyrics() {
           title,
           artist,
           image_url,
-          lyrics (
+          lyrics!inner (
             content
           )
         `)
-        .not("lyrics", "is", null)
         .limit(50);
 
       if (error) throw error;
 
       const songsWithLyrics = (data || [])
-        .filter((song: any) => song.lyrics && song.lyrics.content)
-        .map((song: any) => ({
-          id: song.id,
-          title: song.title,
-          artist: song.artist,
-          imageUrl: song.image_url,
-          lyrics: song.lyrics,
-        }));
+        .filter((song: any) => {
+          // Handle both array and object formats for lyrics
+          const lyrics = Array.isArray(song.lyrics) ? song.lyrics[0] : song.lyrics;
+          return lyrics && lyrics.content && lyrics.content.trim().length > 0;
+        })
+        .map((song: any) => {
+          // Normalize lyrics to always be an object
+          const lyrics = Array.isArray(song.lyrics) ? song.lyrics[0] : song.lyrics;
+          return {
+            id: song.id,
+            title: song.title,
+            artist: song.artist,
+            imageUrl: song.image_url,
+            lyrics: lyrics,
+          };
+        });
 
       if (songsWithLyrics.length === 0) {
         toast.error("Aucune chanson avec paroles disponible");
