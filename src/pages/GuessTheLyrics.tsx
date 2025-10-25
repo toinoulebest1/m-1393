@@ -59,6 +59,7 @@ export default function GuessTheLyrics() {
   const [currentAudioTime, setCurrentAudioTime] = useState<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0); // +/- décalage manuel
+  const [isPreloading, setIsPreloading] = useState<boolean>(false);
 
   // Mettre à jour le temps de lecture en temps réel et gérer le compte à rebours
   useEffect(() => {
@@ -88,7 +89,7 @@ export default function GuessTheLyrics() {
 
   // Bloquer la lecture audio avant validation (anti-triche)
   useEffect(() => {
-    if (!gameState.isAnswered && gameState.isGameStarted) {
+    if (!gameState.isAnswered && gameState.isGameStarted && !isPreloading) {
       const audioElement = getCurrentAudioElement();
       if (audioElement) {
         let lastWarningTime = 0;
@@ -113,6 +114,36 @@ export default function GuessTheLyrics() {
           "La patience est une vertu ! ⏰",
           "Hop hop hop, du calme ! 🛑",
           "On se calme sur le bouton play ! 😅",
+          "Petit filou va ! 🎭",
+          "Tu me prends pour qui ? 🤷",
+          "Même pas cap' de tricher ! 💪",
+          "Réfléchis d'abord, écoute ensuite ! 🧠",
+          "C'est pas comme ça qu'on gagne ! 🏆",
+          "Ah bah non alors ! 🙅",
+          "Tu rigoles j'espère ? 😂",
+          "On joue fair-play ici ! ⚖️",
+          "Pas de tricherie dans ma maison ! 🏠",
+          "Sois sage et réponds d'abord ! 👼",
+          "T'as cru que j'allais pas voir ? 👀",
+          "Malin mais pas assez ! 🧐",
+          "Pas de ça chez moi ! 🚷",
+          "Faut valider avant, champion ! 🥇",
+          "On respecte les règles ! 📜",
+          "Pas de passe-droit ici ! 🎫",
+          "Essaie encore et je te mets un zéro ! 📝",
+          "Non mais quelle idée ! 💡",
+          "Franchement, tu oses ? 😱",
+          "Allez, sois sympa, joue le jeu ! 🎲",
+          "Tu voudrais pas les réponses aussi ? 📖",
+          "Ah non, faut mériter la musique ! 🎶",
+          "C'est pas en trichant qu'on devient bon ! 📚",
+          "Reviens quand tu auras répondu ! 🚪",
+          "Je vois tout, je sais tout ! 🔮",
+          "Bien tenté mais non ! 🎯",
+          "Tu pensais que j'allais pas le voir ? 🕵️",
+          "Petit coquin ! 🐿️",
+          "On ne trompe pas le jeu ! 🎰",
+          "Retente ta chance après avoir répondu ! 🎲"
         ];
 
         const preventPlay = (e: Event) => {
@@ -146,7 +177,7 @@ export default function GuessTheLyrics() {
         };
       }
     }
-  }, [gameState.isAnswered, gameState.isGameStarted, getCurrentAudioElement]);
+  }, [gameState.isAnswered, gameState.isGameStarted, isPreloading, getCurrentAudioElement]);
 
   useEffect(() => {
     fetchSongsWithLyrics();
@@ -326,6 +357,8 @@ export default function GuessTheLyrics() {
 
     // Précharger la musique en pause
     if (currentSong.filePath) {
+      setIsPreloading(true); // Désactiver anti-triche pendant préchargement
+      
       const playerSong: PlayerSong = {
         id: currentSong.id,
         title: currentSong.title,
@@ -339,6 +372,7 @@ export default function GuessTheLyrics() {
       // Mettre en pause immédiatement après le chargement
       setTimeout(() => {
         pause();
+        setIsPreloading(false); // Réactiver anti-triche
       }, 100);
     }
   };
