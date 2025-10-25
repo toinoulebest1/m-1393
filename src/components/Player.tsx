@@ -382,6 +382,7 @@ export const Player = () => {
             onClick={handleLyricsNavigation}
             disabled={!currentSong}
             className="text-spotify-neutral hover:text-white transition-colors"
+            data-lyrics-button="true"
           >
             <Mic className="h-5 w-5" />
           </Button>

@@ -198,22 +198,19 @@ export default function GuessTheLyrics() {
       
       const handleLyricsClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        // Vérifier si c'est le bouton paroles (icône Mic ou son parent)
-        const lyricsButton = target.closest('button[class*="ghost"]');
+        // Vérifier si c'est le bouton paroles en utilisant le data-attribute
+        const lyricsButton = target.closest('button[data-lyrics-button="true"]');
         if (lyricsButton) {
-          const micIcon = lyricsButton.querySelector('svg');
-          if (micIcon && micIcon.parentElement === lyricsButton) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const now = Date.now();
-            if (now - lastLyricsWarningTime > 2000) {
-              const randomMessage = lyricsMessages[Math.floor(Math.random() * lyricsMessages.length)];
-              toast.error("🛡️ Système anti-triche :", {
-                description: randomMessage
-              });
-              lastLyricsWarningTime = now;
-            }
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const now = Date.now();
+          if (now - lastLyricsWarningTime > 2000) {
+            const randomMessage = lyricsMessages[Math.floor(Math.random() * lyricsMessages.length)];
+            toast.error("🛡️ Système anti-triche :", {
+              description: randomMessage
+            });
+            lastLyricsWarningTime = now;
           }
         }
       };
