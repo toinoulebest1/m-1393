@@ -58,6 +58,7 @@ export default function GuessTheLyrics() {
   const [correctAnswers, setCorrectAnswers] = useState<{ [key: number]: boolean }>({});
   const [currentAudioTime, setCurrentAudioTime] = useState<number>(0);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0); // +/- décalage manuel
 
   // Mettre à jour le temps de lecture en temps réel et gérer le compte à rebours
   useEffect(() => {
@@ -66,10 +67,11 @@ export default function GuessTheLyrics() {
       if (audioElement && gameState.isAnswered) {
         const time = audioElement.currentTime;
         setCurrentAudioTime(time);
-        
-        // Calculer le compte à rebours jusqu'aux paroles
-        if (time < excerptStartTime) {
-          const timeUntilLyrics = Math.ceil(excerptStartTime - time);
+
+        // Calculer le compte à rebours jusqu'aux paroles (avec offset)
+        const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
+        if (time < effectiveStart) {
+          const timeUntilLyrics = Math.ceil(effectiveStart - time);
           if (timeUntilLyrics <= 5 && timeUntilLyrics > 0) {
             setCountdown(timeUntilLyrics);
           } else if (timeUntilLyrics <= 0) {
@@ -82,7 +84,7 @@ export default function GuessTheLyrics() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [getCurrentAudioElement, gameState.isAnswered, excerptStartTime]);
+  }, [getCurrentAudioElement, gameState.isAnswered, excerptStartTime, syncOffsetMs]);
 
   useEffect(() => {
     fetchSongsWithLyrics();
@@ -307,21 +309,27 @@ export default function GuessTheLyrics() {
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
     }
 
-    // Positionner l'audio 5 secondes avant le timestamp des paroles pour le compte à rebours
+    // Positionner l'audio 5 secondes avant le timestamp des paroles pour le compte à rebours (avec offset)
     const audioElement = getCurrentAudioElement();
     if (audioElement && excerptStartTime > 0) {
+      const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
       // Démarrer 5 secondes avant les paroles (ou au début si moins de 5s)
-      const startTime = Math.max(0, excerptStartTime - 5);
-      console.log(`📍 Positionnement direct à ${startTime}s (paroles à ${excerptStartTime}s)`);
+      const startTime = Math.max(0, effectiveStart - 5);
+      console.log(`📍 Positionnement direct à ${startTime}s (paroles à ${effectiveStart}s, offset ${syncOffsetMs}ms)`);
       
+      const onSeeked = () => {
+        audioElement.removeEventListener('seeked', onSeeked);
+        console.log('▶️ Lecture après seeked');
+        // Démarrer directement l'élément audio pour ne pas recharger la source
+        audioElement.play().catch(() => {
+          // Fallback si le navigateur bloque, utiliser le contrôleur
+          playerPlay();
+        });
+      };
+
+      audioElement.addEventListener('seeked', onSeeked, { once: true });
       audioElement.currentTime = startTime;
       setCurrentAudioTime(startTime);
-      console.log(`✅ Audio positionné à ${audioElement.currentTime}s`);
-      
-      // Puis démarrer la lecture
-      setTimeout(() => {
-        playerPlay();
-      }, 100);
     } else {
       // Pas de timestamp, on démarre juste au début
       playerPlay();
@@ -413,10 +421,14 @@ export default function GuessTheLyrics() {
     const currentSong = songs[gameState.currentSongIndex];
     if (!currentSong) return null;
     
+    // Fenêtre d'affichage (avec offset manuel)
+    const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
+    const effectiveEnd = Math.max(effectiveStart, excerptEndTime + syncOffsetMs / 1000);
+
     // Vérifier si on est dans la période de l'extrait
     const isInExcerptTime = gameState.isAnswered && 
-                           currentAudioTime >= excerptStartTime && 
-                           currentAudioTime <= excerptEndTime;
+                           currentAudioTime >= effectiveStart && 
+                           currentAudioTime <= effectiveEnd;
 
     return (
       <div className="max-w-3xl mx-auto space-y-6">
