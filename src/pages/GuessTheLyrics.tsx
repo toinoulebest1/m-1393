@@ -135,10 +135,11 @@ export default function GuessTheLyrics() {
     prepareQuestion(0);
   };
 
-  const prepareQuestion = (songIndex: number) => {
+  const prepareQuestion = async (songIndex: number) => {
     if (!songs[songIndex] || !songs[songIndex].lyrics) return;
 
-    const lyricsContent = songs[songIndex].lyrics!.content;
+    const currentSong = songs[songIndex];
+    const lyricsContent = currentSong.lyrics!.content;
     
     // Try to parse as LRC to get timestamps
     let plainText = lyricsContent;
@@ -216,9 +217,27 @@ export default function GuessTheLyrics() {
 
     setDisplayedLyrics(displayed);
     setUserInputs({});
+
+    // Précharger la musique en pause
+    if (currentSong.filePath) {
+      const playerSong: PlayerSong = {
+        id: currentSong.id,
+        title: currentSong.title,
+        artist: currentSong.artist || "Artiste inconnu",
+        url: currentSong.filePath,
+        imageUrl: currentSong.imageUrl,
+        duration: currentSong.duration,
+      };
+      
+      await playerPlay(playerSong);
+      // Mettre en pause immédiatement après le chargement
+      setTimeout(() => {
+        pause();
+      }, 100);
+    }
   };
 
-  const checkAnswer = async () => {
+  const checkAnswer = () => {
     let correctCount = 0;
     
     hiddenWords.forEach(({ word, index }) => {
@@ -240,34 +259,21 @@ export default function GuessTheLyrics() {
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
     }
 
-    // Play the song at the excerpt timestamp
+    // La musique est déjà chargée, on la positionne et on la démarre
     const currentSong = songs[gameState.currentSongIndex];
-    if (currentSong && currentSong.filePath) {
-      const playerSong: PlayerSong = {
-        id: currentSong.id,
-        title: currentSong.title,
-        artist: currentSong.artist || "Artiste inconnu",
-        url: currentSong.filePath,
-        imageUrl: currentSong.imageUrl,
-        duration: currentSong.duration,
-      };
-      
-      await playerPlay(playerSong);
-      
-      // Wait for song to load and convert seconds to percentage
+    if (currentSong && currentSong.duration && excerptStartTime > 0) {
       // Parse duration string (MM:SS) to total seconds
-      if (currentSong.duration && excerptStartTime > 0) {
-        const durationParts = currentSong.duration.split(':');
-        const totalSeconds = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
-        
-        // Convert excerpt time (seconds) to percentage
-        const progressPercentage = (excerptStartTime / totalSeconds) * 100;
-        
-        // Wait for audio to be ready before seeking
-        setTimeout(() => {
-          setProgress(progressPercentage);
-        }, 1000);
-      }
+      const durationParts = currentSong.duration.split(':');
+      const totalSeconds = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
+      
+      // Convert excerpt time (seconds) to percentage
+      const progressPercentage = (excerptStartTime / totalSeconds) * 100;
+      
+      // Positionner et démarrer immédiatement
+      setProgress(progressPercentage);
+      setTimeout(() => {
+        playerPlay();
+      }, 100);
     }
   };
 
