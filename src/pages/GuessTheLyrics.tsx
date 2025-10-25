@@ -307,23 +307,21 @@ export default function GuessTheLyrics() {
       toast.error(`${correctCount}/${hiddenWords.length} bonnes réponses`);
     }
 
-    // Positionner l'audio directement au bon timestamp puis démarrer
-    const currentSong = songs[gameState.currentSongIndex];
-    if (excerptStartTime > 0) {
-      console.log(`📍 Positionnement direct à ${excerptStartTime}s`);
+    // Positionner l'audio 5 secondes avant le timestamp des paroles pour le compte à rebours
+    const audioElement = getCurrentAudioElement();
+    if (audioElement && excerptStartTime > 0) {
+      // Démarrer 5 secondes avant les paroles (ou au début si moins de 5s)
+      const startTime = Math.max(0, excerptStartTime - 5);
+      console.log(`📍 Positionnement direct à ${startTime}s (paroles à ${excerptStartTime}s)`);
       
-      // Accéder directement à l'élément audio pour le positionner
-      const audioElement = getCurrentAudioElement();
-      if (audioElement) {
-        // Positionner d'abord
-        audioElement.currentTime = excerptStartTime;
-        console.log(`✅ Audio positionné à ${audioElement.currentTime}s`);
-        
-        // Puis démarrer la lecture
-        setTimeout(() => {
-          playerPlay();
-        }, 100);
-      }
+      audioElement.currentTime = startTime;
+      setCurrentAudioTime(startTime);
+      console.log(`✅ Audio positionné à ${audioElement.currentTime}s`);
+      
+      // Puis démarrer la lecture
+      setTimeout(() => {
+        playerPlay();
+      }, 100);
     } else {
       // Pas de timestamp, on démarre juste au début
       playerPlay();
