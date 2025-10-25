@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Pause, Play, SkipForward, Trophy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { SoundEffects, SoundType } from "@/components/SoundEffects";
+import { getAudioFileUrl } from "@/utils/storage";
 
 type Song = {
   id: string;
@@ -102,6 +103,11 @@ export function RewindQuizGame() {
       // Stop any currently playing audio
       stopAudio();
 
+      // Get the actual audio URL from storage
+      console.log('🔍 Récupération URL complète pour:', url);
+      const fullUrl = await getAudioFileUrl(url);
+      console.log('✅ URL complète obtenue:', fullUrl);
+
       // Create or reuse audio context
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -110,7 +116,10 @@ export function RewindQuizGame() {
       const audioContext = audioContextRef.current;
 
       // Fetch and decode audio
-      const response = await fetch(url);
+      const response = await fetch(fullUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
