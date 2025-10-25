@@ -98,27 +98,52 @@ export default function GuessTheLyrics() {
           "On valide d'abord, on écoute après ! 🎵",
           "Eh oh, pas si vite ! 😄",
           "Tu croyais pouvoir tricher ? Raté ! 😎",
-          "Valide ta réponse d'abord, coquin ! 😜"
+          "Valide ta réponse d'abord, coquin ! 😜",
+          "Alors, on essaie de tricher ? 🤨",
+          "Même pas en rêve ! 💭",
+          "Non mais allô quoi ! 📱",
+          "C'est non ! ❌",
+          "Interdit de toucher ! ✋",
+          "On ne triche pas dans ce jeu ! 🎮",
+          "Tss tss tss... 👆",
+          "Pas touche à mon bouton ! 🔴",
+          "Tu es un petit malin toi ! 🦊",
+          "Valide d'abord, espèce de trublion ! 🤪",
+          "Alors, on veut savoir avant tout le monde ? 🤔",
+          "La patience est une vertu ! ⏰",
+          "Hop hop hop, du calme ! 🛑",
+          "On se calme sur le bouton play ! 😅",
         ];
 
-        const preventPlay = () => {
-          if (!audioElement.paused) {
-            audioElement.pause();
-            
-            // Afficher un message seulement toutes les 2 secondes
-            const now = Date.now();
-            if (now - lastWarningTime > 2000) {
-              const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
-              toast.error(randomMessage);
-              lastWarningTime = now;
-            }
+        const preventPlay = (e: Event) => {
+          e.preventDefault();
+          audioElement.pause();
+          audioElement.currentTime = 0; // Remettre à zéro pour éviter tout son
+          
+          // Afficher un message seulement toutes les 2 secondes
+          const now = Date.now();
+          if (now - lastWarningTime > 2000) {
+            const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+            toast.error(randomMessage);
+            lastWarningTime = now;
           }
         };
 
-        // Vérifier toutes les 100ms si l'audio est en lecture
-        const checkInterval = setInterval(preventPlay, 100);
+        // Intercepter l'événement play immédiatement
+        audioElement.addEventListener('play', preventPlay);
 
-        return () => clearInterval(checkInterval);
+        // Aussi vérifier périodiquement au cas où
+        const checkInterval = setInterval(() => {
+          if (!audioElement.paused) {
+            audioElement.pause();
+            audioElement.currentTime = 0;
+          }
+        }, 50);
+
+        return () => {
+          audioElement.removeEventListener('play', preventPlay);
+          clearInterval(checkInterval);
+        };
       }
     }
   }, [gameState.isAnswered, gameState.isGameStarted, getCurrentAudioElement]);
