@@ -3,12 +3,13 @@ import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gamepad2, Music, ArrowLeft, RotateCcw } from "lucide-react";
+import { Gamepad2, Music, ArrowLeft, RotateCcw, Piano } from "lucide-react";
 import { BlindTestGame } from "@/components/games/BlindTestGame";
 import { GuessTheLyricsGame } from "@/components/games/GuessTheLyricsGame";
 import { RewindQuizGame } from "@/components/games/RewindQuizGame";
+import { PianoGame } from "@/components/games/PianoGame";
 
-type GameType = "blind-test" | "guess-lyrics" | "rewind-quiz" | null;
+type GameType = "blind-test" | "guess-lyrics" | "rewind-quiz" | "piano-game" | null;
 
 const BlindTest = () => {
   const [selectedGame, setSelectedGame] = useState<GameType>(null);
@@ -21,7 +22,7 @@ const BlindTest = () => {
           Choisissez votre jeu
         </h1>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card 
             className="bg-spotify-dark border-white/10 cursor-pointer hover:border-spotify-accent transition-all hover:scale-105"
             onClick={() => setSelectedGame("blind-test")}
@@ -99,6 +100,32 @@ const BlindTest = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <Card 
+            className="bg-spotify-dark border-white/10 cursor-pointer hover:border-spotify-accent transition-all hover:scale-105"
+            onClick={() => setSelectedGame("piano-game")}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Piano className="w-8 h-8 text-blue-500" />
+                Piano Game
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-spotify-neutral">
+                Appuyez sur les tuiles qui descendent au rythme de la musique !
+              </p>
+              <ul className="space-y-2 text-sm text-spotify-neutral">
+                <li>✓ 4 colonnes de tuiles</li>
+                <li>✓ Système de combo</li>
+                <li>✓ 3 vies seulement</li>
+                <li>✓ Comme Piano Tiles</li>
+              </ul>
+              <Button className="w-full mt-4" variant="default">
+                Jouer au Piano Game
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -127,10 +154,15 @@ const BlindTest = () => {
                 <Music className="w-8 h-8 text-primary" />
                 Devine les Paroles
               </>
-            ) : (
+            ) : selectedGame === "rewind-quiz" ? (
               <>
                 <RotateCcw className="w-8 h-8 text-purple-500" />
                 Rewind Quiz
+              </>
+            ) : (
+              <>
+                <Piano className="w-8 h-8 text-blue-500" />
+                Piano Game
               </>
             )}
           </h1>
@@ -139,6 +171,7 @@ const BlindTest = () => {
         {selectedGame === "blind-test" && <BlindTestGame />}
         {selectedGame === "guess-lyrics" && <GuessTheLyricsGame />}
         {selectedGame === "rewind-quiz" && <RewindQuizGame />}
+        {selectedGame === "piano-game" && <PianoGame />}
       </div>
     </div>
   );
