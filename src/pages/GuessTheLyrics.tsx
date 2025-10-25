@@ -143,7 +143,39 @@ export default function GuessTheLyrics() {
           "Tu pensais que j'allais pas le voir ? 🕵️",
           "Petit coquin ! 🐿️",
           "On ne trompe pas le jeu ! 🎰",
-          "Retente ta chance après avoir répondu ! 🎲"
+          "Retente ta chance après avoir répondu ! 🎲",
+          "Ohhhh le vilain ! 😈",
+          "Arrête de cliquer partout ! 🖱️",
+          "Tu crois qu'on est né de la dernière pluie ? ☔",
+          "Allez ouste, valide ta réponse ! 👋",
+          "On a dit PAS de triche ! 🙊",
+          "Toi là, oui toi, arrête ça ! 👉",
+          "Je t'ai à l'œil mon coco ! 🥥",
+          "Pas de ça entre nous ! 💔",
+          "Tu vas te calmer oui ? 😤",
+          "C'est moi le chef ici ! 👑",
+          "Fais pas l'innocent ! 😇",
+          "Allez zou, au travail ! 🔨",
+          "Nan mais sérieux là ? 🤦",
+          "T'as pas honte un peu ? 😳",
+          "Arrête de faire le malin ! 🤓",
+          "On se croirait dans un western ! 🤠",
+          "Doucement cowboy ! 🐎",
+          "Pas touche à la sono ! 🔊",
+          "Tu veux qu'on parle de ta tentative ? 🎤",
+          "Beau joueur on a dit ! 🃏",
+          "Concentration ! Les neurones ! 🧬",
+          "Réfléchis, tu peux le faire ! 💭",
+          "On ne copie pas sur son voisin ! 📋",
+          "Je note ta tentative dans ton dossier ! 📁",
+          "Recommence plus jamais ça ! ⚠️",
+          "Prends ton temps mais triche pas ! ⏳",
+          "La musique, c'est sacré ! 🎻",
+          "Un peu de respect pour les règles ! 🎓",
+          "T'inquiète, je surveille ! 👁️",
+          "Allez allez, réponds ! 📝",
+          "Petit malin va ! 🦝",
+          "On fait pas les choses à moitié ! 🍕"
         ];
 
         const preventPlay = (e: Event) => {
@@ -155,7 +187,7 @@ export default function GuessTheLyrics() {
           const now = Date.now();
           if (now - lastWarningTime > 2000) {
             const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
-            toast.error(`🛡️ Système anti-triche : ${randomMessage}`);
+            toast.error(`🛡️ Système anti-triche :\n${randomMessage}`);
             lastWarningTime = now;
           }
         };
