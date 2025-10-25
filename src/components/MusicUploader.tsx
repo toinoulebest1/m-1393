@@ -276,7 +276,8 @@ export const MusicUploader = () => {
       // 1. Priorité à la pochette dans les métadonnées du fichier
       if (metadataResult?.picture) {
         try {
-          const blob = new Blob([metadataResult.picture.data], { type: metadataResult.picture.format });
+          const uint8Array = new Uint8Array(metadataResult.picture.data);
+          const blob = new Blob([uint8Array.buffer], { type: metadataResult.picture.format });
           imageUrl = URL.createObjectURL(blob);
           console.log("Pochette créée depuis les métadonnées");
         } catch (error) {

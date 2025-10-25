@@ -97,6 +97,7 @@
     "libraryUpToDate": "Library up to date, all files are present",
     "syncError": "Error syncing library",
     "blindTest": "Blind Test",
+    "guessLyrics": "Guess the Lyrics",
     "playlists": "Playlists",
     "reports": "Reports",
     "language": "Language"

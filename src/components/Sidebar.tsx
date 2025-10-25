@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings, MessageSquareQuote } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -47,7 +47,8 @@ export const Sidebar = () => {
     { to: "/favorites", icon: Heart, label: t('common.favorites') },
     { to: "/history", icon: History, label: t('common.history') },
     { to: "/top100", icon: Trophy, label: t('common.top100') },
-    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') }
+    { to: "/blind-test", icon: Gamepad2, label: t('common.blindTest') },
+    { to: "/guess-lyrics", icon: MessageSquareQuote, label: t('common.guessLyrics') }
   ];
 
   if (isAdmin) {
