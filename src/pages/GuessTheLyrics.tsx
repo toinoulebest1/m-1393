@@ -155,7 +155,7 @@ export default function GuessTheLyrics() {
           const now = Date.now();
           if (now - lastWarningTime > 2000) {
             const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
-            toast.error(randomMessage);
+            toast.error(`🛡️ Système anti-triche : ${randomMessage}`);
             lastWarningTime = now;
           }
         };
@@ -537,15 +537,6 @@ export default function GuessTheLyrics() {
             Score: {gameState.score}
           </Badge>
         </div>
-
-        {/* Badge Système Anti-Triche */}
-        {!gameState.isAnswered && (
-          <div className="flex justify-center">
-            <Badge variant="destructive" className="px-4 py-2 text-sm font-semibold animate-pulse">
-              🛡️ Système Anti-Triche Activé
-            </Badge>
-          </div>
-        )}
 
         <Progress value={(gameState.currentSongIndex / gameState.totalQuestions) * 100} className="h-2" />
 
