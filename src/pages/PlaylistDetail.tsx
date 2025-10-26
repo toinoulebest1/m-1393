@@ -29,8 +29,6 @@ import { SongCard } from "@/components/SongCard";
 import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
-import { AutoMixSettings } from "@/components/AutoMixSettings";
-import { useAutoMix } from "@/hooks/useAutoMix";
 
 interface Song {
   id: string;
@@ -232,38 +230,6 @@ const PlaylistDetail = () => {
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
-  
-  // Auto-Mix DJ
-  const autoMix = useAutoMix();
-  
-  // Handler pour analyser la playlist avec l'auto-mix
-  const handleAnalyzePlaylist = async () => {
-    if (songs.length === 0) {
-      toast({
-        title: "Cannot analyze",
-        description: "Add songs to the playlist first",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const songList = songs.map(s => s.songs);
-      await autoMix.analyzePlaylist(songList);
-      
-      toast({
-        title: "Analysis Complete",
-        description: `Successfully analyzed ${songs.length} tracks for auto-mixing`
-      });
-    } catch (error) {
-      console.error("Error analyzing playlist:", error);
-      toast({
-        title: "Analysis Failed",
-        description: "Could not analyze some tracks",
-        variant: "destructive"
-      });
-    }
-  };
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -968,18 +934,6 @@ const PlaylistDetail = () => {
                   onVisibilityChanged={handleVisibilityChanged}
                   isOwner={isOwner}
                 />
-                
-                {/* Auto-Mix DJ Settings */}
-                {songs.length > 0 && (
-                  <AutoMixSettings
-                    config={autoMix.config}
-                    isAnalyzing={autoMix.isAnalyzing}
-                    analysisProgress={autoMix.analysisProgress}
-                    onToggle={autoMix.toggleAutoMix}
-                    onConfigChange={autoMix.updateConfig}
-                    onAnalyzePlaylist={handleAnalyzePlaylist}
-                  />
-                )}
               </div>
             </div>
           </div>
