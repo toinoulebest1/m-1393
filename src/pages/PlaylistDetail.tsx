@@ -30,6 +30,9 @@ import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 import { Layout } from "@/components/Layout";
+import { AutoMixSettings } from "@/components/AutoMixSettings";
+import { AutoMixVisualizer } from "@/components/AutoMixVisualizer";
+import { useAutoMix } from "@/hooks/useAutoMix";
 
 interface Song {
   id: string;
@@ -231,6 +234,9 @@ const PlaylistDetail = () => {
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
+  const autoMix = useAutoMix();
+  const [showVisualizer, setShowVisualizer] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -470,6 +476,26 @@ const PlaylistDetail = () => {
       return () => clearTimeout(timer);
     }
   }, [songs.length, playlist?.id, currentUserId]);
+
+  // Analyze playlist for auto-mix when enabled
+  useEffect(() => {
+    if (autoMix.config.enabled && songs.length > 0 && !autoMix.analyzing) {
+      const songsToAnalyze = songs.map(s => ({
+        id: s.songs.id,
+        url: s.songs.url,
+        title: s.songs.title,
+        artist: s.songs.artist,
+      }));
+      
+      autoMix.analyzePlaylist(songsToAnalyze).then(() => {
+        setShowVisualizer(true);
+        toast({
+          title: "Auto-Mix activé",
+          description: `${songsToAnalyze.length} morceaux analysés pour le mixage`,
+        });
+      });
+    }
+  }, [autoMix.config.enabled, songs.length]);
 
   const handleUpdateName = async () => {
     if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
@@ -907,13 +933,17 @@ const PlaylistDetail = () => {
               
               <div className="flex gap-2 mt-4">
                 {songs.length > 0 && (
-                  <Button 
-                    onClick={playPlaylist}
-                    className="bg-spotify-accent hover:bg-spotify-accent-hover rounded-full"
-                  >
-                    <Play className="h-5 w-5 mr-2" />
-                    {t('common.play')}
-                  </Button>
+                  <>
+                    <Button 
+                      onClick={playPlaylist}
+                      className="bg-spotify-accent hover:bg-spotify-accent-hover rounded-full"
+                    >
+                      <Play className="h-5 w-5 mr-2" />
+                      {t('common.play')}
+                    </Button>
+                    
+                    <AutoMixSettings />
+                  </>
                 )}
                 
                 {/* Afficher le bouton d'ajout de musiques seulement si l'utilisateur est propriétaire */}
@@ -988,6 +1018,33 @@ const PlaylistDetail = () => {
             </div>
           )}
         </div>
+        
+        {/* Auto-Mix Visualizer */}
+        {autoMix.config.enabled && currentSong && songs.length > 1 && autoMix.currentTransition && (
+          <AutoMixVisualizer
+            currentSong={{
+              id: currentSong.id,
+              url: currentSong.url,
+              title: currentSong.title,
+              artist: currentSong.artist,
+              analysis: autoMix.analyzedSongs.get(currentSong.id)
+            }}
+            nextSong={{
+              id: songs[1].songs.id,
+              url: songs[1].songs.url,
+              title: songs[1].songs.title,
+              artist: songs[1].songs.artist,
+              analysis: autoMix.analyzedSongs.get(songs[1].songs.id)
+            }}
+            transition={autoMix.currentTransition}
+            isPlaying={isPlaying}
+            currentTime={audioRef.current?.currentTime || 0}
+            onTogglePlay={() => isPlaying ? pause() : play(currentSong)}
+            onVolumeChange={(volume) => {
+              if (audioRef.current) audioRef.current.volume = volume;
+            }}
+          />
+        )}
       <Player />
     </Layout>
   );
