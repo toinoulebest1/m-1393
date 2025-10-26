@@ -26,6 +26,7 @@ export interface PlayerPreferences {
 
 export interface PlayerContextType {
   currentSong: Song | null;
+  displayedSong: Song | null;
   isPlaying: boolean;
   progress: number;
   volume: number;

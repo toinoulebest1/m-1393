@@ -57,6 +57,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const changeTimeoutRef = useRef<number | null>(null);
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
+  const [displayedSong, setDisplayedSong] = useState<Song | null>(null);
 
   // Hook d'égaliseur
   const equalizer = useEqualizer({ audioElement: audioRef.current });
@@ -326,6 +327,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     restorePlayback();
   }, []);
 
+  // Garder affichage aligné quand la chanson change naturellement
+  useEffect(() => {
+    setDisplayedSong(currentSong);
+  }, [currentSong]);
+
   // Sauvegarde en temps réel de la position - OPTIMISÉ
   useEffect(() => {
     if (!audioRef.current) return;
@@ -506,9 +512,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playPromise.then(() => {
           console.log("Lecture de la prochaine chanson démarrée avec succès");
           
-          // Changer immédiatement l'affichage vers la nouvelle chanson
-          setCurrentSong(nextSong);
-          localStorage.setItem('currentSong', JSON.stringify(nextSong));
+          // Afficher immédiatement la prochaine chanson dans l'UI, sans changer la source principale
+          setDisplayedSong(nextSong);
           
           if ('mediaSession' in navigator) {
             updateMediaSessionMetadata(nextSong);
@@ -560,16 +565,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 audioRef.current.currentTime = 0;
               }
               
-              // Swap des références audio (l'ancienne devient la nouvelle pour le prochain crossfade)
-              const tempAudio = audioRef.current;
-              audioRef.current = nextAudioRef.current;
-              nextAudioRef.current = tempAudio;
-              nextAudioRef.current.src = '';
-              setNextSongPreloaded(false);
-              fadingRef.current = false;
-              
-              // Précharger la prochaine piste
-              setTimeout(() => preloadNextTracks(), 1000);
+              const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
+              const nextTrack = queue[currentIndex + 1];
+              if (nextTrack) {
+                const tempAudio = audioRef.current;
+                audioRef.current = nextAudioRef.current;
+                nextAudioRef.current = tempAudio;
+                nextAudioRef.current.src = '';
+                setCurrentSong(nextTrack);
+                localStorage.setItem('currentSong', JSON.stringify(nextTrack));
+                setNextSongPreloaded(false);
+                fadingRef.current = false;
+                
+                if ('mediaSession' in navigator) {
+                  updateMediaSessionMetadata(nextTrack);
+                  console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
+                }
+                
+                setTimeout(() => preloadNextTracks(), 1000);
+              }
             }
           }, intervalTime);
         }).catch(error => {
@@ -664,6 +678,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // L'objet context complet avec l'égaliseur - Fix type mapping
   const playerContext: PlayerContextType = {
     currentSong,
+    displayedSong,
     isPlaying,
     progress,
     volume,
