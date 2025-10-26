@@ -348,24 +348,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleLoadStart = () => {
-      console.log("🔄 Début du chargement audio");
-      setIsAudioReady(false);
+      // Seulement mettre à false si on change de chanson, pas pendant le préchargement
+      if (isChangingSong) {
+        console.log("🔄 Début du chargement audio");
+        setIsAudioReady(false);
+      }
     };
 
     const handleCanPlay = () => {
       console.log("✅ Audio prêt");
       setIsAudioReady(true);
     };
+    
+    const handlePlaying = () => {
+      // S'assurer que isAudioReady est true quand la lecture démarre
+      setIsAudioReady(true);
+    };
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('loadstart', handleLoadStart);
     audioRef.current.addEventListener('canplay', handleCanPlay);
+    audioRef.current.addEventListener('playing', handlePlaying);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('loadstart', handleLoadStart);
         audioRef.current.removeEventListener('canplay', handleCanPlay);
+        audioRef.current.removeEventListener('playing', handlePlaying);
       }
     };
   }, [currentSong, setProgress]);

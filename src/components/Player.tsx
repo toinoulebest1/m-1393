@@ -261,13 +261,13 @@ export const Player = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
-      {/* Overlay de chargement pour toute la longueur */}
-      {(isChangingSong || !isAudioReady) && (
+      {/* Overlay de chargement seulement pendant le changement de musique */}
+      {isChangingSong && (
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="flex items-center gap-3 bg-spotify-dark/80 px-4 py-2 rounded-full border border-spotify-border">
             <div className="w-4 h-4 border-2 border-spotify-accent border-t-transparent rounded-full animate-spin"></div>
             <span className="text-sm text-white font-medium">
-              {isChangingSong ? "Chargement de la musique..." : "Préparation de l'audio..."}
+              Chargement de la musique...
             </span>
           </div>
         </div>
