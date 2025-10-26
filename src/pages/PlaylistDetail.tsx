@@ -29,6 +29,7 @@ import { SongCard } from "@/components/SongCard";
 import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
+import { Layout } from "@/components/Layout";
 
 interface Song {
   id: string;
@@ -759,40 +760,45 @@ const PlaylistDetail = () => {
 
   if (loading) {
     return (
-      <div className="container p-6">
-        <div className="flex items-start gap-6 mb-8">
-          <Skeleton className="w-48 h-48" />
-          <div className="flex-1">
-            <Skeleton className="h-10 w-3/4 mb-4" />
-            <Skeleton className="h-6 w-1/2 mb-6" />
-            <Skeleton className="h-9 w-20" />
+      <Layout>
+        <div className="container p-6">
+          <div className="flex items-start gap-6 mb-8">
+            <Skeleton className="w-48 h-48" />
+            <div className="flex-1">
+              <Skeleton className="h-10 w-3/4 mb-4" />
+              <Skeleton className="h-6 w-1/2 mb-6" />
+              <Skeleton className="h-9 w-20" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-full" />
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
           </div>
         </div>
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      </div>
+        <Player />
+      </Layout>
     );
   }
 
   if (!playlist) {
     return (
-      <div className="container p-6">
-        <div className="text-center py-12">
-          <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
-          <p className="text-spotify-neutral text-lg">{t('playlists.notFound')}</p>
+      <Layout>
+        <div className="container p-6">
+          <div className="text-center py-12">
+            <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
+            <p className="text-spotify-neutral text-lg">{t('playlists.notFound')}</p>
+          </div>
         </div>
-      </div>
+        <Player />
+      </Layout>
     );
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto">
-        <div className="container p-6 pb-32">
+    <Layout>
+      <div className="container p-6 pb-32">
           <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
             <div className="relative group w-48 h-48 min-w-48 bg-spotify-card rounded-md overflow-hidden flex items-center justify-center">
               {coverImageUrl ? (
@@ -982,9 +988,8 @@ const PlaylistDetail = () => {
             </div>
           )}
         </div>
-      </div>
       <Player />
-    </div>
+    </Layout>
   );
 };
 
