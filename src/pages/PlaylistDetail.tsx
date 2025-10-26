@@ -32,7 +32,7 @@ import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySetti
 import { Layout } from "@/components/Layout";
 import { AutoMixSettings } from "@/components/AutoMixSettings";
 import { AutoMixVisualizer } from "@/components/AutoMixVisualizer";
-import { useAutoMix } from "@/hooks/useAutoMix";
+import { SongWithAnalysis } from "@/hooks/useAutoMix";
 
 interface Song {
   id: string;
@@ -232,11 +232,9 @@ const PlaylistDetail = () => {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause } = usePlayer();
+  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause, autoMixConfig, toggleAutoMix, updateAutoMixConfig, autoMixTransition, autoMixAnalyzing, getCurrentAudioElement } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
-  const autoMix = useAutoMix();
   const [showVisualizer, setShowVisualizer] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -477,25 +475,14 @@ const PlaylistDetail = () => {
     }
   }, [songs.length, playlist?.id, currentUserId]);
 
-  // Analyze playlist for auto-mix when enabled
+  // Show visualizer when auto-mix is enabled and has a transition
   useEffect(() => {
-    if (autoMix.config.enabled && songs.length > 0 && !autoMix.analyzing) {
-      const songsToAnalyze = songs.map(s => ({
-        id: s.songs.id,
-        url: s.songs.url,
-        title: s.songs.title,
-        artist: s.songs.artist,
-      }));
-      
-      autoMix.analyzePlaylist(songsToAnalyze).then(() => {
-        setShowVisualizer(true);
-        toast({
-          title: "Auto-Mix activé",
-          description: `${songsToAnalyze.length} morceaux analysés pour le mixage`,
-        });
-      });
+    if (autoMixConfig?.enabled && autoMixTransition) {
+      setShowVisualizer(true);
+    } else {
+      setShowVisualizer(false);
     }
-  }, [autoMix.config.enabled, songs.length]);
+  }, [autoMixConfig?.enabled, autoMixTransition]);
 
   const handleUpdateName = async () => {
     if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
@@ -1020,28 +1007,29 @@ const PlaylistDetail = () => {
         </div>
         
         {/* Auto-Mix Visualizer */}
-        {autoMix.config.enabled && currentSong && songs.length > 1 && autoMix.currentTransition && (
+        {showVisualizer && autoMixConfig?.enabled && currentSong && songs.length > 1 && autoMixTransition && (
           <AutoMixVisualizer
             currentSong={{
               id: currentSong.id,
               url: currentSong.url,
               title: currentSong.title,
-              artist: currentSong.artist,
-              analysis: autoMix.analyzedSongs.get(currentSong.id)
+              artist: currentSong.artist || 'Unknown',
+              analysis: undefined
             }}
             nextSong={{
-              id: songs[1].songs.id,
-              url: songs[1].songs.url,
-              title: songs[1].songs.title,
-              artist: songs[1].songs.artist,
-              analysis: autoMix.analyzedSongs.get(songs[1].songs.id)
+              id: queue[1]?.id || songs[1]?.songs.id,
+              url: queue[1]?.url || songs[1]?.songs.url,
+              title: queue[1]?.title || songs[1]?.songs.title,
+              artist: queue[1]?.artist || songs[1]?.songs.artist || 'Unknown',
+              analysis: undefined
             }}
-            transition={autoMix.currentTransition}
+            transition={autoMixTransition}
             isPlaying={isPlaying}
-            currentTime={audioRef.current?.currentTime || 0}
+            currentTime={getCurrentAudioElement()?.currentTime || 0}
             onTogglePlay={() => isPlaying ? pause() : play(currentSong)}
-            onVolumeChange={(volume) => {
-              if (audioRef.current) audioRef.current.volume = volume;
+            onVolumeChange={(vol) => {
+              const audio = getCurrentAudioElement();
+              if (audio) audio.volume = vol;
             }}
           />
         )}

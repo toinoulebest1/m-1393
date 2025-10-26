@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { useAutoMix, MixMode } from '@/hooks/useAutoMix';
+import { MixMode } from '@/hooks/useAutoMix';
+import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 
 export function AutoMixSettings() {
-  const { config, updateConfig, toggleAutoMix, analyzing } = useAutoMix();
+  const { autoMixConfig, updateAutoMixConfig, toggleAutoMix, autoMixAnalyzing } = usePlayer();
   const [isOpen, setIsOpen] = useState(false);
 
   const modes: { value: MixMode; label: string; description: string; emoji: string }[] = [
@@ -29,7 +30,7 @@ export function AutoMixSettings() {
       energie: { transitionDuration: 8, effectsEnabled: true, eqEnabled: true },
     };
     
-    updateConfig({
+    updateAutoMixConfig({
       mode,
       ...modeConfig[mode],
     });
@@ -39,15 +40,15 @@ export function AutoMixSettings() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button
-          variant={config.enabled ? "default" : "outline"}
+          variant={autoMixConfig?.enabled ? "default" : "outline"}
           className={cn(
             "gap-2 transition-all duration-300",
-            config.enabled && "bg-gradient-to-r from-primary to-accent hover:opacity-90 animate-pulse"
+            autoMixConfig?.enabled && "bg-gradient-to-r from-primary to-accent hover:opacity-90 animate-pulse"
           )}
         >
           <Music2 className="h-4 w-4" />
           Auto-Mix DJ
-          {config.enabled && (
+          {autoMixConfig?.enabled && (
             <Badge variant="secondary" className="ml-1 px-1.5 py-0">
               ON
             </Badge>
@@ -73,13 +74,13 @@ export function AutoMixSettings() {
               </p>
             </div>
             <Switch
-              checked={config.enabled}
+              checked={autoMixConfig?.enabled || false}
               onCheckedChange={toggleAutoMix}
-              disabled={analyzing}
+              disabled={autoMixAnalyzing}
             />
           </div>
 
-          {config.enabled && (
+          {autoMixConfig?.enabled && (
             <>
               {/* Mix Mode */}
               <div className="space-y-3">
@@ -87,7 +88,7 @@ export function AutoMixSettings() {
                   <Settings2 className="h-4 w-4" />
                   Style de Mix
                 </Label>
-                <Select value={config.mode} onValueChange={handleModeChange}>
+                <Select value={autoMixConfig.mode} onValueChange={handleModeChange}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -113,11 +114,11 @@ export function AutoMixSettings() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Durée de transition</Label>
-                  <span className="text-sm font-medium">{config.transitionDuration}s</span>
+                  <span className="text-sm font-medium">{autoMixConfig.transitionDuration}s</span>
                 </div>
                 <Slider
-                  value={[config.transitionDuration]}
-                  onValueChange={([value]) => updateConfig({ transitionDuration: value })}
+                  value={[autoMixConfig.transitionDuration]}
+                  onValueChange={([value]) => updateAutoMixConfig({ transitionDuration: value })}
                   min={4}
                   max={12}
                   step={1}
@@ -140,8 +141,8 @@ export function AutoMixSettings() {
                     </p>
                   </div>
                   <Switch
-                    checked={config.tempoStretch}
-                    onCheckedChange={(checked) => updateConfig({ tempoStretch: checked })}
+                    checked={autoMixConfig.tempoStretch}
+                    onCheckedChange={(checked) => updateAutoMixConfig({ tempoStretch: checked })}
                   />
                 </div>
 
@@ -153,8 +154,8 @@ export function AutoMixSettings() {
                     </p>
                   </div>
                   <Switch
-                    checked={config.eqEnabled}
-                    onCheckedChange={(checked) => updateConfig({ eqEnabled: checked })}
+                    checked={autoMixConfig.eqEnabled}
+                    onCheckedChange={(checked) => updateAutoMixConfig({ eqEnabled: checked })}
                   />
                 </div>
 
@@ -166,8 +167,8 @@ export function AutoMixSettings() {
                     </p>
                   </div>
                   <Switch
-                    checked={config.effectsEnabled}
-                    onCheckedChange={(checked) => updateConfig({ effectsEnabled: checked })}
+                    checked={autoMixConfig.effectsEnabled}
+                    onCheckedChange={(checked) => updateAutoMixConfig({ effectsEnabled: checked })}
                   />
                 </div>
               </div>
@@ -182,7 +183,7 @@ export function AutoMixSettings() {
             </>
           )}
 
-          {analyzing && (
+          {autoMixAnalyzing && (
             <div className="text-center py-4">
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Analyse en cours...</p>

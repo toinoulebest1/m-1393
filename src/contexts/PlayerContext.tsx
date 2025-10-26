@@ -7,6 +7,7 @@ import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useEqualizer } from '@/hooks/useEqualizer';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
+import { useAutoMix, SongWithAnalysis } from '@/hooks/useAutoMix';
 import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
@@ -76,6 +77,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue,
     isPlaying
   });
+
+  // Hook auto-mix pour les transitions DJ
+  const autoMix = useAutoMix();
 
   // Fonctions exposées à travers le contexte - définies après les hooks
   const { 
@@ -351,6 +355,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem('queue', JSON.stringify(queue));
   }, [queue]);
 
+  // Analyser les chansons de la queue quand auto-mix est activé
+  useEffect(() => {
+    if (autoMix.config.enabled && queue.length > 0) {
+      const songsToAnalyze: SongWithAnalysis[] = queue.slice(0, 10).map(song => ({
+        id: song.id,
+        url: song.url,
+        title: song.title,
+        artist: song.artist || 'Unknown'
+      }));
+      
+      autoMix.analyzePlaylist(songsToAnalyze).catch(console.error);
+    }
+  }, [autoMix.config.enabled, queue.length]);
+
   // Logique de crossfade et de fin de piste
   useEffect(() => {
     if (!audioRef.current) return;
@@ -362,13 +380,41 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const timeLeft = audioRef.current.duration - audioRef.current.currentTime;
       
-      if (timeLeft <= overlapTimeRef.current && timeLeft > 0 && !fadingRef.current) {
-        console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${overlapTimeRef.current}s`);
+      // Utiliser auto-mix si activé pour déterminer le point de transition
+      const transitionTime = autoMix.config.enabled && autoMix.currentTransition
+        ? autoMix.currentTransition.duration
+        : overlapTimeRef.current;
+      
+      if (timeLeft <= transitionTime && timeLeft > 0 && !fadingRef.current) {
+        console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
         
         const nextSong = getNextSong();
         if (!nextSong) {
           console.log("Pas de chanson suivante disponible");
           return;
+        }
+
+        // Préparer la transition auto-mix si activé
+        if (autoMix.config.enabled && currentSong) {
+          const currentSongAnalysis: SongWithAnalysis = {
+            id: currentSong.id,
+            url: currentSong.url,
+            title: currentSong.title,
+            artist: currentSong.artist || 'Unknown'
+          };
+          
+          const nextSongAnalysis: SongWithAnalysis = {
+            id: nextSong.id,
+            url: nextSong.url,
+            title: nextSong.title,
+            artist: nextSong.artist || 'Unknown'
+          };
+          
+          autoMix.prepareNextTrack(
+            currentSongAnalysis, 
+            nextSongAnalysis, 
+            audioRef.current.duration
+          ).catch(console.error);
         }
 
         fadingRef.current = true;
@@ -403,6 +449,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const startCrossfade = (timeLeft: number, nextSong: Song) => {
       console.log(`Début du fondu enchaîné pour ${nextSong.title}`);
       
+      // Appliquer les effets auto-mix si disponibles
+      if (autoMix.config.enabled && autoMix.currentTransition) {
+        console.log('[AutoMix] Applying transition with effects:', autoMix.currentTransition);
+        autoMix.applyCrossfadeWithEffects(
+          audioRef.current,
+          nextAudioRef.current,
+          autoMix.currentTransition
+        );
+      }
+      
       nextAudioRef.current.volume = 0;
       const playPromise = nextAudioRef.current.play();
       
@@ -410,7 +466,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playPromise.then(() => {
           console.log("Lecture de la prochaine chanson démarrée avec succès");
           
-          const fadeDuration = Math.min(timeLeft * 1000, overlapTimeRef.current * 1000);
+          const crossfadeDuration = autoMix.config.enabled && autoMix.currentTransition
+            ? autoMix.currentTransition.duration
+            : overlapTimeRef.current;
+          
+          const fadeDuration = Math.min(timeLeft * 1000, crossfadeDuration * 1000);
           const steps = Math.max(50, fadeDuration / 20);
           const intervalTime = fadeDuration / steps;
           const volumeStep = (volume / 100) / steps;
@@ -611,7 +671,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleEqualizer: equalizer.toggleEnabled,
     resetEqualizer: equalizer.resetEqualizer,
     setEqualizerPreAmp: equalizer.setPreAmp,
-    initializeEqualizer: equalizer.initializeAudioContext
+    initializeEqualizer: equalizer.initializeAudioContext,
+    
+    // Auto-mix properties
+    autoMixConfig: autoMix.config,
+    autoMixAnalyzing: autoMix.analyzing,
+    autoMixTransition: autoMix.currentTransition,
+    toggleAutoMix: autoMix.toggleAutoMix,
+    updateAutoMixConfig: autoMix.updateConfig
   };
 
   return (
