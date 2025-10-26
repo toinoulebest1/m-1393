@@ -27,8 +27,8 @@ type Tile = {
 
 const COLUMNS = 4;
 const TILE_HEIGHT = 120;
-const FALL_DURATION = 3; // secondes pour descendre
-const SPAWN_INTERVAL = 800; // ms entre chaque tuile
+const FALL_DURATION = 1.2; // secondes pour descendre jusqu'à la zone de hit
+const SPAWN_INTERVAL = 600; // ms entre chaque tuile (fallback si pas de beat)
 
 export const PianoGame = () => {
   const { favorites } = usePlayer();
@@ -44,7 +44,17 @@ export const PianoGame = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const gameLoopRef = useRef<number | null>(null);
   const lastSpawnRef = useRef<number>(0);
-  const tileIdCounterRef = useRef(0);
+const tileIdCounterRef = useRef(0);
+
+  // Web Audio pour détection de beats
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<any>(null);
+  const lastOnsetRef = useRef<number>(0);
+  const emaEnergyRef = useRef<number>(0);
+  const emaVarRef = useRef<number>(0);
+  const beatModeRef = useRef<boolean>(false);
 
   // Charger une chanson aléatoire
   const loadRandomSong = useCallback(async () => {
@@ -98,8 +108,32 @@ export const PianoGame = () => {
         }
 
         const audio = new Audio(audioUrl);
+        audio.crossOrigin = "anonymous";
         audio.volume = 0.5;
         audioRef.current = audio;
+
+        // Préparer l'AudioContext et l'analyseur pour la détection de beats
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } else if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+
+        // (Re)créer le graphe
+        sourceNodeRef.current?.disconnect();
+        analyserRef.current?.disconnect();
+        if (audioContextRef.current) {
+          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audio);
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          analyserRef.current.fftSize = 2048;
+          sourceNodeRef.current.connect(analyserRef.current);
+          analyserRef.current.connect(audioContextRef.current.destination);
+          dataArrayRef.current = new Uint8Array(new ArrayBuffer(analyserRef.current.fftSize));
+          beatModeRef.current = true;
+          emaEnergyRef.current = 0;
+          emaVarRef.current = 0;
+          lastOnsetRef.current = 0;
+        }
 
         await audio.play();
         setIsPlaying(true);
@@ -108,6 +142,7 @@ export const PianoGame = () => {
         audioRef.current?.pause();
         setIsPlaying(false);
         stopGameLoop();
+        teardownAudioGraph();
       }
     } catch (error) {
       console.error("Erreur lecture audio:", error);
@@ -166,10 +201,37 @@ export const PianoGame = () => {
         return updated;
       });
 
-      // Spawner des tuiles
-      if (now - lastSpawnRef.current > SPAWN_INTERVAL) {
-        spawnTile();
-        lastSpawnRef.current = now;
+      // Détection de beat via analyseur
+      if (analyserRef.current) {
+        const analyser = analyserRef.current;
+        if (!dataArrayRef.current || dataArrayRef.current.length !== analyser.fftSize) {
+          dataArrayRef.current = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+        }
+        const data = dataArrayRef.current;
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128;
+          sum += v * v;
+        }
+        const energy = sum / data.length;
+        const alpha = 0.01;
+        const diff = energy - emaEnergyRef.current;
+        emaEnergyRef.current = emaEnergyRef.current + alpha * diff;
+        emaVarRef.current = (1 - alpha) * emaVarRef.current + alpha * diff * diff;
+        const threshold = emaEnergyRef.current + 2 * Math.sqrt(emaVarRef.current);
+        const minGap = 250; // ms entre beats
+        if (energy > threshold && now - lastOnsetRef.current > minGap) {
+          spawnTile();
+          lastOnsetRef.current = now;
+          lastSpawnRef.current = now; // éviter double spawn avec le fallback
+        }
+      } else {
+        // Fallback: spawner à intervalle régulier si pas d'analyseur
+        if (now - lastSpawnRef.current > SPAWN_INTERVAL) {
+          spawnTile();
+          lastSpawnRef.current = now;
+        }
       }
 
       gameLoopRef.current = requestAnimationFrame(loop);
@@ -183,6 +245,16 @@ export const PianoGame = () => {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = null;
     }
+  }, []);
+
+  const teardownAudioGraph = useCallback(() => {
+    try {
+      sourceNodeRef.current?.disconnect();
+      analyserRef.current?.disconnect();
+    } catch {}
+    sourceNodeRef.current = null;
+    analyserRef.current = null;
+    beatModeRef.current = false;
   }, []);
 
   // Clic sur une colonne
@@ -237,8 +309,9 @@ export const PianoGame = () => {
     return () => {
       audioRef.current?.pause();
       stopGameLoop();
+      teardownAudioGraph();
     };
-  }, [stopGameLoop]);
+  }, [stopGameLoop, teardownAudioGraph]);
 
   if (!currentSong) {
     return (
