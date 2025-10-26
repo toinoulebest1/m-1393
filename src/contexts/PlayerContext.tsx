@@ -105,6 +105,32 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preloadNextTracks
   });
 
+  // Prépare l'élément audio suivant avec l'URL et attend le canplay
+  const prepareNextAudio = async (song: Song) => {
+    try {
+      const url = await getAudioFileUrl(song.url);
+      if (!url || typeof url !== 'string') throw new Error('URL invalide pour la prochaine piste');
+      nextAudioRef.current.src = url;
+      nextAudioRef.current.preload = 'auto';
+      await new Promise<void>((resolve, reject) => {
+        const onCanPlay = () => { cleanup(); resolve(); };
+        const onError = () => { cleanup(); reject(new Error('Erreur chargement prochaine piste')); };
+        const cleanup = () => {
+          nextAudioRef.current.removeEventListener('canplay', onCanPlay);
+          nextAudioRef.current.removeEventListener('error', onError);
+        };
+        nextAudioRef.current.addEventListener('canplay', onCanPlay, { once: true });
+        nextAudioRef.current.addEventListener('error', onError, { once: true });
+        if (nextAudioRef.current.readyState >= 3) resolve();
+      });
+      setNextSongPreloaded(true);
+      console.log('Prochaine piste prête pour crossfade:', song.title);
+    } catch (e) {
+      console.error('Préparation prochaine piste échouée:', e);
+      setNextSongPreloaded(false);
+    }
+  };
+
   // Mettre à jour les fonctions du hook queue avec la vraie fonction play
   useEffect(() => {
     queueHook.nextSong = async () => {
@@ -374,7 +400,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!audioRef.current) return;
 
     const handleTimeUpdate = () => {
-      if (!audioRef.current || !currentSong || !preferences.crossfadeEnabled || fadingRef.current) {
+      if (!audioRef.current || !currentSong || (!preferences.crossfadeEnabled && !autoMix.config.enabled) || fadingRef.current) {
         return;
       }
 
@@ -436,9 +462,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         if (!nextAudioRef.current.src || !nextSongPreloaded) {
-          console.log("La prochaine chanson n'est pas préchargée correctement, préchargement forcé");
-          preloadNextTracks().then(() => {
+          console.log("Préparation de la prochaine piste pour le crossfade...");
+          prepareNextAudio(nextSong).then(() => {
             startCrossfade(timeLeft, nextSong);
+          }).catch((e) => {
+            console.error('Impossible de préparer la prochaine piste:', e);
+            // Tentative de fallback: démarrer quand même avec préchargement intelligent
+            preloadNextTracks().finally(() => startCrossfade(timeLeft, nextSong));
           });
         } else {
           startCrossfade(timeLeft, nextSong);
