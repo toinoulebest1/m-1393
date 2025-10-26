@@ -5,8 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Music2, Settings, Zap, Volume2, Waves, Radio, Sparkles, Flame } from 'lucide-react';
-import { AutoMixConfig, MixMode } from '@/hooks/useAutoMix';
+import { Music2, Settings, Zap, Volume2 } from 'lucide-react';
+import { AutoMixConfig } from '@/hooks/useAutoMix';
 import { cn } from '@/lib/utils';
 
 interface AutoMixSettingsProps {
@@ -14,59 +14,19 @@ interface AutoMixSettingsProps {
   isAnalyzing: boolean;
   analysisProgress: number;
   onToggle: (enabled: boolean) => void;
-  onModeChange: (mode: MixMode) => void;
   onConfigChange: (updates: Partial<AutoMixConfig>) => void;
   onAnalyzePlaylist?: () => void;
 }
-
-const MIX_MODES: Array<{
-  id: MixMode;
-  label: string;
-  description: string;
-  icon: any;
-  color: string;
-}> = [
-  {
-    id: 'fluide',
-    label: '🎚️ Fluide',
-    description: 'Fondu doux, parfait pour chill ou pop',
-    icon: Waves,
-    color: 'from-blue-500 to-cyan-500'
-  },
-  {
-    id: 'club',
-    label: '💥 Club',
-    description: 'Mix rythmique avec effets, idéal pour electro/house',
-    icon: Zap,
-    color: 'from-purple-500 to-pink-500'
-  },
-  {
-    id: 'radio',
-    label: '🎶 Radio',
-    description: 'Enchaînement naturel comme une playlist radio',
-    icon: Radio,
-    color: 'from-green-500 to-emerald-500'
-  },
-  {
-    id: 'energie',
-    label: '⚡ Énergie',
-    description: 'Enchaînements dynamiques pour ambiance de fête',
-    icon: Flame,
-    color: 'from-orange-500 to-red-500'
-  }
-];
 
 export const AutoMixSettings = ({
   config,
   isAnalyzing,
   analysisProgress,
   onToggle,
-  onModeChange,
   onConfigChange,
   onAnalyzePlaylist
 }: AutoMixSettingsProps) => {
   const [open, setOpen] = useState(false);
-  const currentMode = MIX_MODES.find(m => m.id === config.mode) || MIX_MODES[0];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -75,21 +35,13 @@ export const AutoMixSettings = ({
           variant={config.enabled ? "default" : "outline"}
           size="sm"
           className={cn(
-            "gap-2 transition-all relative group",
-            config.enabled && "bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25"
+            "gap-2 transition-all",
+            config.enabled && "bg-gradient-to-r from-primary to-primary/80"
           )}
         >
           <Music2 className="h-4 w-4" />
-          <span className="font-medium">Auto-Mix DJ</span>
-          {config.enabled && (
-            <>
-              <Zap className="h-3 w-3 animate-pulse text-yellow-300" />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-              </span>
-            </>
-          )}
+          Auto-Mix DJ
+          {config.enabled && <Zap className="h-3 w-3 animate-pulse" />}
         </Button>
       </DialogTrigger>
       
@@ -105,9 +57,9 @@ export const AutoMixSettings = ({
           {/* Enable/Disable */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-base font-medium">Activer Auto-Mix DJ</Label>
+              <Label className="text-base font-medium">Enable Auto-Mix</Label>
               <p className="text-sm text-muted-foreground">
-                Mixage DJ automatique avec transitions intelligentes
+                Automatic DJ mixing with intelligent transitions
               </p>
             </div>
             <Switch
@@ -116,112 +68,55 @@ export const AutoMixSettings = ({
             />
           </div>
 
-          {/* Mix Mode Selection */}
-          {config.enabled && (
-            <div className="space-y-3">
-              <Label className="text-base">Mode de Mix</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {MIX_MODES.map((mode) => {
-                  const Icon = mode.icon;
-                  const isActive = config.mode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      onClick={() => onModeChange(mode.id)}
-                      className={cn(
-                        "relative p-4 rounded-lg border-2 transition-all text-left group",
-                        isActive
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50 bg-background"
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "p-2 rounded-lg",
-                          isActive ? `bg-gradient-to-br ${mode.color}` : "bg-muted"
-                        )}>
-                          <Icon className={cn(
-                            "h-4 w-4",
-                            isActive ? "text-white" : "text-muted-foreground"
-                          )} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={cn(
-                            "font-medium text-sm mb-1",
-                            isActive ? "text-primary" : "text-foreground"
-                          )}>
-                            {mode.label}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {mode.description}
-                          </p>
-                        </div>
-                      </div>
-                      {isActive && (
-                        <div className="absolute top-2 right-2">
-                          <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Analyze Playlist Button */}
-          {onAnalyzePlaylist && config.enabled && (
+          {onAnalyzePlaylist && (
             <div className="space-y-2">
               <Button
                 onClick={onAnalyzePlaylist}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !config.enabled}
                 className="w-full"
                 variant="secondary"
               >
                 {isAnalyzing ? (
                   <>
                     <Settings className="mr-2 h-4 w-4 animate-spin" />
-                    Analyse en cours... {Math.round(analysisProgress)}%
+                    Analyzing... {Math.round(analysisProgress)}%
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Analyser la Playlist
+                    <Zap className="mr-2 h-4 w-4" />
+                    Analyze Playlist
                   </>
                 )}
               </Button>
               {isAnalyzing && (
                 <Progress value={analysisProgress} className="h-2" />
               )}
-              <p className="text-xs text-muted-foreground text-center">
-                ✨ Gratuit • Sans limite • Accessible à tous
-              </p>
             </div>
           )}
 
           <div className="h-px bg-border" />
 
           {/* Transition Duration */}
-          {config.enabled && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Durée de transition</Label>
-                <span className="text-sm text-muted-foreground">
-                  {config.transitionDuration}s
-                </span>
-              </div>
-              <Slider
-                value={[config.transitionDuration]}
-                onValueChange={([value]) => onConfigChange({ transitionDuration: value })}
-                min={2}
-                max={12}
-                step={1}
-              />
-              <p className="text-xs text-muted-foreground">
-                Entre 2 et 12 secondes selon le mode
-              </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Transition Duration</Label>
+              <span className="text-sm text-muted-foreground">
+                {config.transitionDuration}s
+              </span>
             </div>
-          )}
+            <Slider
+              value={[config.transitionDuration]}
+              onValueChange={([value]) => onConfigChange({ transitionDuration: value })}
+              min={4}
+              max={32}
+              step={2}
+              disabled={!config.enabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              8-32 beats transition length
+            </p>
+          </div>
 
           {/* Max Stretch */}
           <div className="space-y-3">
@@ -319,16 +214,11 @@ export const AutoMixSettings = ({
         </div>
 
         <div className="flex justify-between items-center pt-4 border-t">
-          <div className="flex-1">
-            <p className="text-xs font-medium text-foreground mb-1">
-              🎵 Mix comme un DJ professionnel
-            </p>
-            <p className="text-xs text-muted-foreground">
-              BPM sync • Harmonic mixing • Smart transitions
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Intelligent mixing with BPM, key, and energy matching
+          </p>
           <Button onClick={() => setOpen(false)} size="sm">
-            Fermer
+            Done
           </Button>
         </div>
       </DialogContent>

@@ -30,8 +30,6 @@ import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 import { AutoMixSettings } from "@/components/AutoMixSettings";
-import { AutoMixVisualizer } from "@/components/AutoMixVisualizer";
-import { AutoMixInfo } from "@/components/AutoMixInfo";
 import { useAutoMix } from "@/hooks/useAutoMix";
 
 interface Song {
@@ -237,7 +235,6 @@ const PlaylistDetail = () => {
   
   // Auto-Mix DJ
   const autoMix = useAutoMix();
-  const [showVisualizer, setShowVisualizer] = useState(false);
   
   // Handler pour analyser la playlist avec l'auto-mix
   const handleAnalyzePlaylist = async () => {
@@ -258,11 +255,6 @@ const PlaylistDetail = () => {
         title: "Analysis Complete",
         description: `Successfully analyzed ${songs.length} tracks for auto-mixing`
       });
-      
-      // Afficher le visualizer après l'analyse si config activé
-      if (autoMix.config.enabled) {
-        setShowVisualizer(true);
-      }
     } catch (error) {
       console.error("Error analyzing playlist:", error);
       toast({
@@ -272,18 +264,6 @@ const PlaylistDetail = () => {
       });
     }
   };
-
-  // Effet pour gérer l'affichage du visualizer
-  useEffect(() => {
-    if (!autoMix.config.enabled) {
-      setShowVisualizer(false);
-    }
-  }, [autoMix.config.enabled]);
-
-  // Calculer la transition entre la chanson actuelle et la suivante
-  const currentTransition = currentSong && queue.length > 1 
-    ? autoMix.calculateTransition(currentSong, queue[1])
-    : null;
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -996,7 +976,6 @@ const PlaylistDetail = () => {
                     isAnalyzing={autoMix.isAnalyzing}
                     analysisProgress={autoMix.analysisProgress}
                     onToggle={autoMix.toggleAutoMix}
-                    onModeChange={autoMix.setMixMode}
                     onConfigChange={autoMix.updateConfig}
                     onAnalyzePlaylist={handleAnalyzePlaylist}
                   />
@@ -1004,13 +983,6 @@ const PlaylistDetail = () => {
               </div>
             </div>
           </div>
-          
-          {/* Auto-Mix Info */}
-          {autoMix.config.enabled && songs.length > 0 && (
-            <div className="mb-6">
-              <AutoMixInfo />
-            </div>
-          )}
           
           {songs.length > 0 ? (
             <div className="space-y-2">
@@ -1058,30 +1030,6 @@ const PlaylistDetail = () => {
         </div>
       </div>
       <Player />
-      
-      {/* Auto-Mix DJ Visualizer */}
-      {showVisualizer && autoMix.config.enabled && currentTransition && currentSong && queue.length > 1 && (
-        <AutoMixVisualizer
-          currentSong={currentSong}
-          nextSong={queue[1]}
-          transition={currentTransition}
-          isPlaying={isPlaying}
-          currentTime={0} // TODO: Get actual current time from player
-          onPlayPause={() => isPlaying ? pause() : play()}
-          onTransitionTypeChange={(type) => {
-            console.log('Transition type changed:', type);
-          }}
-          onVolumeOverlapChange={(value) => {
-            console.log('Volume overlap changed:', value);
-          }}
-          onEqChange={(value) => {
-            console.log('EQ changed:', value);
-          }}
-          onEffectChange={(value) => {
-            console.log('Effect changed:', value);
-          }}
-        />
-      )}
     </div>
   );
 };
