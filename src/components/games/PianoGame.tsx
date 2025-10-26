@@ -19,8 +19,10 @@ type Song = {
 type Tile = {
   id: string;
   column: number;
-  position: number;
+  position: number; // en pourcentage de la hauteur de la zone (0 -> 100)
   clicked: boolean;
+  missed?: boolean;
+  spawnTime: number; // timestamp en ms
 };
 
 const COLUMNS = 4;
@@ -121,6 +123,8 @@ export const PianoGame = () => {
       column,
       position: 0,
       clicked: false,
+      missed: false,
+      spawnTime: performance.now(),
     };
     setTiles(prev => [...prev, newTile]);
   }, []);
@@ -128,8 +132,40 @@ export const PianoGame = () => {
   // Boucle de jeu
   const startGameLoop = useCallback(() => {
     const loop = () => {
-      const now = Date.now();
-      
+      const now = performance.now();
+
+      // Mettre à jour la position des tuiles en fonction du temps écoulé
+      setTiles(prev => {
+        const updated = prev.flatMap(t => {
+          const elapsed = now - t.spawnTime;
+          const progress = (elapsed / (FALL_DURATION * 1000)) * 100; // en %
+          const position = Math.min(progress, 110); // permet de dépasser un peu pour la suppression
+
+          // Gestion des tuiles ratées
+          if (!t.clicked && !t.missed && position >= 100) {
+            // Compter une erreur une seule fois par tuile
+            t.missed = true;
+            setMisses(m => {
+              const next = m + 1;
+              if (next >= 3) {
+                setGameOver(true);
+                setSoundEffect("gameover");
+              }
+              return next;
+            });
+            setCombo(0);
+          }
+
+          // Supprimer les tuiles très en dessous
+          if (position > 110) {
+            return [] as Tile[];
+          }
+
+          return [{ ...t, position }];
+        });
+        return updated;
+      });
+
       // Spawner des tuiles
       if (now - lastSpawnRef.current > SPAWN_INTERVAL) {
         spawnTile();
@@ -279,60 +315,24 @@ export const PianoGame = () => {
                 </div>
 
                 {/* Tuiles */}
-                <AnimatePresence>
-                  {tiles.map(tile => (
-                    <motion.div
+                <div className="absolute inset-0">
+                  {tiles.map((tile) => (
+                    <div
                       key={tile.id}
-                      className={`absolute rounded-lg ${
-                        tile.clicked ? 'bg-primary/50' : 'bg-primary'
-                      }`}
+                      className={`absolute rounded-lg ${tile.clicked ? 'bg-primary/50' : 'bg-primary'}`}
                       style={{
                         left: `${(tile.column * 100) / COLUMNS}%`,
                         width: `${100 / COLUMNS}%`,
                         height: `${TILE_HEIGHT}px`,
                         padding: '4px',
-                      }}
-                      initial={{ top: -TILE_HEIGHT }}
-                      animate={{
                         top: `${tile.position}%`,
-                      }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{
-                        duration: FALL_DURATION,
-                        ease: "linear",
-                      }}
-                      onUpdate={(latest) => {
-                        // Mettre à jour la position du tile
-                        const topValue = latest.top as string;
-                        const percentage = parseFloat(topValue);
-                        setTiles(prev => prev.map(t => {
-                          if (t.id === tile.id) {
-                            // Vérifier si la tuile est ratée (dépasse 100%)
-                            if (!t.clicked && percentage >= 100) {
-                              // Tuile ratée - incrémenter les erreurs
-                              setMisses(m => {
-                                const newMisses = m + 1;
-                                if (newMisses >= 3) {
-                                  setGameOver(true);
-                                  setSoundEffect("gameover");
-                                  stopGameLoop();
-                                }
-                                return newMisses;
-                              });
-                              setCombo(0);
-                              // Retirer la tuile
-                              return null;
-                            }
-                            return { ...t, position: percentage };
-                          }
-                          return t;
-                        }).filter(Boolean) as Tile[]);
+                        transition: 'top 16ms linear',
                       }}
                     >
                       <div className="w-full h-full bg-gradient-to-b from-primary/80 to-primary rounded-md" />
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
+                </div>
               </div>
 
               {/* Contrôles */}
