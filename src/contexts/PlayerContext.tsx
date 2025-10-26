@@ -506,6 +506,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playPromise.then(() => {
           console.log("Lecture de la prochaine chanson démarrée avec succès");
           
+          // Changer immédiatement l'affichage vers la nouvelle chanson
+          setCurrentSong(nextSong);
+          localStorage.setItem('currentSong', JSON.stringify(nextSong));
+          
+          if ('mediaSession' in navigator) {
+            updateMediaSessionMetadata(nextSong);
+            console.log("Métadonnées MediaSession mises à jour au début du crossfade:", nextSong.title);
+          }
+          
           const crossfadeDuration = autoMix.config.enabled && autoMix.currentTransition
             ? autoMix.currentTransition.duration
             : overlapTimeRef.current;
@@ -551,25 +560,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 audioRef.current.currentTime = 0;
               }
               
-              const currentIndex = queue.findIndex(song => song.id === currentSong?.id);
-              const nextTrack = queue[currentIndex + 1];
-              if (nextTrack) {
-                const tempAudio = audioRef.current;
-                audioRef.current = nextAudioRef.current;
-                nextAudioRef.current = tempAudio;
-                nextAudioRef.current.src = '';
-                setCurrentSong(nextTrack);
-                localStorage.setItem('currentSong', JSON.stringify(nextTrack));
-                setNextSongPreloaded(false);
-                fadingRef.current = false;
-                
-                if ('mediaSession' in navigator) {
-                  updateMediaSessionMetadata(nextTrack);
-                  console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
-                }
-                
-                setTimeout(() => preloadNextTracks(), 1000);
-              }
+              // Swap des références audio (l'ancienne devient la nouvelle pour le prochain crossfade)
+              const tempAudio = audioRef.current;
+              audioRef.current = nextAudioRef.current;
+              nextAudioRef.current = tempAudio;
+              nextAudioRef.current.src = '';
+              setNextSongPreloaded(false);
+              fadingRef.current = false;
+              
+              // Précharger la prochaine piste
+              setTimeout(() => preloadNextTracks(), 1000);
             }
           }, intervalTime);
         }).catch(error => {
