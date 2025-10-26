@@ -27,6 +27,7 @@ interface DropboxChangesDialogProps {
 export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [changes, setChanges] = useState<DropboxChanges | null>(null);
 
   const listDropboxFiles = async (): Promise<DropboxFile[]> => {
@@ -112,6 +113,108 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
       toast.error(error instanceof Error ? error.message : "Erreur lors de l'analyse");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const addMissingFiles = async () => {
+    if (!changes || changes.added.length === 0) {
+      toast.error("Aucun fichier à ajouter");
+      return;
+    }
+
+    // Filtrer uniquement les fichiers audio (pas les lyrics)
+    const audioFiles = changes.added.filter(file => 
+      !file.name.startsWith('lyrics_') && 
+      (file.name.endsWith('.mp3') || file.name.endsWith('.m4a') || file.name.endsWith('.wav'))
+    );
+
+    if (audioFiles.length === 0) {
+      toast.error("Aucun fichier audio à ajouter");
+      return;
+    }
+
+    const confirmAdd = window.confirm(
+      `Voulez-vous ajouter ${audioFiles.length} chanson(s) de Dropbox à la base de données ?\n\n` +
+      `Les métadonnées seront extraites des noms de fichiers (format: Artiste - Titre).`
+    );
+
+    if (!confirmAdd) {
+      return;
+    }
+
+    setAdding(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const file of audioFiles) {
+        try {
+          // Extraire l'ID du nom de fichier (sans extension)
+          const fileId = file.name.replace(/\.[^/.]+$/, '');
+          
+          // Parser le nom du fichier pour extraire artiste et titre
+          let artist = 'Artiste inconnu';
+          let title = fileId;
+          
+          // Si le format est "Artiste - Titre", on parse
+          if (fileId.includes(' - ')) {
+            const parts = fileId.split(' - ');
+            artist = parts[0].trim();
+            title = parts.slice(1).join(' - ').trim();
+          }
+
+          // Insérer dans la base de données
+          const { error: insertError } = await supabase
+            .from('songs')
+            .insert({
+              id: fileId,
+              title: title,
+              artist: artist,
+              file_path: file.path_display,
+              duration: '0:00', // Durée par défaut, sera mise à jour plus tard
+            });
+
+          if (insertError) {
+            console.error(`Erreur pour ${file.name}:`, insertError);
+            errorCount++;
+          } else {
+            // Créer un lien partagé Dropbox pour ce fichier
+            try {
+              const config = getDropboxConfig();
+              await supabase.functions.invoke('generate-dropbox-links', {
+                body: {
+                  dropboxPath: file.path_display,
+                  localId: fileId,
+                  accessToken: config.accessToken
+                }
+              });
+            } catch (linkError) {
+              console.error(`Erreur création lien pour ${file.name}:`, linkError);
+            }
+            
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Erreur pour ${file.name}:`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} chanson(s) ajoutée(s) avec succès`);
+      }
+      
+      if (errorCount > 0) {
+        toast.warning(`${errorCount} erreur(s) lors de l'ajout`);
+      }
+
+      // Rafraîchir les changements
+      await detectChanges();
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout:', error);
+      toast.error(error instanceof Error ? error.message : "Erreur lors de l'ajout");
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -277,28 +380,41 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
                 <Button 
                   variant="outline" 
                   onClick={detectChanges}
-                  disabled={loading || deleting}
+                  disabled={loading || deleting || adding}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Actualiser
                 </Button>
                 
+                {changes.added.length > 0 && (
+                  <Button
+                    variant="default"
+                    onClick={addMissingFiles}
+                    disabled={loading || deleting || adding}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {adding && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    <Plus className="h-4 w-4 mr-2" />
+                    {adding ? "Ajout..." : `Ajouter ${changes.added.filter(f => !f.name.startsWith('lyrics_')).length} chanson(s)`}
+                  </Button>
+                )}
+                
                 {changes.deleted.length > 0 && (
                   <Button
                     variant="destructive"
                     onClick={deleteOrphanedSongs}
-                    disabled={loading || deleting}
+                    disabled={loading || deleting || adding}
                     className="bg-red-600 hover:bg-red-700"
                   >
                     {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    {deleting ? "Suppression..." : `⚠️ Supprimer définitivement ${changes.deleted.length} chanson(s)`}
+                    {deleting ? "Suppression..." : `⚠️ Supprimer ${changes.deleted.length} chanson(s)`}
                   </Button>
                 )}
                 
                 <Button 
                   variant="outline" 
                   onClick={() => onOpenChange(false)}
-                  disabled={deleting}
+                  disabled={deleting || adding}
                 >
                   Fermer
                 </Button>
