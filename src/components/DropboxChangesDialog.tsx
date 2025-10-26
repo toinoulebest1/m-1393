@@ -250,9 +250,9 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
 
       console.log('Chansons à supprimer:', songsToDelete);
 
-      // Appeler la fonction Supabase pour supprimer les chansons
-      const { data, error } = await supabase.rpc('delete_songs_batch', {
-        song_ids: changes.deleted
+      // Appeler l'edge function pour supprimer les chansons
+      const { data, error } = await supabase.functions.invoke('delete-songs-batch', {
+        body: { songIds: changes.deleted }
       });
 
       if (error) {
@@ -261,16 +261,15 @@ export const DropboxChangesDialog = ({ open, onOpenChange }: DropboxChangesDialo
         return;
       }
 
-      const result = data[0]; // La fonction retourne un tableau avec un seul élément
-      const { deleted_count, errors } = result;
+      const { deletedCount, errors } = data;
       
       if (errors && errors.length > 0) {
         console.error('Erreurs lors de la suppression:', errors);
         toast.error(`Erreurs: ${errors.join(', ')}`);
       }
 
-      if (deleted_count > 0) {
-        toast.success(`${deleted_count} chanson(s) supprimée(s) avec succès`);
+      if (deletedCount > 0) {
+        toast.success(`${deletedCount} chanson(s) supprimée(s) avec succès`);
         // Rafraîchir les changements après suppression
         await detectChanges();
       } else {
