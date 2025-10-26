@@ -9,9 +9,12 @@ import {
   TransitionPoint
 } from '@/utils/audioAnalysis';
 
+export type MixMode = 'fluide' | 'club' | 'radio' | 'energie';
+
 export interface AutoMixConfig {
   enabled: boolean;
-  transitionDuration: number; // secondes (8-32 beats)
+  mode: MixMode; // Mode de mix
+  transitionDuration: number; // secondes (4-12)
   maxStretch: number; // 0.06 = ±6%, max 0.10 = ±10%
   targetLUFS: number; // -14 LUFS
   eqSweepEnabled: boolean;
@@ -40,12 +43,45 @@ export interface AutoMixTransition {
 
 const DEFAULT_CONFIG: AutoMixConfig = {
   enabled: false,
+  mode: 'fluide',
   transitionDuration: 8, // 8 secondes par défaut
   maxStretch: 0.06,
   targetLUFS: -14,
   eqSweepEnabled: true,
   filterEnabled: true,
   echoOutEnabled: false
+};
+
+// Configuration par mode de mix
+const MODE_CONFIGS: Record<MixMode, Partial<AutoMixConfig>> = {
+  fluide: {
+    transitionDuration: 8,
+    eqSweepEnabled: true,
+    filterEnabled: true,
+    echoOutEnabled: false,
+    maxStretch: 0.04 // Plus conservateur
+  },
+  club: {
+    transitionDuration: 4,
+    eqSweepEnabled: true,
+    filterEnabled: true,
+    echoOutEnabled: true,
+    maxStretch: 0.06
+  },
+  radio: {
+    transitionDuration: 6,
+    eqSweepEnabled: false,
+    filterEnabled: false,
+    echoOutEnabled: false,
+    maxStretch: 0.02 // Très subtil
+  },
+  energie: {
+    transitionDuration: 2,
+    eqSweepEnabled: true,
+    filterEnabled: false,
+    echoOutEnabled: false,
+    maxStretch: 0.08 // Plus agressif
+  }
 };
 
 export const useAutoMix = () => {
@@ -320,6 +356,15 @@ export const useAutoMix = () => {
   }, [initAudioContext]);
 
   /**
+   * Change le mode de mix et applique la configuration associée
+   */
+  const setMixMode = useCallback((mode: MixMode) => {
+    const modeConfig = MODE_CONFIGS[mode];
+    setConfig(prev => ({ ...prev, mode, ...modeConfig }));
+    console.log('🎵 Mix mode changed to:', mode, modeConfig);
+  }, []);
+
+  /**
    * Met à jour la configuration
    */
   const updateConfig = useCallback((updates: Partial<AutoMixConfig>) => {
@@ -343,6 +388,7 @@ export const useAutoMix = () => {
     isAnalyzing,
     analysisProgress,
     toggleAutoMix,
+    setMixMode,
     updateConfig,
     analyzeSong,
     analyzePlaylist,

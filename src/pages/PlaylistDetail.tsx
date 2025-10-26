@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 import { AutoMixSettings } from "@/components/AutoMixSettings";
 import { AutoMixVisualizer } from "@/components/AutoMixVisualizer";
+import { AutoMixInfo } from "@/components/AutoMixInfo";
 import { useAutoMix } from "@/hooks/useAutoMix";
 
 interface Song {
@@ -995,6 +996,7 @@ const PlaylistDetail = () => {
                     isAnalyzing={autoMix.isAnalyzing}
                     analysisProgress={autoMix.analysisProgress}
                     onToggle={autoMix.toggleAutoMix}
+                    onModeChange={autoMix.setMixMode}
                     onConfigChange={autoMix.updateConfig}
                     onAnalyzePlaylist={handleAnalyzePlaylist}
                   />
@@ -1002,6 +1004,13 @@ const PlaylistDetail = () => {
               </div>
             </div>
           </div>
+          
+          {/* Auto-Mix Info */}
+          {autoMix.config.enabled && songs.length > 0 && (
+            <div className="mb-6">
+              <AutoMixInfo />
+            </div>
+          )}
           
           {songs.length > 0 ? (
             <div className="space-y-2">
