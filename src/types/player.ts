@@ -72,11 +72,4 @@ export interface PlayerContextType {
   resetEqualizer: () => void;
   setEqualizerPreAmp: (value: number) => void;
   initializeEqualizer: () => void;
-  
-  // Auto-mix properties
-  autoMixConfig: any;
-  autoMixAnalyzing: boolean;
-  autoMixTransition: any;
-  toggleAutoMix: (enabled: boolean) => void;
-  updateAutoMixConfig: (config: any) => void;
 }

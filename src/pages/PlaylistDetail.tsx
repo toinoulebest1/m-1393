@@ -30,9 +30,6 @@ import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 import { Layout } from "@/components/Layout";
-import { AutoMixSettings } from "@/components/AutoMixSettings";
-import { AutoMixVisualizer } from "@/components/AutoMixVisualizer";
-import { SongWithAnalysis } from "@/hooks/useAutoMix";
 
 interface Song {
   id: string;
@@ -232,9 +229,8 @@ const PlaylistDetail = () => {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause, autoMixConfig, toggleAutoMix, updateAutoMixConfig, autoMixTransition, autoMixAnalyzing, getCurrentAudioElement } = usePlayer();
+  const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause, getCurrentAudioElement } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
-  const [showVisualizer, setShowVisualizer] = useState(false);
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -475,14 +471,6 @@ const PlaylistDetail = () => {
     }
   }, [songs.length, playlist?.id, currentUserId]);
 
-  // Show visualizer when auto-mix is enabled and has a transition
-  useEffect(() => {
-    if (autoMixConfig?.enabled && autoMixTransition) {
-      setShowVisualizer(true);
-    } else {
-      setShowVisualizer(false);
-    }
-  }, [autoMixConfig?.enabled, autoMixTransition]);
 
   const handleUpdateName = async () => {
     if (!playlistId || !editedName.trim() || editedName === playlist?.name) {
@@ -937,8 +925,6 @@ const PlaylistDetail = () => {
                       <Play className="h-5 w-5 mr-2" />
                       {t('common.play')}
                     </Button>
-                    
-                    <AutoMixSettings />
                   </>
                 )}
                 
@@ -1014,34 +1000,6 @@ const PlaylistDetail = () => {
             </div>
           )}
         </div>
-        
-        {/* Auto-Mix Visualizer */}
-        {showVisualizer && autoMixConfig?.enabled && currentSong && songs.length > 1 && autoMixTransition && (
-          <AutoMixVisualizer
-            currentSong={{
-              id: currentSong.id,
-              url: currentSong.url,
-              title: currentSong.title,
-              artist: currentSong.artist || 'Unknown',
-              analysis: undefined
-            }}
-            nextSong={{
-              id: queue[1]?.id || songs[1]?.songs.id,
-              url: queue[1]?.url || songs[1]?.songs.url,
-              title: queue[1]?.title || songs[1]?.songs.title,
-              artist: queue[1]?.artist || songs[1]?.songs.artist || 'Unknown',
-              analysis: undefined
-            }}
-            transition={autoMixTransition}
-            isPlaying={isPlaying}
-            currentTime={getCurrentAudioElement()?.currentTime || 0}
-            onTogglePlay={() => isPlaying ? pause() : play(currentSong)}
-            onVolumeChange={(vol) => {
-              const audio = getCurrentAudioElement();
-              if (audio) audio.volume = vol;
-            }}
-          />
-        )}
       <Player />
     </Layout>
   );
