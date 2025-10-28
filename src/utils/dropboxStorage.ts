@@ -1,6 +1,6 @@
 import { DropboxConfig, DropboxFileReference } from '@/types/dropbox';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 // Add a simple local storage helper for Dropbox configuration
 export const getDropboxConfig = (): DropboxConfig => {
@@ -163,58 +163,94 @@ export const uploadFileToDropbox = async (
   console.log(`Uploading file to Dropbox: ${dropboxPath}`, file);
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
-  try {
-    // Upload directly to Dropbox API (CORS is supported)
-    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: dropboxPath,
-          mode: 'overwrite',
-          autorename: true,
-          mute: false
-        })
-      },
-      body: file
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox upload error:', response.status, errorText);
-      
-      // More specific error messages
-      if (response.status === 401) {
-        toast.error("Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
-      } else if (response.status === 403) {
-        toast.error("Accès refusé. Vérifiez les permissions de votre app Dropbox.");
-      } else if (response.status === 429) {
-        toast.error("Trop de requêtes. Veuillez réessayer plus tard.");
-      } else {
-        toast.error(`Erreur Dropbox: ${response.status}`);
-      }
-      
-      throw new Error(`Dropbox upload failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ File uploaded to Dropbox:', data.path_display);
-
-    // Store reference in database
+  // Retry logic for rate limiting
+  const uploadWithRetry = async (retryCount = 0): Promise<string> => {
     try {
-      await supabase
-        .from('dropbox_files')
-        .upsert({
-          local_id: path,
-          dropbox_path: data.path_display || dropboxPath
-        });
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-    }
+      // Upload directly to Dropbox API (CORS is supported)
+      const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            path: dropboxPath,
+            mode: 'overwrite',
+            autorename: true,
+            mute: false
+          })
+        },
+        body: file
+      });
 
-    toast.success("Fichier téléchargé avec succès vers Dropbox");
-    return data.path_display || dropboxPath;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Dropbox upload error:', response.status, errorText);
+        
+        // Handle rate limiting with retry
+        if (response.status === 429 && retryCount < 3) {
+          let retryAfter = 1; // Default to 1 second
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            retryAfter = errorData.error?.retry_after || retryAfter;
+          } catch (e) {
+            console.warn('Could not parse retry_after from error:', e);
+          }
+          
+          console.log(`Rate limited. Retrying after ${retryAfter} seconds (attempt ${retryCount + 1}/3)`);
+          toast(`Trop de requêtes. Nouvelle tentative dans ${retryAfter}s...`);
+          
+          // Wait for the specified time plus a small buffer
+          await new Promise(resolve => setTimeout(resolve, (retryAfter + 0.5) * 1000));
+          
+          // Retry the upload
+          return uploadWithRetry(retryCount + 1);
+        }
+        
+        // More specific error messages
+        if (response.status === 401) {
+          toast.error("Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
+        } else if (response.status === 403) {
+          toast.error("Accès refusé. Vérifiez les permissions de votre app Dropbox.");
+        } else if (response.status === 429) {
+          toast.error("Trop de requêtes. Veuillez réessayer plus tard.");
+        } else {
+          toast.error(`Erreur Dropbox: ${response.status}`);
+        }
+        
+        throw new Error(`Dropbox upload failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ File uploaded to Dropbox:', data.path_display);
+
+      // Store reference in database
+      try {
+        await supabase
+          .from('dropbox_files')
+          .upsert({
+            local_id: path,
+            dropbox_path: data.path_display || dropboxPath
+          });
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+      }
+
+      toast.success("Fichier téléchargé avec succès vers Dropbox");
+      return data.path_display || dropboxPath;
+    } catch (error) {
+      // If it's a network error and we haven't retried too many times, try again
+      if (retryCount < 3 && error instanceof TypeError) {
+        console.log(`Network error. Retrying (attempt ${retryCount + 1}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return uploadWithRetry(retryCount + 1);
+      }
+      throw error;
+    }
+  };
+
+  try {
+    return await uploadWithRetry();
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
     toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");

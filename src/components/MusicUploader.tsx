@@ -491,9 +491,16 @@ export const MusicUploader = () => {
       console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
     }
 
-    const processedSongs = await Promise.all(
-      audioFiles.map(processAudioFile)
-    );
+    // Traiter les fichiers séquentiellement pour éviter les erreurs de rate limiting
+    // sur Dropbox (max 2 fichiers en parallèle)
+    const processedSongs: (Song | null)[] = [];
+    const maxConcurrent = 2;
+    
+    for (let i = 0; i < audioFiles.length; i += maxConcurrent) {
+      const batch = audioFiles.slice(i, i + maxConcurrent);
+      const batchResults = await Promise.all(batch.map(processAudioFile));
+      processedSongs.push(...batchResults);
+    }
 
     const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
     console.log("Chansons valides traitées:", validSongs);
