@@ -750,27 +750,27 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
             </div>
             
             {/* Volume control */}
-            <div className="flex items-center space-x-3 mt-2 px-2">
+            <div className="flex items-center space-x-2 mt-2 px-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setVolume(volume === 0 ? 50 : 0)}
-                className="text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0"
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-6 w-6 flex-shrink-0"
               >
                 {volume === 0 ? (
-                  <VolumeX className="h-3.5 w-3.5" />
+                  <VolumeX className="h-3 w-3" />
                 ) : (
-                  <Volume2 className="h-3.5 w-3.5" />
+                  <Volume2 className="h-3 w-3" />
                 )}
               </Button>
               <Slider
                 value={[volume]}
                 max={100}
                 step={1}
-                className="flex-grow max-w-[120px]"
+                className="flex-grow max-w-[90px]"
                 onValueChange={(value) => setVolume(value[0])}
               />
-              <span className="text-xs text-spotify-neutral w-8 text-right flex-shrink-0">
+              <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">
                 {volume}%
               </span>
             </div>

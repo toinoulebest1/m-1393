@@ -30,7 +30,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentSong, setCurrentSong,
     isPlaying, setIsPlaying,
     progress, setProgress, savedProgress, setSavedProgress,
-    volume, setVolume,
+    volume, setVolume: setVolumeState,
     isChangingSong, setIsChangingSong,
     history, setHistory,
     searchQuery, setSearchQuery,
@@ -103,6 +103,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNextSongPreloaded,
     preloadNextTracks
   });
+
+  // Wrapper function for setVolume that updates both state and audio element
+  const setVolume = useCallback((newVolume: number) => {
+    setVolumeState(newVolume);
+    updateVolume(newVolume);
+  }, [setVolumeState, updateVolume]);
 
   // Prépare l'élément audio suivant avec l'URL et attend le canplay
   const prepareNextAudio = async (song: Song) => {
