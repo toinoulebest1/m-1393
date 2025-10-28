@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Song } from "@/types/player";
 import { rgbToClass } from "@/utils/colorExtractor";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AutoplayManager } from "@/utils/autoplayManager";
 import { toast } from "@/hooks/use-toast";
 
@@ -51,7 +51,7 @@ export const SongCard = ({
 }: SongCardProps) => {
   const { toggleFavorite, isPlaying, pause, play } = usePlayerContext();
   const navigate = useNavigate();
-
+  const location = useLocation();
   const handlePlay = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
@@ -88,7 +88,7 @@ export const SongCard = ({
     }
     
     // Navigate to synced lyrics page instead of using modal
-    navigate("/synced-lyrics");
+    navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
     // If the onLyricsClick prop is provided, call it as well (for backward compatibility)
     if (onLyricsClick) {
       onLyricsClick();

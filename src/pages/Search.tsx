@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ const Search = () => {
   } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Trigger saved search on component mount
   useEffect(() => {
@@ -378,8 +379,8 @@ const Search = () => {
   // Handle navigation to synced lyrics page
   const handleLyricsNavigation = useCallback(() => {
     // Just navigate to the synced lyrics page
-    navigate("/synced-lyrics");
-  }, [navigate]);
+    navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
+  }, [navigate, location]);
   const songCardContextMenu = (song: any) => [{
     label: "Voir le profil de l'artiste",
     icon: <User className="h-4 w-4" />,

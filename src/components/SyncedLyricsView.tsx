@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,7 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 export const SyncedLyricsView: React.FC = () => {
   const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement } = usePlayer();
   const navigate = useNavigate();
+  const location = useLocation();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [displayedProgress, setDisplayedProgress] = useState<number>(0);
@@ -276,7 +277,12 @@ export const SyncedLyricsView: React.FC = () => {
   const handleClose = () => {
     setAnimationStage("exit");
     setTimeout(() => {
-      navigate(-1);
+      const state = (location as any)?.state as { from?: string } | null;
+      if (state?.from) {
+        navigate(state.from);
+      } else {
+        navigate(-1);
+      }
     }, 150);
   };
 

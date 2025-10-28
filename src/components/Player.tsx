@@ -8,12 +8,13 @@ import { EqualizerWrapper } from "@/components/EqualizerWrapper";
 import { toast } from "sonner";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { CastButton } from "@/components/CastButton";
 
 export const Player = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const {
     currentSong,
@@ -234,7 +235,7 @@ export const Player = () => {
 
   // Navigate to synced lyrics
   const handleLyricsNavigation = () => {
-    navigate("/synced-lyrics");
+    navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
   };
 
   // Handle favorite toggle with proper error handling
