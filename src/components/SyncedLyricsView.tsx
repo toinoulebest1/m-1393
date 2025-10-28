@@ -59,14 +59,7 @@ export const SyncedLyricsView: React.FC = () => {
       : `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`;
   };
 
-  // Debug log to check if currentSong is available
-  useEffect(() => {
-    console.log('SyncedLyricsView: currentSong =', currentSong);
-    if (currentSong) {
-      console.log('SyncedLyricsView: Song title =', currentSong.title);
-      console.log('SyncedLyricsView: Song artist =', currentSong.artist);
-    }
-  }, [currentSong]);
+  // Sync current song info
 
   // Utiliser un useEffect pour mettre à jour le temps actuel périodiquement
   useEffect(() => {
@@ -84,13 +77,7 @@ export const SyncedLyricsView: React.FC = () => {
         if (audioElement) {
           const audioCurrentTime = audioElement.currentTime;
           setCurrentTime(audioCurrentTime);
-          
-          // Log moins fréquent pour éviter de surcharger la console
-          if (Math.floor(audioCurrentTime * 2) % 2 === 0) {
-            console.log(`SyncedLyricsView: Temps audio réel = ${audioCurrentTime.toFixed(2)}s`);
-          }
         } else {
-          console.log("SyncedLyricsView: Aucun élément audio trouvé");
           
           // Fallback sur le calcul basé sur la progression
           if (currentSong && currentSong.duration) {
@@ -145,11 +132,6 @@ export const SyncedLyricsView: React.FC = () => {
           if (durationInSeconds > 0) {
             const calculatedProgress = (audioElement.currentTime / durationInSeconds) * 100;
             setDisplayedProgress(Math.min(100, calculatedProgress));
-            
-            // Log moins fréquent
-            if (Math.floor(audioElement.currentTime) % 5 === 0) {
-              console.log(`SyncedLyricsView: Progression mise à jour = ${calculatedProgress.toFixed(2)}%, temps = ${audioElement.currentTime.toFixed(2)}s, durée = ${durationInSeconds}s`);
-            }
           }
         }
       }, 200); // Intervalle pour mettre à jour la progression
@@ -220,13 +202,6 @@ export const SyncedLyricsView: React.FC = () => {
             
             setDominantColor(finalDominantColor);
             setAccentColor(finalAccentColor);
-            
-            console.log('Extracted colors:', {
-              original: dominantRgb, 
-              luminance: luminance.toFixed(2),
-              dominant: finalDominantColor, 
-              accent: finalAccentColor
-            });
           } else {
             setDominantColor(DEFAULT_COLORS.dark);
             setAccentColor(DEFAULT_COLORS.accent);
@@ -248,7 +223,6 @@ export const SyncedLyricsView: React.FC = () => {
   // Detect song change and show loading overlay if applicable
   useEffect(() => {
     if (currentSong && currentSong.id !== currentSongId) {
-      console.log('SyncedLyricsView: Song changed, loading lyrics for:', currentSong.title);
       setIsChangingSong(true);
       setParsedLyrics(null);
       setLyricsText(null);
@@ -285,8 +259,6 @@ export const SyncedLyricsView: React.FC = () => {
     }
     
     try {
-      console.log('SyncedLyricsView: Fetching lyrics for song ID:', songId);
-      
       // Get lyrics from Supabase
       const { data, error } = await supabase
         .from('lyrics')
@@ -295,7 +267,6 @@ export const SyncedLyricsView: React.FC = () => {
         .single();
         
       if (error || !data) {
-        console.log('SyncedLyricsView: No lyrics found in database');
         setIsLoadingLyrics(false);
         return;
       }
@@ -306,7 +277,6 @@ export const SyncedLyricsView: React.FC = () => {
       // Parse LRC format lyrics
       try {
         const parsed = parseLrc(lyrics);
-        console.log('SyncedLyricsView: Successfully parsed lyrics:', parsed);
         setParsedLyrics(parsed);
       } catch (parseError) {
         console.error('SyncedLyricsView: Error parsing lyrics', parseError);
@@ -343,8 +313,6 @@ export const SyncedLyricsView: React.FC = () => {
     setIsGenerating(true);
     setError(null);
     try {
-      console.log('Generating lyrics for:', currentSong.title, 'by', currentSong.artist);
-      
       // Convert duration from MM:SS format to seconds
       let durationInSeconds: number | undefined;
       if (currentSong.duration) {
@@ -366,8 +334,6 @@ export const SyncedLyricsView: React.FC = () => {
       if (response.error) {
         throw new Error(response.error.message);
       }
-
-      console.log('Generated lyrics response:', response.data);
       
       if (response.data.error) {
         throw new Error(response.data.error);
@@ -394,7 +360,7 @@ export const SyncedLyricsView: React.FC = () => {
         const parsed = parseLrc(lyricsContent);
         setParsedLyrics(parsed);
       } catch (e) {
-        console.log('Lyrics are not in LRC format');
+        // Lyrics are not in LRC format
       }
       
       toast.success("Les paroles ont été récupérées avec succès");
@@ -460,7 +426,6 @@ export const SyncedLyricsView: React.FC = () => {
 
   // If no current song, show message to start music
   if (!currentSong) {
-    console.log('SyncedLyricsView: No current song, showing fallback message');
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-b from-spotify-dark to-black p-4">
         <div className="text-center max-w-md">

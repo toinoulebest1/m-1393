@@ -31,14 +31,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
   const [remainingTime, setRemainingTime] = useState<string>("");
   const lastCurrentTimeRef = useRef<number>(0);
 
-  // Log for debugging time synchronization
-  useEffect(() => {
-    if (Math.abs(currentTime - lastCurrentTimeRef.current) > 0.2) {
-      console.log(`LrcPlayer: Temps mis à jour - ${currentTime.toFixed(2)}s (différence: ${(currentTime - lastCurrentTimeRef.current).toFixed(2)}s)`);
-      lastCurrentTimeRef.current = currentTime;
-    }
-  }, [currentTime]);
-
   // Determine the first lyric time and setup loading bar
   useEffect(() => {
     if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) return;
@@ -52,11 +44,9 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       // Check if we're before the first lyric
       if (currentTime < firstLine.time) {
         setIsWaitingForFirstLyric(true);
-        console.log(`LrcPlayer: En attente de la première parole à ${firstLine.time}s, temps actuel: ${currentTime}s`);
       } else {
         setIsWaitingForFirstLyric(false);
         setLoadingProgress(100);
-        console.log(`LrcPlayer: Les paroles ont déjà commencé`);
       }
     }
   }, [parsedLyrics, currentTime]);
@@ -68,11 +58,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       const progress = Math.min(100, (currentTime / firstLyricTime) * 100);
       setLoadingProgress(progress);
       
-      if (progress % 5 < 0.2) {
-        // Log moins fréquemment pour éviter la surcharge
-        console.log(`LrcPlayer: Progression du chargement: ${progress.toFixed(1)}%, temps actuel: ${currentTime.toFixed(1)}s, premier lyric à: ${firstLyricTime.toFixed(1)}s`);
-      }
-      
       // Calculate remaining time in seconds
       const timeRemaining = Math.max(0, firstLyricTime - currentTime);
       const seconds = Math.floor(timeRemaining);
@@ -82,7 +67,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       
       // If we've reached the first lyric, stop showing the loading bar
       if (currentTime >= firstLyricTime) {
-        console.log(`LrcPlayer: Première parole atteinte`);
         setIsWaitingForFirstLyric(false);
       }
     }
@@ -96,12 +80,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     const adjustedTime = parsedLyrics.offset 
       ? currentTime + (parsedLyrics.offset / 1000) 
       : currentTime;
-
-    // Log moins fréquemment
-    if (Math.abs(adjustedTime - previousTimeRef.current) > 0.5) {
-      console.log(`LrcPlayer: Temps ajusté - ${adjustedTime.toFixed(2)}s (offset: ${parsedLyrics.offset || 0}ms)`);
-      previousTimeRef.current = adjustedTime;
-    }
     
     const { current, next } = findCurrentLyricLine(
       parsedLyrics.lines,
@@ -110,7 +88,6 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     );
     
     if (current !== currentLineIndex) {
-      console.log(`LrcPlayer: Nouvelle ligne active - Index ${current}, Temps ${parsedLyrics.lines[current]?.time.toFixed(2)}s`);
       setCurrentLineIndex(current);
       setNextLines(next);
       

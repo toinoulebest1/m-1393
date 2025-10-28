@@ -102,7 +102,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       }
       
       if (audioElement) {
-        console.log("Élément audio trouvé:", audioElement);
         audioRef.current = audioElement;
         setCurrentAudioTime(audioElement.currentTime || 0);
         
@@ -121,7 +120,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     const found = findAudioElement();
     
     if (!found) {
-      console.log("Audio non trouvé, mise en place d'un polling...");
       // Polling plus fréquent pour trouver l'audio
       if (audioPollingRef.current) {
         window.clearInterval(audioPollingRef.current);
@@ -135,13 +133,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         attempts++;
         
         if (foundInInterval) {
-          console.log(`Élément audio trouvé après ${attempts} tentatives`);
           if (audioPollingRef.current) {
             window.clearInterval(audioPollingRef.current);
             audioPollingRef.current = null;
           }
         } else if (attempts >= maxAttempts) {
-          console.warn(`Échec de détection de l'élément audio après ${maxAttempts} tentatives`);
           if (audioPollingRef.current) {
             window.clearInterval(audioPollingRef.current);
             audioPollingRef.current = null;
@@ -176,11 +172,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         if (audioRef.current) {
           const currentTime = audioRef.current.currentTime;
           setCurrentAudioTime(currentTime);
-          
-          // Log moins fréquent pour éviter de surcharger la console
-          if (Math.floor(currentTime * 2) % 2 === 0) {
-            console.log(`LyricsFullscreenView: temps audio actuel = ${currentTime.toFixed(2)}s`);
-          }
         }
       }, 16.67); // ~60 fps pour une synchronisation fluide
     }
@@ -279,7 +270,6 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     
     // Compter les lignes qui correspondent exactement au format LRC
     const matchCount = lines.filter(line => strongLrcRegex.test(line)).length;
-    console.log(`Détection LRC améliorée: ${matchCount} lignes sur ${lines.length} contiennent des timestamps valides`);
     
     // Si au moins 30% des 10 premières lignes ont un timestamp, c'est probablement un LRC
     return matchCount >= Math.min(2, Math.ceil(lines.length * 0.3));
@@ -317,17 +307,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
           
           if (lrcFormatDetected) {
             try {
-              console.log("Format LRC détecté, parsing...");
               const parsed = parseLrc(data);
               setParsedLyrics(parsed);
-              console.log("Paroles LRC parsées avec succès:", parsed.lines.length, "lignes");
             } catch (error) {
               console.error("Erreur lors du parsing des paroles LRC:", error);
               setIsLrcFormat(false);
               setParsedLyrics(null);
             }
           } else {
-            console.log("Format LRC non détecté, affichage normal");
             setParsedLyrics(null);
           }
         }
@@ -542,12 +529,10 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   
   // Fonctions pour gérer les changements de musique
   const handleNextSong = useCallback(() => {
-    console.log("Next song clicked in lyrics view");
     nextSong();
   }, [nextSong]);
   
   const handlePreviousSong = useCallback(() => {
-    console.log("Previous song clicked in lyrics view");
     previousSong();
   }, [previousSong]);
 
