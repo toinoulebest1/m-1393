@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -551,6 +551,69 @@ export type Database = {
         }
         Relationships: []
       }
+      reservations: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string | null
+          date: string
+          duree: number
+          email: string
+          google_event_id: string | null
+          heure: string
+          id: string
+          message: string | null
+          nom: string
+          payment_intent_id: string | null
+          payment_status: string
+          status: string
+          stripe_checkout_session_id: string | null
+          telephone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          date: string
+          duree: number
+          email: string
+          google_event_id?: string | null
+          heure: string
+          id?: string
+          message?: string | null
+          nom: string
+          payment_intent_id?: string | null
+          payment_status?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          telephone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          date?: string
+          duree?: number
+          email?: string
+          google_event_id?: string | null
+          heure?: string
+          id?: string
+          message?: string | null
+          nom?: string
+          payment_intent_id?: string | null
+          payment_status?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          telephone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           id: string
@@ -721,6 +784,27 @@ export type Database = {
           },
         ]
       }
+      user_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_bans: {
         Row: {
           ban_type: string
@@ -812,10 +896,7 @@ export type Database = {
         Args: { playlist_id: string; viewer_user_id: string }
         Returns: boolean
       }
-      deactivate_expired_bans: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      deactivate_expired_bans: { Args: never; Returns: undefined }
       delete_song_completely: {
         Args: { song_id_param: string }
         Returns: boolean
@@ -827,22 +908,10 @@ export type Database = {
           errors: string[]
         }[]
       }
-      generate_random_username: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      has_role: {
-        Args: { _user_id: string; _role: string }
-        Returns: boolean
-      }
-      is_admin: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
-      is_user_banned: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
+      generate_random_username: { Args: never; Returns: string }
+      has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_user_banned: { Args: { user_id: string }; Returns: boolean }
     }
     Enums: {
       user_role: "admin" | "user"
