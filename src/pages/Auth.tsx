@@ -13,7 +13,7 @@ const Auth = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
-        navigate('/');
+        navigate('/home');
       }
       if (event === 'SIGNED_OUT') {
         setErrorMessage("");
