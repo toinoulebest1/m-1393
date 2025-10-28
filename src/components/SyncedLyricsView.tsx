@@ -190,43 +190,31 @@ export const SyncedLyricsView: React.FC = () => {
           const dominantRgb = await extractDominantColor(currentSong.imageUrl);
           
           if (dominantRgb) {
-            // Check luminance and brighten if too dark
+            // Check luminance
             const luminance = getColorLuminance(dominantRgb);
             
             let finalDominantColor: [number, number, number];
             let finalAccentColor: [number, number, number];
             
-            if (luminance < 0.15) {
-              // Color is too dark, brighten it significantly
+            // Only brighten if extremely dark (luminance < 0.1)
+            if (luminance < 0.1) {
               finalDominantColor = [
+                Math.min(255, dominantRgb[0] * 2),
+                Math.min(255, dominantRgb[1] * 2),
+                Math.min(255, dominantRgb[2] * 2)
+              ];
+              finalAccentColor = [
                 Math.min(255, dominantRgb[0] * 2.5),
                 Math.min(255, dominantRgb[1] * 2.5),
                 Math.min(255, dominantRgb[2] * 2.5)
               ];
-              finalAccentColor = [
-                Math.min(255, dominantRgb[0] * 3),
-                Math.min(255, dominantRgb[1] * 3),
-                Math.min(255, dominantRgb[2] * 3)
-              ];
-            } else if (luminance < 0.3) {
-              // Color is somewhat dark, brighten moderately
-              finalDominantColor = [
-                Math.min(255, dominantRgb[0] * 1.8),
-                Math.min(255, dominantRgb[1] * 1.8),
-                Math.min(255, dominantRgb[2] * 1.8)
-              ];
-              finalAccentColor = [
-                Math.min(255, dominantRgb[0] * 2.2),
-                Math.min(255, dominantRgb[1] * 2.2),
-                Math.min(255, dominantRgb[2] * 2.2)
-              ];
             } else {
-              // Color is bright enough, use as is
+              // Use the vibrant color as extracted
               finalDominantColor = dominantRgb;
               finalAccentColor = [
-                Math.min(255, dominantRgb[0] * 1.4),
-                Math.min(255, dominantRgb[1] * 1.4),
-                Math.min(255, dominantRgb[2] * 1.4)
+                Math.min(255, dominantRgb[0] * 1.2),
+                Math.min(255, dominantRgb[1] * 1.2),
+                Math.min(255, dominantRgb[2] * 1.2)
               ];
             }
             
@@ -240,7 +228,6 @@ export const SyncedLyricsView: React.FC = () => {
               accent: finalAccentColor
             });
           } else {
-            // Fallback colors
             setDominantColor(DEFAULT_COLORS.dark);
             setAccentColor(DEFAULT_COLORS.accent);
           }
