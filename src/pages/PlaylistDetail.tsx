@@ -278,10 +278,13 @@ const PlaylistDetail = () => {
   };
 
   // Create or update playlist cover based on song images
-  const updatePlaylistCover = async (forceUpdate = false) => {
+  const updatePlaylistCover = async (forceUpdate = false, songsToUse?: PlaylistSong[]) => {
+    // Utiliser les chansons passées en paramètre ou l'état actuel
+    const currentSongs = songsToUse || songs;
+    
     console.log("=== STARTING PLAYLIST COVER UPDATE ===");
     console.log(`Playlist ID: ${playlistId}`);
-    console.log(`Songs count: ${songs.length}`);
+    console.log(`Songs count: ${currentSongs.length}`);
     console.log(`Force update: ${forceUpdate}`);
     
     if (!playlistId) {
@@ -289,7 +292,7 @@ const PlaylistDetail = () => {
       return;
     }
     
-    if (songs.length === 0) {
+    if (currentSongs.length === 0) {
       console.log("Cannot update cover: no songs");
       return;
     }
@@ -297,7 +300,7 @@ const PlaylistDetail = () => {
     try {
       setUploading(true);
       
-      const coverDataUrl = await generatePlaylistCover(songs);
+      const coverDataUrl = await generatePlaylistCover(currentSongs);
       
       if (!coverDataUrl) {
         console.log("No cover data URL generated");
@@ -616,11 +619,12 @@ const PlaylistDetail = () => {
         description: t('playlists.songRemoved')
       });
       
-      // Trigger cover update after song removal
+      // Trigger cover update after song removal with the updated songs list
       if (updatedSongs.length > 0) {
+        // Passer les chansons mises à jour directement pour éviter d'utiliser l'ancienne liste
         setTimeout(() => {
-          updatePlaylistCover(true);
-        }, 2000); // Increased delay to 2 seconds
+          updatePlaylistCover(true, updatedSongs);
+        }, 500); // Réduit le délai car on a déjà les bonnes données
       }
       
     } catch (error) {
