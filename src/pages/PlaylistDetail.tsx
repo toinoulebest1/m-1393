@@ -722,9 +722,18 @@ const PlaylistDetail = () => {
     }
   ];
 
-  const handleVisibilityChanged = (newVisibility: string) => {
-    // Mise à jour locale pour l'interface, les données sont stockées dans user_settings
-    console.log('Visibility changed to:', newVisibility);
+  const handleVisibilityChanged = async (newVisibility: string) => {
+    if (!playlistId) return;
+    try {
+      const { error } = await supabase
+        .from('playlists')
+        .update({ visibility: newVisibility })
+        .eq('id', playlistId);
+      if (error) throw error;
+      setPlaylist(prev => prev ? { ...prev, visibility: newVisibility } : prev);
+    } catch (e) {
+      console.error('Error updating playlist visibility:', e);
+    }
   };
 
   // Déterminer si l'utilisateur est propriétaire de la playlist
@@ -953,7 +962,7 @@ const PlaylistDetail = () => {
 
                 <PlaylistVisibilitySettings
                   playlistId={playlistId!}
-                  currentVisibility="private"
+                  currentVisibility={playlist?.visibility || 'private'}
                   onVisibilityChanged={handleVisibilityChanged}
                   isOwner={isOwner}
                 />

@@ -42,6 +42,11 @@ export const PlaylistVisibilitySettings = ({
   const { toast } = useToast();
   const { t } = useTranslation();
 
+  // Synchroniser l'état local quand la prop change (après chargement des données)
+  useEffect(() => {
+    setVisibility(currentVisibility);
+  }, [currentVisibility]);
+
   const fetchPlaylistSettings = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
