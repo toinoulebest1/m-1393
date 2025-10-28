@@ -194,21 +194,48 @@ export const MusicUploader = () => {
     }
   };
 
-  const checkIfSongExists = async (artist: string, title: string): Promise<boolean> => {
+  const checkIfSongExists = async (artist: string, title: string, duration?: number): Promise<boolean> => {
     try {
+      // Normaliser les chaînes pour comparaison
+      const normalizedArtist = artist.trim().toLowerCase();
+      const normalizedTitle = title.trim().toLowerCase();
+      
       const { data: existingSongs, error } = await supabase
         .from('songs')
-        .select('id')
-        .ilike('artist', artist)
-        .ilike('title', title)
-        .limit(1);
+        .select('id, title, artist, duration')
+        .ilike('artist', normalizedArtist)
+        .ilike('title', normalizedTitle);
 
       if (error) {
         console.error("Erreur lors de la vérification de la chanson:", error);
         return false;
       }
 
-      return existingSongs && existingSongs.length > 0;
+      if (!existingSongs || existingSongs.length === 0) {
+        return false;
+      }
+
+      // Si la durée est fournie, vérifier avec une tolérance de ±2 secondes
+      if (duration) {
+        for (const song of existingSongs) {
+          if (song.duration) {
+            // Convertir la durée MM:SS en secondes
+            const [minutes, seconds] = song.duration.split(':').map(Number);
+            const songDuration = minutes * 60 + seconds;
+            
+            // Vérifier si la durée correspond avec ±2 secondes de tolérance
+            if (Math.abs(songDuration - duration) <= 2) {
+              console.log(`Doublon détecté: "${song.title}" par ${song.artist} (durées: ${songDuration}s vs ${duration}s)`);
+              return true;
+            }
+          }
+        }
+        // Si aucune durée ne correspond, ce n'est pas un doublon
+        return false;
+      }
+
+      // Sans durée, considérer comme doublon si titre et artiste correspondent
+      return true;
     } catch (error) {
       console.error("Erreur lors de la vérification de la chanson:", error);
       return false;
@@ -235,7 +262,24 @@ export const MusicUploader = () => {
         if (metadataResult.title) title = metadataResult.title;
       }
 
-      const songExists = await checkIfSongExists(artist, title);
+      // Créer un objet audio temporaire pour obtenir la durée AVANT de vérifier les doublons
+      const tempAudioUrl = URL.createObjectURL(file);
+      const tempAudio = new Audio();
+      
+      const tempDuration = await new Promise<number>((resolve, reject) => {
+        tempAudio.addEventListener('loadedmetadata', () => {
+          resolve(tempAudio.duration);
+        });
+        tempAudio.addEventListener('error', (e) => {
+          console.error("Erreur lors du chargement de l'audio:", e);
+          reject(e);
+        });
+        tempAudio.src = tempAudioUrl;
+      });
+      
+      URL.revokeObjectURL(tempAudioUrl);
+
+      const songExists = await checkIfSongExists(artist, title, tempDuration);
       if (songExists) {
         toast.error(`"${title}" par ${artist} existe déjà dans la bibliothèque`);
         setCurrentUploadingSong(null);
