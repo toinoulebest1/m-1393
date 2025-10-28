@@ -160,17 +160,34 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
     };
   }, []);
 
-  // Generate styles based on accentColor
+  // Calculate luminance to determine if a color is dark or light
+  const getColorLuminance = (color: [number, number, number]) => {
+    const [r, g, b] = color.map(c => {
+      const normalized = c / 255;
+      return normalized <= 0.03928
+        ? normalized / 12.92
+        : Math.pow((normalized + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  // Generate styles based on accentColor with proper contrast
   const getAccentColor = () => {
-    if (!accentColor) return 'rgb(137, 90, 240)'; // Default Spotify accent color
-    return `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`;
+    if (!accentColor) return 'rgb(255, 255, 255)'; // Default white
+    const luminance = getColorLuminance(accentColor);
+    // If color is too dark (luminance < 0.4), use white for better contrast
+    return luminance < 0.4 
+      ? 'rgb(255, 255, 255)' 
+      : `rgb(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]})`;
   };
 
   // Style for active line with accent color
-  const activeLineStyle = accentColor ? {
+  const activeLineStyle = {
     color: getAccentColor(),
-    textShadow: `0 0 8px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.5)`
-  } : undefined;
+    textShadow: accentColor && getColorLuminance(accentColor) >= 0.4
+      ? `0 0 8px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.5)`
+      : '0 0 8px rgba(255, 255, 255, 0.3)'
+  };
 
   if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) {
     return (
