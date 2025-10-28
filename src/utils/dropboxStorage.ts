@@ -164,68 +164,51 @@ export const uploadFileToDropbox = async (
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Using Dropbox API v2 with fetch
-    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path: dropboxPath,
-          mode: 'overwrite',
-          autorename: true,
-          mute: false
-        })
-      },
-      body: file
+    // Convert file to base64 for edge function
+    const fileData = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Dropbox upload error status:', response.status, response.statusText);
-      console.error('Dropbox upload error details:', errorText);
+
+    // Use edge function to avoid CORS issues
+    const { data, error } = await supabase.functions.invoke('upload-to-dropbox', {
+      body: {
+        file: fileData,
+        path: dropboxPath,
+        accessToken: config.accessToken
+      }
+    });
+
+    if (error) {
+      console.error('Edge function error:', error);
       
-      // More specific error messages based on status code
-      if (response.status === 400) {
-        toast.error("Erreur 400: Requête invalide. Vérifiez la taille du fichier et les permissions Dropbox.");
-        console.error("Possible causes: invalid file format, file too large, or incorrect parameters");
-      } else if (response.status === 401) {
-        toast.error("Erreur 401: Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
-      } else if (response.status === 403) {
-        toast.error("Erreur 403: Accès refusé. Vérifiez les permissions de votre app Dropbox.");
-      } else if (response.status === 429) {
-        toast.error("Erreur 429: Trop de requêtes. Veuillez réessayer plus tard.");
+      // More specific error messages
+      if (error.message?.includes('401')) {
+        toast.error("Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
+      } else if (error.message?.includes('403')) {
+        toast.error("Accès refusé. Vérifiez les permissions de votre app Dropbox.");
+      } else if (error.message?.includes('429')) {
+        toast.error("Trop de requêtes. Veuillez réessayer plus tard.");
       } else {
-        toast.error(`Erreur Dropbox: ${response.status} ${response.statusText}`);
+        toast.error(`Erreur Dropbox: ${error.message}`);
       }
       
-      throw new Error(`Failed to upload to Dropbox: ${response.status} ${response.statusText} - ${errorText}`);
+      throw error;
     }
-    
-    const data = await response.json();
-    console.log('Dropbox upload successful:', data);
+
+    if (!data?.success) {
+      throw new Error(data?.error || 'Upload failed');
+    }
+
+    console.log('Dropbox upload successful:', data.path);
     toast.success("Fichier téléchargé avec succès vers Dropbox");
     
-    // Store the reference in Supabase
-    try {
-      // Insert using a raw query instead of the typed client
-      const { error } = await supabase
-        .from('dropbox_files')
-        .upsert({
-          local_id: path,
-          dropbox_path: data.path_display || dropboxPath
-        });
-        
-      if (error) {
-        console.error('Error saving Dropbox reference:', error);
-        // Continue anyway since the upload succeeded
-      }
-    } catch (dbError) {
-      console.error('Database error when saving reference:', dbError);
-      // Continue anyway since the upload succeeded
-    }
-    
-    return data.path_display || dropboxPath;
+    return data.path;
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
     toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
