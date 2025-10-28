@@ -276,7 +276,7 @@ export const SyncedLyricsView: React.FC = () => {
   const handleClose = () => {
     setAnimationStage("exit");
     setTimeout(() => {
-      navigate("/");
+      navigate(-1);
     }, 150);
   };
 
