@@ -164,51 +164,57 @@ export const uploadFileToDropbox = async (
   console.log(`File size: ${file.size} bytes, type: ${file.type}`);
   
   try {
-    // Convert file to base64 for edge function
-    const fileData = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+    // Upload directly to Dropbox API (CORS is supported)
+    const response = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.accessToken}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({
+          path: dropboxPath,
+          mode: 'overwrite',
+          autorename: true,
+          mute: false
+        })
+      },
+      body: file
     });
 
-    // Use edge function to avoid CORS issues
-    const { data, error } = await supabase.functions.invoke('upload-to-dropbox', {
-      body: {
-        file: fileData,
-        path: dropboxPath,
-        accessToken: config.accessToken
-      }
-    });
-
-    if (error) {
-      console.error('Edge function error:', error);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Dropbox upload error:', response.status, errorText);
       
       // More specific error messages
-      if (error.message?.includes('401')) {
+      if (response.status === 401) {
         toast.error("Token invalide ou expiré. Veuillez mettre à jour votre token Dropbox.");
-      } else if (error.message?.includes('403')) {
+      } else if (response.status === 403) {
         toast.error("Accès refusé. Vérifiez les permissions de votre app Dropbox.");
-      } else if (error.message?.includes('429')) {
+      } else if (response.status === 429) {
         toast.error("Trop de requêtes. Veuillez réessayer plus tard.");
       } else {
-        toast.error(`Erreur Dropbox: ${error.message}`);
+        toast.error(`Erreur Dropbox: ${response.status}`);
       }
       
-      throw error;
+      throw new Error(`Dropbox upload failed: ${response.status}`);
     }
 
-    if (!data?.success) {
-      throw new Error(data?.error || 'Upload failed');
+    const data = await response.json();
+    console.log('✅ File uploaded to Dropbox:', data.path_display);
+
+    // Store reference in database
+    try {
+      await supabase
+        .from('dropbox_files')
+        .upsert({
+          local_id: path,
+          dropbox_path: data.path_display || dropboxPath
+        });
+    } catch (dbError) {
+      console.error('Database error:', dbError);
     }
 
-    console.log('Dropbox upload successful:', data.path);
     toast.success("Fichier téléchargé avec succès vers Dropbox");
-    
-    return data.path;
+    return data.path_display || dropboxPath;
   } catch (error) {
     console.error('Error uploading to Dropbox:', error);
     toast.error("Échec de l'upload vers Dropbox. Vérifiez votre connexion et les permissions.");
