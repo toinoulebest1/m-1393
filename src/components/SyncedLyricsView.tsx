@@ -32,10 +32,10 @@ export const SyncedLyricsView: React.FC = () => {
   const syncIntervalRef = useRef<number | null>(null);
   const progressUpdateIntervalRef = useRef<number | null>(null);
 
-  // Default colors for songs without image or during loading
+  // Default colors for songs without image or during loading (Spotify theme colors)
   const DEFAULT_COLORS = {
-    dark: [48, 12, 61] as [number, number, number],
-    accent: [75, 20, 95] as [number, number, number]
+    dark: [155, 135, 245] as [number, number, number], // spotify-accent #9b87f5
+    accent: [214, 188, 250] as [number, number, number] // spotify-light #D6BCFA
   };
 
   // Calculate luminance to determine if a color is dark or light

@@ -16,38 +16,52 @@ export const extractDominantColor = async (
 
     const colorThief = new ColorThief();
     // Get palette instead of single dominant color for better color selection
-    const palette = colorThief.getPalette(img, 5);
+    const palette = colorThief.getPalette(img, 8);
     
     if (!palette || palette.length === 0) {
       return null;
     }
     
-    // Calculate saturation for each color and pick the most vibrant one
-    const getMostVibrantColor = (colors: number[][]) => {
-      return colors.reduce((mostVibrant, color) => {
-        const [r, g, b] = color;
-        // Convert to HSL to get saturation
-        const max = Math.max(r, g, b) / 255;
-        const min = Math.min(r, g, b) / 255;
-        const lightness = (max + min) / 2;
-        const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(2 * lightness - 1));
-        
-        const [prevR, prevG, prevB] = mostVibrant;
-        const prevMax = Math.max(prevR, prevG, prevB) / 255;
-        const prevMin = Math.min(prevR, prevG, prevB) / 255;
-        const prevLightness = (prevMax + prevMin) / 2;
-        const prevSaturation = prevMax === prevMin ? 0 : (prevMax - prevMin) / (1 - Math.abs(2 * prevLightness - 1));
-        
-        // Prefer colors with higher saturation and moderate lightness (not too dark, not too light)
-        const score = saturation * (1 - Math.abs(lightness - 0.5));
-        const prevScore = prevSaturation * (1 - Math.abs(prevLightness - 0.5));
-        
-        return score > prevScore ? color : mostVibrant;
-      });
+    // Calculate HSL values and filter out bad colors
+    const getColorHSL = (color: number[]) => {
+      const [r, g, b] = color;
+      const max = Math.max(r, g, b) / 255;
+      const min = Math.min(r, g, b) / 255;
+      const lightness = (max + min) / 2;
+      const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(2 * lightness - 1));
+      
+      return { r, g, b, lightness, saturation };
     };
     
-    const vibrantColor = getMostVibrantColor(palette);
-    return [vibrantColor[0], vibrantColor[1], vibrantColor[2]];
+    // Filter and score colors
+    const validColors = palette
+      .map(color => getColorHSL(color))
+      .filter(color => {
+        // Reject colors that are too light (white, pale pink, etc.)
+        if (color.lightness > 0.75) return false;
+        
+        // Reject colors that are too desaturated (gray, beige, etc.)
+        if (color.saturation < 0.25) return false;
+        
+        // Reject colors that are too dark
+        if (color.lightness < 0.15) return false;
+        
+        return true;
+      })
+      .map(color => ({
+        ...color,
+        // Score based on saturation and ideal lightness (0.3-0.6 range)
+        score: color.saturation * (1 - Math.abs(color.lightness - 0.45))
+      }))
+      .sort((a, b) => b.score - a.score);
+    
+    // Return the best color, or null if no valid colors
+    if (validColors.length === 0) {
+      return null;
+    }
+    
+    const bestColor = validColors[0];
+    return [bestColor.r, bestColor.g, bestColor.b];
   } catch (error) {
     console.error('Error extracting dominant color:', error);
     return null;
