@@ -14,6 +14,7 @@ import { Song } from "@/types/player";
 import { rgbToClass } from "@/utils/colorExtractor";
 import { useNavigate } from "react-router-dom";
 import { AutoplayManager } from "@/utils/autoplayManager";
+import { toast } from "@/hooks/use-toast";
 
 interface ContextMenuItem {
   label: string;
@@ -75,6 +76,17 @@ export const SongCard = ({
 
   const handleLyricsClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
+    
+    // Check if the current song is playing
+    if (!isCurrentSong || !isPlaying) {
+      toast({
+        title: "Lecture requise",
+        description: "Veuillez démarrer la lecture de cette musique pour accéder aux paroles synchronisées",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Navigate to synced lyrics page instead of using modal
     navigate("/synced-lyrics");
     // If the onLyricsClick prop is provided, call it as well (for backward compatibility)
@@ -172,7 +184,11 @@ export const SongCard = ({
           variant="ghost"
           size="icon"
           onClick={handleLyricsClick}
-          className="text-muted-foreground hover:text-foreground"
+          disabled={!isCurrentSong || !isPlaying}
+          className={cn(
+            "text-muted-foreground hover:text-foreground transition-opacity",
+            (!isCurrentSong || !isPlaying) && "opacity-40 cursor-not-allowed"
+          )}
         >
           <Mic size={18} />
         </Button>
