@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Heart, MoreHorizontal, FileText, AlertTriangle, Music, Play } from "lucide-react";
+import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -174,7 +174,7 @@ export const SongCard = ({
           onClick={handleLyricsClick}
           className="text-muted-foreground hover:text-foreground"
         >
-          <FileText size={18} />
+          <Mic size={18} />
         </Button>
 
         <DropdownMenu>
