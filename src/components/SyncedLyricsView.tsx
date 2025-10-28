@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, getCurrentAudioElement } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement } = usePlayer();
   const navigate = useNavigate();
   const location = useLocation();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
@@ -556,6 +556,32 @@ export const SyncedLyricsView: React.FC = () => {
                 className="flex-grow"
                 onValueChange={handleProgressChange}
               />
+            </div>
+            
+            {/* Volume control */}
+            <div className="flex items-center space-x-3 mb-4 px-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setVolume(volume === 0 ? 50 : 0)}
+                className="text-white hover:bg-white/10 rounded-full h-8 w-8 flex-shrink-0"
+              >
+                {volume === 0 ? (
+                  <VolumeX className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Slider
+                value={[volume]}
+                max={100}
+                step={1}
+                className="flex-grow max-w-[150px]"
+                onValueChange={(value) => setVolume(value[0])}
+              />
+              <span className="text-xs text-spotify-neutral w-8 text-right flex-shrink-0">
+                {volume}%
+              </span>
             </div>
             
             {/* Playback controls */}

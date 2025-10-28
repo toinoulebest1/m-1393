@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward } from "lucide-react";
+import { X, Music, Loader2, Maximize, Minimize, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -72,6 +72,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     play,
     pause,
     setProgress,
+    setVolume,
     nextSong,
     previousSong
   } = usePlayer();
@@ -746,6 +747,32 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                   <SkipForward className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+            
+            {/* Volume control */}
+            <div className="flex items-center space-x-3 mt-2 px-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setVolume(volume === 0 ? 50 : 0)}
+                className="text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0"
+              >
+                {volume === 0 ? (
+                  <VolumeX className="h-3.5 w-3.5" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              <Slider
+                value={[volume]}
+                max={100}
+                step={1}
+                className="flex-grow max-w-[120px]"
+                onValueChange={(value) => setVolume(value[0])}
+              />
+              <span className="text-xs text-spotify-neutral w-8 text-right flex-shrink-0">
+                {volume}%
+              </span>
             </div>
           </div>
           
