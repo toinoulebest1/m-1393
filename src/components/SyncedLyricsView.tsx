@@ -190,17 +190,55 @@ export const SyncedLyricsView: React.FC = () => {
           const dominantRgb = await extractDominantColor(currentSong.imageUrl);
           
           if (dominantRgb) {
-            setDominantColor(dominantRgb);
+            // Check luminance and brighten if too dark
+            const luminance = getColorLuminance(dominantRgb);
             
-            // Create a more vibrant accent color
-            const accentRgb: [number, number, number] = [
-              Math.min(255, dominantRgb[0] * 1.4),
-              Math.min(255, dominantRgb[1] * 1.4),
-              Math.min(255, dominantRgb[2] * 1.4)
-            ];
-            setAccentColor(accentRgb);
+            let finalDominantColor: [number, number, number];
+            let finalAccentColor: [number, number, number];
             
-            console.log('Extracted colors:', {dominant: dominantRgb, accent: accentRgb});
+            if (luminance < 0.15) {
+              // Color is too dark, brighten it significantly
+              finalDominantColor = [
+                Math.min(255, dominantRgb[0] * 2.5),
+                Math.min(255, dominantRgb[1] * 2.5),
+                Math.min(255, dominantRgb[2] * 2.5)
+              ];
+              finalAccentColor = [
+                Math.min(255, dominantRgb[0] * 3),
+                Math.min(255, dominantRgb[1] * 3),
+                Math.min(255, dominantRgb[2] * 3)
+              ];
+            } else if (luminance < 0.3) {
+              // Color is somewhat dark, brighten moderately
+              finalDominantColor = [
+                Math.min(255, dominantRgb[0] * 1.8),
+                Math.min(255, dominantRgb[1] * 1.8),
+                Math.min(255, dominantRgb[2] * 1.8)
+              ];
+              finalAccentColor = [
+                Math.min(255, dominantRgb[0] * 2.2),
+                Math.min(255, dominantRgb[1] * 2.2),
+                Math.min(255, dominantRgb[2] * 2.2)
+              ];
+            } else {
+              // Color is bright enough, use as is
+              finalDominantColor = dominantRgb;
+              finalAccentColor = [
+                Math.min(255, dominantRgb[0] * 1.4),
+                Math.min(255, dominantRgb[1] * 1.4),
+                Math.min(255, dominantRgb[2] * 1.4)
+              ];
+            }
+            
+            setDominantColor(finalDominantColor);
+            setAccentColor(finalAccentColor);
+            
+            console.log('Extracted colors:', {
+              original: dominantRgb, 
+              luminance: luminance.toFixed(2),
+              dominant: finalDominantColor, 
+              accent: finalAccentColor
+            });
           } else {
             // Fallback colors
             setDominantColor(DEFAULT_COLORS.dark);
