@@ -79,19 +79,32 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
   }
 
   try {
-    // Create canvas
+    console.log("=== STARTING PLAYLIST COVER GENERATION ===");
+    console.log(`Number of songs: ${songs.length}`);
+    
+    // Filter songs that have images
+    const songsWithImages = songs.filter(song => song.songs.imageUrl);
+    
+    console.log(`Songs with images: ${songsWithImages.length}`);
+    
+    if (songsWithImages.length === 0) {
+      console.error("No songs with images available");
+      return null;
+    }
+
+    // Reduce size for faster processing (300x300 instead of 400x400)
+    const size = 300;
     const canvas = document.createElement('canvas');
-    const size = 400;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     
     if (!ctx) {
-      console.error("Failed to get canvas context");
+      console.error("Could not get canvas context");
       return null;
     }
 
-    // Fill background
+    // Dark background
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, size, size);
 
@@ -106,7 +119,8 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
         img.onload = () => {
           console.log("Single image loaded successfully");
           ctx.drawImage(img, 0, 0, size, size);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          // Reduced quality from 0.9 to 0.7 for faster processing
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           console.log("Single image canvas created");
           resolve(dataUrl);
         };
@@ -123,27 +137,25 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
     const imagesToLoad = songsWithImages.slice(0, 4);
     const imageSize = size / 2;
     
-    // Load all images
+    // Load all images in parallel with reduced timeout
     const imagePromises = imagesToLoad.map((song, index) => {
       return new Promise<{img: HTMLImageElement, index: number} | null>((resolve) => {
-        console.log(`Loading image ${index + 1}: ${song.songs.imageUrl}`);
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
+        // Reduced timeout from 10000ms to 2000ms for faster failure
         const timeout = setTimeout(() => {
           console.warn(`Image ${index + 1} loading timeout`);
           resolve(null);
-        }, 10000);
+        }, 2000);
         
         img.onload = () => {
           clearTimeout(timeout);
-          console.log(`Image ${index + 1} loaded successfully`);
           resolve({img, index});
         };
         
-        img.onerror = (error) => {
+        img.onerror = () => {
           clearTimeout(timeout);
-          console.error(`Error loading image ${index + 1}:`, error);
           resolve(null);
         };
         
@@ -169,8 +181,6 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
         const col = index % 2;
         const x = col * imageSize;
         const y = row * imageSize;
-        
-        console.log(`Drawing image ${index + 1} at position (${x}, ${y})`);
         ctx.drawImage(img, x, y, imageSize, imageSize);
       }
     });
@@ -193,8 +203,8 @@ const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | nu
       ctx.stroke();
     }
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    console.log("Grid canvas created successfully");
+    // Reduced quality from 0.9 to 0.7 for faster upload
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
     console.log("=== PLAYLIST COVER GENERATION COMPLETED ===");
     return dataUrl;
 
@@ -488,12 +498,9 @@ const PlaylistDetail = () => {
     // Ne régénérer que si le nombre de chansons a changé
     if (previousCount !== currentCount) {
       console.log(`Nombre de chansons changé (${previousCount} -> ${currentCount}), régénération de la couverture...`);
-      const timer = setTimeout(() => {
-        updatePlaylistCover(true);
-        previousSongCountRef.current = currentCount;
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      // Génération immédiate sans délai
+      updatePlaylistCover(true);
+      previousSongCountRef.current = currentCount;
     }
   }, [songs.length, playlist?.id, currentUserId]);
 
@@ -621,10 +628,8 @@ const PlaylistDetail = () => {
       
       // Trigger cover update after song removal with the updated songs list
       if (updatedSongs.length > 0) {
-        // Passer les chansons mises à jour directement pour éviter d'utiliser l'ancienne liste
-        setTimeout(() => {
-          updatePlaylistCover(true, updatedSongs);
-        }, 500); // Réduit le délai car on a déjà les bonnes données
+        // Génération immédiate sans délai
+        updatePlaylistCover(true, updatedSongs);
       }
       
     } catch (error) {
@@ -667,10 +672,8 @@ const PlaylistDetail = () => {
         description: `${selectedSongs.length} ${t('playlists.songsAdded')}`
       });
       
-      // Trigger cover update after adding songs
-      setTimeout(() => {
-        updatePlaylistCover(true);
-      }, 2000); // Increased delay to 2 seconds
+      // Trigger cover update after adding songs - immédiat
+      updatePlaylistCover(true);
       
     } catch (error) {
       console.error("Error adding songs to playlist:", error);
