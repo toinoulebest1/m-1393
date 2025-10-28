@@ -53,21 +53,19 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     return cachedUrl;
   }
 
-  // 2. Vérifier s'il y a un lien pré-généré dans la base de données (pour Dropbox)
-  if (isDropboxEnabledForReading()) {
-    // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
-    const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
-    console.log('🔍 Recherche lien pré-généré pour ID:', localId);
-    
-    const preGeneratedLink = await getPreGeneratedDropboxLink(localId || filePath);
-    if (preGeneratedLink) {
-      console.log('⚡ Lien pré-généré trouvé:', preGeneratedLink);
-      // Mettre en cache et retourner
-      memoryCache.set(filePath, preGeneratedLink);
-      return preGeneratedLink;
-    }
-    console.log('❌ Aucun lien pré-généré trouvé pour:', localId);
+  // 2. TOUJOURS vérifier s'il y a un lien pré-généré dans la base de données (pour Dropbox)
+  // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
+  const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
+  console.log('🔍 Recherche lien pré-généré pour ID:', localId);
+  
+  const preGeneratedLink = await getPreGeneratedDropboxLink(localId || filePath);
+  if (preGeneratedLink) {
+    console.log('⚡ Lien pré-généré trouvé:', preGeneratedLink);
+    // Mettre en cache et retourner
+    memoryCache.set(filePath, preGeneratedLink);
+    return preGeneratedLink;
   }
+  console.log('❌ Aucun lien pré-généré trouvé pour:', localId);
   
   // 3. Priorité stricte à Dropbox d'abord (génération classique si pas de lien pré-généré)
   // Mais seulement si l'utilisateur a un token (admin)
