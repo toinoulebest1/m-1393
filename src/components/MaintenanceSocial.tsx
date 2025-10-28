@@ -11,10 +11,10 @@ export const MaintenanceSocial = () => {
   ];
 
   return (
-    <div className="bg-spotify-accent/10 rounded-lg p-4 space-y-3 border border-spotify-accent/30">
+    <div className="bg-spotify-dark/50 rounded-lg p-4 space-y-3">
       <div className="text-center">
-        <h3 className="font-medium text-spotify-light mb-2">Restez connecté</h3>
-        <p className="text-sm text-spotify-light/60">
+        <h3 className="font-medium text-white mb-2">Restez connecté</h3>
+        <p className="text-sm text-spotify-neutral">
           Suivez-nous pour les dernières mises à jour
         </p>
       </div>
@@ -25,7 +25,7 @@ export const MaintenanceSocial = () => {
             key={label}
             variant="ghost"
             size="icon"
-            className={`text-spotify-light/70 transition-colors ${color}`}
+            className={`text-spotify-neutral transition-colors ${color}`}
             onClick={() => window.open(url, '_blank')}
           >
             <Icon className="w-5 h-5" />

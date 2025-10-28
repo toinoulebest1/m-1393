@@ -6,8 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import { CastProvider } from "./contexts/CastContext";
-import { useMaintenanceMode } from "./hooks/useMaintenanceMode";
-import { MaintenancePage } from "./components/MaintenancePage";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Search from "./pages/Search";
@@ -26,53 +24,6 @@ import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 const queryClient = new QueryClient();
 
-function AppContent() {
-  const { isMaintenanceMode, maintenanceMessage, endTime, currentStep, totalSteps, isLoading } = useMaintenanceMode();
-
-  // Afficher la page de maintenance si le mode est activé
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-spotify-base flex items-center justify-center">
-        <div className="text-spotify-light">Chargement...</div>
-      </div>
-    );
-  }
-
-  // Permettre l'accès à la page d'administration même en mode maintenance
-  const isAdminRoute = window.location.pathname === '/maintenance-admin';
-  
-  if (isMaintenanceMode && !isAdminRoute) {
-    return (
-      <MaintenancePage 
-        message={maintenanceMessage}
-        endTime={endTime}
-        currentStep={currentStep}
-        totalSteps={totalSteps}
-      />
-    );
-  }
-
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/search" element={<Search />} />
-      <Route path="/favorites" element={<Favorites />} />
-      <Route path="/history" element={<History />} />
-      <Route path="/playlists" element={<Playlists />} />
-      <Route path="/playlist/:id" element={<PlaylistDetail />} />
-      <Route path="/blind-test" element={<BlindTest />} />
-      <Route path="/top100" element={<Top100 />} />
-      <Route path="/artist/:id" element={<ArtistProfile />} />
-      <Route path="/reports" element={<Reports />} />
-      <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
-      <Route path="/dropbox-settings" element={<DropboxSettings />} />
-      <Route path="/metadata-update" element={<SongMetadataUpdate />} />
-      <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
-    </Routes>
-  );
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -82,7 +33,23 @@ function App() {
         <BrowserRouter>
           <PlayerProvider>
             <CastProvider>
-              <AppContent />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/playlists" element={<Playlists />} />
+                <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                <Route path="/blind-test" element={<BlindTest />} />
+                <Route path="/top100" element={<Top100 />} />
+                <Route path="/artist/:id" element={<ArtistProfile />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
+                <Route path="/dropbox-settings" element={<DropboxSettings />} />
+                <Route path="/metadata-update" element={<SongMetadataUpdate />} />
+                <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
+              </Routes>
             </CastProvider>
           </PlayerProvider>
         </BrowserRouter>

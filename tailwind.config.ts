@@ -26,7 +26,6 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         spotify: {
-          base: "#0f1419",
           dark: "#1A1F2C",
           light: "#D6BCFA",
           neutral: "#8E9196",

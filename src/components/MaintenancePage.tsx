@@ -25,19 +25,19 @@ export const MaintenancePage = ({
       <div className="max-w-lg w-full space-y-6">
         {/* En-tête avec animation */}
         <div className="text-center space-y-4 animate-fade-in">
-          <div className="mx-auto w-24 h-24 bg-spotify-accent/20 rounded-full flex items-center justify-center animate-pulse border-2 border-spotify-accent">
+          <div className="mx-auto w-24 h-24 bg-spotify-dark rounded-full flex items-center justify-center animate-pulse">
             <Construction className="w-12 h-12 text-spotify-accent" />
           </div>
           
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2">
               <Sparkles className="w-5 h-5 text-spotify-accent animate-pulse" />
-              <h1 className="text-2xl font-bold text-spotify-light">
+              <h1 className="text-2xl font-bold text-white">
                 Maintenance en cours
               </h1>
               <Sparkles className="w-5 h-5 text-spotify-accent animate-pulse" />
             </div>
-            <p className="text-spotify-light/80 leading-relaxed">
+            <p className="text-spotify-neutral leading-relaxed">
               {message}
             </p>
           </div>
@@ -81,10 +81,10 @@ export const MaintenancePage = ({
 
         {/* Message de remerciement */}
         <div className="text-center animate-fade-in">
-          <div className="text-sm text-spotify-light/70">
+          <div className="text-xs text-spotify-neutral">
             Merci pour votre patience
           </div>
-          <div className="text-sm text-spotify-accent mt-1">
+          <div className="text-xs text-spotify-neutral/70 mt-1">
             🎵 Nous préparons de nouvelles fonctionnalités pour vous 🎵
           </div>
         </div>

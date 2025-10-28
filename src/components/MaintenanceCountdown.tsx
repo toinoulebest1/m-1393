@@ -70,7 +70,7 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
   }
 
   return (
-    <div className="bg-spotify-accent/10 rounded-lg p-4 space-y-3 border border-spotify-accent/30">
+    <div className="bg-spotify-dark/50 rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-center gap-2 text-spotify-accent">
         <Clock className="w-5 h-5" />
         <span className="font-medium">Retour estimé dans</span>
@@ -78,22 +78,22 @@ export const MaintenanceCountdown = ({ endTime }: MaintenanceCountdownProps) => 
       
       <div className="flex justify-center gap-4">
         <div className="text-center">
-          <div className="text-2xl font-bold text-spotify-light">
+          <div className="text-2xl font-bold text-white">
             {timeLeft.hours.toString().padStart(2, '0')}
           </div>
-          <div className="text-xs text-spotify-light/60">Heures</div>
+          <div className="text-xs text-spotify-neutral">Heures</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-spotify-light">
+          <div className="text-2xl font-bold text-white">
             {timeLeft.minutes.toString().padStart(2, '0')}
           </div>
-          <div className="text-xs text-spotify-light/60">Minutes</div>
+          <div className="text-xs text-spotify-neutral">Minutes</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-spotify-light">
+          <div className="text-2xl font-bold text-white">
             {timeLeft.seconds.toString().padStart(2, '0')}
           </div>
-          <div className="text-xs text-spotify-light/60">Secondes</div>
+          <div className="text-xs text-spotify-neutral">Secondes</div>
         </div>
       </div>
     </div>
