@@ -231,6 +231,9 @@ const PlaylistDetail = () => {
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause, getCurrentAudioElement } = usePlayer();
   const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
+  
+  // Suivre le nombre précédent de chansons pour éviter de régénérer la couverture inutilement
+  const previousSongCountRef = useRef<number | null>(null);
 
   // Function to get the actual cover image URL with cache busting
   const getCoverImageUrl = async (playlistId: string): Promise<string | null> => {
@@ -459,13 +462,33 @@ const PlaylistDetail = () => {
     }
   };
 
-  // Watch for changes in songs to trigger cover update
+  // Watch for changes in songs to trigger cover update ONLY when songs are added/removed
   useEffect(() => {
-    if (songs.length > 0 && playlist && currentUserId === playlist.user_id) {
-      console.log("Songs changed, triggering cover update...");
+    // Ne rien faire si :
+    // - Pas de chansons
+    // - Pas de playlist
+    // - L'utilisateur n'est pas propriétaire
+    if (!songs.length || !playlist || currentUserId !== playlist.user_id) {
+      return;
+    }
+    
+    const currentCount = songs.length;
+    const previousCount = previousSongCountRef.current;
+    
+    // Au premier chargement (previousCount est null), on met juste à jour la référence sans régénérer
+    if (previousCount === null) {
+      console.log("Premier chargement, pas de régénération de couverture");
+      previousSongCountRef.current = currentCount;
+      return;
+    }
+    
+    // Ne régénérer que si le nombre de chansons a changé
+    if (previousCount !== currentCount) {
+      console.log(`Nombre de chansons changé (${previousCount} -> ${currentCount}), régénération de la couverture...`);
       const timer = setTimeout(() => {
         updatePlaylistCover(true);
-      }, 2000); // Increased delay to 2 seconds
+        previousSongCountRef.current = currentCount;
+      }, 2000);
       
       return () => clearTimeout(timer);
     }
