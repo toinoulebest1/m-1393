@@ -146,12 +146,17 @@ export const MusicUploader = () => {
     }
   };
 
-  const fetchLyrics = async (title: string, artist: string, songId: string) => {
+  const fetchLyrics = async (title: string, artist: string, songId: string, duration?: number, albumName?: string) => {
     try {
       console.log(`Récupération des paroles pour: ${title} de ${artist}`);
       
       const { data, error } = await supabase.functions.invoke('generate-lyrics', {
-        body: { songTitle: title, artist: artist }
+        body: { 
+          songTitle: title, 
+          artist: artist,
+          duration: duration,
+          albumName: albumName
+        }
       });
       
       if (error) {
@@ -162,12 +167,15 @@ export const MusicUploader = () => {
       if (data && data.lyrics) {
         console.log("Paroles récupérées avec succès");
         
+        // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
+        const lyricsContent = data.syncedLyrics || data.lyrics;
+        
         // Enregistrer les paroles dans la base de données
         const { error: saveLyricsError } = await supabase
           .from('lyrics')
           .insert({
             song_id: songId,
-            content: data.lyrics
+            content: lyricsContent
           });
         
         if (saveLyricsError) {
@@ -365,8 +373,8 @@ export const MusicUploader = () => {
         // Toast de chargement des paroles
         const lyricsToastId = toast.loading(`Récupération des paroles pour "${title}"...`);
         
-        // Récupération des paroles en arrière-plan
-        fetchLyrics(title, artist, fileId).then(lyrics => {
+        // Récupération des paroles en arrière-plan (passer la durée en secondes)
+        fetchLyrics(title, artist, fileId, duration, undefined).then(lyrics => {
           if (lyrics) {
             toast.success(`Paroles récupérées pour "${title}"`, {
               id: lyricsToastId

@@ -344,8 +344,23 @@ export const SyncedLyricsView: React.FC = () => {
     setError(null);
     try {
       console.log('Generating lyrics for:', currentSong.title, 'by', currentSong.artist);
+      
+      // Convert duration from MM:SS format to seconds
+      let durationInSeconds: number | undefined;
+      if (currentSong.duration) {
+        const parts = currentSong.duration.split(':');
+        if (parts.length === 2) {
+          durationInSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+      }
+      
       const response = await supabase.functions.invoke('generate-lyrics', {
-        body: { songTitle: currentSong.title, artist: currentSong.artist },
+        body: { 
+          songTitle: currentSong.title, 
+          artist: currentSong.artist,
+          duration: durationInSeconds,
+          albumName: currentSong.album_name
+        },
       });
 
       if (response.error) {
@@ -358,7 +373,8 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(response.data.error);
       }
 
-      const lyricsContent = response.data.lyrics;
+      // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
+      const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
       
       // Save lyrics to database
       const { error: insertError } = await supabase

@@ -9,7 +9,8 @@ export interface Song {
   genre?: string;
   created_at?: string;
   user_id?: string;
-  bitrate?: string; // Add missing bitrate property
+  bitrate?: string;
+  album_name?: string; // Add album name for LRCLIB API
 }
 
 export interface FavoriteStat {

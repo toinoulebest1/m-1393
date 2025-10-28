@@ -14,53 +14,83 @@ serve(async (req) => {
   }
 
   try {
-    const { songTitle, artist } = await req.json();
+    const { songTitle, artist, albumName, duration } = await req.json();
     console.log('Attempting to find lyrics for:', songTitle, 'by', artist);
     
-    if (!artist) {
-      console.log('No artist provided, cannot search for lyrics');
+    if (!artist || !songTitle) {
+      console.log('Missing required parameters');
       return new Response(
         JSON.stringify({ 
-          lyrics: `Impossible de trouver les paroles sans le nom de l'artiste.` 
+          lyrics: `Impossible de trouver les paroles sans le titre et l'artiste.` 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // Use the lyrics.ovh API
-    const apiUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(songTitle)}`;
-    console.log('Fetching lyrics from URL:', apiUrl);
+    // Build LRCLIB API URL with required and optional parameters
+    const params = new URLSearchParams({
+      artist_name: artist,
+      track_name: songTitle,
+    });
     
-    const lyricsResponse = await fetch(apiUrl);
+    if (albumName) {
+      params.append('album_name', albumName);
+    }
+    
+    if (duration) {
+      params.append('duration', Math.round(duration).toString());
+    }
+    
+    const apiUrl = `https://lrclib.net/api/get?${params.toString()}`;
+    console.log('Fetching lyrics from LRCLIB:', apiUrl);
+    
+    const lyricsResponse = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
+      }
+    });
     
     if (!lyricsResponse.ok) {
       if (lyricsResponse.status === 404) {
         console.log('Lyrics not found for:', songTitle, 'by', artist);
         return new Response(
           JSON.stringify({ 
-            lyrics: `Aucune parole trouvée pour "${songTitle}" par ${artist}.` 
+            lyrics: `Aucune parole trouvée pour "${songTitle}" par ${artist}.`,
+            syncedLyrics: null
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      throw new Error(`Lyrics.ovh API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
+      throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
     }
 
     const lyricsData = await lyricsResponse.json();
     console.log('Successfully retrieved lyrics for:', songTitle, 'by', artist);
 
-    // Format lyrics for better display (remove excessive newlines, etc.)
-    let formattedLyrics = lyricsData.lyrics
-      .replace(/\n{3,}/g, '\n\n')  // Normalize multiple newlines
-      .trim();
-    
-    if (!formattedLyrics) {
-      formattedLyrics = `Aucune parole disponible pour "${songTitle}" par ${artist}.`;
+    // Check if track is instrumental
+    if (lyricsData.instrumental) {
+      return new Response(
+        JSON.stringify({ 
+          lyrics: `Cette piste est instrumentale.`,
+          syncedLyrics: null
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
     }
 
+    // Return both plain and synced lyrics
+    const plainLyrics = lyricsData.plainLyrics || `Aucune parole disponible pour "${songTitle}" par ${artist}.`;
+    const syncedLyrics = lyricsData.syncedLyrics || null;
+
     return new Response(
-      JSON.stringify({ lyrics: formattedLyrics }),
+      JSON.stringify({ 
+        lyrics: plainLyrics,
+        syncedLyrics: syncedLyrics
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200

@@ -100,8 +100,30 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
     setError(null);
     try {
       console.log('Generating lyrics for:', songTitle, 'by', artist);
+      
+      // Récupérer les infos de la chanson pour avoir la durée et l'album
+      const { data: songData } = await supabase
+        .from('songs')
+        .select('duration, album_name')
+        .eq('id', songId)
+        .single();
+      
+      // Convert duration from MM:SS format to seconds
+      let durationInSeconds: number | undefined;
+      if (songData?.duration) {
+        const parts = songData.duration.split(':');
+        if (parts.length === 2) {
+          durationInSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+      }
+      
       const response = await supabase.functions.invoke('generate-lyrics', {
-        body: { songTitle, artist },
+        body: { 
+          songTitle, 
+          artist,
+          duration: durationInSeconds,
+          albumName: songData?.album_name
+        },
       });
 
       if (response.error) {
@@ -114,7 +136,8 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         throw new Error(response.data.error);
       }
 
-      const lyricsContent = response.data.lyrics;
+      // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
+      const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
       
       // Enregistrer les paroles dans la base de données
       const { error: insertError } = await supabase
