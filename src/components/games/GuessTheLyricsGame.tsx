@@ -758,6 +758,22 @@ export function GuessTheLyricsGame() {
                     const isCorrect = correctAnswers[wordIndex];
                     const hasAnswer = gameState.isAnswered;
                     
+                    // Si déjà répondu, afficher le mot en couleur au lieu de l'input
+                    if (hasAnswer) {
+                      const correctWord = hiddenWords.find(hw => hw.index === wordIndex)?.word || "";
+                      return (
+                        <span
+                          key={idx}
+                          className={cn(
+                            "inline-block mx-1 px-2 py-1 rounded font-bold transition-all duration-300",
+                            "bg-primary/20 text-primary border-2 border-primary/40"
+                          )}
+                        >
+                          {correctWord}
+                        </span>
+                      );
+                    }
+                    
                     return (
                       <Input
                         key={idx}
@@ -767,11 +783,7 @@ export function GuessTheLyricsGame() {
                           setUserInputs(prev => ({ ...prev, [wordIndex]: e.target.value }))
                         }
                         disabled={gameState.isAnswered}
-                        className={cn(
-                          "inline-block w-32 mx-1 text-center",
-                          hasAnswer && isCorrect && "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300",
-                          hasAnswer && !isCorrect && "border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
-                        )}
+                        className="inline-block w-32 mx-1 text-center"
                         placeholder="..."
                       />
                     );
@@ -781,14 +793,6 @@ export function GuessTheLyricsGame() {
               </p>
             </div>
 
-            {gameState.isAnswered && (
-              <div className="bg-primary/10 p-4 rounded-lg">
-                <p className="text-sm font-medium mb-2">Réponses correctes:</p>
-                <p className="text-lg">
-                  {hiddenWords.map(({ word }) => word).join(" • ")}
-                </p>
-              </div>
-            )}
 
             <div className="flex gap-4">
               {!gameState.isAnswered ? (
