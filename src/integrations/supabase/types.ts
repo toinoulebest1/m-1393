@@ -721,6 +721,7 @@ export type Database = {
       }
       songs: {
         Row: {
+          album_name: string | null
           artist: string | null
           created_at: string
           duration: string | null
@@ -732,6 +733,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          album_name?: string | null
           artist?: string | null
           created_at?: string
           duration?: string | null
@@ -743,6 +745,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          album_name?: string | null
           artist?: string | null
           created_at?: string
           duration?: string | null
