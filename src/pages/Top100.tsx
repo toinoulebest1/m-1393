@@ -42,8 +42,8 @@ const Top100 = () => {
   const [songToDelete, setSongToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const fetchFavoriteStats = async () => {
-    setIsLoading(true);
+  const fetchFavoriteStats = async (silent: boolean = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const { data: hiddenSongs } = await supabase
         .from('hidden_songs')
@@ -66,12 +66,12 @@ const Top100 = () => {
           )
         `)
         .not('song_id', 'in', hiddenIds.length > 0 ? `(${hiddenIds.join(',')})` : '()')
-        .order('count', { ascending: false })
-        .limit(100);
+        .order('count', { ascending: false });
+        // NOTE: No SQL .limit here; we limit after grouping to avoid excluding new songs
 
       if (error) throw error;
 
-      const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
+      const groupedStats = (data || []).reduce((acc: { [key: string]: FavoriteStat }, stat: any) => {
         if (!stat.songs) return acc;
         
         const key = `${stat.songs.title}-${stat.songs.artist}`.toLowerCase();
@@ -93,7 +93,7 @@ const Top100 = () => {
           acc[key].count += (stat.count || 0);
         }
         return acc;
-      }, {});
+      }, {} as { [key: string]: FavoriteStat });
 
       const formattedStats = Object.values(groupedStats)
         .sort((a, b) => b.count - a.count)
@@ -104,7 +104,7 @@ const Top100 = () => {
       console.error("Error fetching stats:", error);
       toast.error("Impossible de charger le Top 100");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -138,7 +138,7 @@ const Top100 = () => {
         { event: '*', schema: 'public', table: 'favorite_stats' },
         (payload) => {
           console.log('Favorite stats changed:', payload);
-          fetchFavoriteStats();
+          fetchFavoriteStats(true);
         }
       )
       .on(
@@ -146,7 +146,7 @@ const Top100 = () => {
         { event: '*', schema: 'public', table: 'hidden_songs' },
         (payload) => {
           console.log('Hidden songs changed:', payload);
-          fetchFavoriteStats();
+          fetchFavoriteStats(true);
         }
       )
       .subscribe((status) => {
