@@ -254,7 +254,7 @@ const Top100 = () => {
                   <div key={stat.songId} className="relative">
                     {/* Badge de rang */}
                     <div className={cn(
-                      "absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs",
+                      "absolute left-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs",
                       rank <= 3 ? "bg-gradient-to-br" : "bg-white/10",
                       getRankBadgeStyle(rank)
                     )}>
@@ -267,7 +267,7 @@ const Top100 = () => {
                       <span className="text-xs font-medium text-white">{stat.count}</span>
                     </div>
 
-                    <div className="pl-10" onClick={() => handlePlay(stat.song, index)}>
+                    <div className="pl-12" onClick={() => handlePlay(stat.song, index)}>
                       <SongCard
                         song={{
                           ...stat.song,
