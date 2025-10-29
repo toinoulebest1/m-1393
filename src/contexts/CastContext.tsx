@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { usePlayerContext } from './PlayerContext';
 
@@ -21,79 +21,223 @@ interface CastContextType {
 
 const CastContext = createContext<CastContextType | null>(null);
 
+// Extend window interface for Cast API
+declare global {
+  interface Window {
+    __onGCastApiAvailable: (isAvailable: boolean) => void;
+    chrome: {
+      cast: any;
+    };
+    cast: any;
+  }
+}
+
 export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Use usePlayerContext instead of usePlayer to match the export name
-  const { currentSong, isPlaying, progress, play, pause } = usePlayerContext();
+  const { currentSong, isPlaying } = usePlayerContext();
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [activeDevice, setActiveDevice] = useState<CastDevice | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [isCasting, setIsCasting] = useState(false);
+  const [castSession, setCastSession] = useState<any>(null);
+  const [isApiReady, setIsApiReady] = useState(false);
 
-  // Simuler la découverte des appareils (dans une vraie application, 
-  // vous utiliseriez des API comme Web Bluetooth, Google Cast, ou AirPlay)
-  const discoverDevices = async () => {
+  // Initialize Google Cast API
+  useEffect(() => {
+    const initializeCastApi = () => {
+      window['__onGCastApiAvailable'] = (isAvailable: boolean) => {
+        if (isAvailable) {
+          const cast = window.chrome?.cast || window.cast;
+          
+          if (!cast) {
+            console.log('Cast API not available');
+            return;
+          }
+
+          const sessionRequest = new cast.SessionRequest(cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID);
+          const apiConfig = new cast.ApiConfig(
+            sessionRequest,
+            (session: any) => {
+              console.log('Cast session started:', session);
+              setCastSession(session);
+              setIsCasting(true);
+              setActiveDevice({
+                id: session.sessionId,
+                name: session.receiver.friendlyName,
+                type: 'chromecast'
+              });
+              toast.success(`Connecté à ${session.receiver.friendlyName}`);
+            },
+            (status: string) => {
+              console.log('Cast session status:', status);
+              if (status === 'disconnected') {
+                handleDisconnect();
+              }
+            }
+          );
+
+          cast.initialize(apiConfig, () => {
+            console.log('Cast API initialized');
+            setIsApiReady(true);
+          }, (error: any) => {
+            console.error('Cast initialization error:', error);
+          });
+        }
+      };
+    };
+
+    // Wait for Cast SDK to load
+    if (typeof window.chrome?.cast !== 'undefined') {
+      initializeCastApi();
+    } else {
+      // Poll for Cast API availability
+      const checkInterval = setInterval(() => {
+        if (typeof window.chrome?.cast !== 'undefined') {
+          initializeCastApi();
+          clearInterval(checkInterval);
+        }
+      }, 100);
+
+      return () => clearInterval(checkInterval);
+    }
+  }, []);
+
+  const discoverDevices = useCallback(async () => {
+    if (!isApiReady) {
+      toast.error('API Cast non disponible. Assurez-vous d\'avoir un Chromecast sur votre réseau.');
+      return;
+    }
+
     setIsDiscovering(true);
     
     try {
-      // Simulation de la découverte d'appareils
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const cast = window.chrome?.cast || window.cast;
       
-      const mockDevices: CastDevice[] = [
-        { id: '1', name: 'Salon TV', type: 'chromecast' },
-        { id: '2', name: 'Haut-parleur cuisine', type: 'airplay' },
-        { id: '3', name: 'Chambre Speaker', type: 'other' }
-      ];
-      
-      setDevices(mockDevices);
-      toast.success('Appareils découverts');
-    } catch (error) {
-      console.error('Erreur lors de la découverte des appareils:', error);
-      toast.error('Impossible de découvrir les appareils');
+      if (!cast) {
+        throw new Error('Cast API not available');
+      }
+
+      // Request a cast session (this will show the device picker)
+      await new Promise((resolve, reject) => {
+        cast.requestSession(
+          (session: any) => {
+            console.log('Session obtained:', session);
+            setCastSession(session);
+            setIsCasting(true);
+            setActiveDevice({
+              id: session.sessionId,
+              name: session.receiver.friendlyName,
+              type: 'chromecast'
+            });
+            
+            // Set up session event listeners
+            session.addUpdateListener((isAlive: boolean) => {
+              if (!isAlive) {
+                handleDisconnect();
+              }
+            });
+            
+            toast.success(`Connecté à ${session.receiver.friendlyName}`);
+            resolve(session);
+          },
+          (error: any) => {
+            console.error('Session request error:', error);
+            if (error.code !== 'cancel') {
+              toast.error('Aucun appareil trouvé');
+            }
+            reject(error);
+          }
+        );
+      });
+    } catch (error: any) {
+      console.error('Erreur lors de la découverte:', error);
+      if (error.code !== 'cancel') {
+        toast.error('Impossible de découvrir les appareils');
+      }
     } finally {
       setIsDiscovering(false);
     }
-  };
+  }, [isApiReady]);
 
   const connectToDevice = async (device: CastDevice) => {
-    try {
-      // Simulation de la connexion à un appareil
-      toast.loading(`Connexion à ${device.name}...`, { id: 'cast-connect' });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setActiveDevice(device);
-      setIsCasting(true);
-      toast.success(`Connecté à ${device.name}`, { id: 'cast-connect' });
-      
-      // Si une chanson est en cours de lecture, la diffuser sur le nouvel appareil
-      if (currentSong && isPlaying) {
-        toast(`Diffusion de ${currentSong.title} sur ${device.name}`);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la connexion à l\'appareil:', error);
-      toast.error(`Impossible de se connecter à ${device.name}`, { id: 'cast-connect' });
-    }
+    // This is now handled by discoverDevices through requestSession
+    console.log('Connect to device:', device);
   };
 
-  const disconnectFromDevice = () => {
-    if (!activeDevice) return;
-    
-    try {
-      // Simulation de la déconnexion
-      setIsCasting(false);
-      toast.success(`Déconnecté de ${activeDevice.name}`);
-      setActiveDevice(null);
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
-      toast.error('Erreur lors de la déconnexion');
+  const handleDisconnect = useCallback(() => {
+    setIsCasting(false);
+    const deviceName = activeDevice?.name;
+    setActiveDevice(null);
+    setCastSession(null);
+    if (deviceName) {
+      toast.success(`Déconnecté de ${deviceName}`);
     }
-  };
+  }, [activeDevice]);
 
-  // Écouter les changements de chanson pour mettre à jour la diffusion
+  const disconnectFromDevice = useCallback(() => {
+    if (castSession) {
+      castSession.stop(
+        () => {
+          console.log('Session stopped');
+          handleDisconnect();
+        },
+        (error: any) => {
+          console.error('Error stopping session:', error);
+          handleDisconnect();
+        }
+      );
+    } else {
+      handleDisconnect();
+    }
+  }, [castSession, handleDisconnect]);
+
+  // Load media when song changes
   useEffect(() => {
-    if (isCasting && activeDevice && currentSong) {
-      console.log(`[Cast] Mise à jour de la diffusion sur ${activeDevice.name}: ${currentSong.title}`);
+    if (isCasting && castSession && currentSong && isPlaying) {
+      const cast = window.chrome?.cast || window.cast;
+      
+      if (!cast) return;
+
+      const mediaInfo = new cast.media.MediaInfo(currentSong.url, 'audio/mp3');
+      mediaInfo.metadata = new cast.media.GenericMediaMetadata();
+      mediaInfo.metadata.title = currentSong.title;
+      mediaInfo.metadata.subtitle = currentSong.artist || 'Unknown Artist';
+      
+      if (currentSong.imageUrl) {
+        mediaInfo.metadata.images = [
+          new cast.Image(currentSong.imageUrl)
+        ];
+      }
+
+      const request = new cast.media.LoadRequest(mediaInfo);
+      request.autoplay = true;
+
+      castSession.loadMedia(
+        request,
+        () => {
+          console.log('Media loaded successfully');
+          toast(`Diffusion de ${currentSong.title}`);
+        },
+        (error: any) => {
+          console.error('Error loading media:', error);
+          toast.error('Erreur lors du chargement du média');
+        }
+      );
     }
-  }, [currentSong, activeDevice, isCasting]);
+  }, [currentSong, isPlaying, isCasting, castSession]);
+
+  // Control playback on cast device
+  useEffect(() => {
+    if (isCasting && castSession) {
+      const media = castSession.getMediaSession();
+      if (media) {
+        if (isPlaying) {
+          media.play(null, () => {}, () => {});
+        } else {
+          media.pause(null, () => {}, () => {});
+        }
+      }
+    }
+  }, [isPlaying, isCasting, castSession]);
 
   return (
     <CastContext.Provider value={{
