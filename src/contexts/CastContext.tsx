@@ -45,6 +45,14 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize Google Cast API
   useEffect(() => {
     console.log('🎬 Initializing Cast API...');
+
+    // Cast ne fonctionne pas de manière fiable dans un iframe (mode preview)
+    if (window.top !== window.self) {
+      console.warn('⚠️ Cast in iframe preview may be limited. Open the app in a new tab.');
+      toast.info('Cast indisponible en mode aperçu', {
+        description: 'Ouvrez l’application dans un nouvel onglet pour détecter vos appareils Cast.'
+      });
+    }
     
     const initializeCastApi = () => {
       window['__onGCastApiAvailable'] = (isAvailable: boolean) => {
