@@ -42,26 +42,6 @@ const Top100 = () => {
   const [songToDelete, setSongToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/auth');
-        return;
-      }
-
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .single();
-
-      setIsAdmin(userRole?.role === 'admin');
-    };
-
-    checkAuth();
-  }, [navigate]);
-
   const fetchFavoriteStats = async () => {
     setIsLoading(true);
     try {
@@ -127,6 +107,26 @@ const Top100 = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
+    };
+
+    checkAuth();
+  }, [navigate]);
 
   useEffect(() => {
     fetchFavoriteStats();
