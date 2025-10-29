@@ -215,8 +215,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Load media when song changes
   useEffect(() => {
     const loadMediaToCast = async () => {
-      if (!isCasting || !castSession || !currentSong || !isPlaying) {
-        console.log('❌ Cast conditions not met:', { isCasting, hasSession: !!castSession, hasSong: !!currentSong, isPlaying });
+      if (!isCasting || !castSession || !currentSong) {
         return;
       }
 
@@ -224,13 +223,11 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!cast) {
         console.error('❌ Cast API not available');
-        toast.error('API Cast non disponible');
         return;
       }
 
       try {
         console.log('🎵 Preparing to cast:', currentSong.title);
-        console.log('📍 Original URL:', currentSong.url);
         
         // Obtenir l'URL réelle via UltraFastStreaming
         const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(currentSong.url);
@@ -262,13 +259,12 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ];
         }
 
-        // Ajouter des métadonnées supplémentaires
         if (currentSong.album_name) {
           mediaInfo.metadata.albumName = currentSong.album_name;
         }
 
         const request = new cast.media.LoadRequest(mediaInfo);
-        request.autoplay = true;
+        request.autoplay = isPlaying;
         request.currentTime = 0;
 
         console.log('📡 Sending to Cast device...');
@@ -297,7 +293,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     loadMediaToCast();
-  }, [currentSong, isPlaying, isCasting, castSession, activeDevice]);
+  }, [currentSong, isCasting, castSession, activeDevice]);
 
   // Control playback on cast device
   useEffect(() => {
@@ -307,7 +303,6 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const media = castSession.getMediaSession();
     if (!media) {
-      console.log('⚠️ No media session available yet');
       return;
     }
 
