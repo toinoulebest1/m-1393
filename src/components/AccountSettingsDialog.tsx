@@ -152,109 +152,122 @@ export const AccountSettingsDialog = () => {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-spotify-dark text-white max-w-4xl">
+      <DialogContent className="bg-spotify-dark text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">{t('common.accountSettings')}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6 mt-4">
-          <div className="flex flex-col items-center space-y-4">
-            <Avatar className="w-24 h-24">
-              <AvatarImage src={avatarUrl || undefined} alt="Avatar" />
-              <AvatarFallback><UserCog className="w-12 h-12" /></AvatarFallback>
-            </Avatar>
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                className="hidden"
-                id="avatar-upload"
-                disabled={isUploading}
-              />
-              <label htmlFor="avatar-upload">
-                <Button
-                  type="button"
-                  variant="secondary"
+        <div className="space-y-5 mt-4">
+          {/* Section Profil */}
+          <div className="bg-white/5 rounded-lg p-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-20 h-20">
+                <AvatarImage src={avatarUrl || undefined} alt="Avatar" />
+                <AvatarFallback><UserCog className="w-10 h-10" /></AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                  id="avatar-upload"
                   disabled={isUploading}
-                  className="cursor-pointer bg-spotify-accent hover:bg-spotify-accent/80"
-                  asChild
-                >
-                  <span>
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('common.uploading')}
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        {t('common.changeAvatar')}
-                      </>
-                    )}
-                  </span>
-                </Button>
-              </label>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="username" className="text-sm font-medium text-spotify-neutral">
-              Nom d'utilisateur
-            </label>
-            <Input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
-              placeholder="Entrez votre nom d'utilisateur"
-            />
-          </div>
-
-          {signupDate && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-spotify-neutral flex items-center gap-2">
-                <CalendarDays className="w-4 h-4" />
-                Date d'inscription
-              </h3>
-              <p className="text-sm text-white/80">
-                {format(new Date(signupDate), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
-              </p>
-            </div>
-          )}
-
-          {lastLogins.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-spotify-neutral flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Dernières connexions
-              </h3>
-              <div className="space-y-1">
-                {lastLogins.slice(0, 3).map((login: any, index: number) => (
-                  <p key={index} className="text-sm text-white/80">
-                    {format(new Date(login.timestamp), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
-                  </p>
-                ))}
+                />
+                <label htmlFor="avatar-upload">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={isUploading}
+                    className="cursor-pointer bg-spotify-accent hover:bg-spotify-accent/80"
+                    asChild
+                  >
+                    <span>
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          {t('common.uploading')}
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {t('common.changeAvatar')}
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
               </div>
             </div>
-          )}
 
-          <Button
-            onClick={handleUpdateProfile}
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Mise à jour...
-              </>
-            ) : (
-              "Enregistrer les modifications"
-            )}
-          </Button>
+            <div className="space-y-2">
+              <label htmlFor="username" className="text-sm font-medium text-spotify-neutral">
+                Nom d'utilisateur
+              </label>
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="Entrez votre nom d'utilisateur"
+              />
+            </div>
+
+            <Button
+              onClick={handleUpdateProfile}
+              disabled={isLoading}
+              className="w-full"
+              size="sm"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Mise à jour...
+                </>
+              ) : (
+                "Enregistrer les modifications"
+              )}
+            </Button>
+          </div>
+
+          {/* Section Informations */}
+          {(signupDate || lastLogins.length > 0) && (
+            <div className="bg-white/5 rounded-lg p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-white">Informations du compte</h3>
+              
+              {signupDate && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-spotify-neutral">
+                    <CalendarDays className="w-4 h-4" />
+                    <span className="text-xs font-medium">Date d'inscription</span>
+                  </div>
+                  <p className="text-sm text-white/80 pl-6">
+                    {format(new Date(signupDate), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                  </p>
+                </div>
+              )}
+
+              {lastLogins.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-spotify-neutral">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-xs font-medium">Dernières connexions</span>
+                  </div>
+                  <div className="space-y-1 pl-6">
+                    {lastLogins.slice(0, 3).map((login: any, index: number) => (
+                      <p key={index} className="text-sm text-white/80">
+                        {format(new Date(login.timestamp), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <Separator className="bg-white/10" />
 
+          {/* Section Préférences Musicales */}
           <MusicPreferences />
         </div>
       </DialogContent>
