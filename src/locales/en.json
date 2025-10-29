@@ -100,7 +100,9 @@
     "guessLyrics": "Guess the Lyrics",
     "playlists": "Playlists",
     "reports": "Reports",
-    "language": "Language"
+    "language": "Language",
+    "changeAvatar": "Change Avatar",
+    "uploading": "Uploading..."
   },
   "playlists": {
     "title": "Playlists",

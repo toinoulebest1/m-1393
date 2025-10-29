@@ -103,7 +103,9 @@
     "songsDeletedSuccess": "{{count}} chanson(s) supprimée(s) car fichiers introuvables",
     "errorDeletingSongs": "Erreur lors de la suppression des chansons",
     "libraryUpToDate": "Médiathèque à jour, tous les fichiers sont présents",
-    "syncError": "Erreur lors de la synchronisation de la médiathèque"
+    "syncError": "Erreur lors de la synchronisation de la médiathèque",
+    "changeAvatar": "Changer l'avatar",
+    "uploading": "Téléchargement..."
   },
   "playlists": {
     "title": "Playlists",
