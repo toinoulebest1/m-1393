@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SongCard } from "./SongCard";
-import { Skeleton } from "./ui/skeleton";
 import { Sparkles } from "lucide-react";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 
@@ -111,12 +110,28 @@ export const MusicDiscovery = () => {
     return (
       <div className="w-full px-6 py-8">
         <div className="flex items-center gap-2 mb-6">
-          <Sparkles className="w-6 h-6 text-spotify-accent" />
+          <Sparkles className="w-6 h-6 text-spotify-accent animate-pulse" />
           <h2 className="text-2xl font-bold">Découverte</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-64 rounded-lg" />
+            <div 
+              key={i} 
+              className="h-64 rounded-lg bg-gradient-to-br from-spotify-dark/50 to-spotify-dark animate-pulse relative overflow-hidden"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_ease-in-out_infinite]" 
+                   style={{ 
+                     animationDelay: `${i * 0.15}s`,
+                     backgroundSize: '200% 100%'
+                   }} 
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-spotify-accent/30 border-t-spotify-accent rounded-full animate-spin" 
+                     style={{ animationDelay: `${i * 0.05}s` }}
+                />
+              </div>
+            </div>
           ))}
         </div>
       </div>
