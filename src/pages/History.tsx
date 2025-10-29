@@ -184,9 +184,16 @@ const History = () => {
       return;
     }
     
-    setQueue([song]);
-    play(song);
+    // Créer la queue complète à partir de la chanson cliquée
+    const songIndex = history.findIndex(s => s.id === song.id);
+    const newQueue = songIndex >= 0 ? history.slice(songIndex) : [song];
     
+    // Sauvegarder la queue et les résultats pour la navigation
+    setQueue(newQueue);
+    localStorage.setItem('queue', JSON.stringify(newQueue));
+    localStorage.setItem('lastSearchResults', JSON.stringify(history));
+    
+    play(song);
     toast.success(`Lecture de : ${song.title}`);
   };
 
