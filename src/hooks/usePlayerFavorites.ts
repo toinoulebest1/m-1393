@@ -151,6 +151,7 @@ export const usePlayerFavorites = () => {
           console.log("Updated favorites after removal:", newFavorites.map(f => f.id));
           return newFavorites;
         });
+        window.dispatchEvent(new CustomEvent('favorite_stats_changed'));
         console.log("Favorite removed successfully");
       } else {
         // Le favori n'existe pas, on l'ajoute
@@ -207,6 +208,7 @@ export const usePlayerFavorites = () => {
           console.log("Updated favorites after addition:", newFavorites.map(f => f.id));
           return newFavorites;
         });
+        window.dispatchEvent(new CustomEvent('favorite_stats_changed'));
         console.log("Favorite added successfully");
       }
       console.log("==============================");
@@ -235,6 +237,7 @@ export const usePlayerFavorites = () => {
       }
 
       setFavorites(prev => prev.filter(s => s.id !== songId));
+      window.dispatchEvent(new CustomEvent('favorite_stats_changed'));
     } catch (error) {
       console.error("Erreur lors de la suppression du favori:", error);
     }

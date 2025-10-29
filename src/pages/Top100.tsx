@@ -131,6 +131,8 @@ const Top100 = () => {
   useEffect(() => {
     fetchFavoriteStats();
 
+    const onLocalChange = () => fetchFavoriteStats(true);
+
     const channel = supabase
       .channel('favorite_stats_top100_realtime')
       .on(
@@ -153,7 +155,12 @@ const Top100 = () => {
         console.log('Realtime subscription status:', status);
       });
 
-    return () => { supabase.removeChannel(channel); };
+    window.addEventListener('favorite_stats_changed', onLocalChange);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('favorite_stats_changed', onLocalChange);
+    };
   }, []);
 
   useEffect(() => {
