@@ -15,6 +15,7 @@ import { Song } from "@/types/player";
 import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { MusicDiscovery } from "@/components/MusicDiscovery";
+import { parseLrc, findCurrentLyricLine, ParsedLrc } from "@/utils/lrcParser";
 const Index = () => {
   const location = useLocation();
   const [username, setUsername] = useState<string | null>(null);
@@ -28,13 +29,16 @@ const Index = () => {
     previousSong,
     isPlaying,
     stopCurrentSong,
-    removeSong
+    removeSong,
+    progress
   } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+  const [parsedLyrics, setParsedLyrics] = useState<ParsedLrc | null>(null);
+  const [currentLyricLine, setCurrentLyricLine] = useState<string>("");
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -51,6 +55,63 @@ const Index = () => {
       setTimeout(restoreScroll, 300);
     }
   }, [location.pathname]);
+
+  // Fetch lyrics when song changes
+  useEffect(() => {
+    const fetchLyrics = async () => {
+      if (!currentSong?.id) {
+        setParsedLyrics(null);
+        setCurrentLyricLine("");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('lyrics')
+          .select('content')
+          .eq('song_id', currentSong.id)
+          .single();
+
+        if (error || !data?.content) {
+          setParsedLyrics(null);
+          setCurrentLyricLine("");
+          return;
+        }
+
+        // Parse lyrics if in LRC format
+        const timeRegex = /\[\d{1,2}[\.\:]\d{2}(?:[\.\:]\d{2})?\]/;
+        if (timeRegex.test(data.content)) {
+          const parsed = parseLrc(data.content);
+          setParsedLyrics(parsed);
+        } else {
+          setParsedLyrics(null);
+          setCurrentLyricLine("");
+        }
+      } catch (error) {
+        console.error("Error fetching lyrics:", error);
+        setParsedLyrics(null);
+        setCurrentLyricLine("");
+      }
+    };
+
+    fetchLyrics();
+  }, [currentSong?.id]);
+
+  // Update current lyric line based on playback progress
+  useEffect(() => {
+    if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) {
+      setCurrentLyricLine("");
+      return;
+    }
+
+    const { current } = findCurrentLyricLine(parsedLyrics.lines, progress, parsedLyrics.offset);
+    
+    if (current >= 0 && parsedLyrics.lines[current]) {
+      setCurrentLyricLine(parsedLyrics.lines[current].text);
+    } else {
+      setCurrentLyricLine("");
+    }
+  }, [progress, parsedLyrics]);
 
   // Force re-render when currentSong changes
   useEffect(() => {
@@ -254,15 +315,26 @@ const Index = () => {
         </div>
         
         <div className="w-full flex items-center justify-center py-8">
-          {currentSong ? <div className="text-center p-6 max-w-md mx-auto">
-              <div className="w-64 h-64 mx-auto mb-8 relative">
-                <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
+          {currentSong ? <div className="flex items-center justify-center gap-8 p-6 max-w-5xl mx-auto">
+              <div className="text-center flex-shrink-0">
+                <div className="w-64 h-64 mx-auto mb-6 relative">
+                  <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
+                <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
+                {currentSong.genre && <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+                    {currentSong.genre}
+                  </span>}
               </div>
-              <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
-              <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
-              {currentSong.genre && <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
-                  {currentSong.genre}
-                </span>}
+              
+              {currentLyricLine && <div className="flex items-center justify-center min-w-[300px] max-w-md">
+                  <p className="text-2xl font-semibold text-center leading-relaxed transition-all duration-300" style={{
+                    color: dominantColor ? `rgb(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]})` : 'rgb(255, 255, 255)',
+                    textShadow: dominantColor ? `0 0 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)` : '0 0 20px rgba(255, 255, 255, 0.3)'
+                  }}>
+                    {currentLyricLine}
+                  </p>
+                </div>}
             </div> : <div className="text-center p-6">
               <p className="text-gray-400">Aucune musique en cours de lecture</p>
             </div>}
