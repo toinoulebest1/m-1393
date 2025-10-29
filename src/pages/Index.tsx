@@ -39,6 +39,8 @@ const Index = () => {
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
   const [parsedLyrics, setParsedLyrics] = useState<ParsedLrc | null>(null);
   const [currentLyricLine, setCurrentLyricLine] = useState<string>("");
+  const [previousLyricLine, setPreviousLyricLine] = useState<string>("");
+  const [nextLyricLine, setNextLyricLine] = useState<string>("");
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -70,11 +72,13 @@ const Index = () => {
           .from('lyrics')
           .select('content')
           .eq('song_id', currentSong.id)
-          .single();
+          .maybeSingle();
 
         if (error || !data?.content) {
           setParsedLyrics(null);
           setCurrentLyricLine("");
+          setPreviousLyricLine("");
+          setNextLyricLine("");
           return;
         }
 
@@ -86,6 +90,8 @@ const Index = () => {
         } else {
           setParsedLyrics(null);
           setCurrentLyricLine("");
+          setPreviousLyricLine("");
+          setNextLyricLine("");
         }
       } catch (error) {
         console.error("Error fetching lyrics:", error);
@@ -101,6 +107,8 @@ const Index = () => {
   useEffect(() => {
     if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) {
       setCurrentLyricLine("");
+      setPreviousLyricLine("");
+      setNextLyricLine("");
       return;
     }
 
@@ -108,8 +116,24 @@ const Index = () => {
     
     if (current >= 0 && parsedLyrics.lines[current]) {
       setCurrentLyricLine(parsedLyrics.lines[current].text);
+      
+      // Previous line
+      if (current > 0 && parsedLyrics.lines[current - 1]) {
+        setPreviousLyricLine(parsedLyrics.lines[current - 1].text);
+      } else {
+        setPreviousLyricLine("");
+      }
+      
+      // Next line
+      if (current < parsedLyrics.lines.length - 1 && parsedLyrics.lines[current + 1]) {
+        setNextLyricLine(parsedLyrics.lines[current + 1].text);
+      } else {
+        setNextLyricLine("");
+      }
     } else {
       setCurrentLyricLine("");
+      setPreviousLyricLine("");
+      setNextLyricLine("");
     }
   }, [progress, parsedLyrics]);
 
@@ -315,7 +339,7 @@ const Index = () => {
         </div>
         
         <div className="w-full flex items-center justify-center py-8">
-          {currentSong ? <div className="flex items-center justify-center gap-8 p-6 max-w-5xl mx-auto">
+          {currentSong ? <div className="flex items-start justify-between gap-12 p-6 max-w-6xl mx-auto">
               <div className="text-center flex-shrink-0">
                 <div className="w-64 h-64 mx-auto mb-6 relative">
                   <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
@@ -327,13 +351,25 @@ const Index = () => {
                   </span>}
               </div>
               
-              {currentLyricLine && <div className="flex items-center justify-center min-w-[300px] max-w-md">
-                  <p className="text-2xl font-semibold text-center leading-relaxed transition-all duration-300" style={{
+              {currentLyricLine && <div className="flex flex-col justify-center gap-2 min-w-[350px] max-w-lg ml-auto pt-16">
+                  {previousLyricLine && <p className="text-sm text-right leading-relaxed transition-all duration-300" style={{
+                      color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)` : 'rgba(255, 255, 255, 0.3)'
+                    }}>
+                      {previousLyricLine}
+                    </p>}
+                  
+                  <p className="text-lg font-semibold text-right leading-relaxed transition-all duration-300" style={{
                     color: dominantColor ? `rgb(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]})` : 'rgb(255, 255, 255)',
-                    textShadow: dominantColor ? `0 0 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)` : '0 0 20px rgba(255, 255, 255, 0.3)'
+                    textShadow: dominantColor ? `0 0 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)` : '0 0 15px rgba(255, 255, 255, 0.3)'
                   }}>
                     {currentLyricLine}
                   </p>
+                  
+                  {nextLyricLine && <p className="text-sm text-right leading-relaxed transition-all duration-300" style={{
+                      color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)` : 'rgba(255, 255, 255, 0.4)'
+                    }}>
+                      {nextLyricLine}
+                    </p>}
                 </div>}
             </div> : <div className="text-center p-6">
               <p className="text-gray-400">Aucune musique en cours de lecture</p>
