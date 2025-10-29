@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PlayerPreferences } from '@/types/player';
-import { isInCache, getFromCache, addToCache } from '@/utils/audioCache';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 export const usePlayerPreferences = () => {
   const [preferences, setPreferences] = useState<PlayerPreferences>({
@@ -43,9 +43,8 @@ export const usePlayerPreferences = () => {
     loadPreferences();
   }, []);
 
-  // Fonction pour précharger les pistes suivantes
+  // Fonction pour précharger les pistes suivantes avec système ultra-rapide
   const preloadNextTracks = useCallback(async () => {
-    const { supabase } = await import('@/integrations/supabase/client');
     try {
       // On récupère les données du contexte 
       const currentSongStr = localStorage.getItem('currentSong');
@@ -61,23 +60,13 @@ export const usePlayerPreferences = () => {
       const currentIndex = queue.findIndex((song: any) => song.id === currentSong.id);
       if (currentIndex === -1) return;
       
-      const tracksToPreload = queue.slice(currentIndex + 1, currentIndex + 3);
+      // Précharger uniquement la prochaine chanson pour ne pas surcharger
+      const nextTrack = queue[currentIndex + 1];
       
-      for (const track of tracksToPreload) {
-        if (await isInCache(track.url)) {
-          console.log(`Utilisation du fichier audio en cache: ${track.title}`);
-        } else {
-          console.log(`Préchargement de la piste: ${track.title}`);
-          const { getAudioFileUrl } = await import('@/utils/storage');
-          const audioUrl = await getAudioFileUrl(track.url);
-          if (!audioUrl || typeof audioUrl !== 'string') continue;
-          
-          const response = await fetch(audioUrl);
-          if (response.ok) {
-            const blob = await response.blob();
-            await addToCache(track.url, blob);
-          }
-        }
+      if (nextTrack) {
+        console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
+        await UltraFastStreaming.preloadNext(nextTrack.url);
+        console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }
     } catch (error) {
       console.error("Erreur lors du préchargement des pistes:", error);

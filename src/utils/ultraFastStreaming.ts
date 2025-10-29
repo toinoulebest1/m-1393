@@ -5,15 +5,13 @@
 
 import { getAudioFileUrl } from './storage';
 import { UltraFastCache } from './ultraFastCache';
-// import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
-// import { isInCache, getFromCache } from './audioCache'; // DÉSACTIVÉ
 
 export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
   private static requestCount = 0;
 
   /**
-   * Obtention URL ultra-rapide avec multiples stratégies parallèles
+   * Obtention URL ultra-rapide avec stratégies parallèles
    */
   static async getAudioUrlUltraFast(songUrl: string): Promise<string> {
     const startTime = performance.now();
@@ -39,16 +37,14 @@ export class UltraFastStreaming {
       return warmResult;
     }
 
-    // Cache mémoire DÉSACTIVÉ
-    
     // 3. Vérifier si déjà en cours de récupération
     if (this.promisePool.has(songUrl)) {
       console.log("⏳ Réutilisation promesse existante");
       return await this.promisePool.get(songUrl)!;
     }
 
-    // 4. Streaming ultra-agressif avec parallélisation
-    const promise = this.streamingDirectOnly(songUrl, startTime);
+    // 4. Streaming ultra-agressif
+    const promise = this.streamingDirect(songUrl, startTime);
     this.promisePool.set(songUrl, promise);
 
     try {
@@ -64,12 +60,11 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Streaming direct sans IndexedDB
+   * Streaming direct optimisé
    */
-  private static async streamingDirectOnly(songUrl: string, startTime: number): Promise<string> {
-    console.log("🚀 Streaming direct sans cache");
+  private static async streamingDirect(songUrl: string, startTime: number): Promise<string> {
+    console.log("🚀 Streaming direct");
 
-    // Directement le réseau
     try {
       const result = await this.tryNetwork(songUrl);
       if (result) {
@@ -83,14 +78,6 @@ export class UltraFastStreaming {
       console.error("❌ Erreur streaming direct:", error);
       throw error;
     }
-  }
-
-  /**
-   * Tentative IndexedDB DÉSACTIVÉE
-   */
-  private static async tryIndexedDB(songUrl: string): Promise<string | null> {
-    // IndexedDB désactivé
-    return null;
   }
 
   /**
@@ -116,9 +103,6 @@ export class UltraFastStreaming {
     // Warm cache immédiat
     UltraFastCache.setWarm(songUrl, audioUrl);
     
-    // Cache mémoire DÉSACTIVÉ
-    // memoryCache.set(songUrl, audioUrl);
-    
     // L0 cache en arrière-plan avec blob
     setTimeout(async () => {
       try {
@@ -136,39 +120,23 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Préchargement batch ultra-optimisé
+   * Préchargement de la chanson suivante en arrière-plan
    */
-  static async preloadBatch(songUrls: string[]): Promise<void> {
-    console.log("🚀 BATCH PRELOAD:", songUrls.length, "URLs");
+  static async preloadNext(songUrl: string): Promise<void> {
+    console.log("🔮 Préchargement arrière-plan:", songUrl);
     
-    // Filtrer les URLs déjà en cache
-    const urlsToPreload = songUrls.filter(url => 
-      !UltraFastCache.hasL0(url) && !UltraFastCache.getWarm(url)
-    );
-    
-    if (urlsToPreload.length === 0) {
-      console.log("✅ Tous déjà en cache");
+    // Ne précharger que si pas déjà en cache
+    if (UltraFastCache.hasL0(songUrl) || UltraFastCache.getWarm(songUrl)) {
+      console.log("✅ Déjà en cache");
       return;
     }
     
-    console.log("📡 Préchargement de", urlsToPreload.length, "URLs");
-    
-    // Précharger avec délai échelonné
-    const promises = urlsToPreload.map((url, index) => 
-      new Promise<void>(resolve => 
-        setTimeout(async () => {
-          try {
-            await this.getAudioUrlUltraFast(url);
-          } catch (error) {
-            console.warn("⚠️ Préchargement échoué:", url);
-          }
-          resolve();
-        }, index * 50) // 50ms entre chaque requête
-      )
-    );
-    
-    await Promise.allSettled(promises);
-    console.log("✅ Batch preload terminé");
+    try {
+      await this.getAudioUrlUltraFast(songUrl);
+      console.log("✅ Préchargement terminé:", songUrl);
+    } catch (error) {
+      console.warn("⚠️ Échec préchargement:", error);
+    }
   }
 
   /**

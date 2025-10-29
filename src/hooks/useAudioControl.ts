@@ -1,10 +1,8 @@
 import { useCallback } from 'react';
-import { getAudioFileUrl } from '@/utils/storage';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
-// import { isInCache, getFromCache, addToCache } from '@/utils/audioCache'; // DÉSACTIVÉ
-// import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { AutoplayManager } from '@/utils/autoplayManager';
 
 interface UseAudioControlProps {
@@ -65,16 +63,16 @@ export const useAudioControl = ({
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
         
-        console.log("🚀 Récupération URL...");
+        console.log("🚀 Récupération URL ultra-rapide...");
         const startTime = performance.now();
         
-        // Récupération de l'URL audio
-        const audioData = await getAudioFileUrl(song.url).then(url => {
-          if (typeof url === 'string') {
-            return { url, fromCache: false };
-          }
-          throw new Error('URL invalide');
-        }).catch(error => {
+        // Récupération ultra-rapide de l'URL audio
+        let audioUrl: string;
+        try {
+          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url);
+          const elapsed = performance.now() - startTime;
+          console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+        } catch (error: any) {
           console.error("❌ Erreur récupération audio:", error.message);
           
           // Gestion spécifique des erreurs
@@ -87,54 +85,54 @@ export const useAudioControl = ({
           }
           
           throw error;
-        });
-        
-        const audioUrl = audioData.url;
-        const elapsed = performance.now() - startTime;
-        
-        console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+        }
 
         if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration audio
-        console.log("⚡ Configuration streaming");
-        audio.preload = "metadata"; // Chargement minimal pour démarrer plus vite
+        // Configuration streaming ultra-rapide
+        console.log("⚡ Configuration streaming ultra-rapide");
+        audio.preload = "auto"; // Chargement immédiat
         audio.src = audioUrl;
         
-        // Attendre que l'audio soit prêt à être joué
-        const waitForCanPlay = new Promise<void>((resolve, reject) => {
+        // Attendre uniquement un buffer minimal (HAVE_ENOUGH_DATA)
+        const waitForMinimalBuffer = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Timeout lors du chargement audio'));
-          }, 10000); // 10 secondes max
+          }, 5000); // 5 secondes max (réduit de 10s)
           
-          const onCanPlay = () => {
-            clearTimeout(timeout);
-            audio.removeEventListener('canplay', onCanPlay);
-            audio.removeEventListener('error', onError);
-            resolve();
+          const checkReady = () => {
+            // Accepter dès que readyState >= 2 (HAVE_CURRENT_DATA)
+            // Plus besoin d'attendre HAVE_FUTURE_DATA (3) ou HAVE_ENOUGH_DATA (4)
+            if (audio.readyState >= 2) {
+              clearTimeout(timeout);
+              audio.removeEventListener('loadeddata', checkReady);
+              audio.removeEventListener('canplay', checkReady);
+              audio.removeEventListener('error', onError);
+              console.log("✅ Buffer minimal atteint (readyState:", audio.readyState, ")");
+              resolve();
+            }
           };
           
           const onError = (e: Event) => {
             clearTimeout(timeout);
-            audio.removeEventListener('canplay', onCanPlay);
+            audio.removeEventListener('loadeddata', checkReady);
+            audio.removeEventListener('canplay', checkReady);
             audio.removeEventListener('error', onError);
             reject(new Error('Erreur lors du chargement audio'));
           };
           
-          audio.addEventListener('canplay', onCanPlay, { once: true });
-          audio.addEventListener('error', onError, { once: true });
+          audio.addEventListener('loadeddata', checkReady);
+          audio.addEventListener('canplay', checkReady);
+          audio.addEventListener('error', onError);
           
-          // Si l'audio est déjà prêt
-          if (audio.readyState >= 3) { // HAVE_FUTURE_DATA ou plus
-            onCanPlay();
-          }
+          // Vérifier immédiatement si déjà prêt
+          checkReady();
         });
         
-        console.log("⏳ Attente du chargement audio...");
-        await waitForCanPlay;
-        console.log("✅ Audio prêt à être lu");
+        console.log("⏳ Attente buffer minimal...");
+        await waitForMinimalBuffer;
         
         // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
         console.log("🚀 Démarrage lecture avec AutoplayManager...");
@@ -153,8 +151,8 @@ export const useAudioControl = ({
           
           setIsPlaying(true);
           
-          // Préchargement désactivé pour éviter les conflits
-          // setTimeout(() => preloadNextTracks(), 50);
+          // Préchargement de la chanson suivante en arrière-plan
+          setTimeout(() => preloadNextTracks(), 1000);
           
           // Changement terminé
           changeTimeoutRef.current = window.setTimeout(() => {
