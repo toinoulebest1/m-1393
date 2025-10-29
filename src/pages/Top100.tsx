@@ -1,23 +1,27 @@
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
-import { Award, Play, Heart, Trash2, ShieldCheck, FileText } from "lucide-react";
+import { Trophy, Play, Heart, Music, Trash2 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Button } from "@/components/ui/button";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { LyricsModal } from "@/components/LyricsModal";
-import { cn } from "@/lib/utils";
 import { extractDominantColor } from "@/utils/colorExtractor";
-
-const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?w=64&h=64&fit=crop&auto=format";
+import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface FavoriteStat {
   songId: string;
   count: number;
-  lastUpdated: string;
   song: {
     id: string;
     title: string;
@@ -29,128 +33,73 @@ interface FavoriteStat {
 }
 
 const Top100 = () => {
-  const { play, currentSong, isPlaying, addToQueue } = usePlayer();
+  const { play, currentSong, isPlaying, pause, setQueue } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
   const [dominantColors, setDominantColors] = useState<{ [key: string]: [number, number, number] }>({});
-  const [previousPositions, setPreviousPositions] = useState<{ [key: string]: number }>({});
-  const [animatingItems, setAnimatingItems] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [songToDelete, setSongToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
-  const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist?: string } | null>(null);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          navigate('/auth');
-          return;
-        }
-
-        if (!session) {
-          console.log("No active session found");
-          navigate('/auth');
-          return;
-        }
-
-        const checkAdminStatus = async () => {
-          try {
-            console.log("Checking admin status for user:", session.user.id);
-            const { data: userRole, error: roleError } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .single();
-
-            if (roleError) {
-              console.error("Error fetching user role:", roleError);
-              return;
-            }
-
-            console.log("User role data:", userRole);
-            setIsAdmin(userRole?.role === 'admin');
-          } catch (error) {
-            console.error("Admin check error:", error);
-          }
-        };
-
-        await checkAdminStatus();
-      } catch (error) {
-        console.error("Session check error:", error);
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         navigate('/auth');
+        return;
       }
+
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAdmin(userRole?.role === 'admin');
     };
 
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
-      if (event === 'SIGNED_OUT' || !session) {
-        navigate('/auth');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    checkAuth();
   }, [navigate]);
 
   useEffect(() => {
     const fetchFavoriteStats = async () => {
+      setIsLoading(true);
       try {
-        console.log("Fetching favorite stats...");
-        
-        const { data: hiddenSongsData } = await supabase
+        const { data: hiddenSongs } = await supabase
           .from('hidden_songs')
           .select('song_id');
         
-        const hiddenSongIds = hiddenSongsData?.map(hs => hs.song_id) || [];
-        console.log("Hidden song IDs:", hiddenSongIds);
+        const hiddenIds = hiddenSongs?.map(hs => hs.song_id) || [];
 
         const { data, error } = await supabase
           .from('favorite_stats')
           .select(`
             song_id,
             count,
-            last_updated,
             songs (
               id,
               title,
               artist,
               file_path,
-              created_at,
               duration,
               image_url
             )
           `)
-          .not('song_id', 'in', `(${hiddenSongIds.join(',')})`)
-          .order('count', { ascending: false });
+          .not('song_id', 'in', hiddenIds.length > 0 ? `(${hiddenIds.join(',')})` : '()')
+          .order('count', { ascending: false })
+          .limit(100);
 
-        if (error) {
-          console.error("Error fetching favorite stats:", error);
-          toast({
-            variant: "destructive",
-            title: "Erreur",
-            description: "Impossible de charger le top 100",
-          });
-          return;
-        }
-
-        console.log("Received favorite stats:", data);
+        if (error) throw error;
 
         const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
           if (!stat.songs) return acc;
           
-          const key = `${stat.songs.title.toLowerCase()}-${(stat.songs.artist || '').toLowerCase()}`;
+          const key = `${stat.songs.title}-${stat.songs.artist}`.toLowerCase();
           
           if (!acc[key]) {
             acc[key] = {
               songId: stat.song_id,
               count: stat.count || 0,
-              lastUpdated: stat.last_updated,
               song: {
                 id: stat.songs.id,
                 title: stat.songs.title,
@@ -161,115 +110,45 @@ const Top100 = () => {
               }
             };
           } else {
-            if (stat.count) {
-              acc[key].count = (acc[key].count || 0) + stat.count;
-            }
-            if (new Date(stat.last_updated) > new Date(acc[key].lastUpdated)) {
-              acc[key].lastUpdated = stat.last_updated;
-            }
+            acc[key].count += (stat.count || 0);
           }
           return acc;
         }, {});
 
         const formattedStats = Object.values(groupedStats)
-          .sort((a, b) => (b.count || 0) - (a.count || 0))
+          .sort((a, b) => b.count - a.count)
           .slice(0, 100);
 
-        console.log("Formatted and grouped stats:", formattedStats);
-        
-        // Détecter les changements de position pour les animations
-        const newPositions: { [key: string]: number } = {};
-        const newAnimatingItems = new Set<string>();
-        
-        formattedStats.forEach((stat, index) => {
-          const songKey = stat.songId;
-          newPositions[songKey] = index;
-          
-          // Si la chanson existait avant et a changé de position
-          if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
-            const previousPos = previousPositions[songKey];
-            const movement = previousPos > index ? 'up' : 'down';
-            console.log(`🎵 Animation détectée: ${stat.song.title} - Position ${previousPos} → ${index} (${movement})`);
-            newAnimatingItems.add(songKey);
-          }
-        });
-        
-        // Mettre à jour les positions et déclencher les animations
-        if (newAnimatingItems.size > 0) {
-          console.log(`🎬 Déclenchement de ${newAnimatingItems.size} animations`);
-        }
-        
-        setPreviousPositions(newPositions);
-        setAnimatingItems(newAnimatingItems);
         setFavoriteStats(formattedStats);
-        
-        // Nettoyer les animations après un délai
-        if (newAnimatingItems.size > 0) {
-          setTimeout(() => {
-            console.log("🧹 Nettoyage des animations");
-            setAnimatingItems(new Set());
-          }, 1200);
-        }
       } catch (error) {
-        console.error("Error in fetchFavoriteStats:", error);
+        console.error("Error fetching stats:", error);
+        toast.error("Impossible de charger le Top 100");
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchFavoriteStats();
 
-    const favoriteStatsChannel = supabase
-      .channel('favorite_stats_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'favorite_stats'
-        },
-        (payload) => {
-          console.log("Favorite stats changed:", payload);
-          fetchFavoriteStats();
-        }
-      )
+    const channel = supabase
+      .channel('favorite_stats_top100')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'favorite_stats' }, fetchFavoriteStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hidden_songs' }, fetchFavoriteStats)
       .subscribe();
 
-    const hiddenSongsChannel = supabase
-      .channel('hidden_songs_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'hidden_songs'
-        },
-        (payload) => {
-          console.log("Hidden songs changed:", payload);
-          fetchFavoriteStats();
-        }
-      )
-      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
-    return () => {
-      supabase.removeChannel(favoriteStatsChannel);
-      supabase.removeChannel(hiddenSongsChannel);
-    };
-  }, [toast]);
-
-  // Extract dominant colors for images
   useEffect(() => {
     const extractColors = async () => {
       const newColors: { [key: string]: [number, number, number] } = {};
       
-      for (const stat of favoriteStats) {
+      for (const stat of favoriteStats.slice(0, 20)) {
         if (stat.song.image_url && !dominantColors[stat.songId]) {
           try {
             const color = await extractDominantColor(stat.song.image_url);
-            if (color) {
-              newColors[stat.songId] = color;
-            }
-          } catch (error) {
-            console.error("Error extracting color for", stat.song.title, error);
-          }
+            if (color) newColors[stat.songId] = color;
+          } catch (e) {}
         }
       }
       
@@ -278,150 +157,80 @@ const Top100 = () => {
       }
     };
 
-    if (favoriteStats.length > 0) {
-      extractColors();
+    if (favoriteStats.length > 0) extractColors();
+  }, [favoriteStats]);
+
+  const handlePlay = (song: any, index: number) => {
+    const songWithImage = {
+      ...song,
+      url: song.url,
+      imageUrl: song.image_url,
+      id: song.id
+    };
+
+    if (currentSong?.id === song.id) {
+      isPlaying ? pause() : play();
+      return;
     }
-  }, [favoriteStats, dominantColors]);
 
-  const handlePlay = async (song: any) => {
-    try {
-      console.log("Tentative de lecture de la chanson:", song);
-      if (!song) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Chanson invalide"
-        });
-        return;
-      }
+    const newQueue = favoriteStats.slice(index).map(stat => ({
+      ...stat.song,
+      url: stat.song.url,
+      imageUrl: stat.song.image_url,
+      id: stat.song.id
+    }));
 
-      const songWithImage = {
-        ...song,
-        url: song.url,
-        imageUrl: song.image_url,
-        duration: song.duration,
-        title: song.title,
-        artist: song.artist,
-        id: song.id
-      };
-
-      await play(songWithImage);
-      console.log("Lecture démarrée:", songWithImage.title);
-      
-      const songIndex = favoriteStats.findIndex(stat => stat.songId === song.id);
-      const remainingSongs = favoriteStats
-        .slice(songIndex + 1)
-        .map(stat => ({
-          ...stat.song,
-          url: stat.song.url,
-          imageUrl: stat.song.image_url,
-          duration: stat.song.duration,
-          title: stat.song.title,
-          artist: stat.song.artist,
-          id: stat.song.id
-        }));
-      
-      console.log("Ajout à la file d'attente:", remainingSongs);
-      
-      remainingSongs.forEach(nextSong => {
-        if (nextSong) {
-          console.log("Ajout à la file d'attente:", nextSong.title);
-          addToQueue(nextSong);
-        }
-      });
-    } catch (error) {
-      console.error("Erreur lors de la lecture:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur de lecture",
-        description: "Impossible de lire cette chanson"
-      });
-    }
+    setQueue(newQueue);
+    localStorage.setItem('queue', JSON.stringify(newQueue));
+    localStorage.setItem('lastSearchResults', JSON.stringify(favoriteStats.map(s => s.song)));
+    
+    play(songWithImage);
+    toast.success(`Lecture: ${song.title}`);
   };
 
-  const handleDelete = async (songId: string) => {
+  const handleDelete = async () => {
+    if (!songToDelete) return;
+
     try {
-      console.log("Checking if song is already hidden:", songId);
-      
-      const { data: existingHidden } = await supabase
-        .from('hidden_songs')
-        .select('id')
-        .eq('song_id', songId)
-        .single();
-
-      if (existingHidden) {
-        console.log("Song is already hidden:", songId);
-        toast({
-          title: "Information",
-          description: "Cette musique est déjà masquée",
-        });
-        return;
-      }
-
-      console.log("Masquage de la chanson dans la base de données:", songId);
       const { error } = await supabase
         .from('hidden_songs')
-        .insert({ song_id: songId });
+        .insert({ song_id: songToDelete });
 
-      if (error) {
-        console.error("Erreur lors du masquage de la chanson:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de masquer la chanson"
-        });
-        return;
-      }
+      if (error) throw error;
 
-      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songId));
-      toast({
-        title: "Succès",
-        description: "La musique a été masquée",
-      });
+      setFavoriteStats(prev => prev.filter(stat => stat.songId !== songToDelete));
+      toast.success("Chanson masquée du Top 100");
+      setSongToDelete(null);
     } catch (error) {
-      console.error("Erreur lors du masquage de la chanson:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Une erreur est survenue lors du masquage de la chanson"
-      });
+      toast.error("Erreur lors du masquage");
     }
   };
 
-  const formatDuration = (duration: string) => {
-    if (!duration) return "0:00";
-    
-    try {
-      if (duration.includes(':')) {
-        const [minutes, seconds] = duration.split(':').map(Number);
-        if (isNaN(minutes) || isNaN(seconds)) return "0:00";
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      }
-      
-      const durationInSeconds = parseFloat(duration);
-      if (isNaN(durationInSeconds)) return "0:00";
-      
-      const minutes = Math.floor(durationInSeconds / 60);
-      const seconds = Math.floor(durationInSeconds % 60);
-      
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error("Error formatting duration:", error);
-      return "0:00";
-    }
+  const getRankBadgeStyle = (rank: number) => {
+    if (rank === 1) return "from-yellow-400 to-yellow-600 text-black";
+    if (rank === 2) return "from-gray-300 to-gray-500 text-black";
+    if (rank === 3) return "from-orange-400 to-orange-600 text-white";
+    return "bg-white/10 text-spotify-neutral";
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <Music className="w-12 h-12 text-spotify-accent animate-pulse" />
+        </div>
+        <Player />
+      </Layout>
+    );
+  }
 
   if (favoriteStats.length === 0) {
     return (
       <Layout>
-        <div className="container mx-auto p-6 max-w-6xl">
-          <div className="text-center space-y-4 py-20">
-            <Award className="w-16 h-16 text-spotify-accent mx-auto" />
-            <h1 className="text-3xl font-bold text-white">Top 100</h1>
-            <p className="text-spotify-neutral text-lg">
-              Aucune musique n'a encore été ajoutée aux favoris par la communauté
-            </p>
-          </div>
+        <div className="flex flex-col items-center justify-center h-screen space-y-4">
+          <Trophy className="w-20 h-20 text-spotify-neutral/50" />
+          <h2 className="text-2xl font-bold text-white">Aucune chanson dans le Top 100</h2>
+          <p className="text-spotify-neutral">Commencez à aimer des chansons pour les voir ici</p>
         </div>
         <Player />
       </Layout>
@@ -430,318 +239,183 @@ const Top100 = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 max-w-6xl">
-        {isAdmin && (
-          <Alert className="mb-6 border-spotify-accent bg-spotify-accent/10">
-            <ShieldCheck className="h-5 w-5 text-spotify-accent" />
-            <AlertDescription className="text-spotify-accent">
-              Vous êtes connecté en tant qu'administrateur
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-              <Award className="w-8 h-8 text-white" />
+      <div className="w-full h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-8 pb-32">
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Trophy className="w-10 h-10 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-5xl font-bold text-white mb-1">Top 100</h1>
+                  <p className="text-spotify-neutral text-lg">
+                    Les {favoriteStats.length} morceaux les plus aimés par la communauté
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Top 100</h1>
-              <p className="text-spotify-neutral">{favoriteStats.length} morceaux les plus aimés</p>
-            </div>
-            
-            <div className="flex gap-3">
-              {/* Simulation d'activité pour rendre les animations visibles */}
-              <Button
-                onClick={() => {
-                  console.log("🎲 Simulation d'activité naturelle");
-                  const statsToUpdate = [...favoriteStats];
-                  
-                  // Simuler des changements réalistes (quelques musiques bougent légèrement)
-                  for (let i = 0; i < Math.min(3, statsToUpdate.length - 1); i++) {
-                    const randomIndex = Math.floor(Math.random() * (statsToUpdate.length - 1));
-                    
-                    // Échanger avec l'élément suivant (mouvement naturel)
-                    if (randomIndex < statsToUpdate.length - 1) {
-                      [statsToUpdate[randomIndex], statsToUpdate[randomIndex + 1]] = 
-                      [statsToUpdate[randomIndex + 1], statsToUpdate[randomIndex]];
-                    }
-                  }
-                  
-                  // Appliquer la logique de détection d'animation
-                  const newPositions: { [key: string]: number } = {};
-                  const newAnimatingItems = new Set<string>();
-                  
-                  statsToUpdate.forEach((stat, index) => {
-                    const songKey = stat.songId;
-                    newPositions[songKey] = index;
-                    
-                    if (previousPositions[songKey] !== undefined && previousPositions[songKey] !== index) {
-                      const movement = previousPositions[songKey] > index ? 'up' : 'down';
-                      console.log(`✨ Mouvement naturel: ${stat.song.title} - Position ${previousPositions[songKey]} → ${index} (${movement})`);
-                      newAnimatingItems.add(songKey);
-                    }
-                  });
-                  
-                  if (newAnimatingItems.size > 0) {
-                    console.log(`🎬 ${newAnimatingItems.size} changements détectés`);
-                    setPreviousPositions(newPositions);
-                    setAnimatingItems(newAnimatingItems);
-                    setFavoriteStats(statsToUpdate);
-                    
-                    setTimeout(() => {
-                      setAnimatingItems(new Set());
-                    }, 1200);
-                  }
-                }}
-                variant="outline"
-                className="border-spotify-accent/30 text-spotify-accent hover:bg-spotify-accent/10"
-              >
-                🎵 Simuler Activité
-              </Button>
-              
-              {/* Bouton pour rotation automatique */}
-              <Button
-                onClick={() => {
-                  console.log("🔄 Rotation automatique activée");
-                  let rotationCount = 0;
-                  const maxRotations = 5;
-                  
-                  const rotationInterval = setInterval(() => {
-                    if (rotationCount >= maxRotations) {
-                      clearInterval(rotationInterval);
-                      console.log("🛑 Rotation automatique terminée");
-                      return;
-                    }
-                    
-                    setFavoriteStats(currentStats => {
-                      const newStats = [...currentStats];
-                      
-                      // Mouvement circulaire plus naturel
-                      for (let i = 0; i < 2; i++) {
-                        const randomIdx = Math.floor(Math.random() * (newStats.length - 2));
-                        if (randomIdx < newStats.length - 1) {
-                          [newStats[randomIdx], newStats[randomIdx + 1]] = 
-                          [newStats[randomIdx + 1], newStats[randomIdx]];
-                        }
-                      }
-                      
-                      // Détecter et animer
-                      const newPositions: { [key: string]: number } = {};
-                      const newAnimatingItems = new Set<string>();
-                      
-                      newStats.forEach((stat, index) => {
-                        newPositions[stat.songId] = index;
-                        if (previousPositions[stat.songId] !== undefined && 
-                            previousPositions[stat.songId] !== index) {
-                          newAnimatingItems.add(stat.songId);
-                        }
-                      });
-                      
-                      setPreviousPositions(newPositions);
-                      setAnimatingItems(newAnimatingItems);
-                      
-                      setTimeout(() => setAnimatingItems(new Set()), 1200);
-                      
-                      rotationCount++;
-                      console.log(`🔄 Rotation ${rotationCount}/${maxRotations}`);
-                      
-                      return newStats;
-                    });
-                  }, 2000);
-                }}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                🔄 Auto-Rotation
-              </Button>
-            </div>
-          </div>
 
-          <div className="bg-white/5 rounded-lg overflow-hidden">
-            <div className="space-y-0">
-              {favoriteStats.map((stat, index) => {
-                const isCurrentSong = currentSong?.id === stat.song.id;
-                const rankNumber = index + 1;
-                const isTop3 = rankNumber <= 3;
-                const dominantColor = dominantColors[stat.songId];
+            {/* Top 3 podium */}
+            {favoriteStats.length >= 3 && (
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                {[1, 0, 2].map((idx) => {
+                  const stat = favoriteStats[idx];
+                  if (!stat) return null;
+                  const rank = idx + 1;
+                  const isCurrentSong = currentSong?.id === stat.song.id;
 
-                const isAnimating = animatingItems.has(stat.songId);
-                const previousPos = previousPositions[stat.songId];
-                const hasMovedUp = previousPos !== undefined && previousPos > index;
-                const hasMovedDown = previousPos !== undefined && previousPos < index;
-                
-                if (isAnimating) {
-                  console.log(`🎭 Animation active pour: ${stat.song.title} (position ${index})`);
-                }
-
-                return (
-                  <div
-                    key={stat.songId}
-                    className={cn(
-                      "group p-4 cursor-pointer border-b border-white/5 last:border-b-0 relative overflow-hidden",
-                      "transition-all duration-700 ease-out",
-                      isCurrentSong 
-                        ? "bg-spotify-accent/20" 
-                        : "hover:bg-white/5",
-                      // Animations plus visibles pour les changements de position
-                      isAnimating && hasMovedUp && "animate-[slideUp_0.7s_ease-out] bg-green-500/10 border-green-400/30",
-                      isAnimating && hasMovedDown && "animate-[slideDown_0.7s_ease-out] bg-red-500/10 border-red-400/30",
-                      isAnimating && "shadow-2xl ring-2 ring-spotify-accent/50"
-                    )}
-                    style={{
-                      transform: isAnimating ? 'scale(1.02)' : 'scale(1)',
-                      zIndex: isAnimating ? 10 : 1,
-                      ...(isCurrentSong && dominantColor
-                        ? {
-                            background: `linear-gradient(135deg, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.15) 0%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.05) 100%)`,
-                            borderColor: `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)`,
-                          }
-                        : {})
-                    }}
-                    onClick={() => handlePlay(stat.song)}
-                  >
-                    {isCurrentSong && dominantColor && (
-                      <div 
-                        className="absolute inset-0 opacity-10"
-                        style={{
-                          background: `radial-gradient(circle at 20% 80%, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4) 0%, transparent 50%)`
-                        }}
-                      />
-                    )}
-                    
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex items-center space-x-4">
+                  return (
+                    <div
+                      key={stat.songId}
+                      onClick={() => handlePlay(stat.song, idx)}
+                      className={cn(
+                        "relative p-6 rounded-xl cursor-pointer transition-all duration-300",
+                        "bg-gradient-to-br hover:scale-105",
+                        rank === 1 && "from-yellow-500/20 to-yellow-600/20 border-2 border-yellow-500/30",
+                        rank === 2 && "from-gray-400/20 to-gray-500/20 border-2 border-gray-400/30",
+                        rank === 3 && "from-orange-500/20 to-orange-600/20 border-2 border-orange-500/30",
+                        isCurrentSong && "ring-2 ring-spotify-accent"
+                      )}
+                    >
+                      <div className="text-center">
                         <div className={cn(
-                          "w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition-all duration-500",
-                          isTop3 ? "bg-gradient-to-br" : "bg-white/10",
-                          rankNumber === 1 && "from-yellow-400 to-yellow-600 text-black",
-                          rankNumber === 2 && "from-gray-300 to-gray-400 text-black",
-                          rankNumber === 3 && "from-amber-600 to-amber-800 text-white",
-                          !isTop3 && "text-spotify-neutral",
-                          isAnimating && "animate-pulse"
+                          "w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center text-2xl font-bold bg-gradient-to-br",
+                          rank === 1 && "from-yellow-400 to-yellow-600 text-black",
+                          rank === 2 && "from-gray-300 to-gray-500 text-black",
+                          rank === 3 && "from-orange-400 to-orange-600 text-white"
                         )}>
-                          #{rankNumber}
+                          #{rank}
                         </div>
-                        
-                        <div className={cn(
-                          "relative transition-transform duration-500",
-                          isAnimating && "hover-scale"
-                        )}>
-                          <img
-                            src={stat.song.image_url || PLACEHOLDER_IMAGE}
-                            alt={`Pochette de ${stat.song.title}`}
-                            className={cn(
-                              "w-12 h-12 rounded-lg object-cover shadow-lg transition-all duration-500",
-                              isCurrentSong && "ring-2 ring-white/30",
-                              isAnimating && "animate-scale-in"
-                            )}
-                            loading="lazy"
-                            style={
-                              isCurrentSong && dominantColor
-                                ? {
-                                    boxShadow: `0 4px 20px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)`
-                                  }
-                                : {}
-                            }
-                          />
-                          {isCurrentSong && (
-                            <div className="absolute inset-0 rounded-lg border-2 border-white/20 animate-pulse" />
-                          )}
-                          {isAnimating && (
-                            <div className="absolute inset-0 rounded-lg border-2 border-spotify-accent/50 animate-pulse" />
-                          )}
-                        </div>
-                        
-                        <div className={cn(
-                          "min-w-0 flex-1 transition-all duration-500",
-                          isAnimating && "animate-fade-in"
-                        )}>
-                          <h3 className={cn(
-                            "font-medium truncate transition-all duration-300",
-                            isCurrentSong ? "text-white font-semibold" : "text-white",
-                            isAnimating && "text-spotify-accent"
-                          )}>
-                            {stat.song.title}
-                          </h3>
-                          <p className={cn(
-                            "text-sm text-spotify-neutral truncate transition-all duration-300",
-                            isAnimating && "text-white/80"
-                          )}>
-                            {stat.song.artist}
-                          </p>
+                        <img
+                          src={stat.song.image_url || "https://via.placeholder.com/200"}
+                          alt={stat.song.title}
+                          className="w-32 h-32 mx-auto rounded-lg mb-3 shadow-lg object-cover"
+                        />
+                        <h3 className="font-bold text-white truncate mb-1">{stat.song.title}</h3>
+                        <p className="text-sm text-spotify-neutral truncate mb-2">{stat.song.artist}</p>
+                        <div className="flex items-center justify-center gap-1 text-spotify-accent">
+                          <Heart className="w-4 h-4 fill-current" />
+                          <span className="font-semibold">{stat.count}</span>
                         </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-                      <div className="flex items-center space-x-6">
-                        <div className="flex items-center space-x-2 text-spotify-neutral">
-                          <Heart className="w-4 h-4 text-spotify-accent fill-spotify-accent" />
-                          <span className="text-sm font-medium">{stat.count || 0}</span>
+            {/* Liste complète */}
+            <div className="bg-white/5 rounded-xl overflow-hidden">
+              <div className="divide-y divide-white/5">
+                {favoriteStats.map((stat, index) => {
+                  const rank = index + 1;
+                  const isCurrentSong = currentSong?.id === stat.song.id;
+                  const dominantColor = dominantColors[stat.songId];
+
+                  return (
+                    <div
+                      key={stat.songId}
+                      onClick={() => handlePlay(stat.song, index)}
+                      className={cn(
+                        "group flex items-center gap-4 p-4 cursor-pointer transition-all",
+                        isCurrentSong ? "bg-spotify-accent/20" : "hover:bg-white/5"
+                      )}
+                      style={
+                        isCurrentSong && dominantColor
+                          ? {
+                              background: `linear-gradient(90deg, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2) 0%, transparent 100%)`
+                            }
+                          : {}
+                      }
+                    >
+                      {/* Rang */}
+                      <div className={cn(
+                        "w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm shrink-0",
+                        rank <= 3 ? "bg-gradient-to-br" : "bg-white/10",
+                        getRankBadgeStyle(rank)
+                      )}>
+                        #{rank}
+                      </div>
+
+                      {/* Pochette */}
+                      <img
+                        src={stat.song.image_url || "https://via.placeholder.com/48"}
+                        alt={stat.song.title}
+                        className="w-14 h-14 rounded-lg object-cover shadow-md"
+                      />
+
+                      {/* Info chanson */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className={cn(
+                          "font-medium truncate",
+                          isCurrentSong ? "text-spotify-accent" : "text-white"
+                        )}>
+                          {stat.song.title}
+                        </h3>
+                        <p className="text-sm text-spotify-neutral truncate">
+                          {stat.song.artist}
+                        </p>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center gap-6 shrink-0">
+                        <div className="flex items-center gap-2 text-spotify-accent">
+                          <Heart className="w-4 h-4 fill-current" />
+                          <span className="font-medium">{stat.count}</span>
                         </div>
 
-                        <span className="text-sm text-spotify-neutral min-w-[40px] text-right">
-                          {formatDuration(stat.song.duration)}
+                        <span className="text-sm text-spotify-neutral min-w-[50px] text-right">
+                          {stat.song.duration}
                         </span>
 
+                        {/* Actions admin */}
                         {isAdmin && (
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-white/10 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlay(stat.song);
-                              }}
-                            >
-                              <Play className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-white/10 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedSong({
-                                  id: stat.song.id,
-                                  title: stat.song.title,
-                                  artist: stat.song.artist,
-                                });
-                              }}
-                            >
-                              <FileText className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-destructive/10 text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(stat.songId);
-                              }}
-                              title="Masquer du Top 100"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSongToDelete(stat.songId);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500/20 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
                         )}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        <LyricsModal
-          isOpen={!!selectedSong}
-          onClose={() => setSelectedSong(null)}
-          songId={selectedSong?.id || ''}
-          songTitle={selectedSong?.title || ''}
-          artist={selectedSong?.artist || ''}
-        />
+        <Player />
       </div>
-      <Player />
+
+      {/* Dialog de confirmation suppression */}
+      <AlertDialog open={!!songToDelete} onOpenChange={() => setSongToDelete(null)}>
+        <AlertDialogContent className="bg-spotify-dark border-spotify-light">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Masquer cette chanson ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-spotify-neutral">
+              Cette chanson sera retirée du Top 100 mais ne sera pas supprimée de la base de données.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Masquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
