@@ -15,8 +15,6 @@ import { Song } from "@/types/player";
 import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { MusicDiscovery } from "@/components/MusicDiscovery";
-import { parseLrc, findCurrentLyricLine, ParsedLrc } from "@/utils/lrcParser";
-import { LrcPlayer } from "@/components/LrcPlayer";
 const Index = () => {
   const location = useLocation();
   const [username, setUsername] = useState<string | null>(null);
@@ -30,20 +28,13 @@ const Index = () => {
     previousSong,
     isPlaying,
     stopCurrentSong,
-    removeSong,
-    progress
+    removeSong
   } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
-  const [parsedLyrics, setParsedLyrics] = useState<ParsedLrc | null>(null);
-  const [currentLyricLine, setCurrentLyricLine] = useState<string>("");
-  const [previousLyricLine, setPreviousLyricLine] = useState<string>("");
-  const [nextLyricLine, setNextLyricLine] = useState<string>("");
-  // Léger décalage d'affichage pour compenser les latences de rendu
-  const [lyricsFineOffsetMs] = useState<number>(-250);
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -60,86 +51,6 @@ const Index = () => {
       setTimeout(restoreScroll, 300);
     }
   }, [location.pathname]);
-
-  // Fetch lyrics when song changes
-  useEffect(() => {
-    const fetchLyrics = async () => {
-      if (!currentSong?.id) {
-        setParsedLyrics(null);
-        setCurrentLyricLine("");
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('lyrics')
-          .select('content')
-          .eq('song_id', currentSong.id)
-          .maybeSingle();
-
-        if (error || !data?.content) {
-          setParsedLyrics(null);
-          setCurrentLyricLine("");
-          setPreviousLyricLine("");
-          setNextLyricLine("");
-          return;
-        }
-
-        // Parse lyrics if in LRC format
-        const timeRegex = /\[\d{1,2}[\.\:]\d{2}(?:[\.\:]\d{2})?\]/;
-        if (timeRegex.test(data.content)) {
-          const parsed = parseLrc(data.content);
-          setParsedLyrics(parsed);
-        } else {
-          setParsedLyrics(null);
-          setCurrentLyricLine("");
-          setPreviousLyricLine("");
-          setNextLyricLine("");
-        }
-      } catch (error) {
-        console.error("Error fetching lyrics:", error);
-        setParsedLyrics(null);
-        setCurrentLyricLine("");
-      }
-    };
-
-    fetchLyrics();
-  }, [currentSong?.id]);
-
-  // Update current lyric line based on playback progress
-  useEffect(() => {
-    if (!parsedLyrics?.lines || parsedLyrics.lines.length === 0) {
-      setCurrentLyricLine("");
-      setPreviousLyricLine("");
-      setNextLyricLine("");
-      return;
-    }
-
-    const totalOffset = (parsedLyrics.offset ?? 0) + lyricsFineOffsetMs;
-    const { current } = findCurrentLyricLine(parsedLyrics.lines, progress, totalOffset);
-    
-    if (current >= 0 && parsedLyrics.lines[current]) {
-      setCurrentLyricLine(parsedLyrics.lines[current].text);
-      
-      // Previous line
-      if (current > 0 && parsedLyrics.lines[current - 1]) {
-        setPreviousLyricLine(parsedLyrics.lines[current - 1].text);
-      } else {
-        setPreviousLyricLine("");
-      }
-      
-      // Next line
-      if (current < parsedLyrics.lines.length - 1 && parsedLyrics.lines[current + 1]) {
-        setNextLyricLine(parsedLyrics.lines[current + 1].text);
-      } else {
-        setNextLyricLine("");
-      }
-    } else {
-      setCurrentLyricLine("");
-      setPreviousLyricLine("");
-      setNextLyricLine("");
-    }
-  }, [progress, parsedLyrics]);
 
   // Force re-render when currentSong changes
   useEffect(() => {
@@ -343,31 +254,15 @@ const Index = () => {
         </div>
         
         <div className="w-full flex items-center justify-center py-8">
-          {currentSong ? <div className="flex items-start justify-between gap-12 p-6 max-w-6xl mx-auto">
-              <div className="text-center flex-shrink-0">
-                <div className="w-64 h-64 mx-auto mb-6 relative">
-                  <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
-                </div>
-                <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
-                <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
-                {currentSong.genre && <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
-                    {currentSong.genre}
-                  </span>}
+          {currentSong ? <div className="text-center p-6 max-w-md mx-auto">
+              <div className="w-64 h-64 mx-auto mb-8 relative">
+                <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
               </div>
-              
-              {parsedLyrics?.lines?.length ? (
-                <div className="ml-auto pr-2 pt-6 min-w-[320px] max-w-md">
-                  <div className="scale-90 origin-right">
-                    <LrcPlayer
-                      parsedLyrics={parsedLyrics}
-                      currentTime={Math.max(0, progress + lyricsFineOffsetMs / 1000)}
-                      accentColor={dominantColor}
-                      className="h-32 overflow-hidden"
-                    />
-                  </div>
-                </div>
-              ) : null}
-
+              <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
+              <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
+              {currentSong.genre && <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+                  {currentSong.genre}
+                </span>}
             </div> : <div className="text-center p-6">
               <p className="text-gray-400">Aucune musique en cours de lecture</p>
             </div>}
