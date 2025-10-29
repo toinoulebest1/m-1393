@@ -51,13 +51,13 @@ export const CastButton = () => {
       <PopoverContent className="w-64 p-2 bg-spotify-dark border-spotify-neutral/20">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Diffuser sur</h3>
+            <h3 className="text-sm font-medium text-foreground">Diffuser sur</h3>
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => discoverDevices()}
               disabled={isDiscovering}
-              className="text-xs"
+              className="text-xs text-foreground hover:text-white"
             >
               {isDiscovering ? 'Recherche...' : 'Actualiser'}
             </Button>
