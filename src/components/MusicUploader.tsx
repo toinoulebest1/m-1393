@@ -615,7 +615,7 @@ export const MusicUploader = () => {
   return (
     <div 
       className={cn(
-        "p-4 relative transition-all duration-300",
+        "relative transition-all duration-300",
         isDragging && "bg-white/5 rounded-lg"
       )}
       onDrop={handleDrop}
@@ -623,54 +623,52 @@ export const MusicUploader = () => {
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
     >
-      <div className="flex items-center justify-between mb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/10"
-            >
-              <Upload className="w-5 h-5 mr-2" />
-              <span>Importer de la musique</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-spotify-dark border-white/10">
-            <DropdownMenuItem
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
-            >
-              <Music className="w-4 h-4" />
-              <span>Fichier(s) audio</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => folderInputRef.current?.click()}
-              className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
-            >
-              <FolderOpen className="w-4 h-4" />
-              <span>Dossier complet</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/10 px-3 py-2"
+          >
+            <Upload className="w-5 h-5 mr-3" />
+            <span className="text-sm font-medium">Importer</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="bg-spotify-dark border-white/10">
+          <DropdownMenuItem
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
+          >
+            <Music className="w-4 h-4" />
+            <span>Fichier(s) audio</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => folderInputRef.current?.click()}
+            className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span>Dossier complet</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
         
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*,.lrc"
-          multiple
-          className="hidden"
-          onChange={handleFileUpload}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          accept="audio/*,.lrc"
-          multiple
-          webkitdirectory=""
-          directory=""
-          className="hidden"
-          onChange={handleFileUpload}
-        />
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,.lrc"
+        multiple
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+      <input
+        ref={folderInputRef}
+        type="file"
+        accept="audio/*,.lrc"
+        multiple
+        webkitdirectory=""
+        directory=""
+        className="hidden"
+        onChange={handleFileUpload}
+      />
 
       {/* Upload progress bar */}
       {isUploading && (
