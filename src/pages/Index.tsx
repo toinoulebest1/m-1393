@@ -41,6 +41,8 @@ const Index = () => {
   const [currentLyricLine, setCurrentLyricLine] = useState<string>("");
   const [previousLyricLine, setPreviousLyricLine] = useState<string>("");
   const [nextLyricLine, setNextLyricLine] = useState<string>("");
+  // Léger décalage d'affichage pour compenser les latences de rendu
+  const [lyricsFineOffsetMs] = useState<number>(-250);
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -112,7 +114,8 @@ const Index = () => {
       return;
     }
 
-    const { current } = findCurrentLyricLine(parsedLyrics.lines, progress, parsedLyrics.offset);
+    const totalOffset = (parsedLyrics.offset ?? 0) + lyricsFineOffsetMs;
+    const { current } = findCurrentLyricLine(parsedLyrics.lines, progress, totalOffset);
     
     if (current >= 0 && parsedLyrics.lines[current]) {
       setCurrentLyricLine(parsedLyrics.lines[current].text);
@@ -351,21 +354,21 @@ const Index = () => {
                   </span>}
               </div>
               
-              {currentLyricLine && <div className="flex flex-col justify-center gap-2 min-w-[350px] max-w-lg ml-auto pt-16">
-                  {previousLyricLine && <p className="text-sm text-right leading-relaxed transition-all duration-300" style={{
+              {currentLyricLine && <div className="flex flex-col justify-center gap-2 min-w-[320px] max-w-md ml-auto pr-2 pt-6">
+                  {previousLyricLine && <p className="text-xs text-right leading-relaxed transition-all duration-300" style={{
                       color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)` : 'rgba(255, 255, 255, 0.3)'
                     }}>
                       {previousLyricLine}
                     </p>}
                   
-                  <p className="text-lg font-semibold text-right leading-relaxed transition-all duration-300" style={{
+                  <p className="text-base font-semibold text-right leading-relaxed transition-all duration-300" style={{
                     color: dominantColor ? `rgb(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]})` : 'rgb(255, 255, 255)',
                     textShadow: dominantColor ? `0 0 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)` : '0 0 15px rgba(255, 255, 255, 0.3)'
                   }}>
                     {currentLyricLine}
                   </p>
                   
-                  {nextLyricLine && <p className="text-sm text-right leading-relaxed transition-all duration-300" style={{
+                  {nextLyricLine && <p className="text-xs text-right leading-relaxed transition-all duration-300" style={{
                       color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)` : 'rgba(255, 255, 255, 0.4)'
                     }}>
                       {nextLyricLine}
