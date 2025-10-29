@@ -310,10 +310,14 @@ export const Player = () => {
               className={cn(
                 "w-6 h-6 transition-colors cursor-pointer",
                 (isChangingSong || !isAudioReady)
-                  ? "text-spotify-neutral/50 cursor-not-allowed" 
+                  ? "text-spotify-neutral/50 cursor-not-allowed"
                   : "text-spotify-neutral hover:text-white"
               )}
-              onClick={(isChangingSong || !isAudioReady) ? undefined : previousSong}
+              onClick={async () => {
+                if (!isChangingSong && isAudioReady) {
+                  await previousSong();
+                }
+              }}
             />
             <Button
               variant="ghost"
@@ -337,7 +341,11 @@ export const Player = () => {
                   ? "text-spotify-neutral/50 cursor-not-allowed" 
                   : "text-spotify-neutral hover:text-white"
               )}
-              onClick={(isChangingSong || !isAudioReady) ? undefined : nextSong}
+              onClick={async () => {
+                if (!isChangingSong && isAudioReady) {
+                  await nextSong();
+                }
+              }}
             />
             {repeatMode === 'none' && (
               <Repeat
