@@ -103,7 +103,6 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const discoverDevices = useCallback(async () => {
     if (!isApiReady) {
-      toast.error('API Cast non disponible. Assurez-vous d\'avoir un Chromecast sur votre réseau.');
       return;
     }
 
