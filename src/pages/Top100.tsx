@@ -131,15 +131,13 @@ const Top100 = () => {
   useEffect(() => {
     fetchFavoriteStats();
 
-    const onLocalChange = () => fetchFavoriteStats(true);
-
     const channel = supabase
-      .channel('favorite_stats_top100_realtime')
+      .channel('favorite_stats_global_top100')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'favorite_stats' },
         (payload) => {
-          console.log('Favorite stats changed:', payload);
+          console.log('🔄 TOP 100: Favorite stats changed for ANY user:', payload);
           fetchFavoriteStats(true);
         }
       )
@@ -147,19 +145,20 @@ const Top100 = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'hidden_songs' },
         (payload) => {
-          console.log('Hidden songs changed:', payload);
+          console.log('🔄 TOP 100: Hidden songs changed:', payload);
           fetchFavoriteStats(true);
         }
       )
       .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
+        console.log('🔌 TOP 100: Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ TOP 100: Successfully subscribed to realtime updates for ALL users');
+        }
       });
 
-    window.addEventListener('favorite_stats_changed', onLocalChange);
-
     return () => {
+      console.log('🔌 TOP 100: Unsubscribing from realtime');
       supabase.removeChannel(channel);
-      window.removeEventListener('favorite_stats_changed', onLocalChange);
     };
   }, []);
 
