@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Song, FavoriteStat } from '@/types/player';
 
 export const usePlayerFavorites = () => {
@@ -9,6 +9,98 @@ export const usePlayerFavorites = () => {
     const savedStats = localStorage.getItem('favoriteStats');
     return savedStats ? JSON.parse(savedStats) : [];
   });
+
+  useEffect(() => {
+    let channel: any = null;
+
+    const init = async () => {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Chargement initial des favoris de l'utilisateur
+      const { data } = await supabase
+        .from('favorite_stats')
+        .select(`
+          song_id,
+          user_id,
+          songs (
+            id,
+            title,
+            artist,
+            file_path,
+            duration,
+            image_url
+          )
+        `)
+        .eq('user_id', session.user.id);
+
+      const favSongs: Song[] = (data || [])
+        .filter((row: any) => row.songs)
+        .map((row: any) => ({
+          id: row.songs.id,
+          title: row.songs.title,
+          artist: row.songs.artist || '',
+          url: row.songs.file_path,
+          duration: row.songs.duration || '0:00',
+          imageUrl: row.songs.image_url
+        }));
+
+      setFavorites(favSongs);
+
+      // Abonnement realtime pour MAJ instantanées
+      channel = supabase
+        .channel(`favorites_user_${session.user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'favorite_stats' },
+          async (payload) => {
+            const newRow: any = payload.new;
+            if (!newRow || newRow.user_id !== session.user.id) return;
+            const { data: song } = await supabase
+              .from('songs')
+              .select('*')
+              .eq('id', newRow.song_id)
+              .maybeSingle();
+            if (!song) return;
+            setFavorites(prev => {
+              if (prev.some(s => s.id === song.id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: song.id,
+                  title: song.title,
+                  artist: song.artist || '',
+                  url: song.file_path,
+                  duration: song.duration || '0:00',
+                  imageUrl: song.image_url,
+                },
+              ];
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'favorite_stats' },
+          (payload) => {
+            const oldRow: any = payload.old;
+            if (!oldRow || oldRow.user_id !== session.user.id) return;
+            setFavorites(prev => prev.filter(s => s.id !== oldRow.song_id));
+          }
+        )
+        .subscribe();
+    };
+
+    init();
+
+    return () => {
+      if (channel) {
+        import('@/integrations/supabase/client').then(({ supabase }) => {
+          try { supabase.removeChannel(channel); } catch {}
+        });
+      }
+    };
+  }, [setFavorites]);
 
   const toggleFavorite = useCallback(async (song: Song) => {
     try {
