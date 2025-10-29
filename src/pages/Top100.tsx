@@ -10,6 +10,7 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 import { cn } from "@/lib/utils";
 import { SongCard } from "@/components/SongCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { Top100Countdown } from "@/components/Top100Countdown";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,16 +270,21 @@ const Top100 = () => {
         <div className="flex-1 overflow-y-auto w-full">
           <div className="max-w-6xl mx-auto p-8 pb-32">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Trophy className="w-8 h-8 text-spotify-accent" />
-                <h1 className="text-3xl font-bold text-white">
-                  Top 100
-                </h1>
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Trophy className="w-8 h-8 text-spotify-accent" />
+                  <h1 className="text-3xl font-bold text-white">
+                    Top 100
+                  </h1>
+                </div>
+                <p className="text-spotify-neutral">
+                  {favoriteStats.length} morceaux les plus aimés
+                </p>
               </div>
-              <p className="text-spotify-neutral">
-                {favoriteStats.length} morceaux les plus aimés
-              </p>
+              
+              {/* Countdown */}
+              <Top100Countdown />
             </div>
 
             {/* Liste des chansons */}
