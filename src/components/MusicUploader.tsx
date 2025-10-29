@@ -627,24 +627,24 @@ export const MusicUploader = () => {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
+              variant="ghost" 
+              className="w-full justify-start text-spotify-neutral hover:text-white hover:bg-white/10"
             >
-              <Upload className="w-5 h-5" />
+              <Upload className="w-5 h-5 mr-2" />
               <span>Importer de la musique</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="bg-spotify-dark border-white/10">
             <DropdownMenuItem
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
             >
               <Music className="w-4 h-4" />
               <span>Fichier(s) audio</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => folderInputRef.current?.click()}
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2 cursor-pointer text-spotify-neutral hover:text-white"
             >
               <FolderOpen className="w-4 h-4" />
               <span>Dossier complet</span>
@@ -652,7 +652,6 @@ export const MusicUploader = () => {
           </DropdownMenuContent>
         </DropdownMenu>
         
-        {/* Hidden file inputs */}
         <input
           ref={fileInputRef}
           type="file"
@@ -671,10 +670,6 @@ export const MusicUploader = () => {
           className="hidden"
           onChange={handleFileUpload}
         />
-        
-        <div className="text-xs text-spotify-neutral">
-          Using: {storageProvider}
-        </div>
       </div>
 
       {/* Upload progress bar */}
