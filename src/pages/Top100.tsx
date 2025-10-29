@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
-import { Trophy, Play, Heart, Music, Trash2 } from "lucide-react";
+import { Trophy, Heart, Music, Trash2 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { cn } from "@/lib/utils";
+import { SongCard } from "@/components/SongCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,10 +34,10 @@ interface FavoriteStat {
 }
 
 const Top100 = () => {
-  const { play, currentSong, isPlaying, pause, setQueue } = usePlayer();
+  const { play, currentSong, isPlaying, pause, setQueue, favorites } = usePlayer();
   const [isAdmin, setIsAdmin] = useState(false);
   const [favoriteStats, setFavoriteStats] = useState<FavoriteStat[]>([]);
-  const [dominantColors, setDominantColors] = useState<{ [key: string]: [number, number, number] }>({});
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [songToDelete, setSongToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -140,25 +141,12 @@ const Top100 = () => {
   }, []);
 
   useEffect(() => {
-    const extractColors = async () => {
-      const newColors: { [key: string]: [number, number, number] } = {};
-      
-      for (const stat of favoriteStats.slice(0, 20)) {
-        if (stat.song.image_url && !dominantColors[stat.songId]) {
-          try {
-            const color = await extractDominantColor(stat.song.image_url);
-            if (color) newColors[stat.songId] = color;
-          } catch (e) {}
-        }
-      }
-      
-      if (Object.keys(newColors).length > 0) {
-        setDominantColors(prev => ({ ...prev, ...newColors }));
-      }
-    };
-
-    if (favoriteStats.length > 0) extractColors();
-  }, [favoriteStats]);
+    if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
+      extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));
+    } else {
+      setDominantColor(null);
+    }
+  }, [currentSong?.imageUrl]);
 
   const handlePlay = (song: any, index: number) => {
     const songWithImage = {
@@ -260,77 +248,45 @@ const Top100 = () => {
               {favoriteStats.map((stat, index) => {
                 const rank = index + 1;
                 const isCurrentSong = currentSong?.id === stat.song.id;
-                const dominantColor = dominantColors[stat.songId];
+                const isFavorite = favorites.some(f => f.id === stat.song.id);
 
                 return (
-                  <div
-                    key={stat.songId}
-                    onClick={() => handlePlay(stat.song, index)}
-                    className={cn(
-                      "group flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-all",
-                      isCurrentSong 
-                        ? "bg-spotify-accent/20 hover:bg-spotify-accent/30" 
-                        : "bg-white/5 hover:bg-white/10"
-                    )}
-                    style={
-                      isCurrentSong && dominantColor
-                        ? {
-                            background: `linear-gradient(90deg, rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.2) 0%, rgba(255,255,255,0.05) 100%)`
-                          }
-                        : {}
-                    }
-                  >
-                    {/* Rang */}
+                  <div key={stat.songId} className="relative">
+                    {/* Badge de rang */}
                     <div className={cn(
-                      "w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm shrink-0",
+                      "absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs",
                       rank <= 3 ? "bg-gradient-to-br" : "bg-white/10",
                       getRankBadgeStyle(rank)
                     )}>
                       #{rank}
                     </div>
 
-                    {/* Pochette */}
-                    <img
-                      src={stat.song.image_url || "https://via.placeholder.com/48"}
-                      alt={stat.song.title}
-                      className="w-14 h-14 rounded-lg object-cover shadow-md"
-                    />
-
-                    {/* Info chanson */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className={cn(
-                        "font-medium truncate",
-                        isCurrentSong ? "text-white font-semibold" : "text-white"
-                      )}>
-                        {stat.song.title}
-                      </h3>
-                      <p className="text-sm text-spotify-neutral truncate">
-                        {stat.song.artist}
-                      </p>
+                    {/* Badge de likes */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
+                      <Heart className="w-3 h-3 text-spotify-accent fill-spotify-accent" />
+                      <span className="text-xs font-medium text-white">{stat.count}</span>
                     </div>
 
-                    {/* Stats et actions */}
-                    <div className="flex items-center gap-6 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <Heart className="w-4 h-4 text-spotify-accent fill-spotify-accent" />
-                        <span className="text-sm font-medium text-spotify-neutral">{stat.count}</span>
-                      </div>
-
-                      <span className="text-sm text-spotify-neutral min-w-[45px] text-right">
-                        {stat.song.duration}
-                      </span>
-
-                      {isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSongToDelete(stat.songId);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500/20 rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
-                      )}
+                    <div className="pl-10" onClick={() => handlePlay(stat.song, index)}>
+                      <SongCard
+                        song={{
+                          ...stat.song,
+                          url: stat.song.url,
+                          imageUrl: stat.song.image_url,
+                          id: stat.song.id
+                        }}
+                        isCurrentSong={isCurrentSong}
+                        isFavorite={isFavorite}
+                        dominantColor={dominantColor}
+                        contextMenuItems={isAdmin ? [
+                          {
+                            label: "Masquer du Top 100",
+                            icon: <Trash2 className="w-4 h-4" />,
+                            action: () => setSongToDelete(stat.songId),
+                            show: true
+                          }
+                        ] : []}
+                      />
                     </div>
                   </div>
                 );
