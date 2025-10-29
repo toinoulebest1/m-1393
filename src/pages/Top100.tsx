@@ -62,80 +62,96 @@ const Top100 = () => {
     checkAuth();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchFavoriteStats = async () => {
-      setIsLoading(true);
-      try {
-        const { data: hiddenSongs } = await supabase
-          .from('hidden_songs')
-          .select('song_id');
+  const fetchFavoriteStats = async () => {
+    setIsLoading(true);
+    try {
+      const { data: hiddenSongs } = await supabase
+        .from('hidden_songs')
+        .select('song_id');
+      
+      const hiddenIds = hiddenSongs?.map(hs => hs.song_id) || [];
+
+      const { data, error } = await supabase
+        .from('favorite_stats')
+        .select(`
+          song_id,
+          count,
+          songs (
+            id,
+            title,
+            artist,
+            file_path,
+            duration,
+            image_url
+          )
+        `)
+        .not('song_id', 'in', hiddenIds.length > 0 ? `(${hiddenIds.join(',')})` : '()')
+        .order('count', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
+        if (!stat.songs) return acc;
         
-        const hiddenIds = hiddenSongs?.map(hs => hs.song_id) || [];
+        const key = `${stat.songs.title}-${stat.songs.artist}`.toLowerCase();
+        
+        if (!acc[key]) {
+          acc[key] = {
+            songId: stat.song_id,
+            count: stat.count || 0,
+            song: {
+              id: stat.songs.id,
+              title: stat.songs.title,
+              artist: stat.songs.artist || '',
+              url: stat.songs.file_path,
+              duration: stat.songs.duration || "0:00",
+              image_url: stat.songs.image_url
+            }
+          };
+        } else {
+          acc[key].count += (stat.count || 0);
+        }
+        return acc;
+      }, {});
 
-        const { data, error } = await supabase
-          .from('favorite_stats')
-          .select(`
-            song_id,
-            count,
-            songs (
-              id,
-              title,
-              artist,
-              file_path,
-              duration,
-              image_url
-            )
-          `)
-          .not('song_id', 'in', hiddenIds.length > 0 ? `(${hiddenIds.join(',')})` : '()')
-          .order('count', { ascending: false })
-          .limit(100);
+      const formattedStats = Object.values(groupedStats)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 100);
 
-        if (error) throw error;
+      setFavoriteStats(formattedStats);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      toast.error("Impossible de charger le Top 100");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        const groupedStats = data.reduce((acc: { [key: string]: FavoriteStat }, stat) => {
-          if (!stat.songs) return acc;
-          
-          const key = `${stat.songs.title}-${stat.songs.artist}`.toLowerCase();
-          
-          if (!acc[key]) {
-            acc[key] = {
-              songId: stat.song_id,
-              count: stat.count || 0,
-              song: {
-                id: stat.songs.id,
-                title: stat.songs.title,
-                artist: stat.songs.artist || '',
-                url: stat.songs.file_path,
-                duration: stat.songs.duration || "0:00",
-                image_url: stat.songs.image_url
-              }
-            };
-          } else {
-            acc[key].count += (stat.count || 0);
-          }
-          return acc;
-        }, {});
-
-        const formattedStats = Object.values(groupedStats)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 100);
-
-        setFavoriteStats(formattedStats);
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-        toast.error("Impossible de charger le Top 100");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchFavoriteStats();
 
     const channel = supabase
-      .channel('favorite_stats_top100')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'favorite_stats' }, fetchFavoriteStats)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hidden_songs' }, fetchFavoriteStats)
-      .subscribe();
+      .channel('favorite_stats_top100_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'favorite_stats' },
+        (payload) => {
+          console.log('Favorite stats changed:', payload);
+          fetchFavoriteStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hidden_songs' },
+        (payload) => {
+          console.log('Hidden songs changed:', payload);
+          fetchFavoriteStats();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, []);
