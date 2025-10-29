@@ -16,6 +16,7 @@ import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { MusicDiscovery } from "@/components/MusicDiscovery";
 import { parseLrc, findCurrentLyricLine, ParsedLrc } from "@/utils/lrcParser";
+import { LrcPlayer } from "@/components/LrcPlayer";
 const Index = () => {
   const location = useLocation();
   const [username, setUsername] = useState<string | null>(null);
@@ -354,26 +355,19 @@ const Index = () => {
                   </span>}
               </div>
               
-              {currentLyricLine && <div className="flex flex-col justify-center gap-2 min-w-[320px] max-w-md ml-auto pr-2 pt-6">
-                  {previousLyricLine && <p className="text-xs text-right leading-relaxed transition-all duration-300" style={{
-                      color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.3)` : 'rgba(255, 255, 255, 0.3)'
-                    }}>
-                      {previousLyricLine}
-                    </p>}
-                  
-                  <p className="text-base font-semibold text-right leading-relaxed transition-all duration-300" style={{
-                    color: dominantColor ? `rgb(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]})` : 'rgb(255, 255, 255)',
-                    textShadow: dominantColor ? `0 0 15px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.5)` : '0 0 15px rgba(255, 255, 255, 0.3)'
-                  }}>
-                    {currentLyricLine}
-                  </p>
-                  
-                  {nextLyricLine && <p className="text-xs text-right leading-relaxed transition-all duration-300" style={{
-                      color: dominantColor ? `rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4)` : 'rgba(255, 255, 255, 0.4)'
-                    }}>
-                      {nextLyricLine}
-                    </p>}
-                </div>}
+              {parsedLyrics?.lines?.length ? (
+                <div className="ml-auto pr-2 pt-6 min-w-[320px] max-w-md">
+                  <div className="scale-90 origin-right">
+                    <LrcPlayer
+                      parsedLyrics={parsedLyrics}
+                      currentTime={Math.max(0, progress + lyricsFineOffsetMs / 1000)}
+                      accentColor={dominantColor}
+                      className="h-32 overflow-hidden"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
             </div> : <div className="text-center p-6">
               <p className="text-gray-400">Aucune musique en cours de lecture</p>
             </div>}
