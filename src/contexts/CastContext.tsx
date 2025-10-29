@@ -34,7 +34,7 @@ declare global {
 }
 
 export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentSong, isPlaying } = usePlayerContext();
+  const { currentSong, isPlaying, progress, getCurrentAudioElement } = usePlayerContext();
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [activeDevice, setActiveDevice] = useState<CastDevice | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -43,6 +43,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isApiReady, setIsApiReady] = useState(false);
 
   const handleDisconnectRef = useRef<() => void>(() => {});
+  const lastSyncedProgressRef = useRef<number>(0);
 
   // Initialize Google Cast API (Cast Framework)
   useEffect(() => {
@@ -331,6 +332,48 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ Error controlling playback:', error);
     }
   }, [isPlaying, isCasting, castSession]);
+
+  // Sync seek position to cast device
+  useEffect(() => {
+    if (!isCasting || !castSession || !currentSong) {
+      return;
+    }
+
+    const media = castSession.getMediaSession();
+    if (!media) {
+      return;
+    }
+
+    const audioElement = getCurrentAudioElement();
+    if (!audioElement || !audioElement.duration) {
+      return;
+    }
+
+    // Calculate current time from progress
+    const currentTime = (progress / 100) * audioElement.duration;
+    
+    // Detect manual seek (significant jump in position > 2 seconds)
+    const timeDifference = Math.abs(currentTime - lastSyncedProgressRef.current);
+    
+    if (timeDifference > 2) {
+      console.log(`⏩ Seeking Cast to ${currentTime.toFixed(1)}s (was ${lastSyncedProgressRef.current.toFixed(1)}s)`);
+      
+      const seekRequest = new (window.chrome?.cast || window.cast).media.SeekRequest();
+      seekRequest.currentTime = currentTime;
+      
+      media.seek(
+        seekRequest,
+        () => {
+          console.log('✅ Seek command sent to Cast');
+          lastSyncedProgressRef.current = currentTime;
+        },
+        (error: any) => console.error('❌ Seek error:', error)
+      );
+    } else {
+      // Update ref for normal playback progression
+      lastSyncedProgressRef.current = currentTime;
+    }
+  }, [progress, isCasting, castSession, currentSong, getCurrentAudioElement]);
 
   return (
     <CastContext.Provider value={{
