@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { usePlayerContext } from './PlayerContext';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
@@ -42,99 +42,67 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [castSession, setCastSession] = useState<any>(null);
   const [isApiReady, setIsApiReady] = useState(false);
 
-  // Initialize Google Cast API
-  useEffect(() => {
-    console.log('🎬 Initializing Cast API...');
+  const handleDisconnectRef = useRef<() => void>(() => {});
 
-    // Cast ne fonctionne pas de manière fiable dans un iframe (mode preview)
+  // Initialize Google Cast API (Cast Framework)
+  useEffect(() => {
+    console.log('🎬 Initializing Cast Framework...');
+
     if (window.top !== window.self) {
       console.warn('⚠️ Cast in iframe preview may be limited. Open the app in a new tab.');
       toast.info('Cast indisponible en mode aperçu', {
         description: 'Ouvrez l’application dans un nouvel onglet pour détecter vos appareils Cast.'
       });
     }
-    
-    const initializeCastApi = () => {
-      window['__onGCastApiAvailable'] = (isAvailable: boolean) => {
-        console.log('📡 Cast API available:', isAvailable);
-        
-        if (isAvailable) {
-          const cast = window.chrome?.cast || window.cast;
-          
-          if (!cast) {
-            console.warn('⚠️ Cast API not available in window object');
-            toast.error('Cast non disponible', {
-              description: 'Votre navigateur ne supporte pas Google Cast'
-            });
-            return;
-          }
 
-          try {
-            const sessionRequest = new cast.SessionRequest(cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID);
-            const apiConfig = new cast.ApiConfig(
-              sessionRequest,
-              (session: any) => {
-                console.log('✅ Cast session started:', session.sessionId);
-                setCastSession(session);
-                setIsCasting(true);
-                setActiveDevice({
-                  id: session.sessionId,
-                  name: session.receiver.friendlyName,
-                  type: 'chromecast'
-                });
-                toast.success(`✅ Connecté à ${session.receiver.friendlyName}`);
-              },
-              (status: string) => {
-                console.log('📊 Cast session status:', status);
-                if (status === 'disconnected') {
-                  handleDisconnect();
-                }
-              }
-            );
+    const onCastReady = () => {
+      const castAny: any = (window as any).cast;
+      if (!castAny?.framework) {
+        console.warn('⚠️ cast.framework not available');
+        return;
+      }
 
-            cast.initialize(apiConfig, () => {
-              console.log('✅ Cast API initialized successfully');
-              setIsApiReady(true);
-              toast.success('Cast prêt', {
-                description: 'Vous pouvez maintenant diffuser vers un appareil'
-              });
-            }, (error: any) => {
-              console.error('❌ Cast initialization error:', error);
-              toast.error('Erreur d\'initialisation Cast');
-            });
-          } catch (error) {
-            console.error('❌ Error setting up Cast API:', error);
-            toast.error('Erreur de configuration Cast');
+      try {
+        const context = castAny.framework.CastContext.getInstance();
+        context.setOptions({
+          receiverApplicationId: (window as any).chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          autoJoinPolicy: (window as any).chrome?.cast?.AutoJoinPolicy?.TAB_AND_ORIGIN_SCOPED || 'tab_and_origin_scoped',
+        });
+
+        console.log('✅ Cast Framework initialized');
+        setIsApiReady(true);
+
+        // Listen to session changes
+        context.addEventListener(castAny.framework.CastContextEventType.SESSION_STATE_CHANGED, (e: any) => {
+          console.log('🔁 Session state:', e.sessionState);
+          if (e.sessionState === castAny.framework.SessionState.SESSION_STARTED || e.sessionState === castAny.framework.SessionState.SESSION_RESUMED) {
+            const session = context.getCurrentSession();
+            setCastSession(session);
+            setIsCasting(true);
+            try {
+              const friendlyName = session?.getCastDevice()?.friendlyName || 'Appareil Cast';
+              setActiveDevice({ id: session?.getSessionId?.() || 'cast-session', name: friendlyName, type: 'chromecast' });
+              toast.success(`Connecté à ${friendlyName}`);
+            } catch {}
           }
-        }
-      };
+          if (e.sessionState === castAny.framework.SessionState.SESSION_ENDED) {
+            handleDisconnectRef.current();
+          }
+        });
+      } catch (err) {
+        console.error('❌ Error initializing Cast Framework:', err);
+      }
     };
 
-    // Wait for Cast SDK to load
-    if (typeof window.chrome?.cast !== 'undefined') {
-      console.log('✅ Cast SDK already loaded');
-      initializeCastApi();
-    } else {
-      console.log('⏳ Waiting for Cast SDK to load...');
-      // Poll for Cast API availability
-      const checkInterval = setInterval(() => {
-        if (typeof window.chrome?.cast !== 'undefined') {
-          console.log('✅ Cast SDK loaded');
-          initializeCastApi();
-          clearInterval(checkInterval);
-        }
-      }, 100);
-
-      // Timeout après 10 secondes
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!isApiReady) {
-          console.warn('⏱️ Cast SDK loading timeout');
-        }
-      }, 10000);
-
-      return () => clearInterval(checkInterval);
+    if ((window as any).cast && (window as any).cast.framework) {
+      onCastReady();
+      return;
     }
+
+    (window as any).__onGCastApiAvailable = (isAvailable: boolean) => {
+      console.log('📡 __onGCastApiAvailable:', isAvailable);
+      if (isAvailable) onCastReady();
+    };
   }, []);
 
   const discoverDevices = useCallback(async () => {
@@ -167,7 +135,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Set up session event listeners
             session.addUpdateListener((isAlive: boolean) => {
               if (!isAlive) {
-                handleDisconnect();
+                handleDisconnectRef.current();
               }
             });
             
@@ -203,12 +171,31 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const deviceName = activeDevice?.name;
     setActiveDevice(null);
     setCastSession(null);
+    try {
+      const castAny: any = (window as any).cast;
+      const context = castAny?.framework?.CastContext?.getInstance?.();
+      context?.endCurrentSession?.(true);
+    } catch {}
     if (deviceName) {
       toast.success(`Déconnecté de ${deviceName}`);
     }
   }, [activeDevice]);
 
+  useEffect(() => {
+    handleDisconnectRef.current = handleDisconnect;
+  }, [handleDisconnect]);
+
   const disconnectFromDevice = useCallback(() => {
+    try {
+      const castAny: any = (window as any).cast;
+      const context = castAny?.framework?.CastContext?.getInstance?.();
+      if (context) {
+        context.endCurrentSession(true);
+        handleDisconnect();
+        return;
+      }
+    } catch {}
+
     if (castSession) {
       castSession.stop(
         () => {

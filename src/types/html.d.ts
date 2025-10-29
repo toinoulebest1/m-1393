@@ -12,3 +12,9 @@ declare global {
     webkitAudioContext?: typeof AudioContext;
   }
 }
+
+declare namespace JSX {
+  interface IntrinsicElements {
+    'google-cast-launcher': any;
+  }
+}
