@@ -35,20 +35,31 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Bienvenue</h1>
-          <p className="text-spotify-neutral">Connectez-vous pour continuer</p>
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-background">
+      {/* Background gradient effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10 animate-gradient bg-[length:200%_200%]" />
+      
+      {/* Animated circles */}
+      <div className="absolute top-20 left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-20 right-20 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
+      
+      <div className="w-full max-w-md relative z-10 animate-scale-in-bounce">
+        <div className="text-center mb-8 space-y-3">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient bg-[length:200%_200%]">
+            Bienvenue
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Connectez-vous pour continuer votre expérience musicale
+          </p>
         </div>
         
         {errorMessage && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{errorMessage}</AlertDescription>
+          <Alert variant="destructive" className="mb-4 animate-slide-in border-destructive/50 bg-destructive/10">
+            <AlertDescription className="text-destructive-foreground">{errorMessage}</AlertDescription>
           </Alert>
         )}
 
-        <div className="bg-white/5 backdrop-blur-lg p-6 rounded-lg shadow-xl">
+        <div className="bg-card/50 backdrop-blur-xl border border-border/50 p-8 rounded-2xl shadow-2xl hover:shadow-primary/20 transition-all duration-500">
           <SupabaseAuth 
             supabaseClient={supabase}
             appearance={{
@@ -56,10 +67,40 @@ const Auth = () => {
               variables: {
                 default: {
                   colors: {
-                    brand: '#1DB954',
-                    brandAccent: '#1ed760'
-                  }
+                    brand: 'hsl(var(--primary))',
+                    brandAccent: 'hsl(var(--accent))',
+                    inputBackground: 'hsl(var(--background))',
+                    inputBorder: 'hsl(var(--border))',
+                    inputText: 'hsl(var(--foreground))',
+                    inputLabelText: 'hsl(var(--foreground))',
+                    inputPlaceholder: 'hsl(var(--muted-foreground))',
+                  },
+                  borderWidths: {
+                    buttonBorderWidth: '1px',
+                    inputBorderWidth: '1px',
+                  },
+                  radii: {
+                    borderRadiusButton: '0.5rem',
+                    buttonBorderRadius: '0.5rem',
+                    inputBorderRadius: '0.5rem',
+                  },
+                  space: {
+                    spaceSmall: '8px',
+                    spaceMedium: '16px',
+                    spaceLarge: '24px',
+                  },
+                  fontSizes: {
+                    baseBodySize: '14px',
+                    baseInputSize: '14px',
+                    baseLabelSize: '14px',
+                    baseButtonSize: '14px',
+                  },
                 }
+              },
+              className: {
+                container: 'space-y-4',
+                button: 'transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]',
+                input: 'transition-all duration-300 focus:ring-2 focus:ring-primary/50',
               }
             }}
             localization={{
@@ -78,6 +119,10 @@ const Auth = () => {
             }}
           />
         </div>
+        
+        <p className="text-center mt-6 text-sm text-muted-foreground">
+          En continuant, vous acceptez nos conditions d'utilisation
+        </p>
       </div>
     </div>
   );
