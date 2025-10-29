@@ -11,7 +11,7 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-spotify-base text-white">
+    <div className="flex h-screen overflow-hidden bg-spotify-dark text-white">
       {!hideNavbar && <Sidebar />}
       <div className={cn(
         "relative flex-1 flex flex-col overflow-hidden",

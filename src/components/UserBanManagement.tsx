@@ -251,7 +251,7 @@ export const UserBanManagement = () => {
           
           {/* Liste des utilisateurs trouvés */}
           {users.length > 0 && searchTerm && !selectedUser && (
-            <div className="mt-2 bg-spotify-base border border-spotify-neutral/20 rounded-md max-h-48 overflow-y-auto">
+            <div className="mt-2 bg-spotify-card border border-spotify-neutral/20 rounded-md max-h-48 overflow-y-auto">
               {users.map((user) => (
                 <div
                   key={user.id}

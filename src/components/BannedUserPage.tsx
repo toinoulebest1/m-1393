@@ -20,8 +20,8 @@ export const BannedUserPage = ({ banInfo }: BannedUserPageProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-spotify-base flex items-center justify-center p-4">
-      <div className="bg-spotify-dark rounded-lg p-8 max-w-md w-full text-center">
+    <div className="min-h-screen bg-spotify-dark flex items-center justify-center p-4">
+      <div className="bg-spotify-card rounded-lg p-8 max-w-md w-full text-center">
         <div className="mb-6">
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <LogOut className="w-8 h-8 text-red-400" />
@@ -34,7 +34,7 @@ export const BannedUserPage = ({ banInfo }: BannedUserPageProps) => {
           </p>
         </div>
 
-        <div className="bg-spotify-base rounded-lg p-4 mb-6 text-left">
+        <div className="bg-spotify-dark rounded-lg p-4 mb-6 text-left">
           <h3 className="font-semibold text-white mb-2">Détails du bannissement :</h3>
           <div className="space-y-2 text-sm">
             <div>

@@ -21,7 +21,7 @@ export const MaintenancePage = ({
   onRetry 
 }: MaintenancePageProps) => {
   return (
-    <div className="min-h-screen bg-spotify-base flex items-center justify-center p-4">
+    <div className="min-h-screen bg-spotify-dark flex items-center justify-center p-4">
       <div className="max-w-lg w-full space-y-6">
         {/* En-tête avec animation */}
         <div className="text-center space-y-4 animate-fade-in">
