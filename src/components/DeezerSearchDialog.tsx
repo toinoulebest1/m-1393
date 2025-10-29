@@ -121,7 +121,7 @@ const DeezerSearchDialog = ({ open, onClose, song, onUpdateSuccess }: DeezerSear
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-md md:max-w-xl bg-spotify-dark text-white border-white/20">
+      <DialogContent className="sm:max-w-2xl lg:max-w-4xl bg-spotify-dark text-white border-white/20">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Recherche Deezer
