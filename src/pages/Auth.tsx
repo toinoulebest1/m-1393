@@ -35,7 +35,7 @@ const Auth = () => {
   };
   return <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background">
       {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-accent/30 to-primary/20 animate-gradient bg-[length:400%_400%] opacity-50" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-accent/30 to-primary/20 animate-gradient bg-[length:400%_400%] opacity-50 bg-spotify-card" />
       
       {/* Multiple animated orbs */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/30 rounded-full blur-[120px] animate-pulse" />
