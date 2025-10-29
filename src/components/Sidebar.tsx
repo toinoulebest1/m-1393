@@ -117,7 +117,7 @@ export const Sidebar = () => {
       </nav>
 
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="mt-4 space-y-2 border-t border-white/10 pt-4 flex-1 overflow-y-auto">
+        <div className="mt-4 space-y-2 border-t border-white/10 pt-4 flex-1 overflow-hidden">
           <Select onValueChange={handleLanguageChange} defaultValue={i18n.language}>
             <SelectTrigger className="w-full bg-transparent border-0 text-spotify-neutral hover:text-white focus:ring-0">
               <SelectValue placeholder={t('common.language')} />
