@@ -53,89 +53,46 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
     return cachedUrl;
   }
 
-  // 2. TOUJOURS vérifier s'il y a un lien pré-généré dans la base de données (pour Dropbox)
-  // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
+  // 2. Extraire l'ID du fichier (enlever les préfixes comme "audio/")
   const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
-  console.log('🔍 Recherche lien pré-généré pour ID:', localId);
+  console.log('🔍 Recherche lien Dropbox pour:', localId);
   
-  const preGeneratedLink = await getPreGeneratedDropboxLink(localId || filePath);
-  if (preGeneratedLink) {
-    console.log('⚡ Lien pré-généré trouvé:', preGeneratedLink);
-    // Mettre en cache et retourner
-    memoryCache.set(filePath, preGeneratedLink);
-    return preGeneratedLink;
-  }
-  console.log('❌ Aucun lien pré-généré trouvé pour:', localId);
-  
-  // 3. Priorité stricte à Dropbox d'abord (génération classique si pas de lien pré-généré)
-  // Mais seulement si l'utilisateur a un token (admin)
-  if (isDropboxEnabled()) {
-    console.log('Using Dropbox for file retrieval with admin token');
-    try {
-      const exists = await checkFileExistsOnDropbox(filePath);
-      if (!exists) {
-        console.warn('⚠️ Fichier non trouvé sur Dropbox:', filePath);
-        throw new Error('File not found on Dropbox');
-      }
-      
-      const url = await getDropboxSharedLink(filePath);
-      console.log('✅ URL Dropbox récupérée:', url);
-      
-      // Sauvegarder le lien pour la prochaine fois (en arrière-plan)
-      const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
-      if (localId) {
-        setTimeout(() => {
-          generateAndSaveDropboxLinkAdvanced(localId, filePath, getDropboxConfig().accessToken).catch(err => 
-            console.warn('⚠️ Erreur sauvegarde lien:', err)
-          );
-        }, 0);
-      }
-      
-      // Mettre en cache et retourner
-      memoryCache.set(filePath, url);
-      return url;
-    } catch (error) {
-      console.error('❌ Erreur Dropbox pour', filePath, ':', error);
-      // Si Dropbox est activé mais échoue, aller directement vers Supabase
-      // Ne pas essayer OneDrive si Dropbox est configuré
-    }
-  }
-  
-  // 4. Fallback vers Supabase (OneDrive complètement ignoré si Dropbox est configuré)
-  console.log('Using Supabase for file retrieval');
+  // 3. Récupérer DIRECTEMENT le lien Dropbox depuis Supabase (1 seule requête)
   try {
-    const { data: listData, error: listError } = await supabase.storage
-      .from('audio')
-      .list('', {
-        search: filePath
-      });
+    const { data: dropboxFile, error: dropboxError } = await supabase
+      .from('dropbox_files')
+      .select('shared_link')
+      .eq('local_id', localId)
+      .maybeSingle();
 
-    if (listError) {
-      console.error('❌ Erreur liste Supabase:', listError);
-      throw new Error(`Supabase list error: ${listError.message}`);
+    if (dropboxFile?.shared_link) {
+      console.log('✅ Lien Dropbox trouvé dans DB:', dropboxFile.shared_link);
+      memoryCache.set(filePath, dropboxFile.shared_link);
+      return dropboxFile.shared_link;
     }
-
-    if (!listData || listData.length === 0) {
-      console.warn('⚠️ Fichier non trouvé dans Supabase:', filePath);
-      throw new Error(`File not found in Supabase storage: ${filePath}`);
-    }
-
+    
+    console.log('❌ Aucun lien Dropbox en DB pour:', localId);
+  } catch (error) {
+    console.warn('⚠️ Erreur requête dropbox_files:', error);
+  }
+  
+  // 4. Fallback vers Supabase Storage si pas de lien Dropbox
+  console.log('📦 Fallback Supabase Storage');
+  try {
     const { data, error } = await supabase.storage
       .from('audio')
       .createSignedUrl(filePath, 3600);
 
     if (error) {
-      console.error('❌ Erreur création URL signée:', error);
+      console.error('❌ Erreur Supabase Storage:', error);
       throw new Error(`Supabase signed URL error: ${error.message}`);
     }
 
     if (!data?.signedUrl) {
-      console.error('❌ URL signée vide');
       throw new Error('Failed to get file URL from Supabase');
     }
 
     console.log('✅ URL Supabase récupérée');
-    // Réactiver le cache mémoire pour les URL Supabase
     memoryCache.set(filePath, data.signedUrl);
     return data.signedUrl;
   } catch (error) {
