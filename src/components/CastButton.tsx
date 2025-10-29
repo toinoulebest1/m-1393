@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Cast, Airplay } from 'lucide-react';
+import { Cast, Airplay, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCast } from '@/contexts/CastContext';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+
 export const CastButton = () => {
   const {
     devices,
@@ -16,67 +17,146 @@ export const CastButton = () => {
     disconnectFromDevice
   } = useCast();
   const [open, setOpen] = useState(false);
+
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen && devices.length === 0 && !isDiscovering) {
+      console.log('🔍 Opening Cast menu, discovering devices...');
       discoverDevices();
     }
   };
-  return <Popover open={open} onOpenChange={handleOpenChange}>
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className={cn("text-spotify-neutral hover:text-white transition-colors", isCasting && "text-spotify-accent")}>
-          {isCasting ? <Airplay className="w-5 h-5" /> : <Cast className="w-5 h-5" />}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "text-spotify-neutral hover:text-white transition-all duration-300",
+            isCasting && "text-spotify-accent animate-pulse"
+          )}
+          title={isCasting ? `Diffusion sur ${activeDevice?.name}` : 'Diffuser'}
+        >
+          {isDiscovering ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isCasting ? (
+            <Airplay className="w-5 h-5" />
+          ) : (
+            <Cast className="w-5 h-5" />
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2 bg-spotify-dark border-spotify-neutral/20">
-        <div className="space-y-2">
+      <PopoverContent className="w-80 p-4 bg-spotify-card/95 backdrop-blur-xl border-white/10 shadow-2xl">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-[9b87f5] text-spotify-accent/[0.97]">Diffuser sur</h3>
-            <Button variant="ghost" size="sm" onClick={() => discoverDevices()} disabled={isDiscovering} className="text-[9b87f5] text-spotify-accent bg-gray-800 hover:bg-gray-700">
-              {isDiscovering ? 'Recherche...' : 'Actualiser'}
+            <h3 className="font-semibold text-white">Diffuser sur</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                console.log('🔄 Manual device discovery requested');
+                discoverDevices();
+              }}
+              disabled={isDiscovering}
+              className="text-spotify-accent hover:bg-spotify-accent/10 transition-colors"
+            >
+              {isDiscovering ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Recherche...</>
+              ) : (
+                'Actualiser'
+              )}
             </Button>
           </div>
-          
-          {devices.length === 0 && !isDiscovering && <p className="text-xs text-spotify-neutral py-2">Aucun appareil trouvé</p>}
-          
-          {isDiscovering && <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-spotify-accent"></div>
-            </div>}
-          
-          <ul className="space-y-1 max-h-40 overflow-y-auto">
-            {devices.map(device => <li key={device.id}>
-                <Button variant="ghost" className={cn("w-full justify-start text-left text-sm py-1", activeDevice?.id === device.id && "bg-spotify-accent/20 text-spotify-accent")} onClick={() => {
-              if (activeDevice?.id === device.id) {
-                disconnectFromDevice();
-              } else {
-                connectToDevice(device);
-              }
-              setOpen(false);
-            }}>
-                  <div className="flex items-center">
-                    {device.type === 'chromecast' && <Cast className="w-4 h-4 mr-2" />}
-                    {device.type === 'airplay' && <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 16L7 21H17L12 16Z" fill="currentColor" />
-                        <path d="M5 12C5 8.13401 8.13401 5 12 5C15.866 5 19 8.13401 19 12" stroke="currentColor" strokeWidth="2" />
-                      </svg>}
-                    {device.type === 'other' && <div className="w-4 h-4 mr-2 border border-current rounded-full flex items-center justify-center">
-                        <div className="w-1 h-1 bg-current rounded-full"></div>
-                      </div>}
-                    <span>{device.name}</span>
-                  </div>
-                </Button>
-              </li>)}
-          </ul>
-          
-          {activeDevice && <div className="pt-2 border-t border-spotify-neutral/20">
-              <Button variant="ghost" size="sm" onClick={() => {
-            disconnectFromDevice();
-            setOpen(false);
-          }} className="w-full justify-center text-red-400 hover:text-red-300 text-xs">
+
+          {isCasting && activeDevice && (
+            <div className="bg-spotify-accent/10 border border-spotify-accent/30 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-spotify-accent rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-spotify-accent">
+                  Diffusion en cours
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-spotify-light">
+                {activeDevice.type === 'chromecast' && <Cast className="w-4 h-4" />}
+                {activeDevice.type === 'airplay' && <Airplay className="w-4 h-4" />}
+                <span className="text-sm">{activeDevice.name}</span>
+              </div>
+            </div>
+          )}
+
+          {!isCasting && (
+            <>
+              {devices.length === 0 && !isDiscovering && (
+                <div className="text-center py-6">
+                  <Cast className="w-12 h-12 text-spotify-neutral/50 mx-auto mb-3" />
+                  <p className="text-sm text-spotify-neutral mb-2">
+                    Aucun appareil trouvé
+                  </p>
+                  <p className="text-xs text-spotify-neutral/70">
+                    Assurez-vous que votre appareil Cast est allumé et sur le même réseau
+                  </p>
+                </div>
+              )}
+
+              {isDiscovering && (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 text-spotify-accent animate-spin mb-3" />
+                  <p className="text-sm text-spotify-light">Recherche d'appareils...</p>
+                </div>
+              )}
+
+              {devices.length > 0 && (
+                <ul className="space-y-2 max-h-60 overflow-y-auto">
+                  {devices.map((device) => (
+                    <li key={device.id}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-start text-left py-3 hover:bg-white/10 transition-colors",
+                          activeDevice?.id === device.id && "bg-spotify-accent/20 text-spotify-accent hover:bg-spotify-accent/30"
+                        )}
+                        onClick={() => {
+                          console.log('🎯 Connecting to device:', device.name);
+                          if (activeDevice?.id === device.id) {
+                            disconnectFromDevice();
+                          } else {
+                            connectToDevice(device);
+                          }
+                          setOpen(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {device.type === 'chromecast' && <Cast className="w-5 h-5" />}
+                          {device.type === 'airplay' && <Airplay className="w-5 h-5" />}
+                          <span className="font-medium">{device.name}</span>
+                        </div>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+
+          {activeDevice && (
+            <div className="pt-3 border-t border-white/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  console.log('🔌 Disconnecting from Cast device');
+                  disconnectFromDevice();
+                  setOpen(false);
+                }}
+                className="w-full justify-center text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors"
+              >
                 Arrêter la diffusion
               </Button>
-            </div>}
+            </div>
+          )}
         </div>
       </PopoverContent>
-    </Popover>;
+    </Popover>
+  );
 };
