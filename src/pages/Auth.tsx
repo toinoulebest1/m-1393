@@ -33,19 +33,8 @@ const Auth = () => {
         return error.message;
     }
   };
-  return <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background">
-      {/* Static gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-accent/30 to-primary/20 opacity-50" />
-      
-      {/* Static orbs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/30 rounded-full blur-[120px]" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-accent/40 rounded-full blur-[150px]" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-muted/20 rounded-full blur-[100px]" />
-      
-      {/* Grid pattern overlay */}
-      
-      
-      <div className="w-full max-w-md relative z-10">
+  return <div className="min-h-screen w-full flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8 space-y-3">
           <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
             Bienvenue
