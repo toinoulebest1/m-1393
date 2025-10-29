@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Cast, Airplay, Loader2 } from 'lucide-react';
+import { Cast, Airplay, Loader2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCast } from '@/contexts/CastContext';
+import { usePlayerContext } from '@/contexts/PlayerContext';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,9 @@ export const CastButton = () => {
     disconnectFromDevice
   } = useCast();
   const [open, setOpen] = useState(false);
+  const { currentSong } = usePlayerContext();
+  const [dlnaUrl, setDlnaUrl] = useState<string | null>(null);
+  const [dlnaLoading, setDlnaLoading] = useState(false);
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -26,6 +31,25 @@ export const CastButton = () => {
     }
   };
 
+  const prepareDlnaLink = async () => {
+    try {
+      if (!currentSong) {
+        toast.error("Aucune piste en cours");
+        return;
+      }
+      setDlnaLoading(true);
+      setDlnaUrl(null);
+      console.log('🧩 Resolving DLNA link for:', currentSong.title);
+      const url = await UltraFastStreaming.getAudioUrlUltraFast(currentSong.url);
+      setDlnaUrl(url);
+      toast.success('Lien DLNA prêt', { description: 'Vous pouvez l\'utiliser dans votre app DLNA' });
+    } catch (e) {
+      console.error('DLNA link error:', e);
+      toast.error('Impossible de préparer le lien DLNA');
+    } finally {
+      setDlnaLoading(false);
+    }
+  };
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -138,6 +162,43 @@ export const CastButton = () => {
               )}
             </>
           )}
+
+          {/* DLNA manual section */}
+          <div className="pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-white">DLNA (manuel)</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={prepareDlnaLink}
+                disabled={dlnaLoading || !currentSong}
+                className="text-spotify-accent hover:bg-spotify-accent/10"
+              >
+                {dlnaLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Préparation...</> : 'Préparer le lien'}
+              </Button>
+            </div>
+            <p className="text-xs text-spotify-neutral mb-2">Générez un lien direct à utiliser dans votre application DLNA (VLC, BubbleUPnP, etc.).</p>
+            {dlnaUrl && (
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-md p-2">
+                <input
+                  className="flex-1 bg-transparent text-xs text-spotify-light outline-none"
+                  value={dlnaUrl}
+                  readOnly
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(dlnaUrl);
+                    toast.success('Lien copié dans le presse-papiers');
+                  }}
+                  className="text-spotify-accent hover:bg-spotify-accent/10"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
 
           {activeDevice && (
             <div className="pt-3 border-t border-white/10">
