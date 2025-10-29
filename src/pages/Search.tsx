@@ -343,15 +343,18 @@ const Search = () => {
     console.log("Song index in results:", results.findIndex(r => r.id === song.id));
     console.log("Current results:", results.map((r, idx) => `${idx}: ${r.title} - ${r.artist} (${r.id})`));
     
-    // Mettre la nouvelle queue avec tous les résultats de manière synchrone
+    // Mettre la nouvelle queue avec tous les résultats
     const newQueue = [...results];
     console.log("New queue created with", newQueue.length, "songs");
-    console.log("New queue songs:", newQueue.map((r, idx) => `${idx}: ${r.title} - ${r.artist} (${r.id})`));
     
+    // Sauvegarder immédiatement dans localStorage pour que nextSong puisse y accéder
+    localStorage.setItem('queue', JSON.stringify(newQueue));
+    
+    // Mettre à jour le state
     setQueue(newQueue);
     
-    // Jouer la chanson immédiatement
-    console.log("Playing song immediately:", song.title);
+    // Jouer la chanson (elle utilisera la queue depuis localStorage si besoin)
+    console.log("Playing song:", song.title);
     play(song);
     
     console.log("=====================");

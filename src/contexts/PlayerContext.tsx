@@ -146,31 +146,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       console.log("=== NEXT SONG DEBUG ===");
       console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
-      console.log("Queue length:", queue.length);
-      console.log("Full queue:", queue.map((s, idx) => `${idx}: ${s.title} - ${s.artist} (${s.id})`));
       
-      if (!currentSong || queue.length === 0) {
+      // Relire la queue depuis localStorage pour être sûr d'avoir la version la plus récente
+      let currentQueue = queue;
+      try {
+        const savedQueue = localStorage.getItem('queue');
+        if (savedQueue) {
+          const parsedQueue = JSON.parse(savedQueue);
+          if (parsedQueue.length > currentQueue.length) {
+            console.log("🔄 Queue reloaded from localStorage:", parsedQueue.length, "songs (was", currentQueue.length, ")");
+            currentQueue = parsedQueue;
+          }
+        }
+      } catch (error) {
+        console.error("Error reading queue from localStorage:", error);
+      }
+      
+      console.log("Queue length:", currentQueue.length);
+      console.log("Full queue:", currentQueue.map((s, idx) => `${idx}: ${s.title} - ${s.artist} (${s.id})`));
+      
+      if (!currentSong || currentQueue.length === 0) {
         console.log("No current song or queue is empty");
         return;
       }
       
-      const currentIndex = queue.findIndex(song => song.id === currentSong.id);
+      const currentIndex = currentQueue.findIndex(song => song.id === currentSong.id);
       console.log("Current index in queue:", currentIndex);
       console.log("Looking for song ID:", currentSong.id);
-      console.log("Queue IDs:", queue.map(s => s.id));
+      console.log("Queue IDs:", currentQueue.map(s => s.id));
       
       if (currentIndex === -1) {
         console.log("Current song not found in queue by ID");
-        const fallbackIndex = queue.findIndex(song => 
+        const fallbackIndex = currentQueue.findIndex(song => 
           song.title === currentSong.title && song.artist === currentSong.artist
         );
         
         if (fallbackIndex !== -1) {
           console.log("Found song by title/artist at index:", fallbackIndex);
           const nextIndex = fallbackIndex + 1;
-          if (nextIndex < queue.length) {
-            console.log(`Playing next song at index ${nextIndex}: ${queue[nextIndex].title}`);
-            await play(queue[nextIndex]);
+          if (nextIndex < currentQueue.length) {
+            console.log(`Playing next song at index ${nextIndex}: ${currentQueue[nextIndex].title}`);
+            await play(currentQueue[nextIndex]);
             return;
           } else {
             console.log("Fallback found song but it's the last one");
@@ -178,22 +194,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         
         console.log("Could not find current song in queue, playing first song");
-        if (queue.length > 0) {
-          await play(queue[0]);
+        if (currentQueue.length > 0) {
+          await play(currentQueue[0]);
         }
         return;
       }
       
       const nextIndex = currentIndex + 1;
-      console.log("Next index would be:", nextIndex, "out of", queue.length);
-      if (nextIndex < queue.length) {
-        console.log(`Playing next song at index ${nextIndex}: ${queue[nextIndex].title}`);
-        await play(queue[nextIndex]);
+      console.log("Next index would be:", nextIndex, "out of", currentQueue.length);
+      if (nextIndex < currentQueue.length) {
+        console.log(`Playing next song at index ${nextIndex}: ${currentQueue[nextIndex].title}`);
+        await play(currentQueue[nextIndex]);
       } else {
         console.log("End of queue reached");
-        if (repeatMode === 'all' && queue.length > 0) {
+        if (repeatMode === 'all' && currentQueue.length > 0) {
           console.log("Repeating playlist from beginning");
-          await play(queue[0]);
+          await play(currentQueue[0]);
         } else {
           toast.info("Fin de la playlist");
         }
