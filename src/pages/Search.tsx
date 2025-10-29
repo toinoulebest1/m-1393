@@ -51,12 +51,17 @@ const Search = () => {
     const scrollKey = `scroll-${location.pathname}`;
     const savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll !== null) {
-      // Restaurer après un court délai pour s'assurer que le contenu est chargé
-      requestAnimationFrame(() => {
-        window.scrollTo(0, parseInt(savedScroll, 10));
-        // Nettoyer après restauration
+      // Attendre que le DOM soit complètement chargé
+      const restoreScroll = () => {
+        const scrollPos = parseInt(savedScroll, 10);
+        window.scrollTo(0, scrollPos);
         sessionStorage.removeItem(scrollKey);
-      });
+      };
+      
+      // Utiliser plusieurs tentatives pour s'assurer que le contenu est chargé
+      setTimeout(restoreScroll, 0);
+      setTimeout(restoreScroll, 100);
+      setTimeout(restoreScroll, 300);
     }
   }, [location.pathname]);
   

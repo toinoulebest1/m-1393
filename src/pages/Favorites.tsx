@@ -29,10 +29,15 @@ const Favorites = () => {
     const scrollKey = `scroll-${location.pathname}`;
     const savedScroll = sessionStorage.getItem(scrollKey);
     if (savedScroll !== null) {
-      requestAnimationFrame(() => {
-        window.scrollTo(0, parseInt(savedScroll, 10));
+      const restoreScroll = () => {
+        const scrollPos = parseInt(savedScroll, 10);
+        window.scrollTo(0, scrollPos);
         sessionStorage.removeItem(scrollKey);
-      });
+      };
+      
+      setTimeout(restoreScroll, 0);
+      setTimeout(restoreScroll, 100);
+      setTimeout(restoreScroll, 300);
     }
   }, [location.pathname]);
 

@@ -295,7 +295,8 @@ export const SyncedLyricsView: React.FC = () => {
     setTimeout(() => {
       const state = (location as any)?.state as { from?: string } | null;
       if (state?.from) {
-        navigate(state.from);
+        // Utiliser replace pour ne pas ajouter à l'historique
+        navigate(state.from, { replace: true });
       } else {
         navigate(-1);
       }
