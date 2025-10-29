@@ -155,6 +155,23 @@ export const useAudioControl = ({
           console.log("⚡ Temps total:", totalElapsed.toFixed(1), "ms");
           
           setIsPlaying(true);
+
+          // Enregistrer dans l'historique de lecture (asynchrone, sans bloquer l'UI)
+          ;(async () => {
+            try {
+              const { supabase } = await import('@/integrations/supabase/client');
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user?.id) {
+                const { error } = await supabase.from('play_history').insert({
+                  user_id: session.user.id,
+                  song_id: song.id,
+                });
+                if (error) console.error("Erreur enregistrement historique:", error);
+              }
+            } catch (e) {
+              console.error('Impossible d\'enregistrer l\'historique:', e);
+            }
+          })();
           
           // Préchargement de la chanson suivante en arrière-plan
           setTimeout(() => preloadNextTracks(), 1000);
