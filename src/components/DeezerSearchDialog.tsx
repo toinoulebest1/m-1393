@@ -150,7 +150,7 @@ const DeezerSearchDialog = ({
                     <Button variant="outline" size="sm" onClick={e => {
                 e.stopPropagation();
                 handleApplyMetadata(track);
-              }} className="shrink-0 border-white/20 hover:bg-white/10 text-slate-400">
+              }} className="shrink-0 border-white/20 text-slate-400 bg-slate-700 hover:bg-slate-600">
                       Appliquer
                     </Button>
                   </div>)}
