@@ -103,6 +103,36 @@ export type Database = {
           },
         ]
       }
+      favorite_stats_archive: {
+        Row: {
+          archived_at: string
+          count: number | null
+          id: string
+          period_end: string
+          period_start: string
+          song_id: string
+          user_id: string | null
+        }
+        Insert: {
+          archived_at?: string
+          count?: number | null
+          id?: string
+          period_end: string
+          period_start: string
+          song_id: string
+          user_id?: string | null
+        }
+        Update: {
+          archived_at?: string
+          count?: number | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          song_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       gofile_references: {
         Row: {
           created_at: string
@@ -755,6 +785,30 @@ export type Database = {
           image_url?: string | null
           title?: string
           uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      top100_reset_history: {
+        Row: {
+          id: string
+          period_end: string
+          period_start: string
+          reset_at: string
+          songs_archived: number
+        }
+        Insert: {
+          id?: string
+          period_end: string
+          period_start: string
+          reset_at?: string
+          songs_archived?: number
+        }
+        Update: {
+          id?: string
+          period_end?: string
+          period_start?: string
+          reset_at?: string
+          songs_archived?: number
         }
         Relationships: []
       }
