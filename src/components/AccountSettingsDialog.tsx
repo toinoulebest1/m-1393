@@ -1,7 +1,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserCog, Upload, Loader2, Clock, CalendarDays, Music, BarChart3, Shield, Palette, Mail, Award, TrendingUp, Headphones } from "lucide-react";
+import { UserCog, Upload, Loader2, Clock, CalendarDays, Music, BarChart3, Shield, Palette, Mail, Award, TrendingUp, Headphones, Trash2, Key } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export const AccountSettingsDialog = () => {
   const { t } = useTranslation();
@@ -32,6 +33,10 @@ export const AccountSettingsDialog = () => {
   const [badges, setBadges] = useState<any[]>([]);
   const [email, setEmail] = useState<string>("");
   const [themeAnimation, setThemeAnimation] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -137,6 +142,75 @@ export const AccountSettingsDialog = () => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast.error("Veuillez remplir tous les champs");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("Le mot de passe doit contenir au moins 6 caractères");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast.success("Mot de passe mis à jour avec succès");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error("Erreur lors du changement de mot de passe");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setDeletingAccount(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast.error("Vous devez être connecté");
+        return;
+      }
+
+      // Supprimer les données de l'utilisateur
+      const { error: deleteError } = await supabase.rpc('delete_user_data', {
+        user_id_param: session.user.id
+      });
+
+      if (deleteError) {
+        console.error('Error deleting user data:', deleteError);
+      }
+
+      // Déconnecter l'utilisateur
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) throw signOutError;
+
+      toast.success("Votre compte a été supprimé");
+      setIsOpen(false);
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast.error("Erreur lors de la suppression du compte");
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -504,13 +578,94 @@ export const AccountSettingsDialog = () => {
 
                 <Separator className="bg-white/10" />
 
-                <div className="space-y-2">
-                  <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10">
-                    Changer le mot de passe
-                  </Button>
-                  <Button variant="outline" className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10">
-                    Supprimer le compte
-                  </Button>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-white flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      Changer le mot de passe
+                    </Label>
+                    <Input
+                      type="password"
+                      placeholder="Nouveau mot de passe"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Confirmer le mot de passe"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="bg-white/5 border-white/10 text-white"
+                    />
+                    <Button 
+                      onClick={handleChangePassword}
+                      disabled={changingPassword}
+                      className="w-full bg-spotify-accent hover:bg-spotify-accent/80"
+                    >
+                      {changingPassword ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Changement en cours...
+                        </>
+                      ) : (
+                        "Mettre à jour le mot de passe"
+                      )}
+                    </Button>
+                  </div>
+
+                  <Separator className="bg-white/10" />
+
+                  <div className="space-y-2">
+                    <Label className="text-red-400 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4" />
+                      Zone dangereuse
+                    </Label>
+                    <p className="text-xs text-gray-400">
+                      Cette action est irréversible. Toutes vos données seront supprimées.
+                    </p>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+                          disabled={deletingAccount}
+                        >
+                          {deletingAccount ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Suppression...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer mon compte
+                            </>
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-spotify-dark text-white border-white/20">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-400">
+                            Cette action est irréversible. Votre compte, vos playlists, vos favoris 
+                            et toutes vos données seront définitivement supprimés.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                            Annuler
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleDeleteAccount}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                          >
+                            Oui, supprimer mon compte
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </CardContent>
             </Card>
