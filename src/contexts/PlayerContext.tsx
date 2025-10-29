@@ -147,6 +147,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log("=== NEXT SONG DEBUG ===");
       console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
       console.log("Queue length:", queue.length);
+      console.log("Full queue:", queue.map((s, idx) => `${idx}: ${s.title} - ${s.artist} (${s.id})`));
       
       if (!currentSong || queue.length === 0) {
         console.log("No current song or queue is empty");
@@ -155,9 +156,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       const currentIndex = queue.findIndex(song => song.id === currentSong.id);
       console.log("Current index in queue:", currentIndex);
+      console.log("Looking for song ID:", currentSong.id);
+      console.log("Queue IDs:", queue.map(s => s.id));
       
       if (currentIndex === -1) {
-        console.log("Current song not found in queue");
+        console.log("Current song not found in queue by ID");
         const fallbackIndex = queue.findIndex(song => 
           song.title === currentSong.title && song.artist === currentSong.artist
         );
@@ -166,9 +169,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("Found song by title/artist at index:", fallbackIndex);
           const nextIndex = fallbackIndex + 1;
           if (nextIndex < queue.length) {
-            console.log(`Playing next song: ${queue[nextIndex].title}`);
+            console.log(`Playing next song at index ${nextIndex}: ${queue[nextIndex].title}`);
             await play(queue[nextIndex]);
             return;
+          } else {
+            console.log("Fallback found song but it's the last one");
           }
         }
         
@@ -180,8 +185,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       
       const nextIndex = currentIndex + 1;
+      console.log("Next index would be:", nextIndex, "out of", queue.length);
       if (nextIndex < queue.length) {
-        console.log(`Playing next song: ${queue[nextIndex].title}`);
+        console.log(`Playing next song at index ${nextIndex}: ${queue[nextIndex].title}`);
         await play(queue[nextIndex]);
       } else {
         console.log("End of queue reached");

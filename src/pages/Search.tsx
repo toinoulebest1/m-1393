@@ -340,24 +340,20 @@ const Search = () => {
     console.log("=== SEARCH QUEUE DEBUG ===");
     console.log("Setting queue with results:", results.length, "songs");
     console.log("Playing song:", song.title, "with ID:", song.id);
-    console.log("Current results:", results.map(r => `${r.title} - ${r.artist}`));
+    console.log("Song index in results:", results.findIndex(r => r.id === song.id));
+    console.log("Current results:", results.map((r, idx) => `${idx}: ${r.title} - ${r.artist} (${r.id})`));
     
-    // Vider d'abord la queue actuelle pour éviter toute confusion
-    setQueue([]);
+    // Mettre la nouvelle queue avec tous les résultats de manière synchrone
+    const newQueue = [...results];
+    console.log("New queue created with", newQueue.length, "songs");
+    console.log("New queue songs:", newQueue.map((r, idx) => `${idx}: ${r.title} - ${r.artist} (${r.id})`));
     
-    // Attendre un cycle pour être sûr que la queue est vidée
-    setTimeout(() => {
-      // Mettre la nouvelle queue avec tous les résultats
-      setQueue([...results]);
-      
-      // Attendre encore un peu pour que la queue soit mise à jour
-      setTimeout(() => {
-        console.log("Playing song after queue update:", song.title);
-        play(song);
-      }, 100);
-    }, 50);
+    setQueue(newQueue);
     
-    console.log("Queue will be set with", results.length, "songs");
+    // Jouer la chanson immédiatement
+    console.log("Playing song immediately:", song.title);
+    play(song);
+    
     console.log("=====================");
   };
   const handlePlaylistClick = (playlist: any) => {
