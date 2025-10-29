@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
+import { Layout } from "@/components/Layout";
+import { Player } from "@/components/Player";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
 import { Music, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
@@ -32,7 +31,6 @@ const History = () => {
     pause, 
     isPlaying, 
     favorites, 
-    toggleFavorite, 
     setHistory, 
     currentSong,
     setQueue 
@@ -198,93 +196,100 @@ const History = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-6xl mx-auto p-8 pb-32">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2 p-3 border-2 border-spotify-accent rounded-lg">
-              <Music className="w-6 h-6 text-spotify-accent animate-bounce" />
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#8B5CF6] via-[#D946EF] to-[#0EA5E9] bg-clip-text text-transparent animate-gradient">
-                {t('common.history')}
-              </h2>
+    <Layout>
+      <div className="w-full h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto w-full">
+          <div className="max-w-6xl mx-auto p-8 pb-32">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Music className="w-8 h-8 text-spotify-accent" />
+                <h1 className="text-3xl font-bold text-white">
+                  {t('common.history')}
+                </h1>
+              </div>
+
+              {history.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button 
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-sm">{t('common.deleteHistory')}</span>
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-spotify-dark border-spotify-light">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-white">
+                        {t('common.confirmDeleteHistory')}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-spotify-neutral">
+                        {t('common.confirmDeleteHistoryMessage')}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
+                        {t('common.cancel')}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={clearHistory}
+                        className="bg-red-500 hover:bg-red-600 text-white"
+                      >
+                        {t('common.delete')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <button 
-                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                  <span>{t('common.deleteHistory')}</span>
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-spotify-dark border-spotify-light">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-white">
-                    {t('common.confirmDeleteHistory')}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-spotify-neutral">
-                    {t('common.confirmDeleteHistoryMessage')}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="bg-spotify-light text-white hover:bg-spotify-light/80">
-                    {t('common.cancel')}
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={clearHistory}
-                    className="bg-red-500 hover:bg-red-600 text-white"
-                  >
-                    {t('common.delete')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-
-          <div className="space-y-2">
-            {isLoading ? (
-              <p className="text-spotify-neutral text-center py-8">
-                {t('common.loading')}
-              </p>
-            ) : history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
-                <Music className="w-16 h-16 text-spotify-neutral opacity-50" />
-                <p className="text-spotify-neutral text-lg">
-                  {t('common.emptyHistory')}
-                </p>
-                <p className="text-spotify-neutral text-sm">
-                  {t('common.startListening')}
-                </p>
-              </div>
-            ) : (
-              history.map((song) => {
-                const isFavorite = favorites.some(s => s.id === song.id);
-                const isCurrentSong = currentSong?.id === song.id;
-                
-                return (
-                  <div key={song.id} onClick={() => handlePlay(song)}>
-                    <SongCard
-                      song={song}
-                      isCurrentSong={isCurrentSong}
-                      isFavorite={isFavorite}
-                      dominantColor={dominantColor}
-                      onReportClick={() => setSongToReport(song)}
-                    />
+            <div className="space-y-2">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-spotify-neutral">{t('common.loading')}</p>
+                </div>
+              ) : history.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
+                  <Music className="w-20 h-20 text-spotify-neutral/50" />
+                  <div>
+                    <p className="text-spotify-neutral text-lg mb-2">
+                      {t('common.emptyHistory')}
+                    </p>
+                    <p className="text-spotify-neutral/70 text-sm">
+                      {t('common.startListening')}
+                    </p>
                   </div>
-                );
-              })
-            )}
+                </div>
+              ) : (
+                history.map((song) => {
+                  const isFavorite = favorites.some(s => s.id === song.id);
+                  const isCurrentSong = currentSong?.id === song.id;
+                  
+                  return (
+                    <div key={song.id} onClick={() => handlePlay(song)}>
+                      <SongCard
+                        song={song}
+                        isCurrentSong={isCurrentSong}
+                        isFavorite={isFavorite}
+                        dominantColor={dominantColor}
+                        onReportClick={() => setSongToReport(song)}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
+        
+        <Player />
+        
+        <ReportSongDialog
+          song={songToReport}
+          onClose={() => setSongToReport(null)}
+        />
       </div>
-      <Player />
-      
-      <ReportSongDialog
-        song={songToReport}
-        onClose={() => setSongToReport(null)}
-      />
-    </div>
+    </Layout>
   );
 };
 
