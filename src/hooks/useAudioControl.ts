@@ -91,48 +91,53 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming ultra-rapide
-        console.log("⚡ Configuration streaming ultra-rapide");
+        // Configuration streaming instantané comme Spotify
+        console.log("⚡ Démarrage instantané");
         audio.preload = "auto"; // Chargement immédiat
         audio.src = audioUrl;
         
-        // Attendre uniquement un buffer minimal (HAVE_ENOUGH_DATA)
-        const waitForMinimalBuffer = new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Timeout lors du chargement audio'));
-          }, 5000); // 5 secondes max (réduit de 10s)
-          
-          const checkReady = () => {
-            // Accepter dès que readyState >= 2 (HAVE_CURRENT_DATA)
-            // Plus besoin d'attendre HAVE_FUTURE_DATA (3) ou HAVE_ENOUGH_DATA (4)
-            if (audio.readyState >= 2) {
-              clearTimeout(timeout);
-              audio.removeEventListener('loadeddata', checkReady);
-              audio.removeEventListener('canplay', checkReady);
-              audio.removeEventListener('error', onError);
-              console.log("✅ Buffer minimal atteint (readyState:", audio.readyState, ")");
-              resolve();
-            }
-          };
-          
-          const onError = (e: Event) => {
-            clearTimeout(timeout);
-            audio.removeEventListener('loadeddata', checkReady);
-            audio.removeEventListener('canplay', checkReady);
-            audio.removeEventListener('error', onError);
-            reject(new Error('Erreur lors du chargement audio'));
-          };
-          
-          audio.addEventListener('loadeddata', checkReady);
-          audio.addEventListener('canplay', checkReady);
-          audio.addEventListener('error', onError);
-          
-          // Vérifier immédiatement si déjà prêt
-          checkReady();
-        });
-        
-        console.log("⏳ Attente buffer minimal...");
-        await waitForMinimalBuffer;
+        // Démarrage INSTANTANÉ sans attendre - comme Spotify
+        // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
+        try {
+          // Si déjà quelques données disponibles, on démarre directement
+          if (audio.readyState >= 2) {
+            console.log("✅ Données déjà disponibles, démarrage immédiat");
+          } else {
+            // Sinon on attend juste loadeddata (premier frame)
+            await new Promise<void>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
+                resolve(); // On essaie quand même
+              }, 2000); // 2s max (très court)
+              
+              const onLoadedData = () => {
+                clearTimeout(timeout);
+                audio.removeEventListener('loadeddata', onLoadedData);
+                audio.removeEventListener('error', onError);
+                console.log("✅ Premières données chargées");
+                resolve();
+              };
+              
+              const onError = () => {
+                clearTimeout(timeout);
+                audio.removeEventListener('loadeddata', onLoadedData);
+                audio.removeEventListener('error', onError);
+                reject(new Error('Erreur chargement audio'));
+              };
+              
+              audio.addEventListener('loadeddata', onLoadedData, { once: true });
+              audio.addEventListener('error', onError, { once: true });
+              
+              // Check immédiat
+              if (audio.readyState >= 2) {
+                onLoadedData();
+              }
+            });
+          }
+        } catch (error) {
+          console.warn("⚠️ Erreur attente données:", error);
+          // On continue quand même, le navigateur gérera
+        }
         
         // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
         console.log("🚀 Démarrage lecture avec AutoplayManager...");
