@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { cn } from "@/lib/utils";
 import { SongCard } from "@/components/SongCard";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -281,54 +282,68 @@ const Top100 = () => {
             </div>
 
             {/* Liste des chansons */}
-            <div className="space-y-2">
-              {favoriteStats.map((stat, index) => {
-                const rank = index + 1;
-                const isCurrentSong = currentSong?.id === stat.song.id;
-                const isFavorite = favorites.some(f => f.id === stat.song.id);
+            <AnimatePresence mode="popLayout">
+              <div className="space-y-2">
+                {favoriteStats.map((stat, index) => {
+                  const rank = index + 1;
+                  const isCurrentSong = currentSong?.id === stat.song.id;
+                  const isFavorite = favorites.some(f => f.id === stat.song.id);
 
-                return (
-                  <div key={stat.songId} className="relative">
-                    {/* Badge de rang */}
-                    <div className={cn(
-                      "absolute left-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs",
-                      rank <= 3 ? "bg-gradient-to-br" : "bg-white/10",
-                      getRankBadgeStyle(rank)
-                    )}>
-                      #{rank}
-                    </div>
+                  return (
+                    <motion.div
+                      key={stat.songId}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{
+                        layout: { duration: 0.4, ease: "easeInOut" },
+                        opacity: { duration: 0.3 },
+                        y: { duration: 0.3 }
+                      }}
+                      className="relative"
+                    >
+                      {/* Badge de rang */}
+                      <div className={cn(
+                        "absolute left-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-xs",
+                        rank <= 3 ? "bg-gradient-to-br" : "bg-white/10",
+                        getRankBadgeStyle(rank)
+                      )}>
+                        #{rank}
+                      </div>
 
-                    {/* Badge de likes */}
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
-                      <Heart className="w-3 h-3 text-spotify-accent fill-spotify-accent" />
-                      <span className="text-xs font-medium text-white">{stat.count}</span>
-                    </div>
+                      {/* Badge de likes */}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full">
+                        <Heart className="w-3 h-3 text-spotify-accent fill-spotify-accent" />
+                        <span className="text-xs font-medium text-white">{stat.count}</span>
+                      </div>
 
-                    <div className="pl-12" onClick={() => handlePlay(stat.song, index)}>
-                      <SongCard
-                        song={{
-                          ...stat.song,
-                          url: stat.song.url,
-                          imageUrl: stat.song.image_url,
-                          id: stat.song.id
-                        }}
-                        isCurrentSong={isCurrentSong}
-                        isFavorite={isFavorite}
-                        dominantColor={dominantColor}
-                        contextMenuItems={isAdmin ? [
-                          {
-                            label: "Masquer du Top 100",
-                            icon: <Trash2 className="w-4 h-4" />,
-                            action: () => setSongToDelete(stat.songId),
-                            show: true
-                          }
-                        ] : []}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="pl-12" onClick={() => handlePlay(stat.song, index)}>
+                        <SongCard
+                          song={{
+                            ...stat.song,
+                            url: stat.song.url,
+                            imageUrl: stat.song.image_url,
+                            id: stat.song.id
+                          }}
+                          isCurrentSong={isCurrentSong}
+                          isFavorite={isFavorite}
+                          dominantColor={dominantColor}
+                          contextMenuItems={isAdmin ? [
+                            {
+                              label: "Masquer du Top 100",
+                              icon: <Trash2 className="w-4 h-4" />,
+                              action: () => setSongToDelete(stat.songId),
+                              show: true
+                            }
+                          ] : []}
+                        />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </AnimatePresence>
           </div>
         </div>
 
