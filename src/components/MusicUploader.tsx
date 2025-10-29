@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload } from "lucide-react";
+import { Upload, FolderOpen, Music } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
@@ -11,6 +11,12 @@ import { cn } from "@/lib/utils";
 import { parseLrc, lrcToPlainText } from "@/utils/lrcParser";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Song {
   id: string;
@@ -603,6 +609,9 @@ export const MusicUploader = () => {
     event.target.value = '';
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div 
       className={cn(
@@ -615,35 +624,54 @@ export const MusicUploader = () => {
       onDragLeave={handleDragLeave}
     >
       <div className="flex items-center justify-between mb-2">
-        <div className="flex gap-2">
-          {/* Single file upload button */}
-          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-            <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un fichier</span>
-            <input
-              type="file"
-              accept="audio/*,.lrc"
-              multiple
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </label>
-          
-          {/* Directory upload button */}
-          <label className="flex items-center space-x-2 text-spotify-neutral hover:text-white cursor-pointer transition-colors">
-            <Upload className="w-5 h-5" />
-            <span>{t('common.upload')} un dossier</span>
-            <input
-              type="file"
-              accept="audio/*,.lrc"
-              multiple
-              webkitdirectory=""
-              directory=""
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </label>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="flex items-center gap-2"
+            >
+              <Upload className="w-5 h-5" />
+              <span>Importer de la musique</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Music className="w-4 h-4" />
+              <span>Fichier(s) audio</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => folderInputRef.current?.click()}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span>Dossier complet</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        {/* Hidden file inputs */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*,.lrc"
+          multiple
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          accept="audio/*,.lrc"
+          multiple
+          webkitdirectory=""
+          directory=""
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        
         <div className="text-xs text-spotify-neutral">
           Using: {storageProvider}
         </div>
