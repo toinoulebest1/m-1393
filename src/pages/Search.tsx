@@ -425,7 +425,7 @@ const Search = () => {
               <div className="flex gap-4 mb-6">
                 <div className="relative flex-1 group">
                   <SearchIcon className={cn("absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 transition-all duration-300", "group-focus-within:text-primary group-hover:text-primary", "group-focus-within:scale-110 group-hover:scale-110")} />
-                  <Input type="text" placeholder={searchFilter === "playlist" ? "Rechercher une playlist..." : searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste (ou * pour tout afficher)"} value={searchQuery} onChange={e => handleSearch(e.target.value)} className={cn("pl-10 transition-all duration-300", "border-2 focus:border-primary", "shadow-sm hover:shadow-md focus:shadow-lg", "transform-gpu", "animate-fade-in", "bg-gradient-to-r from-transparent via-transparent to-transparent", "hover:bg-gradient-to-r hover:from-purple-50 hover:via-indigo-50 hover:to-purple-50", "focus:bg-gradient-to-r focus:from-purple-50 focus:via-indigo-50 focus:to-purple-50", "dark:hover:from-purple-900/10 dark:hover:via-indigo-900/10 dark:hover:to-purple-900/10", "dark:focus:from-purple-900/10 dark:focus:via-indigo-900/10 dark:focus:to-purple-900/10")} style={{
+                  <Input type="text" placeholder={searchFilter === "playlist" ? "Rechercher une playlist..." : searchFilter === "genre" ? "Sélectionnez un genre..." : "Rechercher une chanson ou un artiste (ou * pour tout afficher)"} value={searchQuery} onChange={e => handleSearch(e.target.value)} className={cn("pl-10 transition-all duration-300", "border-2 focus:border-primary", "shadow-sm hover:shadow-md focus:shadow-lg", "transform-gpu", "bg-gradient-to-r from-transparent via-transparent to-transparent", "hover:bg-gradient-to-r hover:from-purple-50 hover:via-indigo-50 hover:to-purple-50", "focus:bg-gradient-to-r focus:from-purple-50 focus:via-indigo-50 focus:to-purple-50", "dark:hover:from-purple-900/10 dark:hover:via-indigo-900/10 dark:hover:to-purple-900/10", "dark:focus:from-purple-900/10 dark:focus:via-indigo-900/10 dark:focus:to-purple-900/10")} style={{
                   backgroundSize: '200% 100%'
                 }} onFocus={e => {
                   e.target.style.backgroundPosition = '100% 0';
@@ -490,10 +490,7 @@ const Search = () => {
             playlistResults.length > 0 ? <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {playlistResults.map((playlist, index) => <div key={playlist.id} style={{
-                  animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                  opacity: 0
-                }} onClick={() => handlePlaylistClick(playlist)} className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer">
+                      {playlistResults.map((playlist, index) => <div key={playlist.id} onClick={() => handlePlaylistClick(playlist)} className="bg-card border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer">
                           <div className="flex items-center gap-3">
                             {playlist.cover_image_url ? <img src={playlist.cover_image_url} alt={playlist.name} className="w-16 h-16 rounded object-cover" /> : <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
                                 <List className="h-8 w-8 text-muted-foreground" />
@@ -513,36 +510,30 @@ const Search = () => {
                           </div>
                         </div>)}
                     </div>
-                  </div> : searchQuery ? <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  </div> : searchQuery ? <div className="text-center py-12 text-muted-foreground">
                     Aucune playlist trouvée pour "{searchQuery}"
-                  </div> : <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                  </div> : <div className="text-center py-12 text-muted-foreground">
                     Commencez à taper pour rechercher des playlists...
                   </div> : searchFilter === "all" && (results.length > 0 || playlistResults.length > 0) ?
             // Show both songs and playlists for "all" filter
             <div className="space-y-6">
                   {results.length > 0 && <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Chansons</h3>
-                      <div className="space-y-2">
-                        {results.map((song, index) => {
-                    const isFavorite = favorites.some(s => s.id === song.id);
-                    const isCurrentSong = currentSong?.id === song.id;
-                    return <div key={song.id} style={{
-                      animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                      opacity: 0
-                    }} onClick={() => handlePlay(song)}>
-                              <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
-                            </div>;
-                  })}
-                      </div>
+            <div className="space-y-2">
+                  {results.map((song, index) => {
+                const isFavorite = favorites.some(s => s.id === song.id);
+                const isCurrentSong = currentSong?.id === song.id;
+                return <div key={song.id} onClick={() => handlePlay(song)}>
+                        <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
+                      </div>;
+              })}
+                </div>
                     </div>}
                   
                   {playlistResults.length > 0 && <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Playlists ({playlistResults.length})</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {playlistResults.map((playlist, index) => <div key={playlist.id} style={{
-                    animation: `fadeIn 0.3s ease-out forwards ${(results.length + index) * 50}ms`,
-                    opacity: 0
-                  }} onClick={() => handlePlaylistClick(playlist)} className="border p-4 transition-colors cursor-pointer bg-slate-900 rounded-2xl">
+                        {playlistResults.map((playlist, index) => <div key={playlist.id} onClick={() => handlePlaylistClick(playlist)} className="border p-4 transition-colors cursor-pointer bg-slate-900 rounded-2xl">
                             <div className="flex items-center gap-3">
                               {playlist.cover_image_url ? <img src={playlist.cover_image_url} alt={playlist.name} className="w-16 h-16 rounded object-cover" /> : <div className="w-16 h-16 rounded bg-muted flex items-center justify-center">
                                   <List className="h-8 w-8 text-muted-foreground" />
@@ -568,17 +559,14 @@ const Search = () => {
             <div className="space-y-2">
                   {results.map((song, index) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
-                const isCurrentSong = currentSong?.id === song.id;
-                return <div key={song.id} style={{
-                  animation: `fadeIn 0.3s ease-out forwards ${index * 50}ms`,
-                  opacity: 0
-                }} onClick={() => handlePlay(song)}>
+                 const isCurrentSong = currentSong?.id === song.id;
+                return <div key={song.id} onClick={() => handlePlay(song)}>
                         <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
                       </div>;
               })}
-                </div> : searchQuery ? <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                </div> : searchQuery ? <div className="text-center py-12 text-muted-foreground">
                   Aucun résultat trouvé pour "{searchQuery}"
-                </div> : <div className="text-center py-12 text-muted-foreground animate-fade-in">
+                </div> : <div className="text-center py-12 text-muted-foreground">
                   Commencez à taper pour rechercher des chansons ou utilisez "*" pour tout afficher...
                 </div>}
             </div>
