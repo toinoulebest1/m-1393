@@ -34,7 +34,7 @@ export const Sidebar = () => {
     checkAdminStatus();
   }, []);
   const links = [{
-    to: "/",
+    to: "/home",
     icon: Home,
     label: t('common.home')
   }, {
