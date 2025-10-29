@@ -189,7 +189,7 @@ export const AccountSettingsDialog = () => {
       }
 
       // Supprimer les données de l'utilisateur
-      const { error: deleteError } = await supabase.rpc('delete_user_data', {
+      const { error: deleteError } = await supabase.rpc('delete_user_data' as any, {
         user_id_param: session.user.id
       });
 

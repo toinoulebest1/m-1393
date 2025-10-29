@@ -965,6 +965,7 @@ export type Database = {
           errors: string[]
         }[]
       }
+      delete_user_data: { Args: { user_id_param: string }; Returns: boolean }
       generate_random_username: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_admin: { Args: { user_id: string }; Returns: boolean }
