@@ -15,6 +15,7 @@ import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
 import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
+import { MusicDiscovery } from "@/components/MusicDiscovery";
 
 const Index = () => {
   const location = useLocation();
@@ -262,7 +263,7 @@ const Index = () => {
 
   return (
     <Layout>
-      <div className="w-full h-full flex flex-col">
+      <div className="w-full h-full flex flex-col overflow-y-auto">
         
         
         {!isMobile && (
@@ -291,7 +292,7 @@ const Index = () => {
           </div>
         </div>
         
-        <div className="flex-1 w-full flex items-center justify-center">
+        <div className="w-full flex items-center justify-center py-8">
           {currentSong ? (
             <div className="text-center p-6 max-w-md mx-auto">
               <div className="w-64 h-64 mx-auto mb-8 relative">
@@ -316,6 +317,8 @@ const Index = () => {
             </div>
           )}
         </div>
+
+        <MusicDiscovery />
         
         {showCacheManager && (
           <div className="absolute right-4 top-14 z-50 w-80">
