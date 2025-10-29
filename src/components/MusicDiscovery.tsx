@@ -114,7 +114,7 @@ export const MusicDiscovery = () => {
           <Sparkles className="w-6 h-6 text-spotify-accent" />
           <h2 className="text-2xl font-bold">Découverte</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(8)].map((_, i) => (
             <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
@@ -133,7 +133,7 @@ export const MusicDiscovery = () => {
         <Sparkles className="w-6 h-6 text-spotify-accent animate-pulse" />
         <h2 className="text-2xl font-bold">Découvrez de nouvelles musiques</h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {suggestedSongs.map((song) => (
           <SongCard
             key={song.id}
