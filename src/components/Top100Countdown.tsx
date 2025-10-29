@@ -85,33 +85,15 @@ export const Top100Countdown = () => {
   }
 
   return (
-    <div className="flex items-center gap-3 bg-gradient-to-r from-spotify-light/30 to-spotify-dark/30 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/10">
-      <Clock className="w-5 h-5 text-spotify-accent animate-pulse" />
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-spotify-neutral">Prochain reset dans:</span>
-        <div className="flex items-center gap-2 font-mono">
-          {timeRemaining.days > 0 && (
-            <div className="flex flex-col items-center bg-white/5 px-2 py-1 rounded">
-              <span className="text-lg font-bold text-white">{timeRemaining.days}</span>
-              <span className="text-[10px] text-spotify-neutral">jours</span>
-            </div>
-          )}
-          <div className="flex flex-col items-center bg-white/5 px-2 py-1 rounded">
-            <span className="text-lg font-bold text-white">{String(timeRemaining.hours).padStart(2, '0')}</span>
-            <span className="text-[10px] text-spotify-neutral">h</span>
-          </div>
-          <span className="text-white/30">:</span>
-          <div className="flex flex-col items-center bg-white/5 px-2 py-1 rounded">
-            <span className="text-lg font-bold text-white">{String(timeRemaining.minutes).padStart(2, '0')}</span>
-            <span className="text-[10px] text-spotify-neutral">min</span>
-          </div>
-          <span className="text-white/30">:</span>
-          <div className="flex flex-col items-center bg-white/5 px-2 py-1 rounded">
-            <span className="text-lg font-bold text-white">{String(timeRemaining.seconds).padStart(2, '0')}</span>
-            <span className="text-[10px] text-spotify-neutral">sec</span>
-          </div>
-        </div>
-      </div>
+    <div className="flex items-center gap-2 text-xs text-spotify-neutral/70">
+      <Clock className="w-3.5 h-3.5" />
+      <span>Reset dans</span>
+      <span className="font-mono text-white/60">
+        {timeRemaining.days > 0 && `${timeRemaining.days}j `}
+        {String(timeRemaining.hours).padStart(2, '0')}:
+        {String(timeRemaining.minutes).padStart(2, '0')}:
+        {String(timeRemaining.seconds).padStart(2, '0')}
+      </span>
     </div>
   );
 };
