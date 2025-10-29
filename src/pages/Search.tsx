@@ -205,9 +205,6 @@ const Search = () => {
         console.log("Final visible playlists:", visiblePlaylists);
         setPlaylistResults(visiblePlaylists);
         setResults([]);
-        if (isWildcardSearch) {
-          toast.success(`Toutes les playlists listées (${visiblePlaylists.length})`);
-        }
       } else if (searchFilter === "all") {
         // Search in both songs and playlists
         const promises = [];
@@ -290,9 +287,6 @@ const Search = () => {
         }
         setResults(formattedResults);
         setPlaylistResults(visiblePlaylists);
-        if (isWildcardSearch) {
-          toast.success(`Tous les morceaux (${formattedResults.length}) et playlists (${visiblePlaylists.length}) listés`);
-        }
       } else {
         // ... keep existing code (search in songs only for title, artist, genre filters) the same
         let queryBuilder = supabase.from('songs').select('*');
@@ -325,9 +319,6 @@ const Search = () => {
         }));
         setResults(formattedResults);
         setPlaylistResults([]);
-        if (isWildcardSearch) {
-          toast.success(`Tous les morceaux listés (${formattedResults.length})`);
-        }
       }
     } catch (error) {
       console.error('Erreur de recherche:', error);
@@ -547,7 +538,7 @@ const Search = () => {
             // Show both songs and playlists for "all" filter
             <div className="space-y-6">
                   {results.length > 0 && <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Chansons</h3>
+                      <h3 className="text-lg font-semibold">Chansons ({results.length})</h3>
             <div className="space-y-2">
                   {results.map((song, index) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
@@ -581,18 +572,21 @@ const Search = () => {
                               </div>
                             </div>
                           </div>)}
-                      </div>
-                    </div>}
+                </div>
+                     </div>}
                 </div> : results.length > 0 ?
             // Show only songs for other filters
-            <div className="space-y-2">
-                  {results.map((song, index) => {
+            <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground mb-2">{results.length} morceau{results.length > 1 ? 'x' : ''}</div>
+                  <div className="space-y-2">
+                   {results.map((song, index) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
                  const isCurrentSong = currentSong?.id === song.id;
                 return <div key={song.id} onClick={() => handlePlay(song)}>
                         <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
                       </div>;
               })}
+                </div>
                 </div> : searchQuery ? <div className="text-center py-12 text-muted-foreground">
                   Aucun résultat trouvé pour "{searchQuery}"
                 </div> : <div className="text-center py-12 text-muted-foreground">
