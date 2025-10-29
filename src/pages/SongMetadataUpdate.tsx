@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
+import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -229,6 +230,8 @@ const SongMetadataUpdate = () => {
           onOpenChange={setDropboxChangesOpen}
         />
       </div>
+      
+      <Player />
     </Layout>
   );
 };
