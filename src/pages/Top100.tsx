@@ -131,6 +131,19 @@ const Top100 = () => {
   useEffect(() => {
     fetchFavoriteStats();
 
+    // Intervalle de secours toutes les 5 secondes
+    const intervalId = setInterval(() => {
+      console.log('🔄 TOP 100: Refresh via interval (every 5s)');
+      fetchFavoriteStats(true);
+    }, 5000);
+
+    // Refresh quand l'utilisateur revient sur l'onglet
+    const onFocus = () => {
+      console.log('🔄 TOP 100: Refresh on window focus');
+      fetchFavoriteStats(true);
+    };
+    window.addEventListener('focus', onFocus);
+
     const channel = supabase
       .channel('favorite_stats_global_top100')
       .on(
@@ -157,7 +170,9 @@ const Top100 = () => {
       });
 
     return () => {
-      console.log('🔌 TOP 100: Unsubscribing from realtime');
+      console.log('🔌 TOP 100: Cleanup - unsubscribing');
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
       supabase.removeChannel(channel);
     };
   }, []);
