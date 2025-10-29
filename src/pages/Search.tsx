@@ -84,6 +84,15 @@ const Search = () => {
   useEffect(() => {
     localStorage.setItem('lastSelectedGenre', selectedGenre);
   }, [selectedGenre]);
+  
+  // Sauvegarder les derniers résultats de recherche pour la navigation suivante/précédente
+  useEffect(() => {
+    try {
+      localStorage.setItem('lastSearchResults', JSON.stringify(results || []));
+    } catch (e) {
+      console.warn('Failed to persist lastSearchResults', e);
+    }
+  }, [results]);
   useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {
       extractDominantColor(currentSong.imageUrl).then(color => setDominantColor(color));

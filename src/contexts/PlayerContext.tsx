@@ -158,6 +158,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentQueue = parsedQueue;
           }
         }
+        // Fallback: utiliser les derniers résultats de recherche si la queue est trop courte
+        if (currentQueue.length <= 1) {
+          const lastResultsRaw = localStorage.getItem('lastSearchResults');
+          if (lastResultsRaw) {
+            const lastResults = JSON.parse(lastResultsRaw);
+            if (Array.isArray(lastResults) && lastResults.length > currentQueue.length) {
+              console.log("🧭 Using lastSearchResults as queue:", lastResults.length, "songs");
+              currentQueue = lastResults;
+              // Mettre à jour l'état et persister
+              setQueue(currentQueue);
+              localStorage.setItem('queue', JSON.stringify(currentQueue));
+            }
+          }
+        }
       } catch (error) {
         console.error("Error reading queue from localStorage:", error);
       }
