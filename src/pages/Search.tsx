@@ -46,6 +46,20 @@ const Search = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Restaurer la position de scroll au retour
+  useEffect(() => {
+    const scrollKey = `scroll-${location.pathname}`;
+    const savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+      // Restaurer après un court délai pour s'assurer que le contenu est chargé
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(savedScroll, 10));
+        // Nettoyer après restauration
+        sessionStorage.removeItem(scrollKey);
+      });
+    }
+  }, [location.pathname]);
+  
   // Trigger saved search on component mount
   useEffect(() => {
     const savedSearch = localStorage.getItem('lastSearch');
@@ -378,6 +392,8 @@ const Search = () => {
 
   // Handle navigation to synced lyrics page
   const handleLyricsNavigation = useCallback(() => {
+    // Sauvegarder la position de scroll
+    sessionStorage.setItem(`scroll-${location.pathname}`, window.scrollY.toString());
     // Just navigate to the synced lyrics page
     navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
   }, [navigate, location]);

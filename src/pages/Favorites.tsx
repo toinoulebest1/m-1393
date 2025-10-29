@@ -2,6 +2,7 @@ import { Player } from "@/components/Player";
 import { Layout } from "@/components/Layout";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { Heart, Shuffle, Play } from "lucide-react";
 import { toast } from "sonner";
 import React from 'react';
@@ -11,6 +12,7 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 
 const Favorites = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const { 
     favorites, 
     play, 
@@ -21,6 +23,18 @@ const Favorites = () => {
     setQueue 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
+
+  // Restaurer la position de scroll au retour
+  React.useEffect(() => {
+    const scrollKey = `scroll-${location.pathname}`;
+    const savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(savedScroll, 10));
+        sessionStorage.removeItem(scrollKey);
+      });
+    }
+  }, [location.pathname]);
 
   React.useEffect(() => {
     if (currentSong?.imageUrl && !currentSong.imageUrl.includes('picsum.photos')) {

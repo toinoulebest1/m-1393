@@ -88,6 +88,7 @@ export const SongCard = ({
     }
     
     // Navigate to synced lyrics page instead of using modal
+    sessionStorage.setItem(`scroll-${location.pathname}`, window.scrollY.toString());
     navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
     // If the onLyricsClick prop is provided, call it as well (for backward compatibility)
     if (onLyricsClick) {

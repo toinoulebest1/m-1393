@@ -235,6 +235,8 @@ export const Player = () => {
 
   // Navigate to synced lyrics
   const handleLyricsNavigation = () => {
+    // Sauvegarder la position de scroll
+    sessionStorage.setItem(`scroll-${location.pathname}`, window.scrollY.toString());
     navigate("/synced-lyrics", { state: { from: location.pathname + location.search } });
   };
 

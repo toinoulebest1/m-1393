@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Music, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,7 @@ import {
 
 const History = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const { 
     history, 
     play, 
@@ -38,6 +40,18 @@ const History = () => {
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [songToReport, setSongToReport] = React.useState<any>(null);
+
+  // Restaurer la position de scroll au retour
+  React.useEffect(() => {
+    const scrollKey = `scroll-${location.pathname}`;
+    const savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(savedScroll, 10));
+        sessionStorage.removeItem(scrollKey);
+      });
+    }
+  }, [location.pathname]);
 
   const loadHistory = async () => {
     try {

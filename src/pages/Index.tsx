@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
 
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
@@ -16,6 +17,7 @@ import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 const Index = () => {
+  const location = useLocation();
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { refreshCurrentSong, currentSong, play, pause, nextSong, previousSong, isPlaying, stopCurrentSong, removeSong } = usePlayerContext();
@@ -24,6 +26,18 @@ const Index = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+
+  // Restaurer la position de scroll au retour
+  useEffect(() => {
+    const scrollKey = `scroll-${location.pathname}`;
+    const savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(savedScroll, 10));
+        sessionStorage.removeItem(scrollKey);
+      });
+    }
+  }, [location.pathname]);
 
   // Force re-render when currentSong changes
   useEffect(() => {
