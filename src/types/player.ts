@@ -60,17 +60,4 @@ export interface PlayerContextType {
   setPlaybackRate: (rate: number) => void;
   refreshCurrentSong: () => void;
   getCurrentAudioElement: () => HTMLAudioElement;
-  
-  // Equalizer properties - Fix type mismatches
-  equalizerSettings: number[];
-  equalizerPresets: Record<string, number[]>;
-  currentEqualizerPreset: string | null;
-  isEqualizerEnabled: boolean;
-  isEqualizerInitialized: boolean;
-  updateEqualizerBand: (index: number, value: number) => void;
-  applyEqualizerPreset: (presetName: string) => void;
-  toggleEqualizer: () => void;
-  resetEqualizer: () => void;
-  setEqualizerPreAmp: (value: number) => void;
-  initializeEqualizer: () => void;
 }

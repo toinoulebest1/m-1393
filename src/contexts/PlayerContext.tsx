@@ -5,7 +5,6 @@ import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
-import { useEqualizer } from '@/hooks/useEqualizer';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
@@ -58,9 +57,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [displayedSong, setDisplayedSong] = useState<Song | null>(null);
-
-  // Hook d'égaliseur
-  const equalizer = useEqualizer({ audioElement: audioRef.current });
 
   // Hook pour la queue - doit être déclaré AVANT useUltraFastPlayer
   const queueHook = usePlayerQueue({ currentSong, isChangingSong, setIsChangingSong, play: async () => {} });
@@ -698,23 +694,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSearchQuery,
     setPlaybackRate: updatePlaybackRate,
     refreshCurrentSong,
-    getCurrentAudioElement,
-    equalizerSettings: equalizer.settings.bands.map(band => band.gain),
-    equalizerPresets: Object.fromEntries(
-      Object.entries(equalizer.presets).map(([key, preset]) => [
-        key, 
-        Array.isArray(preset) ? preset : preset.settings.bands.map((band: any) => band.gain)
-      ])
-    ),
-    currentEqualizerPreset: equalizer.currentPreset,
-    isEqualizerEnabled: equalizer.isEnabled,
-    isEqualizerInitialized: equalizer.isInitialized,
-    updateEqualizerBand: equalizer.updateBand,
-    applyEqualizerPreset: equalizer.applyPreset,
-    toggleEqualizer: equalizer.toggleEnabled,
-    resetEqualizer: equalizer.resetEqualizer,
-    setEqualizerPreAmp: equalizer.setPreAmp,
-    initializeEqualizer: equalizer.initializeAudioContext,
+    getCurrentAudioElement
   };
 
   return (

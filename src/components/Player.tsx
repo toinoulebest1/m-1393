@@ -1,10 +1,9 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Settings2, Loader2 } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Heart, Mic, Loader2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { EqualizerWrapper } from "@/components/EqualizerWrapper";
 import { toast } from "sonner";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
@@ -26,8 +25,7 @@ export const Player = () => {
     repeatMode,
     favorites,
     isChangingSong,
-    isAudioReady, // NOUVEAU
-    isEqualizerInitialized,
+    isAudioReady,
     play,
     pause,
     setVolume,
@@ -69,7 +67,6 @@ export const Player = () => {
   };
   
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
-  const [showEqualizer, setShowEqualizer] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const isSeekingRef = useRef(false);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -140,10 +137,6 @@ export const Player = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
     console.log("Toggling mute to:", newMutedState);
-  };
-
-  const toggleEqualizerVisibility = () => {
-    setShowEqualizer(!showEqualizer);
   };
 
   const handleProgressChange = (value: number[]) => {
@@ -276,10 +269,6 @@ export const Player = () => {
           </div>
         </div>
       )}
-
-      {currentSong && showEqualizer && (
-        <EqualizerWrapper onClose={toggleEqualizerVisibility} />
-      )}
       
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {displayedSong ? (
@@ -397,16 +386,6 @@ export const Player = () => {
             data-lyrics-button="true"
           >
             <Mic className="h-5 w-5" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleEqualizerVisibility}
-            disabled={!currentSong}
-            className="text-spotify-neutral hover:text-white transition-colors"
-          >
-            <Settings2 className="h-5 w-5" />
           </Button>
           
           <Button
