@@ -149,12 +149,12 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
     }
   }, [currentSession?.is_playing, getCurrentAudioElement, isHost]);
 
-  // Load session song if different
+  // Load session song if different (ONLY for participants, NOT for host)
   useEffect(() => {
-    if (!currentSession?.current_song_id) return;
+    if (!currentSession?.current_song_id || isHost) return;
     
     if (!currentSong || currentSong.id !== currentSession.current_song_id) {
-      console.log('🎵 Loading session song:', currentSession.current_song_id);
+      console.log('🎵 Participant loading session song:', currentSession.current_song_id);
       supabase
         .from('songs')
         .select('*')
@@ -202,7 +202,7 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
           }
         });
     }
-  }, [currentSession?.current_song_id, currentSong, play, getCurrentAudioElement, currentSession?.current_position, currentSession?.is_playing, setProgress]);
+  }, [currentSession?.current_song_id, currentSong, play, getCurrentAudioElement, currentSession?.current_position, currentSession?.is_playing, setProgress, isHost]);
 
   // Host updates session state based on local playback
   useEffect(() => {
