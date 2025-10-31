@@ -98,23 +98,32 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
 
   // Sync play/pause state
   useEffect(() => {
-    if (!currentSession || isHost) return;
+    if (!currentSession) return;
 
     const audioElement = getCurrentAudioElement();
     if (!audioElement) return;
 
+    console.log('🎵 Sync play/pause:', {
+      sessionPlaying: currentSession.is_playing,
+      audioPaused: audioElement.paused,
+      isHost
+    });
+
     if (currentSession.is_playing && audioElement.paused) {
-      audioElement.play().catch(console.error);
+      console.log('▶️ Starting playback');
+      audioElement.play().catch(e => console.error('Play error:', e));
     } else if (!currentSession.is_playing && !audioElement.paused) {
+      console.log('⏸️ Pausing playback');
       audioElement.pause();
     }
-  }, [currentSession?.is_playing, isHost, getCurrentAudioElement]);
+  }, [currentSession?.is_playing, getCurrentAudioElement, isHost]);
 
   // Load session song if different
   useEffect(() => {
-    if (!currentSession?.current_song_id || isHost) return;
+    if (!currentSession?.current_song_id) return;
     
     if (!currentSong || currentSong.id !== currentSession.current_song_id) {
+      console.log('🎵 Loading session song:', currentSession.current_song_id);
       supabase
         .from('songs')
         .select('*')
@@ -134,11 +143,12 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
               created_at: data.created_at,
               user_id: data.uploaded_by || undefined
             };
+            console.log('🎵 Playing session song:', song.title);
             play(song);
           }
         });
     }
-  }, [currentSession?.current_song_id, currentSong, isHost, play]);
+  }, [currentSession?.current_song_id, currentSong, play]);
 
   // Host updates session state based on local playback
   useEffect(() => {
