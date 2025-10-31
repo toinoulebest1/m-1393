@@ -24,6 +24,7 @@ interface ListeningSessionContextType {
   createSession: (name: string, mode: SessionControlMode, visibility: SessionVisibility, initialSongId: string) => Promise<void>;
   joinSession: (joinCode: string) => Promise<void>;
   leaveSession: () => Promise<void>;
+  endSession: () => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   addToSessionQueue: (songId: string) => Promise<void>;
   vote: (voteType: 'skip' | 'pause' | 'play') => Promise<void>;
@@ -510,11 +511,13 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
           .from('listening_sessions')
           .update({ host_id: nextHost.user_id })
           .eq('id', currentSession.id);
+        toast.success('Session transférée au prochain participant');
       } else {
         await supabase
           .from('listening_sessions')
           .update({ is_active: false, ended_at: new Date().toISOString() })
           .eq('id', currentSession.id);
+        toast.success('Session terminée');
       }
     }
 
@@ -523,7 +526,34 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
     setSessionQueue([]);
     setMessages([]);
     setVotes([]);
-    toast.success('Session quittée');
+    
+    if (!isHost) {
+      toast.success('Session quittée');
+    }
+  };
+
+  const endSession = async () => {
+    if (!currentSession || !isHost) return;
+
+    // End session for everyone
+    await supabase
+      .from('listening_sessions')
+      .update({ is_active: false, ended_at: new Date().toISOString() })
+      .eq('id', currentSession.id);
+
+    // Mark all participants as left
+    await supabase
+      .from('session_participants')
+      .update({ is_active: false, left_at: new Date().toISOString() })
+      .eq('session_id', currentSession.id);
+
+    setCurrentSession(null);
+    setParticipants([]);
+    setSessionQueue([]);
+    setMessages([]);
+    setVotes([]);
+    
+    toast.success('Session supprimée');
   };
 
   const sendMessage = async (message: string) => {
@@ -643,6 +673,7 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
       createSession,
       joinSession,
       leaveSession,
+      endSession,
       sendMessage,
       addToSessionQueue,
       vote,

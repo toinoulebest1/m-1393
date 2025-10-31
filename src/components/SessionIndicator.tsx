@@ -1,11 +1,22 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, LogOut, Crown } from 'lucide-react';
+import { Users, LogOut, Crown, Trash2 } from 'lucide-react';
 import { useListeningSession } from '@/contexts/ListeningSessionContext';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export const SessionIndicator = () => {
-  const { currentSession, isHost, leaveSession, participants } = useListeningSession();
+  const { currentSession, isHost, leaveSession, endSession, participants } = useListeningSession();
 
   if (!currentSession) return null;
 
@@ -18,15 +29,46 @@ export const SessionIndicator = () => {
             <span className="text-sm font-medium">En session</span>
             {isHost && <Crown className="w-3 h-3 text-yellow-500" />}
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={leaveSession}
-            className="h-7 px-2"
-          >
-            <LogOut className="w-3 h-3 mr-1" />
-            Quitter
-          </Button>
+          <div className="flex gap-1">
+            {isHost ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Supprimer
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action mettra fin à la session pour tous les participants. Cette action est irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={endSession} className="bg-destructive hover:bg-destructive/90">
+                      Supprimer la session
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={leaveSession}
+                className="h-7 px-2"
+              >
+                <LogOut className="w-3 h-3 mr-1" />
+                Quitter
+              </Button>
+            )}
+          </div>
         </div>
         
         <div>
