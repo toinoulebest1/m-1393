@@ -218,7 +218,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_playing?: boolean
-          join_code: string
+          join_code?: string
           last_sync_at?: string
           name: string
           playback_rate?: number
