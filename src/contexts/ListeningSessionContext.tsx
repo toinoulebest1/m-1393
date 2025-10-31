@@ -176,20 +176,25 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
             console.log('🎵 Playing session song:', song.title);
             play(song);
             
-            // Wait for audio to load, then sync position
+            // Wait for audio to load, then sync position and play state
             setTimeout(() => {
               const audioElement = getCurrentAudioElement();
-              if (audioElement && currentSession.current_position > 0) {
-                console.log('⏩ Syncing to session position:', currentSession.current_position);
-                audioElement.currentTime = currentSession.current_position;
-                const progressPercent = (currentSession.current_position / audioElement.duration) * 100;
-                setProgress(progressPercent);
+              if (audioElement) {
+                // Always sync position
+                if (currentSession.current_position > 0) {
+                  console.log('⏩ Syncing to session position:', currentSession.current_position);
+                  audioElement.currentTime = currentSession.current_position;
+                  const progressPercent = (currentSession.current_position / audioElement.duration) * 100;
+                  setProgress(progressPercent);
+                }
                 
-                // Sync play/pause state
+                // Force pause first, then play only if session is playing
+                audioElement.pause();
                 if (currentSession.is_playing) {
+                  console.log('▶️ Session is playing, starting playback');
                   audioElement.play().catch(console.error);
                 } else {
-                  audioElement.pause();
+                  console.log('⏸️ Session is paused, keeping paused');
                 }
               }
             }, 1000);
@@ -494,13 +499,20 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
         setTimeout(() => {
           const audioElement = getCurrentAudioElement();
           if (audioElement) {
+            // Sync position
+            console.log('⏩ Joining session at position:', session.current_position);
             audioElement.currentTime = session.current_position;
             
+            // Force pause first to ensure clean state
+            audioElement.pause();
+            
+            // Then play only if session is playing
             if (session.is_playing) {
+              console.log('▶️ Session is playing, starting playback');
               audioElement.play().catch(console.error);
               toast.success('Session rejointe ! Lecture synchronisée');
             } else {
-              audioElement.pause();
+              console.log('⏸️ Session is paused, staying paused');
               toast.success('Session rejointe ! En pause');
             }
           }
