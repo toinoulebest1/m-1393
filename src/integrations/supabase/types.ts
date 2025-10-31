@@ -1170,6 +1170,10 @@ export type Database = {
       generate_random_username: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_session_participant: {
+        Args: { session_id_param: string; user_id_param: string }
+        Returns: boolean
+      }
       is_user_banned: { Args: { user_id: string }; Returns: boolean }
     }
     Enums: {
