@@ -191,6 +191,65 @@ export type Database = {
           },
         ]
       }
+      listening_sessions: {
+        Row: {
+          control_mode: Database["public"]["Enums"]["session_control_mode"]
+          created_at: string
+          current_position: number
+          current_song_id: string | null
+          ended_at: string | null
+          host_id: string
+          id: string
+          is_active: boolean
+          is_playing: boolean
+          join_code: string
+          last_sync_at: string
+          name: string
+          playback_rate: number
+          visibility: Database["public"]["Enums"]["session_visibility"]
+        }
+        Insert: {
+          control_mode?: Database["public"]["Enums"]["session_control_mode"]
+          created_at?: string
+          current_position?: number
+          current_song_id?: string | null
+          ended_at?: string | null
+          host_id: string
+          id?: string
+          is_active?: boolean
+          is_playing?: boolean
+          join_code: string
+          last_sync_at?: string
+          name: string
+          playback_rate?: number
+          visibility?: Database["public"]["Enums"]["session_visibility"]
+        }
+        Update: {
+          control_mode?: Database["public"]["Enums"]["session_control_mode"]
+          created_at?: string
+          current_position?: number
+          current_song_id?: string | null
+          ended_at?: string | null
+          host_id?: string
+          id?: string
+          is_active?: boolean
+          is_playing?: boolean
+          join_code?: string
+          last_sync_at?: string
+          name?: string
+          playback_rate?: number
+          visibility?: Database["public"]["Enums"]["session_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listening_sessions_current_song_id_fkey"
+            columns: ["current_song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listening_stats: {
         Row: {
           created_at: string | null
@@ -662,6 +721,147 @@ export type Database = {
         }
         Relationships: []
       }
+      session_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_participants: {
+        Row: {
+          id: string
+          is_active: boolean
+          joined_at: string
+          left_at: string | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_queue: {
+        Row: {
+          added_at: string
+          added_by: string
+          id: string
+          position: number
+          session_id: string
+          song_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          id?: string
+          position: number
+          session_id: string
+          song_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          position?: number
+          session_id?: string
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_queue_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_votes: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_votes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_announcements: {
         Row: {
           content: string
@@ -966,12 +1166,15 @@ export type Database = {
         }[]
       }
       delete_user_data: { Args: { user_id_param: string }; Returns: boolean }
+      generate_join_code: { Args: never; Returns: string }
       generate_random_username: { Args: never; Returns: string }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_admin: { Args: { user_id: string }; Returns: boolean }
       is_user_banned: { Args: { user_id: string }; Returns: boolean }
     }
     Enums: {
+      session_control_mode: "host" | "democratic" | "silent"
+      session_visibility: "private" | "public"
       user_role: "admin" | "user"
     }
     CompositeTypes: {
@@ -1100,6 +1303,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      session_control_mode: ["host", "democratic", "silent"],
+      session_visibility: ["private", "public"],
       user_role: ["admin", "user"],
     },
   },
