@@ -36,6 +36,9 @@ interface ListeningSessionContextType {
 
 const ListeningSessionContext = createContext<ListeningSessionContextType | null>(null);
 
+// Export the context for use with useContext
+export { ListeningSessionContext };
+
 export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentSong, play, pause, setProgress, getCurrentAudioElement } = usePlayerContext();
   const [currentSession, setCurrentSession] = useState<ListeningSession | null>(null);
@@ -53,9 +56,23 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
 
   // Get current user
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id || null);
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔐 Current user in session context:', user?.id);
+      setUserId(user?.id || null);
+    };
+    
+    getCurrentUser();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth state changed:', event, session?.user?.id);
+      setUserId(session?.user?.id || null);
     });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Synchronization logic - adjust playback to match session

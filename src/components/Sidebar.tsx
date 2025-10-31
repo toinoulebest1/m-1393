@@ -8,16 +8,20 @@ import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
 import { AdBanner } from "./AdBanner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SessionControls } from "./ListeningSession/SessionControls";
-import { useListeningSession } from "@/contexts/ListeningSessionContext";
+import { ListeningSessionContext } from "@/contexts/ListeningSessionContext";
+
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
-  const { currentSession } = useListeningSession();
+  
+  // Use useContext directly to avoid error when provider is not available
+  const sessionContext = useContext(ListeningSessionContext);
+  const currentSession = sessionContext?.currentSession;
   useEffect(() => {
     const checkAdminStatus = async () => {
       const {
