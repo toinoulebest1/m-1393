@@ -52,6 +52,7 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
   const channelRef = useRef<RealtimeChannel | null>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncedPositionRef = useRef<number>(0);
+  const lastSyncedSongIdRef = useRef<string | null>(null);
 
   const isHost = currentSession?.host_id === userId;
 
@@ -251,20 +252,26 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
   useEffect(() => {
     if (!currentSession || !isHost || !currentSong) return;
     
-    // If the current song is different from the session's song, update it
-    if (currentSong.id !== currentSession.current_song_id) {
+    // If the current song is different from the session's song AND we haven't just synced it
+    if (currentSong.id !== currentSession.current_song_id && lastSyncedSongIdRef.current !== currentSong.id) {
       console.log('🎵 Host changed song, updating session:', currentSong.id);
+      
+      const audioElement = getCurrentAudioElement();
+      const isCurrentlyPlaying = audioElement ? !audioElement.paused : false;
+      
+      lastSyncedSongIdRef.current = currentSong.id;
+      
       supabase
         .from('listening_sessions')
         .update({
           current_song_id: currentSong.id,
           current_position: 0,
-          is_playing: true,
+          is_playing: isCurrentlyPlaying,
           last_sync_at: new Date().toISOString()
         })
         .eq('id', currentSession.id);
     }
-  }, [currentSong?.id, currentSession, isHost]);
+  }, [currentSong?.id, currentSession, isHost, getCurrentAudioElement]);
 
   // Subscribe to session updates via Realtime
   useEffect(() => {
