@@ -157,10 +157,28 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
             };
             console.log('🎵 Playing session song:', song.title);
             play(song);
+            
+            // Wait for audio to load, then sync position
+            setTimeout(() => {
+              const audioElement = getCurrentAudioElement();
+              if (audioElement && currentSession.current_position > 0) {
+                console.log('⏩ Syncing to session position:', currentSession.current_position);
+                audioElement.currentTime = currentSession.current_position;
+                const progressPercent = (currentSession.current_position / audioElement.duration) * 100;
+                setProgress(progressPercent);
+                
+                // Sync play/pause state
+                if (currentSession.is_playing) {
+                  audioElement.play().catch(console.error);
+                } else {
+                  audioElement.pause();
+                }
+              }
+            }, 1000);
           }
         });
     }
-  }, [currentSession?.current_song_id, currentSong, play]);
+  }, [currentSession?.current_song_id, currentSong, play, getCurrentAudioElement, currentSession?.current_position, currentSession?.is_playing, setProgress]);
 
   // Host updates session state based on local playback
   useEffect(() => {
@@ -429,7 +447,50 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
     await loadParticipants(session.id);
     await loadQueue(session.id);
     await loadMessages(session.id);
-    toast.success('Session rejointe !');
+    
+    // Important: Load the current song and sync immediately
+    if (session.current_song_id) {
+      const { data: songData } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('id', session.current_song_id)
+        .single();
+      
+      if (songData) {
+        const song: Song = {
+          id: songData.id,
+          title: songData.title,
+          artist: songData.artist || '',
+          url: songData.file_path,
+          imageUrl: songData.image_url || undefined,
+          duration: songData.duration || undefined,
+          genre: songData.genre || undefined,
+          album_name: songData.album_name || undefined,
+          created_at: songData.created_at,
+          user_id: songData.uploaded_by || undefined
+        };
+        
+        play(song);
+        
+        // Wait for audio to be ready and sync
+        setTimeout(() => {
+          const audioElement = getCurrentAudioElement();
+          if (audioElement) {
+            audioElement.currentTime = session.current_position;
+            
+            if (session.is_playing) {
+              audioElement.play().catch(console.error);
+              toast.success('Session rejointe ! Lecture synchronisée');
+            } else {
+              audioElement.pause();
+              toast.success('Session rejointe ! En pause');
+            }
+          }
+        }, 1500);
+      }
+    } else {
+      toast.success('Session rejointe !');
+    }
   };
 
   const leaveSession = async () => {
