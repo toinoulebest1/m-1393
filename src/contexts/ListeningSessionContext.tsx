@@ -270,6 +270,13 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
           last_sync_at: new Date().toISOString()
         })
         .eq('id', currentSession.id);
+
+      // Broadcast change immediately so participants react fast
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'song_change',
+        payload: { songId: currentSong.id, isPlaying: isCurrentlyPlaying }
+      });
     }
   }, [currentSong?.id, currentSession, isHost, getCurrentAudioElement]);
 
@@ -341,6 +348,17 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
           loadVotes(currentSession.id);
         }
       )
+      // Broadcast: immediate notification when host changes song
+      .on('broadcast', { event: 'song_change' }, ({ payload }) => {
+        console.log('📢 Broadcast song_change received:', payload);
+        setCurrentSession(prev => prev ? {
+          ...prev,
+          current_song_id: payload.songId,
+          current_position: 0,
+          is_playing: payload.isPlaying,
+          last_sync_at: new Date().toISOString()
+        } : prev);
+      })
       .subscribe();
 
     return () => {
@@ -712,6 +730,13 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
       })
       .eq('id', currentSession.id);
 
+    // Broadcast change immediately
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'song_change',
+      payload: { songId: nextSong.song_id, isPlaying: true }
+    });
+
     await supabase
       .from('session_queue')
       .delete()
@@ -730,6 +755,13 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
         last_sync_at: new Date().toISOString()
       })
       .eq('id', currentSession.id);
+
+    // Broadcast change immediately
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'song_change',
+      payload: { songId, isPlaying: false }
+    });
   };
 
   return (
