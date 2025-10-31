@@ -8,20 +8,16 @@ import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
 import { ThemeToggle } from "./ThemeToggle";
 import { AdBanner } from "./AdBanner";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SessionControls } from "./ListeningSession/SessionControls";
-import { ListeningSessionContext } from "@/contexts/ListeningSessionContext";
-
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const {
+    t,
+    i18n
+  } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
-  
-  // Use useContext directly to avoid error when provider is not available
-  const sessionContext = useContext(ListeningSessionContext);
-  const currentSession = sessionContext?.currentSession;
   useEffect(() => {
     const checkAdminStatus = async () => {
       const {
@@ -57,10 +53,6 @@ export const Sidebar = () => {
     to: "/history",
     icon: History,
     label: t('common.history')
-  }, {
-    to: "/listening-sessions",
-    icon: Music2,
-    label: 'Sessions'
   }, {
     to: "/top100",
     icon: Trophy,
@@ -144,11 +136,7 @@ export const Sidebar = () => {
 
           <MusicUploader />
           
-          {currentSession && (
-            <div className="mt-4">
-              <SessionControls />
-            </div>
-          )}
+          
         </div>
 
         <div className="mt-4 border-t border-white/10 pt-4">

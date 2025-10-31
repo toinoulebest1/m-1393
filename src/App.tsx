@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import { CastProvider } from "./contexts/CastContext";
-import { ListeningSessionProvider } from "./contexts/ListeningSessionContext";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -22,7 +21,6 @@ import Reports from "./pages/Reports";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
 import DropboxSettings from "./pages/DropboxSettings";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
-import ListeningSessions from "./pages/ListeningSessions";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 const queryClient = new QueryClient();
@@ -36,8 +34,7 @@ function App() {
         <BrowserRouter>
           <PlayerProvider>
             <CastProvider>
-              <ListeningSessionProvider>
-                <Routes>
+              <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/home" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -53,10 +50,8 @@ function App() {
                 <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
                 <Route path="/dropbox-settings" element={<DropboxSettings />} />
                 <Route path="/metadata-update" element={<SongMetadataUpdate />} />
-                <Route path="/listening-sessions" element={<ListeningSessions />} />
                 <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
-                </Routes>
-              </ListeningSessionProvider>
+              </Routes>
             </CastProvider>
           </PlayerProvider>
         </BrowserRouter>

@@ -9,8 +9,6 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CastButton } from "@/components/CastButton";
-import { SessionIndicator } from "@/components/SessionIndicator";
-import { SessionStatusBanner } from "@/components/SessionStatusBanner";
 
 export const Player = () => {
   const { t } = useTranslation();
@@ -425,9 +423,6 @@ export const Player = () => {
           </div>
         </div>
       </div>
-      
-      <SessionIndicator />
-      <SessionStatusBanner />
     </div>
   );
 };
