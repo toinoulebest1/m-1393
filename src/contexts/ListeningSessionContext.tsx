@@ -32,6 +32,7 @@ interface ListeningSessionContextType {
   hostPause: () => Promise<void>;
   hostSeek: (position: number) => Promise<void>;
   hostNext: () => Promise<void>;
+  hostChangeSong: (songId: string) => Promise<void>;
 }
 
 const ListeningSessionContext = createContext<ListeningSessionContextType | null>(null);
@@ -245,6 +246,25 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
 
     return () => clearInterval(updateInterval);
   }, [currentSession, isHost, currentSong, getCurrentAudioElement]);
+
+  // Host auto-updates session when changing song
+  useEffect(() => {
+    if (!currentSession || !isHost || !currentSong) return;
+    
+    // If the current song is different from the session's song, update it
+    if (currentSong.id !== currentSession.current_song_id) {
+      console.log('🎵 Host changed song, updating session:', currentSong.id);
+      supabase
+        .from('listening_sessions')
+        .update({
+          current_song_id: currentSong.id,
+          current_position: 0,
+          is_playing: true,
+          last_sync_at: new Date().toISOString()
+        })
+        .eq('id', currentSession.id);
+    }
+  }, [currentSong?.id, currentSession, isHost]);
 
   // Subscribe to session updates via Realtime
   useEffect(() => {
@@ -691,6 +711,20 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
       .eq('id', nextSong.id);
   };
 
+  const hostChangeSong = async (songId: string) => {
+    if (!currentSession || !isHost) return;
+
+    await supabase
+      .from('listening_sessions')
+      .update({
+        current_song_id: songId,
+        current_position: 0,
+        is_playing: false,
+        last_sync_at: new Date().toISOString()
+      })
+      .eq('id', currentSession.id);
+  };
+
   return (
     <ListeningSessionContext.Provider value={{
       currentSession,
@@ -709,7 +743,8 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
       hostPlay,
       hostPause,
       hostSeek,
-      hostNext
+      hostNext,
+      hostChangeSong
     }}>
       {children}
     </ListeningSessionContext.Provider>
