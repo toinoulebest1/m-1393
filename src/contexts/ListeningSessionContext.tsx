@@ -103,18 +103,30 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
     const audioElement = getCurrentAudioElement();
     if (!audioElement) return;
 
-    console.log('🎵 Sync play/pause:', {
-      sessionPlaying: currentSession.is_playing,
-      audioPaused: audioElement.paused,
-      isHost
+    const shouldPlay = currentSession.is_playing;
+    const isCurrentlyPlaying = !audioElement.paused;
+
+    console.log('🎵 Sync check:', {
+      shouldPlay,
+      isCurrentlyPlaying,
+      isHost,
+      currentTime: audioElement.currentTime
     });
 
-    if (currentSession.is_playing && audioElement.paused) {
-      console.log('▶️ Starting playback');
+    if (shouldPlay && !isCurrentlyPlaying) {
+      console.log('▶️ Starting playback for participant');
       audioElement.play().catch(e => console.error('Play error:', e));
-    } else if (!currentSession.is_playing && !audioElement.paused) {
-      console.log('⏸️ Pausing playback');
+      
+      if (!isHost) {
+        toast.info('L\'hôte a repris la lecture');
+      }
+    } else if (!shouldPlay && isCurrentlyPlaying) {
+      console.log('⏸️ Pausing playback for participant');
       audioElement.pause();
+      
+      if (!isHost) {
+        toast.info('L\'hôte a mis le titre en pause');
+      }
     }
   }, [currentSession?.is_playing, getCurrentAudioElement, isHost]);
 
@@ -157,15 +169,25 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
     const audioElement = getCurrentAudioElement();
     if (!audioElement) return;
 
+    let lastReportedPlayState = currentSession.is_playing;
+
     const updateInterval = setInterval(async () => {
       const currentPosition = audioElement.currentTime;
       const isPlaying = !audioElement.paused;
 
-      // Only update if there's a significant change
+      // Always update position, but only update play state if it changed
+      const stateChanged = isPlaying !== lastReportedPlayState;
+      
       if (
         Math.abs(currentPosition - lastSyncedPositionRef.current) > 0.5 ||
-        isPlaying !== currentSession.is_playing
+        stateChanged
       ) {
+        console.log('🔄 Host updating session state:', { 
+          position: currentPosition, 
+          isPlaying,
+          stateChanged 
+        });
+        
         await supabase
           .from('listening_sessions')
           .update({
@@ -176,6 +198,7 @@ export const ListeningSessionProvider: React.FC<{ children: React.ReactNode }> =
           .eq('id', currentSession.id);
 
         lastSyncedPositionRef.current = currentPosition;
+        lastReportedPlayState = isPlaying;
       }
     }, 500);
 
