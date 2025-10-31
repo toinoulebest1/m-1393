@@ -9,16 +9,11 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CastButton } from "@/components/CastButton";
-import { CreateSessionDialog } from "@/components/ListeningSession/CreateSessionDialog";
-import { JoinSessionDialog } from "@/components/ListeningSession/JoinSessionDialog";
-import { SessionControls } from "@/components/ListeningSession/SessionControls";
-import { useListeningSession } from "@/contexts/ListeningSessionContext";
 
 export const Player = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentSession } = useListeningSession();
   
   const {
     currentSong,
@@ -381,13 +376,6 @@ export const Player = () => {
 
         <div className="flex items-center space-x-4 w-48">
           <CastButton />
-          
-          {!currentSession && (
-            <>
-              <CreateSessionDialog />
-              <JoinSessionDialog />
-            </>
-          )}
           
           <Button
             variant="ghost"

@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { ListeningSession } from '@/types/listeningSession';
 import { useListeningSession } from '@/contexts/ListeningSessionContext';
-import { Users, Crown } from 'lucide-react';
-import { toast } from 'sonner';
+import { CreateSessionDialog } from '@/components/ListeningSession/CreateSessionDialog';
+import { JoinSessionDialog } from '@/components/ListeningSession/JoinSessionDialog';
+import { Users } from 'lucide-react';
 
 export default function ListeningSessions() {
   const [publicSessions, setPublicSessions] = useState<ListeningSession[]>([]);
@@ -58,11 +59,21 @@ export default function ListeningSessions() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Sessions d'écoute publiques</h1>
-          <p className="text-muted-foreground">
-            Rejoignez une session pour écouter de la musique avec d'autres utilisateurs
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Sessions d'écoute</h1>
+            <p className="text-muted-foreground">
+              Créez ou rejoignez une session pour écouter de la musique avec d'autres utilisateurs
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <CreateSessionDialog />
+            <JoinSessionDialog />
+          </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <h2 className="text-xl font-semibold mb-4">Sessions publiques</h2>
         </div>
 
         {publicSessions.length === 0 ? (
