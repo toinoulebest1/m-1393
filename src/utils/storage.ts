@@ -308,14 +308,12 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
     if (cachedLink) {
       console.log('✅ URL trouvée en cache DB (tidal_audio_links)');
-      memoryCache.set(filePath, cachedLink.audio_url);
       return cachedLink.audio_url;
     }
 
     // Si pas en cache, récupérer depuis l'API
     console.log('🔄 Pas en cache, récupération depuis API...');
     const direct = await fetchPhoenixUrl(tidalId);
-    memoryCache.set(filePath, direct);
     
     // Sauvegarder dans la table pour les prochaines fois
     await supabase
@@ -328,10 +326,6 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         last_verified_at: new Date().toISOString()
       });
     console.log('💾 Lien sauvegardé dans tidal_audio_links');
-    
-    // Sauvegarder aussi dans le warm cache pour accès ultra-rapide
-    const { UltraFastCache } = await import('./ultraFastCache');
-    UltraFastCache.setWarm(`tidal:${tidalId}`, direct);
     
     return direct;
   }
@@ -370,13 +364,11 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
       if (cachedLink) {
         console.log('✅ URL trouvée en cache DB (auto-search)');
-        memoryCache.set(filePath, cachedLink.audio_url);
         return cachedLink.audio_url;
       }
 
       // Sinon fetch depuis l'API
       const direct = await fetchPhoenixUrl(foundTidalId);
-      memoryCache.set(filePath, direct);
       
       // Sauvegarder dans la table
       await supabase
@@ -390,10 +382,6 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         });
       console.log('💾 Lien sauvegardé dans tidal_audio_links (auto-search)');
       
-      // Sauvegarder aussi dans le warm cache pour accès ultra-rapide
-      const { UltraFastCache } = await import('./ultraFastCache');
-      UltraFastCache.setWarm(`tidal:${foundTidalId}`, direct);
-      
       return direct;
     }
     console.warn('⚠️ Recherche Tidal automatique échouée, fallback vers Supabase');
@@ -405,9 +393,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       const urlObj = new URL(filePath);
       const maybeId = urlObj.searchParams.get('id');
       if (maybeId) {
-        const direct = await fetchPhoenixUrl(maybeId);
-        memoryCache.set(filePath, direct);
-        return direct;
+        return await fetchPhoenixUrl(maybeId);
       }
     }
   } catch (_) {}
@@ -415,16 +401,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
   // 0-ter. Si le chemin commence par "tidal:{id}", utiliser Phoenix
   if (filePath.startsWith('tidal:')) {
     const extractedTidalId = filePath.replace('tidal:', '');
-    const direct = await fetchPhoenixUrl(extractedTidalId);
-    memoryCache.set(filePath, direct);
-    return direct;
-  }
-
-  // 1. Vérifier le cache mémoire d'abord
-  const cachedUrl = memoryCache.get(filePath);
-  if (cachedUrl) {
-    console.log('💾 Cache mémoire HIT:', filePath);
-    return cachedUrl;
+    return await fetchPhoenixUrl(extractedTidalId);
   }
 
   // 2. Extraire l'ID du fichier (enlever les préfixes comme "audio/")
@@ -449,7 +426,6 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     }
 
     console.log('✅ URL Supabase récupérée');
-    memoryCache.set(filePath, data.signedUrl);
     return data.signedUrl;
   } catch (error) {
     console.error('❌ Erreur complète récupération URL:', error);
