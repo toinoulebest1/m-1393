@@ -105,14 +105,18 @@ const ManageAudioSources = () => {
       console.log('✅ Tidal ID trouvé:', tidalId);
 
       // Vérifier si un lien existe déjà pour ce tidal_id
-      const { data: existing } = await supabase
+      console.log('🔍 Vérification lien existant pour Tidal ID:', tidalId);
+      const { data: existing, error: checkError } = await supabase
         .from("tidal_audio_links")
-        .select("id")
+        .select("id, tidal_id, audio_url")
         .eq("tidal_id", tidalId)
         .maybeSingle();
 
+      console.log('📊 Résultat vérification:', { existing, checkError });
+
       if (existing) {
         // Mettre à jour le lien existant
+        console.log('🔄 Mise à jour lien existant ID:', existing.id);
         const { error } = await supabase
           .from("tidal_audio_links")
           .update({
@@ -121,10 +125,15 @@ const ManageAudioSources = () => {
           })
           .eq("id", existing.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Erreur mise à jour:', error);
+          throw error;
+        }
+        console.log('✅ Lien mis à jour avec succès');
       } else {
         // Créer un nouveau lien
-        const { error } = await supabase
+        console.log('➕ Création nouveau lien pour Tidal ID:', tidalId);
+        const { data: insertData, error } = await supabase
           .from("tidal_audio_links")
           .insert({
             tidal_id: tidalId,
@@ -132,9 +141,14 @@ const ManageAudioSources = () => {
             quality: "LOSSLESS",
             source: "manual",
             last_verified_at: new Date().toISOString(),
-          });
+          })
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Erreur insertion:', error);
+          throw error;
+        }
+        console.log('✅ Nouveau lien créé:', insertData);
       }
 
       toast({

@@ -261,18 +261,35 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     console.log('✅ Tidal ID trouvé pour Deezer:', tidalId);
 
     // Vérifier immédiatement s'il existe un lien manuel pour ce Tidal ID
+    console.log('🔍 VÉRIFICATION LIEN MANUEL - Tidal ID:', tidalId);
     try {
-      const { data: manualLink2 } = await supabase
+      const { data: manualLink2, error: manualError } = await supabase
         .from('tidal_audio_links')
-        .select('audio_url')
+        .select('audio_url, tidal_id')
         .eq('tidal_id', tidalId)
         .maybeSingle();
+      
+      console.log('📊 Résultat requête lien manuel:', { 
+        found: !!manualLink2, 
+        error: manualError, 
+        data: manualLink2 
+      });
+      
       if (manualLink2?.audio_url) {
         console.log('✅ Lien manuel trouvé (post-détection Tidal):', manualLink2.audio_url);
         return manualLink2.audio_url;
+      } else {
+        console.log('⚠️ Aucun lien manuel trouvé pour Tidal ID:', tidalId);
+        
+        // Chercher TOUS les liens pour voir ce qui existe
+        const { data: allLinks } = await supabase
+          .from('tidal_audio_links')
+          .select('tidal_id, audio_url, source')
+          .limit(10);
+        console.log('📋 Tous les liens manuels disponibles:', allLinks);
       }
     } catch (e) {
-      console.warn('⚠️ Vérification lien manuel post-détection échouée:', e);
+      console.error('❌ Erreur vérification lien manuel post-détection:', e);
     }
   }
 
