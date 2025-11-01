@@ -48,7 +48,7 @@ function App() {
                 <Route path="/artist/:id" element={<ArtistProfile />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
-                <Route path="/manage-audio-sources" element={<ManageAudioSources />} />
+                <Route path="/add-songs" element={<ManageAudioSources />} />
                 <Route path="/metadata-update" element={<SongMetadataUpdate />} />
                 <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
               </Routes>
