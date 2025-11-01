@@ -233,10 +233,23 @@ const Search = () => {
         let deezerResult = null;
         if (query.trim()) {
           if (isWildcardSearch) {
-            // Pour *, récupérer le maximum de musiques possibles sans filtrage
-            deezerResult = await supabase.functions.invoke('deezer-search', {
-              body: { query: "a", limit: 1000 } // Recherche très large avec limite maximale
-            });
+            // Pour *, faire 20 requêtes parallèles avec des offsets différents pour récupérer 2000 musiques
+            const requests = [];
+            for (let i = 0; i < 20; i++) {
+              requests.push(
+                supabase.functions.invoke('deezer-search', {
+                  body: { query: "a", limit: 100, index: i * 100 }
+                })
+              );
+            }
+            
+            const allResults = await Promise.all(requests);
+            const allTracks = allResults
+              .filter(r => !r.error && r.data?.data)
+              .flatMap(r => r.data.data);
+            
+            deezerResult = { data: { data: allTracks } };
+            console.log(`✅ Récupéré ${allTracks.length} musiques Deezer pour la recherche wildcard`);
           } else {
             deezerResult = await supabase.functions.invoke('deezer-search', {
               body: { query, limit: 50 }
@@ -355,10 +368,23 @@ const Search = () => {
         let deezerResult = null;
         if (searchFilter !== "genre" && query.trim()) {
           if (isWildcardSearch) {
-            // Pour *, récupérer le maximum de musiques possibles sans filtrage
-            deezerResult = await supabase.functions.invoke('deezer-search', {
-              body: { query: "a", limit: 1000 } // Recherche très large avec limite maximale
-            });
+            // Pour *, faire 20 requêtes parallèles avec des offsets différents pour récupérer 2000 musiques
+            const requests = [];
+            for (let i = 0; i < 20; i++) {
+              requests.push(
+                supabase.functions.invoke('deezer-search', {
+                  body: { query: "a", limit: 100, index: i * 100 }
+                })
+              );
+            }
+            
+            const allResults = await Promise.all(requests);
+            const allTracks = allResults
+              .filter(r => !r.error && r.data?.data)
+              .flatMap(r => r.data.data);
+            
+            deezerResult = { data: { data: allTracks } };
+            console.log(`✅ Récupéré ${allTracks.length} musiques Deezer pour la recherche wildcard`);
           } else {
             deezerResult = await supabase.functions.invoke('deezer-search', {
               body: { query, limit: 50 }
