@@ -46,6 +46,13 @@ export const useAudioControl = ({
       console.log("🎵 === DÉMARRAGE MUSIQUE ===");
       console.log("🎶 Chanson:", song.title, "par", song.artist);
       
+      // Sauvegarder la musique précédente au cas où il y a une erreur
+      const previousSong = currentSong;
+      const previousAudioState = {
+        currentTime: audioRef.current.currentTime,
+        isPlaying: !audioRef.current.paused
+      };
+      
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
@@ -211,6 +218,26 @@ export const useAudioControl = ({
         
       } catch (error) {
         console.error("💥 Erreur récupération:", error);
+        
+        // Revenir à la musique précédente si elle existait
+        if (previousSong) {
+          console.log("🔄 Retour à la musique précédente:", previousSong.title);
+          setCurrentSong(previousSong);
+          localStorage.setItem('currentSong', JSON.stringify(previousSong));
+          
+          // Restaurer l'état audio si la musique jouait
+          if (previousAudioState.isPlaying && audioRef.current.src) {
+            audioRef.current.currentTime = previousAudioState.currentTime;
+            try {
+              await audioRef.current.play();
+              setIsPlaying(true);
+            } catch (playError) {
+              console.error("Erreur restauration lecture:", playError);
+            }
+          }
+        }
+        
+        setIsChangingSong(false);
         handlePlayError(error as any, song);
       }
     } else if (audioRef.current) {
