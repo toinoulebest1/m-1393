@@ -72,7 +72,6 @@ const AddRandomSongs = () => {
     try {
       console.log('🗑️ Suppression des chansons ajoutées...');
       
-      // Appeler l'edge function pour supprimer les chansons
       const { data, error } = await supabase.functions.invoke('delete-songs-batch', {
         body: { song_ids: addedSongIds }
       });
@@ -91,6 +90,39 @@ const AddRandomSongs = () => {
         setAddedSongIds([]);
       } else {
         throw new Error(data?.errors?.[0] || 'Erreur lors de la suppression');
+      }
+    } catch (error: any) {
+      console.error('Erreur:', error);
+      toast({
+        title: "❌ Erreur",
+        description: error.message || "Impossible de supprimer les chansons",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteLast10 = async () => {
+    setIsDeleting(true);
+
+    try {
+      console.log('🗑️ Suppression des 10 dernières chansons...');
+      
+      const { data, error } = await supabase.functions.invoke('delete-last-10-songs');
+
+      if (error) {
+        console.error('Erreur edge function:', error);
+        throw error;
+      }
+
+      if (data?.deleted_count > 0) {
+        toast({
+          title: "✅ Chansons supprimées !",
+          description: `${data.deleted_count} chansons ont été supprimées avec succès.`,
+        });
+      } else {
+        throw new Error(data?.error || 'Aucune chanson à supprimer');
       }
     } catch (error: any) {
       console.error('Erreur:', error);
@@ -126,24 +158,43 @@ const AddRandomSongs = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button
-                onClick={handleAddSongs}
-                disabled={isLoading}
-                size="lg"
-                className="w-full"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Ajout en cours...
-                  </>
-                ) : (
-                  <>
-                    <Music className="mr-2 h-5 w-5" />
-                    Ajouter 10 chansons françaises
-                  </>
-                )}
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={handleAddSongs}
+                  disabled={isLoading}
+                  size="lg"
+                  className="w-full"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Ajout en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Music className="mr-2 h-5 w-5" />
+                      Ajouter 10 chansons françaises
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleDeleteLast10}
+                  disabled={isDeleting}
+                  size="lg"
+                  variant="destructive"
+                  className="w-full"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Suppression...
+                    </>
+                  ) : (
+                    'Supprimer les 10 dernières chansons'
+                  )}
+                </Button>
+              </div>
 
               {isLoading && (
                 <div className="space-y-2">
