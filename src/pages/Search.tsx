@@ -226,16 +226,28 @@ const Search = () => {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
         }
         promises.push(playlistQuery);
+        
         const [songResult, playlistResult] = await Promise.all(promises);
+        
+        // Search on Deezer separately
+        let deezerResult = null;
+        if (!isWildcardSearch && query.trim()) {
+          deezerResult = await supabase.functions.invoke('deezer-search', {
+            body: { query }
+          });
+        }
+        
         console.log("Song query result:", songResult);
         console.log("Song data length:", songResult.data?.length);
         console.log("Song error:", songResult.error);
+        
         if (songResult.error) {
           throw songResult.error;
         }
         if (playlistResult.error) {
           throw playlistResult.error;
         }
+        
         const formattedResults = songResult.data.map(song => ({
           id: song.id,
           title: song.title,
@@ -244,8 +256,24 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          tidal_id: (song as any).tidal_id
+          tidal_id: (song as any).tidal_id,
+          isLocal: true
         }));
+
+        // Add Deezer results
+        if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
+          const deezerSongs = deezerResult.data.data.map((track: any) => ({
+            id: `deezer-${track.id}`,
+            title: track.title,
+            artist: track.artist?.name || '',
+            duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
+            url: track.preview,
+            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
+            bitrate: 'Preview',
+            isDeezer: true
+          }));
+          formattedResults.push(...deezerSongs);
+        }
 
         // Filter playlists that the current user can view (only if user is authenticated)
         const visiblePlaylists = [];
@@ -292,7 +320,7 @@ const Search = () => {
         setResults(formattedResults);
         setPlaylistResults(visiblePlaylists);
       } else {
-        // ... keep existing code (search in songs only for title, artist, genre filters) the same
+        // Search in songs only for title, artist, genre filters
         let queryBuilder = supabase.from('songs').select('*');
         if (!isWildcardSearch) {
           if (searchFilter === "title") {
@@ -305,13 +333,24 @@ const Search = () => {
             }
           }
         }
+        
         const {
           data,
           error
         } = await queryBuilder;
+        
         if (error) {
           throw error;
         }
+        
+        // Also search Deezer for non-genre filters
+        let deezerResult = null;
+        if (searchFilter !== "genre" && !isWildcardSearch && query.trim()) {
+          deezerResult = await supabase.functions.invoke('deezer-search', {
+            body: { query }
+          });
+        }
+        
         const formattedResults = data.map(song => ({
           id: song.id,
           title: song.title,
@@ -320,8 +359,25 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          tidal_id: (song as any).tidal_id
+          tidal_id: (song as any).tidal_id,
+          isLocal: true
         }));
+        
+        // Add Deezer results
+        if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
+          const deezerSongs = deezerResult.data.data.map((track: any) => ({
+            id: `deezer-${track.id}`,
+            title: track.title,
+            artist: track.artist?.name || '',
+            duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
+            url: track.preview,
+            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
+            bitrate: 'Preview',
+            isDeezer: true
+          }));
+          formattedResults.push(...deezerSongs);
+        }
+        
         setResults(formattedResults);
         setPlaylistResults([]);
       }
