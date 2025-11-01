@@ -19,7 +19,7 @@ import Top100 from "./pages/Top100";
 import ArtistProfile from "./pages/ArtistProfile";
 import Reports from "./pages/Reports";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
-import AddRandomSongs from "./pages/AddRandomSongs";
+import ManageAudioSources from "./pages/ManageAudioSources";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
@@ -48,7 +48,7 @@ function App() {
                 <Route path="/artist/:id" element={<ArtistProfile />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
-                <Route path="/add-songs" element={<AddRandomSongs />} />
+                <Route path="/manage-audio-sources" element={<ManageAudioSources />} />
                 <Route path="/metadata-update" element={<SongMetadataUpdate />} />
                 <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
               </Routes>
