@@ -135,12 +135,67 @@ async function searchTidalId(title: string, artist: string): Promise<string | nu
       }
 
       if (results && results.length > 0) {
-        const track = results[0];
-        const tidalId = track?.id ?? track?.trackId ?? track?.tidalId ?? null;
-        
-        if (tidalId) {
-          console.log(`✅ Tidal ID trouvé: ${tidalId} pour ${title}`);
-          return tidalId.toString();
+        const normalize = (s: string) => s
+          ?.toLowerCase()
+          ?.normalize('NFD')
+          ?.replace(/[\u0300-\u036f]/g, '')
+          ?.replace(/[^a-z0-9\s]/g, ' ')
+          ?.replace(/\s+/g, ' ')
+          ?.trim();
+        const simplifyTitle = (s: string) => normalize(String(s || '')).split(/\s*-\s*|\(|\[|\{/)[0];
+
+        const expectedArtist = normalize(artist);
+        const expectedTitle = simplifyTitle(title);
+        const aliases = new Set<string>([
+          expectedArtist,
+          expectedArtist.replace(/^maitre\s+/,'').trim(), // "maitre gims" -> "gims"
+          expectedArtist.replace('gims','maitre gims').trim(),
+        ]);
+
+        let best: any = null;
+        let bestScore = -1;
+
+        for (const tr of results as any[]) {
+          const candId = tr?.id ?? tr?.trackId ?? tr?.tidalId ?? null;
+          if (!candId) continue;
+
+          const candTitle = simplifyTitle(tr?.title || tr?.name || tr?.trackName || '');
+
+          const artistsList: string[] = [];
+          if (tr?.artist?.name) artistsList.push(tr.artist.name);
+          if (Array.isArray(tr?.artists)) artistsList.push(...tr.artists.map((a: any) => a?.name).filter(Boolean));
+          if (tr?.artist_name) artistsList.push(tr.artist_name);
+          if (tr?.artist) artistsList.push(tr.artist);
+          const candArtists = artistsList.map(normalize).filter(Boolean);
+
+          const hasExactArtist = candArtists.some(a => aliases.has(a));
+          const hasPartialArtist = candArtists.some(a => a?.includes(expectedArtist) || expectedArtist.includes(a));
+
+          const titleExact = candTitle === expectedTitle;
+          const titleStarts = candTitle.startsWith(expectedTitle);
+          const titleIncludes = candTitle.includes(expectedTitle);
+
+          let score = 0;
+          if (hasExactArtist) score += 100;
+          else if (hasPartialArtist) score += 50;
+
+          if (titleExact) score += 30;
+          else if (titleStarts) score += 15;
+          else if (titleIncludes) score += 10;
+
+          const popularity = tr?.popularity || tr?.popularityScore || 0;
+          score += Math.min(5, Math.floor(popularity / 20));
+
+          if (score > bestScore) {
+            bestScore = score;
+            best = tr;
+          }
+        }
+
+        if (best) {
+          const bestId = best?.id ?? best?.trackId ?? best?.tidalId;
+          console.log(`✅ Tidal ID choisi avec correspondance stricte: ${bestId}`);
+          return String(bestId);
         }
       }
     } catch (error) {

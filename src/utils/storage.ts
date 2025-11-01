@@ -97,27 +97,55 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
         continue; // Essayer la prochaine combinaison
       }
     
-      // Trouver le meilleur résultat : même artiste + meilleure popularité
-      const normalizedArtist = artist.toLowerCase().trim();
-      let bestMatch = null;
-      let bestPopularity = -1;
-      
+      // Sélection stricte par artiste et titre
+      const normalize = (s: string) => s
+        ?.toLowerCase()
+        ?.normalize('NFD')
+        ?.replace(/[\u0300-\u036f]/g, '')
+        ?.replace(/[^a-z0-9\s]/g, ' ')
+        ?.replace(/\s+/g, ' ')
+        ?.trim();
+      const simplifyTitle = (s: string) => normalize(String(s || '')).split(/\s*-\s*|\(|\[|\{/)[0];
+
+      const expectedArtist = normalize(artist);
+      const expectedTitle = simplifyTitle(title);
+      const aliases = new Set<string>([
+        expectedArtist,
+        expectedArtist.replace(/^maitre\s+/,'').trim(), // "maitre gims" -> "gims"
+        expectedArtist.replace('gims','maitre gims').trim(),
+      ]);
+
+      let bestMatch: any = null;
+      let bestScore = -1;
+
       for (const track of results) {
-        const trackArtist = String(
-          track.artist?.name ||
-          (Array.isArray(track.artists) ? track.artists[0]?.name : undefined) ||
-          track.artist_name ||
-          track.artist ||
-          ''
-        ).toLowerCase().trim();
+        const candId = track?.id ?? track?.trackId ?? track?.tidalId ?? null;
+        if (!candId) continue;
+
+        const candTitle = simplifyTitle(track.title || track.name || track.trackName || '');
+        const artistsList: string[] = [];
+        if (track.artist?.name) artistsList.push(track.artist.name);
+        if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
+        if (track.artist_name) artistsList.push(track.artist_name);
+        if (track.artist) artistsList.push(track.artist);
+        const candArtists = artistsList.map(normalize).filter(Boolean);
+
+        const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
+        const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
+
+        const titleExact = candTitle === expectedTitle;
+        const titleStarts = candTitle.startsWith(expectedTitle);
+        const titleIncludes = candTitle.includes(expectedTitle);
+
+        let score = 0;
+        if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
+        if (titleExact) score += 30; else if (titleStarts) score += 15; else if (titleIncludes) score += 10;
         const popularity = track.popularity || track.popularityScore || 0;
-        
-        // Vérifier si l'artiste correspond
-        if (trackArtist && (trackArtist.includes(normalizedArtist) || normalizedArtist.includes(trackArtist))) {
-          if (popularity > bestPopularity) {
-            bestMatch = track;
-            bestPopularity = popularity;
-          }
+        score += Math.min(5, Math.floor(popularity / 20));
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = track;
         }
       }
       
