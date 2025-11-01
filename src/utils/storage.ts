@@ -116,12 +116,41 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
         expectedArtist.replace('gims','maitre gims').trim(),
       ]);
 
+      // Helper robuste pour extraire UNIQUEMENT un ID Tidal d'un résultat hétérogène
+      const extractTidalId = (obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        // 1) Champs explicites
+        if (obj.tidalId) return String(obj.tidalId);
+        if (obj.tidal_id) return String(obj.tidal_id);
+        if (obj.tidal?.id) return String(obj.tidal.id);
+        // 2) Résultats typés (service/provider/platform/source)
+        const provider = (obj.service || obj.provider || obj.platform || obj.source || '').toString().toLowerCase();
+        if (provider === 'tidal') {
+          const direct = obj.id ?? obj.trackId ?? null;
+          if (direct) return String(direct);
+        }
+        // 3) URL/chemins qui pointent vers Tidal
+        const link = obj.url || obj.link || obj.permalink || obj.webUrl || obj.web_url || '';
+        if (typeof link === 'string') {
+          const m1 = link.match(/tidal\.com\/.*track\/(\d+)/i);
+          if (m1?.[1]) return m1[1];
+          const m2 = link.match(/[?&]trackId=(\d+)/i);
+          if (m2?.[1]) return m2[1];
+        }
+        // 4) Nids communs
+        if (obj.data && typeof obj.data === 'object') {
+          const nested = extractTidalId(obj.data);
+          if (nested) return nested;
+        }
+        return null; // Ne jamais retourner un id non-Tidal (ex: Deezer)
+      };
+
       let bestMatch: any = null;
       let bestScore = -1;
 
       for (const track of results) {
-        const candId = track?.id ?? track?.trackId ?? track?.tidalId ?? null;
-        if (!candId) continue;
+        const candId = extractTidalId(track);
+        if (!candId) continue; // ignorer les résultats non-Tidal
 
         const candTitle = simplifyTitle(track.title || track.name || track.trackName || '');
         const artistsList: string[] = [];
@@ -159,8 +188,7 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
         }, results[0]);
       }
       
-      const getMatchId = (obj: any) => obj?.id ?? obj?.trackId ?? obj?.tidalId ?? null;
-      const matchId = bestMatch ? getMatchId(bestMatch) : null;
+      const matchId = bestMatch ? extractTidalId(bestMatch) : null;
       
       if (matchId) {
         console.log(`✅ Tidal ID trouvé (tentative ${i + 1}):`, matchId);
