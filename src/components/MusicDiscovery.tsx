@@ -4,6 +4,14 @@ import { SongCard } from "./SongCard";
 import { Sparkles } from "lucide-react";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 
+const POPULAR_SEARCH_TERMS = [
+  "top français",
+  "hits 2024",
+  "pop française",
+  "rap français",
+  "musique tendance"
+];
+
 export const MusicDiscovery = () => {
   const [suggestedSongs, setSuggestedSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,100 +20,34 @@ export const MusicDiscovery = () => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
+        // Sélectionner un terme de recherche aléatoire
+        const randomTerm = POPULAR_SEARCH_TERMS[Math.floor(Math.random() * POPULAR_SEARCH_TERMS.length)];
+        
+        // Rechercher des chansons via l'API Deezer
+        const { data, error } = await supabase.functions.invoke('deezer-search', {
+          body: { query: randomTerm }
+        });
+
+        if (error) {
+          console.error("Erreur lors de la recherche Deezer:", error);
           setLoading(false);
           return;
         }
 
-        // Récupérer les préférences musicales de l'utilisateur
-        const { data: preferences } = await supabase
-          .from('music_preferences')
-          .select('favorite_genres')
-          .eq('user_id', session.user.id)
-          .single();
+        if (data?.data && Array.isArray(data.data)) {
+          const formattedSongs = data.data.slice(0, 8).map((track: any) => ({
+            id: `deezer-${track.id}`,
+            title: track.title,
+            artist: track.artist?.name || "Artiste inconnu",
+            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || "",
+            url: track.preview || "",
+            duration: track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : "0:00",
+            genre: "",
+            albumName: track.album?.title || "",
+            deezer_id: track.id
+          }));
 
-        // Récupérer l'historique récent pour identifier les genres/artistes écoutés
-        const { data: recentHistory } = await supabase
-          .from('play_history')
-          .select(`
-            song_id,
-            songs (
-              id,
-              title,
-              artist,
-              genre,
-              image_url,
-              duration,
-              file_path,
-              album_name
-            )
-          `)
-          .eq('user_id', session.user.id)
-          .order('played_at', { ascending: false })
-          .limit(20);
-
-        // Extraire les genres et artistes de l'historique récent
-        const recentGenres = new Set<string>();
-        const recentArtists = new Set<string>();
-        
-        recentHistory?.forEach((item: any) => {
-          if (item.songs?.genre) recentGenres.add(item.songs.genre);
-          if (item.songs?.artist) recentArtists.add(item.songs.artist);
-        });
-
-        // Combiner avec les genres favoris
-        const allGenres = new Set([
-          ...Array.from(recentGenres),
-          ...(preferences?.favorite_genres || []).map((g: any) => g.name || g)
-        ]);
-
-        // Récupérer des chansons correspondant aux goûts
-        let query = supabase
-          .from('songs')
-          .select('*')
-          .limit(20);
-
-        // Filtrer par genre si disponible
-        if (allGenres.size > 0) {
-          query = query.in('genre', Array.from(allGenres));
-        }
-
-        const { data: songs } = await query;
-
-        // Si aucune chanson trouvée avec les préférences, récupérer des chansons aléatoires
-        let finalSongs = songs;
-        if (!songs || songs.length === 0) {
-          const { data: randomSongs } = await supabase
-            .from('songs')
-            .select('*')
-            .limit(20);
-          finalSongs = randomSongs;
-        }
-
-        if (finalSongs && finalSongs.length > 0) {
-          // Exclure les chansons déjà dans l'historique récent
-          const recentSongIds = new Set(
-            recentHistory?.map((item: any) => item.songs?.id).filter(Boolean)
-          );
-          
-          const filteredSongs = finalSongs
-            .filter(song => !recentSongIds.has(song.id))
-            .map(song => ({
-              id: song.id,
-              title: song.title,
-              artist: song.artist || "Artiste inconnu",
-              imageUrl: song.image_url || "",
-              url: song.file_path,
-              duration: song.duration || "0:00",
-              genre: song.genre,
-              albumName: song.album_name,
-              tidal_id: (song as any).tidal_id
-            }));
-
-          // Mélanger et limiter à 8 suggestions
-          const shuffled = filteredSongs.sort(() => Math.random() - 0.5).slice(0, 8);
-          setSuggestedSongs(shuffled);
+          setSuggestedSongs(formattedSongs);
         }
       } catch (error) {
         console.error("Erreur lors de la récupération des suggestions:", error);
