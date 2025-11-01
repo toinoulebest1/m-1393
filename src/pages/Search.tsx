@@ -231,9 +231,11 @@ const Search = () => {
         
         // Search on Deezer separately
         let deezerResult = null;
-        if (!isWildcardSearch && query.trim()) {
+        if (query.trim()) {
+          // For wildcard search, use a popular query to get many results
+          const deezerQuery = isWildcardSearch ? "music" : query;
           deezerResult = await supabase.functions.invoke('deezer-search', {
-            body: { query }
+            body: { query: deezerQuery }
           });
         }
         
@@ -345,9 +347,11 @@ const Search = () => {
         
         // Also search Deezer for non-genre filters
         let deezerResult = null;
-        if (searchFilter !== "genre" && !isWildcardSearch && query.trim()) {
+        if (searchFilter !== "genre" && query.trim()) {
+          // For wildcard search, use a popular query to get many results
+          const deezerQuery = isWildcardSearch ? "music" : query;
           deezerResult = await supabase.functions.invoke('deezer-search', {
-            body: { query }
+            body: { query: deezerQuery }
           });
         }
         
