@@ -97,11 +97,13 @@ async function searchLrcLibLyrics(title: string, artist: string): Promise<string
 
 // Fonction pour chercher un titre sur Tidal
 async function searchTidalId(title: string, artist: string): Promise<string | null> {
+  // Commencer par les recherches avec l'artiste pour plus de précision
   const queries = [
-    title.trim(),
-    `${title} ${artist}`.trim(),
-    `${artist} ${title}`.trim(),
-  ];
+    `${title} ${artist}`.trim(), // 1. Titre + artiste (priorité)
+    `${artist} ${title}`.trim(), // 2. Artiste + titre
+    title.split(/[\(\[\-]|feat\.?|ft\.?/i)[0].trim() + ` ${artist}`, // 3. Titre nettoyé + artiste
+    title.trim(), // 4. Titre seul (en dernier recours)
+  ].filter(q => q.length > 0);
 
   for (const query of queries) {
     try {
