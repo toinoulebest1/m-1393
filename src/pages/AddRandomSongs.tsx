@@ -3,10 +3,20 @@ import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Music, Loader2, CheckCircle } from "lucide-react";
+import { Music, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AddRandomSongs = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,6 +24,8 @@ const AddRandomSongs = () => {
   const [addedSongs, setAddedSongs] = useState<string[]>([]);
   const [addedSongIds, setAddedSongIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPurgeDialog, setShowPurgeDialog] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
 
   const handleAddSongs = async () => {
     setIsLoading(true);
@@ -136,6 +148,42 @@ const AddRandomSongs = () => {
     }
   };
 
+  const handlePurgeAll = async () => {
+    setShowPurgeDialog(false);
+    setIsPurging(true);
+
+    try {
+      console.log('🗑️ PURGE COMPLÈTE : Suppression de TOUTES les chansons...');
+      
+      const { data, error } = await supabase.functions.invoke('purge-all-songs');
+
+      if (error) {
+        console.error('Erreur edge function:', error);
+        throw error;
+      }
+
+      if (data?.deleted_count > 0) {
+        toast({
+          title: "✅ Purge complète réussie !",
+          description: `${data.deleted_count} chansons ont été supprimées définitivement.`,
+        });
+        setAddedSongs([]);
+        setAddedSongIds([]);
+      } else {
+        throw new Error(data?.error || 'Aucune chanson à supprimer');
+      }
+    } catch (error: any) {
+      console.error('Erreur:', error);
+      toast({
+        title: "❌ Erreur",
+        description: error.message || "Impossible de purger les chansons",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto p-6 max-w-4xl">
@@ -180,7 +228,7 @@ const AddRandomSongs = () => {
 
                 <Button
                   onClick={handleDeleteLast10}
-                  disabled={isDeleting}
+                  disabled={isDeleting || isPurging}
                   size="lg"
                   variant="destructive"
                   className="w-full"
@@ -192,6 +240,26 @@ const AddRandomSongs = () => {
                     </>
                   ) : (
                     'Supprimer les 10 dernières chansons'
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => setShowPurgeDialog(true)}
+                  disabled={isDeleting || isPurging}
+                  size="lg"
+                  variant="destructive"
+                  className="w-full bg-red-600 hover:bg-red-700"
+                >
+                  {isPurging ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Purge en cours...
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="mr-2 h-5 w-5" />
+                      PURGER TOUTES LES MUSIQUES
+                    </>
                   )}
                 </Button>
               </div>
@@ -243,6 +311,44 @@ const AddRandomSongs = () => {
         </div>
       </div>
       <Player />
+
+      <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-6 h-6" />
+              ⚠️ ATTENTION - Action irréversible
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p className="font-bold text-lg">
+                Vous êtes sur le point de SUPPRIMER TOUTES LES MUSIQUES du site !
+              </p>
+              <p>
+                Cette action va supprimer définitivement :
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>Toutes les chansons</li>
+                <li>Toutes les pochettes d'album</li>
+                <li>Toutes les paroles</li>
+                <li>Tous les liens Tidal</li>
+                <li>Toutes les statistiques associées</li>
+              </ul>
+              <p className="font-bold text-red-600 mt-4">
+                Cette action est IRRÉVERSIBLE. Êtes-vous absolument certain ?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePurgeAll}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              OUI, SUPPRIMER TOUT
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

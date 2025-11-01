@@ -49,3 +49,15 @@ verify_jwt = false
 
 [functions.send-weekly-reports]
 verify_jwt = false
+
+[functions.add-random-french-songs]
+verify_jwt = false
+
+[functions.delete-songs-batch]
+verify_jwt = false
+
+[functions.delete-last-10-songs]
+verify_jwt = false
+
+[functions.purge-all-songs]
+verify_jwt = false
