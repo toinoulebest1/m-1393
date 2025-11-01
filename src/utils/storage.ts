@@ -202,7 +202,26 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
 
-  // 0. Si c'est une URL Deezer, chercher automatiquement sur Tidal
+  // 0. Vérifier d'abord si un lien manuel existe dans tidal_audio_links
+  if (tidalId) {
+    console.log('🔍 Vérification lien manuel pour Tidal ID:', tidalId);
+    try {
+      const { data: manualLink, error } = await supabase
+        .from('tidal_audio_links')
+        .select('audio_url')
+        .eq('tidal_id', tidalId)
+        .maybeSingle();
+
+      if (!error && manualLink?.audio_url) {
+        console.log('✅ Lien manuel trouvé dans tidal_audio_links:', manualLink.audio_url);
+        return manualLink.audio_url;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur vérification lien manuel:', error);
+    }
+  }
+
+  // 1. Si c'est une URL Deezer, chercher automatiquement sur Tidal
   if (filePath.includes('dzcdn.net') || filePath.includes('deezer.com')) {
     console.log('🎵 Détection Deezer, recherche automatique sur Tidal...');
     

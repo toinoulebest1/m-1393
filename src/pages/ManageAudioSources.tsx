@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
+import { searchTidalId } from "@/utils/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -86,11 +87,28 @@ const ManageAudioSources = () => {
 
     setIsSaving(true);
     try {
+      // Chercher le Tidal ID correspondant à cette chanson Deezer
+      console.log('🔍 Recherche Tidal ID pour:', selectedTrack.title, '-', selectedTrack.artist.name);
+      
+      const tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
+      
+      if (!tidalId) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de trouver l'ID Tidal correspondant",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      console.log('✅ Tidal ID trouvé:', tidalId);
+
       // Vérifier si un lien existe déjà pour ce tidal_id
       const { data: existing } = await supabase
         .from("tidal_audio_links")
         .select("id")
-        .eq("tidal_id", selectedTrack.id.toString())
+        .eq("tidal_id", tidalId)
         .maybeSingle();
 
       if (existing) {
@@ -109,7 +127,7 @@ const ManageAudioSources = () => {
         const { error } = await supabase
           .from("tidal_audio_links")
           .insert({
-            tidal_id: selectedTrack.id.toString(),
+            tidal_id: tidalId,
             audio_url: audioUrl.trim(),
             quality: "LOSSLESS",
             source: "manual",
@@ -121,8 +139,13 @@ const ManageAudioSources = () => {
 
       toast({
         title: "Succès",
-        description: "Le lien audio a été enregistré",
+        description: `Le lien audio a été enregistré avec l'ID Tidal ${tidalId}`,
       });
+
+      // Mettre à jour le cache pour utilisation immédiate
+      const { UltraFastCache } = await import("@/utils/ultraFastCache");
+      UltraFastCache.setWarm(`tidal:${tidalId}`, audioUrl.trim());
+      console.log('💾 Cache mis à jour pour tidal:' + tidalId);
 
       setAudioUrl("");
       setSelectedTrack(null);
