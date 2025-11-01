@@ -5,10 +5,42 @@
 
 import { getAudioFileUrl } from './storage';
 import { UltraFastCache } from './ultraFastCache';
+import { supabase } from '@/integrations/supabase/client';
 
 export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
   private static requestCount = 0;
+  private static preloadedFromDB = false;
+
+  /**
+   * Préchargement massif depuis la DB au démarrage
+   */
+  static async preloadFromDatabase(): Promise<void> {
+    if (this.preloadedFromDB) return;
+    
+    console.log("🚀 Préchargement URLs depuis tidal_audio_links...");
+    
+    try {
+      // Récupérer toutes les URLs en cache depuis la DB
+      const { data: cachedLinks } = await supabase
+        .from('tidal_audio_links')
+        .select('tidal_id, audio_url')
+        .limit(100);
+      
+      if (cachedLinks && cachedLinks.length > 0) {
+        // Charger directement dans le warm cache
+        for (const link of cachedLinks) {
+          // Utiliser tidal:{id} comme clé pour correspondre au format des songs
+          UltraFastCache.setWarm(`tidal:${link.tidal_id}`, link.audio_url);
+        }
+        console.log(`✅ ${cachedLinks.length} URLs préchargées dans le warm cache`);
+      }
+      
+      this.preloadedFromDB = true;
+    } catch (error) {
+      console.error("⚠️ Échec préchargement DB:", error);
+    }
+  }
 
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
@@ -17,7 +49,23 @@ export class UltraFastStreaming {
     const startTime = performance.now();
     this.requestCount++;
     
+    // Précharger depuis la DB au premier appel
+    if (!this.preloadedFromDB) {
+      await this.preloadFromDatabase();
+    }
+    
     console.log("🚀 Ultra-fast streaming:", songUrl);
+    
+    // Si on a un tidal_id, vérifier d'abord avec le format tidal:{id}
+    if (tidalId) {
+      const tidalKey = `tidal:${tidalId}`;
+      const warmResult = UltraFastCache.getWarm(tidalKey);
+      if (warmResult) {
+        const elapsed = performance.now() - startTime;
+        console.log("🔥 TIDAL WARM CACHE:", elapsed.toFixed(2), "ms");
+        return warmResult;
+      }
+    }
 
     // 1. L0 Cache instantané (< 0.1ms)
     if (UltraFastCache.hasL0(songUrl)) {

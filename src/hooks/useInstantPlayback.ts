@@ -2,9 +2,15 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { searchTidalId } from '@/utils/storage';
 import { memoryCache } from '@/utils/memoryCache';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 // Précharge instantanée des URLs audio pour lecture ultra-rapide
 export const useInstantPlayback = (songs: any[]) => {
+  useEffect(() => {
+    // Précharger immédiatement depuis la DB au premier mount
+    UltraFastStreaming.preloadFromDatabase();
+  }, []);
+
   useEffect(() => {
     if (!songs || songs.length === 0) return;
 
@@ -47,6 +53,11 @@ export const useInstantPlayback = (songs: any[]) => {
               // Utiliser le lien existant
               console.log('✅ URL en cache (DB):', song.title);
               memoryCache.set(song.file_path, existingLink.audio_url);
+              
+              // Ajouter aussi au warm cache pour accès ultra-rapide
+              import('@/utils/ultraFastCache').then(({ UltraFastCache }) => {
+                UltraFastCache.setWarm(`tidal:${tidalId}`, existingLink.audio_url);
+              });
             } else {
               // Récupérer depuis l'API Frankfurt en priorité
               const frankfurtUrl = `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
@@ -75,7 +86,7 @@ export const useInstantPlayback = (songs: any[]) => {
                     console.log('✅ URL préchargée:', song.title);
                     memoryCache.set(song.file_path, audioUrl);
                     
-                    // Sauvegarder dans Supabase pour utilisation future
+                     // Sauvegarder dans Supabase pour utilisation future + warm cache
                     supabase
                       .from('tidal_audio_links')
                       .upsert({
@@ -85,7 +96,13 @@ export const useInstantPlayback = (songs: any[]) => {
                         source: 'frankfurt',
                         last_verified_at: new Date().toISOString()
                       })
-                      .then(() => console.log('💾 Lien sauvegardé en DB:', song.title));
+                      .then(() => {
+                        console.log('💾 Lien sauvegardé en DB:', song.title);
+                        // Ajouter au warm cache pour accès instantané
+                        import('@/utils/ultraFastCache').then(({ UltraFastCache }) => {
+                          UltraFastCache.setWarm(`tidal:${tidalId}`, audioUrl);
+                        });
+                      });
                   }
                 }
               } catch (error) {

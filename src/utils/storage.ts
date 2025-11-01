@@ -329,6 +329,10 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       });
     console.log('💾 Lien sauvegardé dans tidal_audio_links');
     
+    // Sauvegarder aussi dans le warm cache pour accès ultra-rapide
+    const { UltraFastCache } = await import('./ultraFastCache');
+    UltraFastCache.setWarm(`tidal:${tidalId}`, direct);
+    
     return direct;
   }
   
@@ -385,6 +389,10 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
           last_verified_at: new Date().toISOString()
         });
       console.log('💾 Lien sauvegardé dans tidal_audio_links (auto-search)');
+      
+      // Sauvegarder aussi dans le warm cache pour accès ultra-rapide
+      const { UltraFastCache } = await import('./ultraFastCache');
+      UltraFastCache.setWarm(`tidal:${foundTidalId}`, direct);
       
       return direct;
     }
