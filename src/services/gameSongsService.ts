@@ -10,6 +10,25 @@ export interface GameSong {
   isDeezer?: boolean;
 }
 
+/**
+ * Vérifie si l'URL est une preview Deezer valide et jouable
+ */
+const isValidDeezerPreview = (url: string): boolean => {
+  if (!url) return false;
+  
+  // Les previews Deezer valides sont sur cdns-preview-X.dzcdn.net
+  const isDeezerCdn = url.includes('dzcdn.net') && url.includes('.mp3');
+  
+  // Exclure les liens Tidal, Spotify ou autres services avec tokens
+  const isInvalidService = 
+    url.includes('tidal.com') || 
+    url.includes('spotify.com') ||
+    url.includes('token=') ||
+    url.includes('.mp4'); // Les previews Deezer sont en MP3, pas MP4
+  
+  return isDeezerCdn && !isInvalidService;
+};
+
 // Différentes requêtes Deezer pour varier les musiques
 const deezerQueries = [
   'top hits 2024',
@@ -70,15 +89,28 @@ export const fetchGameSongs = async (minSongs: number = 20): Promise<GameSong[]>
     });
 
     if (!deezerError && deezerData?.data) {
-      const deezerTracks: GameSong[] = deezerData.data.map((track: any) => ({
-        id: `deezer-${track.id}`,
-        title: track.title,
-        artist: track.artist?.name || '',
-        url: track.preview || '',
-        imageUrl: track.album?.cover_medium || track.album?.cover_big,
-        duration: track.duration ? formatDuration(track.duration) : '0:30',
-        isDeezer: true
-      })).filter((track: GameSong) => track.url); // Filtrer les tracks sans preview
+      const deezerTracks: GameSong[] = deezerData.data
+        .map((track: any) => ({
+          id: `deezer-${track.id}`,
+          title: track.title,
+          artist: track.artist?.name || '',
+          url: track.preview || '',
+          imageUrl: track.album?.cover_medium || track.album?.cover_big,
+          duration: track.duration ? formatDuration(track.duration) : '0:30',
+          isDeezer: true
+        }))
+        .filter((track: GameSong) => {
+          // Filtrer les tracks sans preview ou avec des URLs non valides
+          if (!track.url) {
+            console.log(`❌ Track sans preview: ${track.title}`);
+            return false;
+          }
+          if (!isValidDeezerPreview(track.url)) {
+            console.log(`❌ Preview invalide (Tidal/autre): ${track.title} - ${track.url}`);
+            return false;
+          }
+          return true;
+        });
 
       console.log(`✅ ${deezerTracks.length} tracks Deezer récupérées (query: "${randomQuery}")`);
       
