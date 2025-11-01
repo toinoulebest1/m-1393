@@ -27,11 +27,11 @@ export const WandAnimation = ({ isActive }: WandAnimationProps) => {
   if (!isActive) return null;
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 flex items-center justify-center">
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-[-1] flex items-center justify-center">
       <img 
         src={wands[currentWandIndex]} 
         alt="Magic wand animation" 
-        className="w-full h-full object-contain opacity-60 animate-fade-in"
+        className="w-full h-full object-contain opacity-50 animate-fade-in"
       />
     </div>
   );
