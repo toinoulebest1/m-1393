@@ -335,9 +335,29 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
   // 0-auto. Si pas de tidal_id mais on a titre + artiste, chercher automatiquement
   if (!tidalId && songTitle && songArtist) {
     console.log('🔍 Pas de Tidal ID, recherche automatique pour:', songTitle, '-', songArtist);
-    const foundTidalId = await searchTidalId(songTitle, songArtist);
+    
+    // D'abord chercher dans la table songs si un tidal_id existe déjà
+    const { data: existingSong } = await supabase
+      .from('songs')
+      .select('tidal_id')
+      .ilike('title', songTitle)
+      .ilike('artist', songArtist)
+      .not('tidal_id', 'is', null)
+      .limit(1)
+      .single();
+    
+    let foundTidalId = existingSong?.tidal_id;
+    
+    // Si pas trouvé dans songs, chercher via l'API
+    if (!foundTidalId) {
+      console.log('🌐 Pas en DB, recherche via API...');
+      foundTidalId = await searchTidalId(songTitle, songArtist);
+    } else {
+      console.log('✅ Tidal ID trouvé dans la DB:', foundTidalId);
+    }
+    
     if (foundTidalId) {
-      // Vérifier d'abord en cache
+      // Vérifier d'abord en cache audio links
       const { data: cachedLink } = await supabase
         .from('tidal_audio_links')
         .select('audio_url')
@@ -350,6 +370,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         return cachedLink.audio_url;
       }
 
+      // Sinon fetch depuis l'API
       const direct = await fetchPhoenixUrl(foundTidalId);
       memoryCache.set(filePath, direct);
       
