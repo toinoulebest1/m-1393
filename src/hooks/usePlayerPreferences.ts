@@ -65,7 +65,12 @@ export const usePlayerPreferences = () => {
       
       if (nextTrack) {
         console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
-        await UltraFastStreaming.preloadNext(nextTrack.url);
+        await UltraFastStreaming.getAudioUrlUltraFast(
+          nextTrack.url,
+          nextTrack.tidal_id,
+          nextTrack.title,
+          nextTrack.artist
+        );
         console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }
     } catch (error) {

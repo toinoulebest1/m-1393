@@ -197,7 +197,12 @@ export class PredictivePreloader {
       
       setTimeout(async () => {
         try {
-          await UltraFastStreaming.getAudioUrlUltraFast(song.url);
+          await UltraFastStreaming.getAudioUrlUltraFast(
+            song.url,
+            song.tidal_id,
+            song.title,
+            song.artist
+          );
           console.log("✅ Prédiction préchargée:", song.title);
         } catch (error) {
           console.warn("⚠️ Préchargement prédictif échoué:", song.title);

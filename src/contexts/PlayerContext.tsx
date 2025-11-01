@@ -109,7 +109,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Prépare l'élément audio suivant avec l'URL et attend le canplay
   const prepareNextAudio = async (song: Song) => {
     try {
-      const url = await UltraFastStreaming.getAudioUrlUltraFast(song.url);
+      const url = await UltraFastStreaming.getAudioUrlUltraFast(
+        song.url,
+        song.tidal_id,
+        song.title,
+        song.artist
+      );
       if (!url || typeof url !== 'string') throw new Error('URL invalide pour la prochaine piste');
       nextAudioRef.current.src = url;
       nextAudioRef.current.preload = 'auto';
@@ -299,7 +304,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("🎵 Restauration de:", song.title);
           setIsAudioReady(false);
           
-          const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url);
+          const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+            song.url,
+            song.tidal_id,
+            song.title,
+            song.artist
+          );
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
           // Configuration audio avec gestion d'état

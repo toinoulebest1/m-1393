@@ -234,7 +234,12 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('📍 Original URL:', currentSong.url);
         
         // Obtenir l'URL réelle via UltraFastStreaming
-        const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(currentSong.url);
+        const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+          currentSong.url,
+          currentSong.tidal_id,
+          currentSong.title,
+          currentSong.artist
+        );
         
         if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error('URL audio invalide');
