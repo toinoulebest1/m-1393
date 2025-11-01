@@ -9,24 +9,29 @@ export const fetchAndSaveLyrics = async (
   songTitle: string,
   artist: string,
   duration?: string,
-  albumName?: string
+  albumName?: string,
+  isDeezer?: boolean
 ): Promise<{ syncedLyrics: string | null; plainLyrics: string | null }> => {
   try {
     console.log('🎵 Récupération automatique des paroles pour:', songTitle, 'par', artist);
 
-    // Vérifier si les paroles existent déjà
-    const { data: existingLyrics } = await supabase
-      .from('lyrics')
-      .select('content')
-      .eq('song_id', songId)
-      .maybeSingle();
+    // Pour les musiques Deezer/Tidal, ne pas essayer de vérifier/sauvegarder dans la DB
+    // car elles n'ont pas d'UUID valide
+    if (!isDeezer && !songId.startsWith('deezer-')) {
+      // Vérifier si les paroles existent déjà pour les musiques locales
+      const { data: existingLyrics } = await supabase
+        .from('lyrics')
+        .select('content')
+        .eq('song_id', songId)
+        .maybeSingle();
 
-    if (existingLyrics?.content) {
-      console.log('✅ Paroles déjà en cache');
-      return {
-        syncedLyrics: existingLyrics.content.includes('[') ? existingLyrics.content : null,
-        plainLyrics: existingLyrics.content
-      };
+      if (existingLyrics?.content) {
+        console.log('✅ Paroles déjà en cache');
+        return {
+          syncedLyrics: existingLyrics.content.includes('[') ? existingLyrics.content : null,
+          plainLyrics: existingLyrics.content
+        };
+      }
     }
 
     // Convertir la durée de MM:SS en secondes
@@ -59,26 +64,32 @@ export const fetchAndSaveLyrics = async (
 
     const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
 
-    // Sauvegarder dans la base de données
-    const { error: insertError } = await supabase
-      .from('lyrics')
-      .upsert({
-        song_id: songId,
-        content: lyricsContent
-      });
+    // Sauvegarder dans la base de données uniquement pour les musiques locales (avec UUID valide)
+    if (!isDeezer && !songId.startsWith('deezer-')) {
+      const { error: insertError } = await supabase
+        .from('lyrics')
+        .upsert({
+          song_id: songId,
+          content: lyricsContent
+        });
 
-    if (insertError) {
-      console.error('❌ Erreur sauvegarde paroles:', insertError);
-    }
-
-    // Sauvegarder dans Dropbox si activé
-    if (isDropboxEnabled()) {
-      try {
-        await uploadLyricsToDropbox(songId, lyricsContent);
-        console.log('✅ Paroles sauvegardées dans Dropbox');
-      } catch (error) {
-        console.warn('⚠️ Échec sauvegarde Dropbox:', error);
+      if (insertError) {
+        console.error('❌ Erreur sauvegarde paroles:', insertError);
+      } else {
+        console.log('✅ Paroles sauvegardées dans la DB');
       }
+
+      // Sauvegarder dans Dropbox si activé
+      if (isDropboxEnabled()) {
+        try {
+          await uploadLyricsToDropbox(songId, lyricsContent);
+          console.log('✅ Paroles sauvegardées dans Dropbox');
+        } catch (error) {
+          console.warn('⚠️ Échec sauvegarde Dropbox:', error);
+        }
+      }
+    } else {
+      console.log('ℹ️ Paroles Deezer/Tidal non sauvegardées (pas d\'UUID)');
     }
 
     console.log('✅ Paroles récupérées et sauvegardées');
@@ -100,11 +111,12 @@ export const fetchLyricsInBackground = (
   songTitle: string,
   artist: string,
   duration?: string,
-  albumName?: string
+  albumName?: string,
+  isDeezer?: boolean
 ): void => {
   // Lancer la récupération en arrière-plan sans attendre
   setTimeout(() => {
-    fetchAndSaveLyrics(songId, songTitle, artist, duration, albumName)
+    fetchAndSaveLyrics(songId, songTitle, artist, duration, albumName, isDeezer)
       .catch(error => {
         console.warn('⚠️ Échec récupération paroles en arrière-plan:', error);
       });

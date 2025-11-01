@@ -186,7 +186,8 @@ export const useAudioControl = ({
               song.title,
               song.artist,
               song.duration,
-              song.album_name
+              song.album_name,
+              song.isDeezer
             );
           }
           
