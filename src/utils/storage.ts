@@ -259,6 +259,21 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     // Maintenant qu'on a le Tidal ID, passer au flow normal
     tidalId = foundTidalId;
     console.log('✅ Tidal ID trouvé pour Deezer:', tidalId);
+
+    // Vérifier immédiatement s'il existe un lien manuel pour ce Tidal ID
+    try {
+      const { data: manualLink2 } = await supabase
+        .from('tidal_audio_links')
+        .select('audio_url')
+        .eq('tidal_id', tidalId)
+        .maybeSingle();
+      if (manualLink2?.audio_url) {
+        console.log('✅ Lien manuel trouvé (post-détection Tidal):', manualLink2.audio_url);
+        return manualLink2.audio_url;
+      }
+    } catch (e) {
+      console.warn('⚠️ Vérification lien manuel post-détection échouée:', e);
+    }
   }
 
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
