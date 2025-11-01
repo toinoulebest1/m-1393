@@ -45,12 +45,6 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 
 // Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives
 export const searchTidalId = async (title: string, artist: string): Promise<string | null> => {
-  // Validation des paramètres
-  if (!title || typeof title !== 'string' || !artist || typeof artist !== 'string') {
-    console.warn('⚠️ searchTidalId: paramètres invalides', { title, artist });
-    return null;
-  }
-  
   // Utiliser le format "titre, artiste" avec virgule pour plus de précision
   const searchQueries = [
     `${title}, ${artist}`.trim(), // 1. Titre, artiste (format optimal - priorité)
@@ -206,12 +200,6 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
 
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
-  
-  // Si le filePath est déjà une URL complète (cas des previews Deezer), la retourner directement
-  if (filePath && (filePath.startsWith('http://') || filePath.startsWith('https://'))) {
-    console.log('✅ URL directe détectée (Deezer preview):', filePath);
-    return filePath;
-  }
 
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
