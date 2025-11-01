@@ -244,28 +244,6 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
-    // Essayer Frankfurt en priorité
-    const frankfurtApi = `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=LOSSLESS`;
-    console.log('🎵 Frankfurt API (priorité):', frankfurtApi);
-    
-    let res: Response;
-    let usingFrankfurt = true;
-    
-    try {
-      res = await fetch(frankfurtApi, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`Frankfurt API error: ${res.status}`);
-    } catch (error) {
-      console.warn('⚠️ Frankfurt API échec, fallback Phoenix:', error);
-      // Fallback sur Phoenix
-      const phoenixApi = `https://phoenix.squid.wtf/track/?id=${tid}&quality=LOSSLESS`;
-      console.log('🎵 Phoenix API (fallback):', phoenixApi);
-      res = await fetch(phoenixApi, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
-      usingFrankfurt = false;
-    }
-    
-    console.log(`✅ Utilisation de ${usingFrankfurt ? 'Frankfurt' : 'Phoenix'} API`);
-
     // Helper interne: extraire depuis un manifest éventuel
     const extractFromManifest = async (manifest: string): Promise<string | null> => {
       try {
@@ -293,77 +271,123 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       return typeof direct === 'string' ? direct : null;
     };
 
-    let data: any;
-    let rawText: string | null = null;
-    try {
-      data = await res.json();
-    } catch (e) {
-      rawText = await res.text();
+    // Liste des qualités à essayer (ordre de priorité)
+    const qualities = ['LOSSLESS', 'LOW'];
+    let lastError: Error | null = null;
+    
+    for (const quality of qualities) {
+      console.log(`🎵 Tentative qualité ${quality}...`);
+      
+      // Essayer Frankfurt en priorité
+      const frankfurtApi = `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}`;
+      console.log('🎵 Frankfurt API:', frankfurtApi);
+      
+      let res: Response;
+      let usingFrankfurt = true;
+      
       try {
-        data = JSON.parse(rawText);
-      } catch {
-        console.warn('⚠️ Phoenix non-JSON réponse:', rawText?.slice(0, 200));
-        throw new Error('Phoenix a renvoyé une réponse inattendue');
-      }
-    }
-
-    // Cas où Phoenix renvoie un tableau (observé dans les logs)
-    if (Array.isArray(data)) {
-      // Priorité absolue: chercher l'élément qui contient OriginalTrackUrl
-      for (const item of data) {
-        if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
-          console.log('✅ Phoenix OriginalTrackUrl (array):', item.OriginalTrackUrl);
-          return item.OriginalTrackUrl;
+        res = await fetch(frankfurtApi, { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`Frankfurt API error: ${res.status}`);
+      } catch (error) {
+        console.warn(`⚠️ Frankfurt API échec (${quality}), fallback Phoenix:`, error);
+        // Fallback sur Phoenix
+        const phoenixApi = `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}`;
+        console.log('🎵 Phoenix API (fallback):', phoenixApi);
+        try {
+          res = await fetch(phoenixApi, { headers: { Accept: 'application/json' } });
+          if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
+          usingFrankfurt = false;
+        } catch (phoenixError) {
+          lastError = phoenixError as Error;
+          console.warn(`⚠️ Phoenix API aussi en échec (${quality})`);
+          continue; // Essayer la qualité suivante
         }
       }
       
-      // Fallback: autres champs ou manifest
-      for (const item of data) {
-        const direct = pickDirect(item);
-        // Ignorer les URLs tidal.com/track qui sont des pages web
-        if (direct && !direct.includes('tidal.com/track/') && !direct.includes('www.tidal.com')) {
-          console.log('✅ Phoenix URL (array fallback):', direct);
-          return direct;
+      console.log(`✅ Utilisation de ${usingFrankfurt ? 'Frankfurt' : 'Phoenix'} API avec qualité ${quality}`);
+
+      // Parser la réponse
+      let data: any;
+      let rawText: string | null = null;
+      try {
+        data = await res.json();
+      } catch (e) {
+        rawText = await res.text();
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          console.warn(`⚠️ Phoenix non-JSON réponse (${quality}):`, rawText?.slice(0, 200));
+          lastError = new Error('Phoenix a renvoyé une réponse inattendue');
+          continue; // Essayer la qualité suivante
         }
-        if (item?.manifest) {
-          const fromManifest = await extractFromManifest(item.manifest);
-          if (fromManifest) {
-            console.log('✅ Phoenix URL (manifest):', fromManifest);
-            return fromManifest;
+      }
+
+      // Cas où Phoenix renvoie un tableau (observé dans les logs)
+      if (Array.isArray(data)) {
+        // Priorité absolue: chercher l'élément qui contient OriginalTrackUrl
+        for (const item of data) {
+          if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
+            console.log(`✅ Phoenix OriginalTrackUrl (array, ${quality}):`, item.OriginalTrackUrl);
+            return item.OriginalTrackUrl;
+          }
+        }
+        
+        // Fallback: autres champs ou manifest
+        for (const item of data) {
+          const direct = pickDirect(item);
+          // Ignorer les URLs tidal.com/track qui sont des pages web
+          if (direct && !direct.includes('tidal.com/track/') && !direct.includes('www.tidal.com')) {
+            console.log(`✅ Phoenix URL (array fallback, ${quality}):`, direct);
+            return direct;
+          }
+          if (item?.manifest) {
+            const fromManifest = await extractFromManifest(item.manifest);
+            if (fromManifest) {
+              console.log(`✅ Phoenix URL (manifest, ${quality}):`, fromManifest);
+              return fromManifest;
+            }
+          }
+        }
+        
+        // Si rien trouvé dans le array, essayer la qualité suivante
+        console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (array, ${quality})`);
+        lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+        continue;
+      }
+
+      // Objet standard
+      const directTop = pickDirect(data);
+      if (directTop) {
+        console.log(`✅ Phoenix OriginalTrackUrl (${quality}):`, directTop);
+        return directTop;
+      }
+
+      // Exploration des champs imbriqués
+      if (data && typeof data === 'object') {
+        for (const key of Object.keys(data)) {
+          const val: any = (data as any)[key];
+          if (val && typeof val === 'object') {
+            const d = pickDirect(val);
+            if (d) {
+              console.log(`✅ Phoenix OriginalTrackUrl (nested, ${quality}):`, d);
+              return d;
+            }
+            if (val?.manifest) {
+              const fromManifest = await extractFromManifest(val.manifest);
+              if (fromManifest) return fromManifest;
+            }
           }
         }
       }
-      console.error('❌ Phoenix JSON sans OriginalTrackUrl (array):', data);
-      throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
-    }
 
-    // Objet standard
-    const directTop = pickDirect(data);
-    if (directTop) {
-      console.log('✅ Phoenix OriginalTrackUrl:', directTop);
-      return directTop;
+      console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (${quality})`);
+      lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+      // Continuer avec la qualité suivante
     }
-
-    // Exploration des champs imbriqués
-    if (data && typeof data === 'object') {
-      for (const key of Object.keys(data)) {
-        const val: any = (data as any)[key];
-        if (val && typeof val === 'object') {
-          const d = pickDirect(val);
-          if (d) {
-            console.log('✅ Phoenix OriginalTrackUrl (nested):', d);
-            return d;
-          }
-          if (val?.manifest) {
-            const fromManifest = await extractFromManifest(val.manifest);
-            if (fromManifest) return fromManifest;
-          }
-        }
-      }
-    }
-
-    console.error('❌ Phoenix JSON sans OriginalTrackUrl:', data);
-    throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+    
+    // Si toutes les qualités ont échoué
+    console.error('❌ Aucune qualité disponible après toutes les tentatives');
+    throw lastError || new Error('OriginalTrackUrl introuvable après toutes les tentatives');
   };
   
   // 0. Vérifier d'abord dans le cache Supabase si un tidal_id est fourni
