@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query } = await req.json();
+    const { query, limit = 25 } = await req.json();
     
     if (!query) {
       return new Response(
@@ -22,9 +22,9 @@ serve(async (req) => {
       );
     }
 
-    console.log("Searching Deezer for:", query);
+    console.log("Searching Deezer for:", query, "with limit:", limit);
     
-    const searchUrl = `https://api.deezer.com/search?q=${encodeURIComponent(query)}`;
+    const searchUrl = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`;
     const response = await fetch(searchUrl);
     
     if (!response.ok) {
@@ -32,7 +32,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Deezer search results:", data.total, "matches found");
+    console.log("Deezer search results:", data.data?.length || 0, "tracks returned (", data.total, "total matches)");
     
     return new Response(
       JSON.stringify(data),
