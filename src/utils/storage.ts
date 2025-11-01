@@ -176,6 +176,152 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
 
+  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
+  const fetchPhoenixUrl = async (tid: string): Promise<string> => {
+    // Helper interne: extraire depuis un manifest éventuel
+    const extractFromManifest = async (manifest: string): Promise<string | null> => {
+      try {
+        const decoded = atob(manifest);
+        // Essayer JSON d'abord
+        try {
+          const mObj = JSON.parse(decoded);
+          const direct = mObj?.OriginalTrackUrl || mObj?.originalTrackUrl || mObj?.original_url || mObj?.url || (Array.isArray(mObj?.urls) ? mObj.urls[0] : null);
+          if (typeof direct === 'string') return direct;
+        } catch {}
+        // Fallback: regex URL
+        const match = decoded.match(/https?:\/\/[^"'\s]+/);
+        if (match) return match[0];
+      } catch {
+        // Peut déjà être du texte non base64
+        const match = manifest.match(/https?:\/\/[^"'\s]+/);
+        if (match) return match[0];
+      }
+      return null;
+    };
+
+    // Helper interne: choisir la propriété directe si présente
+    const pickDirect = (obj: any): string | null => {
+      const direct = obj?.OriginalTrackUrl || obj?.originalTrackUrl || obj?.original_url || obj?.url;
+      return typeof direct === 'string' ? direct : null;
+    };
+
+    // Liste des qualités à essayer (ordre de priorité)
+    const qualities = ['LOSSLESS', 'LOW'];
+    let lastError: Error | null = null;
+    
+    for (const quality of qualities) {
+      console.log(`🎵 Tentative qualité ${quality}...`);
+      
+      // Liste des APIs à essayer (ordre de priorité)
+      const apis = [
+        { name: 'Frankfurt', url: `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}` },
+        { name: 'London', url: `https://london.monochrome.tf/track/?id=${tid}&quality=${quality}` },
+        { name: 'Katze', url: `https://katze.qqdl.site/track/?id=${tid}&quality=${quality}` },
+        { name: 'Phoenix', url: `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}` }
+      ];
+      
+      let res: Response | null = null;
+      let successApi: string | null = null;
+      
+      // Essayer chaque API dans l'ordre
+      for (const api of apis) {
+        console.log(`🎵 ${api.name} API:`, api.url);
+        try {
+          res = await fetch(api.url, { headers: { Accept: 'application/json' } });
+          if (!res.ok) throw new Error(`${api.name} API error: ${res.status}`);
+          successApi = api.name;
+          break; // API réussie, sortir de la boucle
+        } catch (error) {
+          console.warn(`⚠️ ${api.name} API échec (${quality}):`, error);
+          lastError = error as Error;
+          // Continuer avec l'API suivante
+        }
+      }
+      
+      // Si aucune API n'a fonctionné pour cette qualité, essayer la qualité suivante
+      if (!res || !successApi) {
+        console.warn(`⚠️ Toutes les APIs ont échoué pour la qualité ${quality}`);
+        continue;
+      }
+      
+      console.log(`✅ Utilisation de ${successApi} API avec qualité ${quality}`);
+      
+      const data = await res.json();
+
+      // Tentative directe
+      const directTop = pickDirect(data);
+      if (directTop) {
+        console.log(`✅ Phoenix OriginalTrackUrl (${quality}):`, directTop);
+        return directTop;
+      }
+
+      // Exploration des champs imbriqués
+      if (data && typeof data === 'object') {
+        for (const key of Object.keys(data)) {
+          const val: any = (data as any)[key];
+          if (val && typeof val === 'object') {
+            const d = pickDirect(val);
+            if (d) {
+              console.log(`✅ Phoenix OriginalTrackUrl (nested, ${quality}):`, d);
+              return d;
+            }
+            if (val?.manifest) {
+              const fromManifest = await extractFromManifest(val.manifest);
+              if (fromManifest) return fromManifest;
+            }
+          }
+        }
+      }
+
+      console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (${quality})`);
+      lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+      // Continuer avec la qualité suivante
+    }
+    
+    // Si toutes les qualités ont échoué
+    console.error('❌ Aucune qualité disponible après toutes les tentatives');
+    throw lastError || new Error('OriginalTrackUrl introuvable après toutes les tentatives');
+  };
+  
+  // Helper: Essayer plusieurs Tidal IDs jusqu'à obtenir un lien valide (pas amz-pr-fa)
+  const fetchWithFallback = async (tidalIds: string[]): Promise<string> => {
+    for (let i = 0; i < tidalIds.length; i++) {
+      const tid = tidalIds[i];
+      console.log(`🔄 Tentative avec Tidal ID #${i + 1}:`, tid);
+      
+      try {
+        const audioUrl = await fetchPhoenixUrl(tid);
+        
+        // Vérifier si le lien est valide (pas amz-pr-fa)
+        if (audioUrl.includes('amz-pr-fa.audio.tidal.com')) {
+          console.warn(`⚠️ Lien amz-pr-fa détecté, essayer prochain ID...`);
+          continue; // Essayer le prochain ID
+        }
+        
+        console.log(`✅ Lien valide obtenu avec ID #${i + 1}`);
+        
+        // Sauvegarder dans la table
+        await supabase
+          .from('tidal_audio_links')
+          .upsert({
+            tidal_id: tid,
+            audio_url: audioUrl,
+            quality: 'LOSSLESS',
+            source: 'frankfurt',
+            last_verified_at: new Date().toISOString()
+          });
+        console.log('💾 Lien sauvegardé dans tidal_audio_links');
+        
+        return audioUrl;
+      } catch (error) {
+        console.warn(`❌ Erreur avec ID #${i + 1}:`, error);
+        if (i === tidalIds.length - 1) throw error; // Dernière tentative, lancer l'erreur
+      }
+    }
+    
+    throw new Error('Aucun lien valide trouvé après toutes les tentatives');
+  };
+
   // 0. Vérifier d'abord si un lien manuel existe dans tidal_audio_links
   if (tidalId) {
     console.log('🔍 Vérification lien manuel pour Tidal ID:', tidalId);
@@ -188,6 +334,31 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
       if (!error && manualLink?.audio_url) {
         console.log('✅ Lien manuel trouvé dans tidal_audio_links:', manualLink.audio_url);
+        
+        // Vérifier si le lien est valide (pas amz-pr-fa)
+        if (manualLink.audio_url.includes('amz-pr-fa.audio.tidal.com')) {
+          console.warn('⚠️ Lien manuel amz-pr-fa détecté, recherche alternatives...');
+          
+          // Si on a titre + artiste, chercher des IDs alternatifs
+          if (songTitle && songArtist) {
+            const alternativeIds = await searchTidalIds(songTitle, songArtist, 5);
+            
+            // Filtrer pour exclure l'ID actuel
+            const otherIds = alternativeIds.filter(id => id !== tidalId);
+            
+            if (otherIds.length > 0) {
+              console.log(`🔄 Réessai avec ${otherIds.length} IDs alternatifs`);
+              return await fetchWithFallback(otherIds);
+            } else {
+              console.warn('⚠️ Aucun ID alternatif trouvé, utilisation lien amz-pr-fa');
+              return manualLink.audio_url;
+            }
+          } else {
+            console.warn('⚠️ Pas de titre/artiste, impossible de chercher alternatives');
+            return manualLink.audio_url;
+          }
+        }
+        
         return manualLink.audio_url;
       }
     } catch (error) {
@@ -267,199 +438,6 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     }
   }
 
-  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
-  const fetchPhoenixUrl = async (tid: string): Promise<string> => {
-    // Helper interne: extraire depuis un manifest éventuel
-    const extractFromManifest = async (manifest: string): Promise<string | null> => {
-      try {
-        const decoded = atob(manifest);
-        // Essayer JSON d'abord
-        try {
-          const mObj = JSON.parse(decoded);
-          const direct = mObj?.OriginalTrackUrl || mObj?.originalTrackUrl || mObj?.original_url || mObj?.url || (Array.isArray(mObj?.urls) ? mObj.urls[0] : null);
-          if (typeof direct === 'string') return direct;
-        } catch {}
-        // Fallback: regex URL
-        const match = decoded.match(/https?:\/\/[^"'\s]+/);
-        if (match) return match[0];
-      } catch {
-        // Peut déjà être du texte non base64
-        const match = manifest.match(/https?:\/\/[^"'\s]+/);
-        if (match) return match[0];
-      }
-      return null;
-    };
-
-    // Helper interne: choisir la propriété directe si présente
-    const pickDirect = (obj: any): string | null => {
-      const direct = obj?.OriginalTrackUrl || obj?.originalTrackUrl || obj?.original_url || obj?.url;
-      return typeof direct === 'string' ? direct : null;
-    };
-
-    // Liste des qualités à essayer (ordre de priorité)
-    const qualities = ['LOSSLESS', 'LOW'];
-    let lastError: Error | null = null;
-    
-    for (const quality of qualities) {
-      console.log(`🎵 Tentative qualité ${quality}...`);
-      
-      // Liste des APIs à essayer (ordre de priorité)
-      const apis = [
-        { name: 'Frankfurt', url: `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}` },
-        { name: 'London', url: `https://london.monochrome.tf/track/?id=${tid}&quality=${quality}` },
-        { name: 'Katze', url: `https://katze.qqdl.site/track/?id=${tid}&quality=${quality}` },
-        { name: 'Phoenix', url: `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}` }
-      ];
-      
-      let res: Response | null = null;
-      let successApi: string | null = null;
-      
-      // Essayer chaque API dans l'ordre
-      for (const api of apis) {
-        console.log(`🎵 ${api.name} API:`, api.url);
-        try {
-          res = await fetch(api.url, { headers: { Accept: 'application/json' } });
-          if (!res.ok) throw new Error(`${api.name} API error: ${res.status}`);
-          successApi = api.name;
-          break; // API réussie, sortir de la boucle
-        } catch (error) {
-          console.warn(`⚠️ ${api.name} API échec (${quality}):`, error);
-          lastError = error as Error;
-          // Continuer avec l'API suivante
-        }
-      }
-      
-      // Si aucune API n'a fonctionné pour cette qualité, essayer la qualité suivante
-      if (!res || !successApi) {
-        console.warn(`⚠️ Toutes les APIs ont échoué pour la qualité ${quality}`);
-        continue;
-      }
-      
-      console.log(`✅ Utilisation de ${successApi} API avec qualité ${quality}`);
-
-      // Parser la réponse
-      let data: any;
-      let rawText: string | null = null;
-      try {
-        data = await res.json();
-      } catch (e) {
-        rawText = await res.text();
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          console.warn(`⚠️ Phoenix non-JSON réponse (${quality}):`, rawText?.slice(0, 200));
-          lastError = new Error('Phoenix a renvoyé une réponse inattendue');
-          continue; // Essayer la qualité suivante
-        }
-      }
-
-      // Cas où Phoenix renvoie un tableau (observé dans les logs)
-      if (Array.isArray(data)) {
-        // Priorité absolue: chercher l'élément qui contient OriginalTrackUrl
-        for (const item of data) {
-          if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
-            console.log(`✅ Phoenix OriginalTrackUrl (array, ${quality}):`, item.OriginalTrackUrl);
-            return item.OriginalTrackUrl;
-          }
-        }
-        
-        // Fallback: autres champs ou manifest
-        for (const item of data) {
-          const direct = pickDirect(item);
-          // Ignorer les URLs tidal.com/track qui sont des pages web
-          if (direct && !direct.includes('tidal.com/track/') && !direct.includes('www.tidal.com')) {
-            console.log(`✅ Phoenix URL (array fallback, ${quality}):`, direct);
-            return direct;
-          }
-          if (item?.manifest) {
-            const fromManifest = await extractFromManifest(item.manifest);
-            if (fromManifest) {
-              console.log(`✅ Phoenix URL (manifest, ${quality}):`, fromManifest);
-              return fromManifest;
-            }
-          }
-        }
-        
-        // Si rien trouvé dans le array, essayer la qualité suivante
-        console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (array, ${quality})`);
-        lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
-        continue;
-      }
-
-      // Objet standard
-      const directTop = pickDirect(data);
-      if (directTop) {
-        console.log(`✅ Phoenix OriginalTrackUrl (${quality}):`, directTop);
-        return directTop;
-      }
-
-      // Exploration des champs imbriqués
-      if (data && typeof data === 'object') {
-        for (const key of Object.keys(data)) {
-          const val: any = (data as any)[key];
-          if (val && typeof val === 'object') {
-            const d = pickDirect(val);
-            if (d) {
-              console.log(`✅ Phoenix OriginalTrackUrl (nested, ${quality}):`, d);
-              return d;
-            }
-            if (val?.manifest) {
-              const fromManifest = await extractFromManifest(val.manifest);
-              if (fromManifest) return fromManifest;
-            }
-          }
-        }
-      }
-
-      console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (${quality})`);
-      lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
-      // Continuer avec la qualité suivante
-    }
-    
-    // Si toutes les qualités ont échoué
-    console.error('❌ Aucune qualité disponible après toutes les tentatives');
-    throw lastError || new Error('OriginalTrackUrl introuvable après toutes les tentatives');
-  };
-  
-  // Helper: Essayer plusieurs Tidal IDs jusqu'à obtenir un lien valide (pas amz-pr-fa)
-  const fetchWithFallback = async (tidalIds: string[]): Promise<string> => {
-    for (let i = 0; i < tidalIds.length; i++) {
-      const tid = tidalIds[i];
-      console.log(`🔄 Tentative avec Tidal ID #${i + 1}:`, tid);
-      
-      try {
-        const audioUrl = await fetchPhoenixUrl(tid);
-        
-        // Vérifier si le lien est valide (pas amz-pr-fa)
-        if (audioUrl.includes('amz-pr-fa.audio.tidal.com')) {
-          console.warn(`⚠️ Lien amz-pr-fa détecté, essayer prochain ID...`);
-          continue; // Essayer le prochain ID
-        }
-        
-        console.log(`✅ Lien valide obtenu avec ID #${i + 1}`);
-        
-        // Sauvegarder dans la table
-        await supabase
-          .from('tidal_audio_links')
-          .upsert({
-            tidal_id: tid,
-            audio_url: audioUrl,
-            quality: 'LOSSLESS',
-            source: 'frankfurt',
-            last_verified_at: new Date().toISOString()
-          });
-        console.log('💾 Lien sauvegardé dans tidal_audio_links');
-        
-        return audioUrl;
-      } catch (error) {
-        console.warn(`❌ Erreur avec ID #${i + 1}:`, error);
-        if (i === tidalIds.length - 1) throw error; // Dernière tentative, lancer l'erreur
-      }
-    }
-    
-    throw new Error('Aucun lien valide trouvé après toutes les tentatives');
-  };
-  
   // 0. Vérifier d'abord dans le cache Supabase si un tidal_id est fourni
   if (tidalId) {
     // Vérifier dans la table tidal_audio_links
