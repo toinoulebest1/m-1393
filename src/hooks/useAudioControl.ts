@@ -69,7 +69,7 @@ export const useAudioControl = ({
         // Récupération ultra-rapide de l'URL audio
         let audioUrl: string;
         try {
-          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url);
+          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url, song.tidal_id);
           const elapsed = performance.now() - startTime;
           console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
         } catch (error: any) {
@@ -325,6 +325,7 @@ export const useAudioControl = ({
           artist: data.artist || currentSong.artist,
           imageUrl: data.image_url || currentSong.imageUrl,
           genre: data.genre || currentSong.genre,
+          tidal_id: data.tidal_id || currentSong.tidal_id,
         };
         
         setCurrentSong(updatedSong);

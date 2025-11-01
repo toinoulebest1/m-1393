@@ -11,6 +11,7 @@ export interface Song {
   user_id?: string;
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
+  tidal_id?: string; // Tidal track ID for Phoenix streaming
 }
 
 export interface FavoriteStat {

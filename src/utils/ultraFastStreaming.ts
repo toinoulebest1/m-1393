@@ -13,7 +13,7 @@ export class UltraFastStreaming {
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
    */
-  static async getAudioUrlUltraFast(songUrl: string): Promise<string> {
+  static async getAudioUrlUltraFast(songUrl: string, tidalId?: string): Promise<string> {
     const startTime = performance.now();
     this.requestCount++;
     
@@ -44,7 +44,7 @@ export class UltraFastStreaming {
     }
 
     // 4. Streaming ultra-agressif
-    const promise = this.streamingDirect(songUrl, startTime);
+    const promise = this.streamingDirect(songUrl, startTime, tidalId);
     this.promisePool.set(songUrl, promise);
 
     try {
@@ -62,11 +62,11 @@ export class UltraFastStreaming {
   /**
    * Streaming direct optimisé
    */
-  private static async streamingDirect(songUrl: string, startTime: number): Promise<string> {
+  private static async streamingDirect(songUrl: string, startTime: number, tidalId?: string): Promise<string> {
     console.log("🚀 Streaming direct");
 
     try {
-      const result = await this.tryNetwork(songUrl);
+      const result = await this.tryNetwork(songUrl, tidalId);
       if (result) {
         const elapsed = performance.now() - startTime;
         console.log("🌐 NETWORK DIRECT:", elapsed.toFixed(2), "ms");
@@ -83,9 +83,9 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide
    */
-  private static async tryNetwork(songUrl: string): Promise<string | null> {
+  private static async tryNetwork(songUrl: string, tidalId?: string): Promise<string | null> {
     try {
-      const url = await getAudioFileUrl(songUrl);
+      const url = await getAudioFileUrl(songUrl, tidalId);
       if (typeof url === 'string') {
         return url;
       }

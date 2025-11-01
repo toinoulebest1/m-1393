@@ -43,9 +43,17 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   return data.path;
 };
 
-export const getAudioFileUrl = async (filePath: string): Promise<string> => {
-  console.log('🔍 Récupération URL pour:', filePath);
+export const getAudioFileUrl = async (filePath: string, tidalId?: string): Promise<string> => {
+  console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
   
+  // 🎵 PHOENIX/TIDAL: Si un tidal_id est fourni, utiliser Phoenix directement
+  if (tidalId) {
+    const phoenixUrl = `https://phoenix.squid.wtf/track/?id=${tidalId}&quality=LOSSLESS`;
+    console.log('🎵 Utilisation Phoenix/Tidal:', phoenixUrl);
+    memoryCache.set(filePath, phoenixUrl);
+    return phoenixUrl;
+  }
+
   // 1. Vérifier le cache mémoire d'abord
   const cachedUrl = memoryCache.get(filePath);
   if (cachedUrl) {
@@ -55,9 +63,20 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
 
   // 2. Extraire l'ID du fichier (enlever les préfixes comme "audio/")
   const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
+  
+  // 2.5 Vérifier si le filePath contient un tidal_id (format: "tidal:{id}")
+  if (filePath.startsWith('tidal:')) {
+    const extractedTidalId = filePath.replace('tidal:', '');
+    const phoenixUrl = `https://phoenix.squid.wtf/track/?id=${extractedTidalId}&quality=LOSSLESS`;
+    console.log('🎵 Utilisation Phoenix/Tidal (from path):', phoenixUrl);
+    memoryCache.set(filePath, phoenixUrl);
+    return phoenixUrl;
+  }
+
   console.log('🔍 Recherche lien Dropbox pour:', localId);
   
-  // 3. Récupérer DIRECTEMENT le lien Dropbox depuis Supabase (1 seule requête)
+  // 3. DROPBOX TEMPORAIREMENT DÉSACTIVÉ - Commenté
+  /*
   try {
     const { data: dropboxFile, error: dropboxError } = await supabase
       .from('dropbox_files')
@@ -75,6 +94,7 @@ export const getAudioFileUrl = async (filePath: string): Promise<string> => {
   } catch (error) {
     console.warn('⚠️ Erreur requête dropbox_files:', error);
   }
+  */
   
   // 4. Fallback vers Supabase Storage si pas de lien Dropbox
   console.log('📦 Fallback Supabase Storage');
