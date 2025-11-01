@@ -19,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { LyricsModal } from "@/components/LyricsModal";
 import { LyricsFullscreenView } from "@/components/LyricsFullscreenView";
+import { WandAnimation } from "@/components/WandAnimation";
 
 interface ReportDialogProps {
   songTitle: string;
@@ -357,6 +358,7 @@ export const NowPlaying = () => {
           {queue.map((song) => {
             const isFavorite = favorites.some(s => s.id === song.id);
             const isCurrentSong = currentSong?.id === song.id;
+            const isDumbledoreSong = song.title?.toLowerCase().includes("dumbledore") && song.artist?.toLowerCase().includes("hooper");
             const glowStyle = isCurrentSong && dominantColor ? {
               boxShadow: `
                 0 0 15px 8px rgba(${dominantColor[0]}, ${dominantColor[1]}, ${dominantColor[2]}, 0.4),
@@ -378,6 +380,8 @@ export const NowPlaying = () => {
                 )}
                 onClick={() => handlePlayPause(song)}
               >
+                {/* Animation de baguette magique pour Dumbledore's Farewell */}
+                <WandAnimation isActive={isCurrentSong && isDumbledoreSong && isPlaying} />
                 {isCurrentSong && (
                   <div className="absolute inset-0 z-0 overflow-hidden">
                     <div 
