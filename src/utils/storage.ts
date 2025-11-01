@@ -44,92 +44,65 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 // Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives
-export const searchTidalId = async (title: any, artist: any): Promise<string | null> => {
+// Retourne PLUSIEURS IDs Tidal alternatifs pour avoir des fallbacks
+export const searchTidalIds = async (title: any, artist: any, maxResults: number = 3): Promise<string[]> => {
   const safeTitle = String(title ?? '').trim();
   const safeArtist = String(artist ?? '').trim();
-  // Utiliser le format "titre, artiste" avec virgule pour plus de précision
   const searchQueries = [
-    `${safeTitle}, ${safeArtist}`.trim(), // 1. Titre, artiste (format optimal - priorité)
-    `${safeTitle} ${safeArtist}`.trim(), // 2. Titre + artiste
-    `${safeArtist} ${safeTitle}`.trim(), // 3. Artiste + titre
-    safeTitle, // 4. Titre seul (en dernier recours)
+    `${safeTitle}, ${safeArtist}`.trim(),
+    `${safeTitle} ${safeArtist}`.trim(),
+    `${safeArtist} ${safeTitle}`.trim(),
+    safeTitle,
   ].filter(q => q.length > 0);
   
-  console.log('🔎 Recherche Tidal avec', searchQueries.length, 'combinaisons');
+  console.log('🔎 Recherche Tidal IDs avec', searchQueries.length, 'combinaisons');
   
-  for (let i = 0; i < searchQueries.length; i++) {
+  const foundIds: string[] = [];
+  
+  for (let i = 0; i < searchQueries.length && foundIds.length < maxResults; i++) {
     const query = searchQueries[i];
     console.log(`🔎 Tentative ${i + 1}/${searchQueries.length}:`, query);
     
     try {
-      // Essayer Frankfurt en priorité
       let searchUrl = `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`;
       let res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
       
-      // Fallback sur Phoenix si Frankfurt échoue
       if (!res.ok) {
         searchUrl = `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`;
         res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
-        
-        if (!res.ok) {
-          console.warn(`⚠️ Échec tentative ${i + 1}, essayer suivante`);
-          continue; // Essayer la prochaine combinaison
-        }
+        if (!res.ok) continue;
       }
       
       const data = await res.json();
-      // Phoenix peut retourner directement un tableau ou un objet avec diverses clés
       let results = [];
-      if (Array.isArray(data)) {
-        results = data;
-      } else if (data?.tracks) {
-        results = data.tracks;
-      } else if (data?.results) {
-        results = data.results;
-      } else if (data?.data) {
-        results = data.data;
-      } else if (data?.items) {
-        results = data.items;
-      }
+      if (Array.isArray(data)) results = data;
+      else if (data?.tracks) results = data.tracks;
+      else if (data?.results) results = data.results;
+      else if (data?.data) results = data.data;
+      else if (data?.items) results = data.items;
       
-      console.log(`📦 Tentative ${i + 1}: ${results.length} résultats`);
+      if (!results || results.length === 0) continue;
       
-      if (!results || results.length === 0) {
-        console.warn(`⚠️ Aucun résultat pour tentative ${i + 1}, essayer suivante`);
-        continue; // Essayer la prochaine combinaison
-      }
-    
-      const normalize = (s: any) => String(s ?? '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const normalize = (s: any) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
       const simplifyTitle = (s: any) => normalize(s).split(/\s*-\s*|\(|\[|\{/)[0];
-
       const expectedArtist = normalize(safeArtist);
       const expectedTitle = simplifyTitle(safeTitle);
       const aliases = new Set<string>([
         expectedArtist,
-        expectedArtist.replace(/^maitre\s+/,'').trim(), // "maitre gims" -> "gims"
+        expectedArtist.replace(/^maitre\s+/,'').trim(),
         expectedArtist.replace('gims','maitre gims').trim(),
       ]);
 
-      // Helper robuste pour extraire UNIQUEMENT un ID Tidal d'un résultat hétérogène
       const extractTidalId = (obj: any): string | null => {
         if (!obj || typeof obj !== 'object') return null;
-        // 1) Champs explicites
         if (obj.tidalId) return String(obj.tidalId);
         if (obj.tidal_id) return String(obj.tidal_id);
         if (obj.tidal?.id) return String(obj.tidal.id);
-        // 2) Résultats typés (service/provider/platform/source)
         const provider = (obj.service || obj.provider || obj.platform || obj.source || '').toString().toLowerCase();
         if (provider === 'tidal') {
           const direct = obj.id ?? obj.trackId ?? null;
           if (direct) return String(direct);
         }
-        // 3) URL/chemins qui pointent vers Tidal
         const link = obj.url || obj.link || obj.permalink || obj.webUrl || obj.web_url || '';
         if (typeof link === 'string') {
           const m1 = link.match(/tidal\.com\/.*track\/(\d+)/i);
@@ -137,94 +110,67 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
           const m2 = link.match(/[?&]trackId=(\d+)/i);
           if (m2?.[1]) return m2[1];
         }
-        // 4) Nids communs
         if (obj.data && typeof obj.data === 'object') {
           const nested = extractTidalId(obj.data);
           if (nested) return nested;
         }
-        return null; // Ne jamais retourner un id non-Tidal (ex: Deezer)
+        return null;
       };
 
-      let bestMatch: any = null;
-      let bestScore = -1;
+      // Calculer le score pour tous les résultats
+      const scoredResults = results
+        .map((track: any) => {
+          const candId = extractTidalId(track);
+          if (!candId) return null;
 
-      for (const track of results) {
-        const candId = extractTidalId(track);
-        if (!candId) continue; // ignorer les résultats non-Tidal
+          const candTitle = simplifyTitle(track.title || track.name || track.trackName || '');
+          const artistsList: string[] = [];
+          if (track.artist?.name) artistsList.push(track.artist.name);
+          if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
+          if (track.artist_name) artistsList.push(track.artist_name);
+          if (track.artist) artistsList.push(track.artist);
+          const candArtists = artistsList.map(normalize).filter(Boolean);
 
-        const candTitle = simplifyTitle(track.title || track.name || track.trackName || '');
-        const artistsList: string[] = [];
-        if (track.artist?.name) artistsList.push(track.artist.name);
-        if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
-        if (track.artist_name) artistsList.push(track.artist_name);
-        if (track.artist) artistsList.push(track.artist);
-        const candArtists = artistsList.map(normalize).filter(Boolean);
+          const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
+          const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
+          const titleExact = candTitle === expectedTitle;
+          const titleStarts = candTitle.startsWith(expectedTitle);
+          const titleIncludes = candTitle.includes(expectedTitle);
 
-        const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
-        const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
+          let score = 0;
+          if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
+          if (titleExact) score += 30; else if (titleStarts) score += 15; else if (titleIncludes) score += 10;
+          const popularity = track.popularity || track.popularityScore || 0;
+          score += Math.min(5, Math.floor(popularity / 20));
 
-        const titleExact = candTitle === expectedTitle;
-        const titleStarts = candTitle.startsWith(expectedTitle);
-        const titleIncludes = candTitle.includes(expectedTitle);
+          return { id: candId, score, track };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.score - a.score);
 
-        let score = 0;
-        if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
-        if (titleExact) score += 30; else if (titleStarts) score += 15; else if (titleIncludes) score += 10;
-        const popularity = track.popularity || track.popularityScore || 0;
-        score += Math.min(5, Math.floor(popularity / 20));
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = track;
+      // Ajouter les meilleurs résultats uniques
+      for (const result of scoredResults) {
+        if (result && !foundIds.includes(result.id)) {
+          foundIds.push(result.id);
+          console.log(`✅ Tidal ID trouvé #${foundIds.length}:`, result.id, 'score:', result.score);
+          if (foundIds.length >= maxResults) break;
         }
       }
       
-      // Si pas de correspondance exacte, prendre le premier résultat avec la meilleure popularité
-      if (!bestMatch && results.length > 0) {
-        bestMatch = results.reduce((best: any, current: any) => {
-          const currentPop = current.popularity || 0;
-          const bestPop = best.popularity || 0;
-          return currentPop > bestPop ? current : best;
-        }, results[0]);
-      }
-      
-      const matchId = bestMatch ? extractTidalId(bestMatch) : null;
-      
-      if (matchId) {
-        console.log(`✅ Tidal ID trouvé (tentative ${i + 1}):`, matchId);
-        
-        // Sauvegarder automatiquement le tidal_id dans la DB
-        try {
-          const { data: songs } = await supabase
-            .from('songs')
-            .select('id')
-            .ilike('title', safeTitle)
-            .ilike('artist', safeArtist)
-            .limit(1);
-            
-          if (songs && songs.length > 0) {
-            await supabase
-              .from('songs')
-              .update({ tidal_id: matchId.toString() })
-              .eq('id', songs[0].id);
-            console.log('💾 Tidal ID sauvegardé dans la DB');
-          }
-        } catch (e) {
-          console.warn('⚠️ Impossible de sauvegarder le tidal_id:', e);
-        }
-        
-        return matchId.toString();
-      }
-      
-      console.warn(`⚠️ Tentative ${i + 1} sans résultat valide, continuer`);
+      if (foundIds.length >= maxResults) break;
     } catch (error) {
       console.error(`❌ Erreur tentative ${i + 1}:`, error);
-      continue; // Essayer la prochaine combinaison
     }
   }
   
-  console.error('❌ Aucun Tidal ID trouvé après toutes les tentatives');
-  return null;
+  console.log(`📋 Total IDs trouvés: ${foundIds.length}`, foundIds);
+  return foundIds;
+};
+
+// Version simple qui retourne juste le premier ID (pour compatibilité)
+export const searchTidalId = async (title: any, artist: any): Promise<string | null> => {
+  const ids = await searchTidalIds(title, artist, 1);
+  return ids.length > 0 ? ids[0] : null;
 };
 
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
@@ -475,6 +421,45 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     throw lastError || new Error('OriginalTrackUrl introuvable après toutes les tentatives');
   };
   
+  // Helper: Essayer plusieurs Tidal IDs jusqu'à obtenir un lien valide (pas amz-pr-fa)
+  const fetchWithFallback = async (tidalIds: string[]): Promise<string> => {
+    for (let i = 0; i < tidalIds.length; i++) {
+      const tid = tidalIds[i];
+      console.log(`🔄 Tentative avec Tidal ID #${i + 1}:`, tid);
+      
+      try {
+        const audioUrl = await fetchPhoenixUrl(tid);
+        
+        // Vérifier si le lien est valide (pas amz-pr-fa)
+        if (audioUrl.includes('amz-pr-fa.audio.tidal.com')) {
+          console.warn(`⚠️ Lien amz-pr-fa détecté, essayer prochain ID...`);
+          continue; // Essayer le prochain ID
+        }
+        
+        console.log(`✅ Lien valide obtenu avec ID #${i + 1}`);
+        
+        // Sauvegarder dans la table
+        await supabase
+          .from('tidal_audio_links')
+          .upsert({
+            tidal_id: tid,
+            audio_url: audioUrl,
+            quality: 'LOSSLESS',
+            source: 'frankfurt',
+            last_verified_at: new Date().toISOString()
+          });
+        console.log('💾 Lien sauvegardé dans tidal_audio_links');
+        
+        return audioUrl;
+      } catch (error) {
+        console.warn(`❌ Erreur avec ID #${i + 1}:`, error);
+        if (i === tidalIds.length - 1) throw error; // Dernière tentative, lancer l'erreur
+      }
+    }
+    
+    throw new Error('Aucun lien valide trouvé après toutes les tentatives');
+  };
+  
   // 0. Vérifier d'abord dans le cache Supabase si un tidal_id est fourni
   if (tidalId) {
     // Vérifier dans la table tidal_audio_links
@@ -489,23 +474,37 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       return cachedLink.audio_url;
     }
 
-    // Si pas en cache, récupérer depuis l'API
-    console.log('🔄 Pas en cache, récupération depuis API...');
-    const direct = await fetchPhoenixUrl(tidalId);
+    // Si pas en cache, récupérer depuis l'API avec fallback
+    console.log('🔄 Pas en cache, récupération depuis API avec fallback...');
     
-    // Sauvegarder dans la table pour les prochaines fois
-    await supabase
-      .from('tidal_audio_links')
-      .upsert({
-        tidal_id: tidalId,
-        audio_url: direct,
-        quality: 'LOSSLESS',
-        source: 'frankfurt',
-        last_verified_at: new Date().toISOString()
-      });
-    console.log('💾 Lien sauvegardé dans tidal_audio_links');
-    
-    return direct;
+    // Si on a titre + artiste, chercher plusieurs IDs alternatifs
+    if (songTitle && songArtist) {
+      const alternativeIds = await searchTidalIds(songTitle, songArtist, 5);
+      
+      // Ajouter l'ID fourni au début si pas déjà présent
+      if (!alternativeIds.includes(tidalId)) {
+        alternativeIds.unshift(tidalId);
+      }
+      
+      return await fetchWithFallback(alternativeIds);
+    } else {
+      // Pas de titre/artiste, juste essayer avec l'ID fourni
+      const direct = await fetchPhoenixUrl(tidalId);
+      
+      // Sauvegarder dans la table pour les prochaines fois
+      await supabase
+        .from('tidal_audio_links')
+        .upsert({
+          tidal_id: tidalId,
+          audio_url: direct,
+          quality: 'LOSSLESS',
+          source: 'frankfurt',
+          last_verified_at: new Date().toISOString()
+        });
+      console.log('💾 Lien sauvegardé dans tidal_audio_links');
+      
+      return direct;
+    }
   }
   
   // 0-auto. Si pas de tidal_id mais on a titre + artiste, chercher automatiquement
@@ -522,47 +521,30 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       .limit(1)
       .single();
     
-    let foundTidalId = existingSong?.tidal_id;
+    let foundTidalIds: string[] = [];
     
-    // Si pas trouvé dans songs, chercher via l'API
-    if (!foundTidalId) {
-      console.log('🌐 Pas en DB, recherche via API...');
-      foundTidalId = await searchTidalId(songTitle, songArtist);
-    } else {
-      console.log('✅ Tidal ID trouvé dans la DB:', foundTidalId);
+    if (existingSong?.tidal_id) {
+      console.log('✅ Tidal ID trouvé dans la DB:', existingSong.tidal_id);
+      foundTidalIds.push(existingSong.tidal_id);
     }
     
-    if (foundTidalId) {
-      // Vérifier d'abord en cache audio links
-      const { data: cachedLink } = await supabase
-        .from('tidal_audio_links')
-        .select('audio_url')
-        .eq('tidal_id', foundTidalId)
-        .single();
-
-      if (cachedLink) {
-        console.log('✅ URL trouvée en cache DB (auto-search)');
-        return cachedLink.audio_url;
+    // Chercher via l'API pour avoir des alternatives
+    console.log('🌐 Recherche alternatives via API...');
+    const apiIds = await searchTidalIds(songTitle, songArtist, 5);
+    
+    // Fusionner les IDs (DB en premier, puis API sans doublons)
+    for (const id of apiIds) {
+      if (!foundTidalIds.includes(id)) {
+        foundTidalIds.push(id);
       }
-
-      // Sinon fetch depuis l'API
-      const direct = await fetchPhoenixUrl(foundTidalId);
-      
-      // Sauvegarder dans la table
-      await supabase
-        .from('tidal_audio_links')
-        .upsert({
-          tidal_id: foundTidalId,
-          audio_url: direct,
-          quality: 'LOSSLESS',
-          source: 'frankfurt',
-          last_verified_at: new Date().toISOString()
-        });
-      console.log('💾 Lien sauvegardé dans tidal_audio_links (auto-search)');
-      
-      return direct;
     }
-    console.warn('⚠️ Recherche Tidal automatique échouée, fallback vers Supabase');
+    
+    if (foundTidalIds.length === 0) {
+      throw new Error(`Aucun ID Tidal trouvé pour: ${songTitle} - ${songArtist}`);
+    }
+    
+    console.log(`📋 ${foundTidalIds.length} IDs Tidal à essayer`);
+    return await fetchWithFallback(foundTidalIds);
   }
 
   // 0-bis. Si l'URL est déjà un lien Phoenix, extraire l'id et récupérer l'URL directe
