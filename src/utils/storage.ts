@@ -422,6 +422,20 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       
       if (manualLink2?.audio_url) {
         console.log('✅ Lien manuel trouvé (post-détection Tidal):', manualLink2.audio_url);
+        // Si le lien manuel pointe vers amz-pr-fa, relancer une recherche avec d'autres IDs (exclure l'ID courant)
+        if (manualLink2.audio_url.includes('amz-pr-fa.audio.tidal.com')) {
+          console.warn('⚠️ Lien manuel amz-pr-fa détecté (post-détection), recherche d’IDs alternatifs...');
+          if (songTitle && songArtist && tidalId) {
+            const alternativeIds = await searchTidalIds(songTitle, songArtist, 5);
+            const otherIds = alternativeIds.filter((id) => id !== tidalId);
+            if (otherIds.length > 0) {
+              console.log(`🔄 Réessai avec ${otherIds.length} IDs alternatifs (post-détection)`);
+              return await fetchWithFallback(otherIds);
+            } else {
+              console.warn('⚠️ Aucun ID alternatif trouvé (post-détection), conservation du lien amz-pr-fa');
+            }
+          }
+        }
         return manualLink2.audio_url;
       } else {
         console.log('⚠️ Aucun lien manuel trouvé pour Tidal ID:', tidalId);
