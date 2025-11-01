@@ -87,10 +87,47 @@ const ManageAudioSources = () => {
 
     setIsSaving(true);
     try {
-      // Chercher le Tidal ID correspondant à cette chanson Deezer
-      console.log('🔍 Recherche Tidal ID pour:', selectedTrack.title, '-', selectedTrack.artist.name);
+      console.log('🔍 Recherche chanson dans DB:', selectedTrack.title, '-', selectedTrack.artist.name);
       
-      const tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
+      // 1. D'abord chercher dans songs si la chanson existe déjà avec un tidal_id
+      const { data: existingSongs } = await supabase
+        .from('songs')
+        .select('id, tidal_id, title, artist')
+        .ilike('title', selectedTrack.title)
+        .ilike('artist', selectedTrack.artist.name)
+        .limit(5);
+
+      console.log('📊 Chansons trouvées:', existingSongs);
+
+      let tidalId: string | null = null;
+      let songId: string | null = null;
+
+      // Chercher une chanson avec un tidal_id existant
+      const songWithTidalId = existingSongs?.find(s => s.tidal_id);
+      if (songWithTidalId) {
+        tidalId = songWithTidalId.tidal_id;
+        songId = songWithTidalId.id;
+        console.log('✅ Tidal ID trouvé dans songs:', tidalId);
+      } else if (existingSongs && existingSongs.length > 0) {
+        // Chanson trouvée mais sans tidal_id, on va le chercher
+        songId = existingSongs[0].id;
+        console.log('🔍 Chanson trouvée sans Tidal ID, recherche API...');
+        tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
+        
+        if (tidalId) {
+          // Sauvegarder le tidal_id dans songs
+          console.log('💾 Sauvegarde Tidal ID dans songs:', tidalId);
+          await supabase
+            .from('songs')
+            .update({ tidal_id: tidalId })
+            .eq('id', songId);
+          console.log('✅ Tidal ID sauvegardé dans songs');
+        }
+      } else {
+        // Aucune chanson trouvée, chercher juste le Tidal ID
+        console.log('⚠️ Chanson non trouvée dans songs, recherche Tidal ID uniquement...');
+        tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
+      }
       
       if (!tidalId) {
         toast({
@@ -102,7 +139,7 @@ const ManageAudioSources = () => {
         return;
       }
 
-      console.log('✅ Tidal ID trouvé:', tidalId);
+      console.log('✅ Tidal ID final:', tidalId);
 
       // Vérifier si un lien existe déjà pour ce tidal_id
       console.log('🔍 Vérification lien existant pour Tidal ID:', tidalId);
