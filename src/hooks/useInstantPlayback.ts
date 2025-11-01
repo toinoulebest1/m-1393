@@ -36,36 +36,61 @@ export const useInstantPlayback = (songs: any[]) => {
 
           // Si on a un tidal_id, précharger l'URL audio
           if (tidalId) {
-            // Essayer Frankfurt en priorité
-            const frankfurtUrl = `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
-            
-            try {
-              const res = await fetch(frankfurtUrl, { headers: { Accept: 'application/json' } });
+            // D'abord vérifier si le lien existe déjà en base
+            const { data: existingLink } = await supabase
+              .from('tidal_audio_links')
+              .select('audio_url, created_at')
+              .eq('tidal_id', tidalId)
+              .single();
+
+            if (existingLink) {
+              // Utiliser le lien existant
+              console.log('✅ URL en cache (DB):', song.title);
+              memoryCache.set(song.file_path, existingLink.audio_url);
+            } else {
+              // Récupérer depuis l'API Frankfurt en priorité
+              const frankfurtUrl = `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
               
-              if (res.ok) {
-                const data = await res.json();
+              try {
+                const res = await fetch(frankfurtUrl, { headers: { Accept: 'application/json' } });
                 
-                // Extraire l'URL audio
-                let audioUrl: string | null = null;
-                
-                if (Array.isArray(data)) {
-                  for (const item of data) {
-                    if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
-                      audioUrl = item.OriginalTrackUrl;
-                      break;
+                if (res.ok) {
+                  const data = await res.json();
+                  
+                  // Extraire l'URL audio
+                  let audioUrl: string | null = null;
+                  
+                  if (Array.isArray(data)) {
+                    for (const item of data) {
+                      if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
+                        audioUrl = item.OriginalTrackUrl;
+                        break;
+                      }
                     }
+                  } else if (data?.OriginalTrackUrl) {
+                    audioUrl = data.OriginalTrackUrl;
                   }
-                } else if (data?.OriginalTrackUrl) {
-                  audioUrl = data.OriginalTrackUrl;
+                  
+                  if (audioUrl) {
+                    console.log('✅ URL préchargée:', song.title);
+                    memoryCache.set(song.file_path, audioUrl);
+                    
+                    // Sauvegarder dans Supabase pour utilisation future
+                    supabase
+                      .from('tidal_audio_links')
+                      .upsert({
+                        tidal_id: tidalId,
+                        audio_url: audioUrl,
+                        quality: 'LOSSLESS',
+                        source: 'frankfurt',
+                        last_verified_at: new Date().toISOString()
+                      })
+                      .then(() => console.log('💾 Lien sauvegardé en DB:', song.title));
+                  }
                 }
-                
-                if (audioUrl) {
-                  console.log('✅ URL préchargée:', song.title);
-                  memoryCache.set(song.file_path, audioUrl);
-                }
+              } catch (error) {
+                console.warn('⚠️ Préchargement échoué:', song.title, error);
               }
-            } catch (error) {
-              console.warn('⚠️ Préchargement échoué:', song.title, error);
             }
           }
         } catch (error) {

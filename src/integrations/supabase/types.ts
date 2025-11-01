@@ -991,6 +991,39 @@ export type Database = {
         }
         Relationships: []
       }
+      tidal_audio_links: {
+        Row: {
+          audio_url: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_verified_at: string
+          quality: string
+          source: string
+          tidal_id: string
+        }
+        Insert: {
+          audio_url: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_verified_at?: string
+          quality?: string
+          source?: string
+          tidal_id: string
+        }
+        Update: {
+          audio_url?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_verified_at?: string
+          quality?: string
+          source?: string
+          tidal_id?: string
+        }
+        Relationships: []
+      }
       top100_reset_history: {
         Row: {
           id: string

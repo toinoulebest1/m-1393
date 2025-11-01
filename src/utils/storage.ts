@@ -291,10 +291,38 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
   };
   
-  // 0. Phoenix prioritaire si un tidal_id est fourni
+  // 0. Vérifier d'abord dans le cache Supabase si un tidal_id est fourni
   if (tidalId) {
+    // Vérifier dans la table tidal_audio_links
+    const { data: cachedLink } = await supabase
+      .from('tidal_audio_links')
+      .select('audio_url, last_verified_at')
+      .eq('tidal_id', tidalId)
+      .single();
+
+    if (cachedLink) {
+      console.log('✅ URL trouvée en cache DB (tidal_audio_links)');
+      memoryCache.set(filePath, cachedLink.audio_url);
+      return cachedLink.audio_url;
+    }
+
+    // Si pas en cache, récupérer depuis l'API
+    console.log('🔄 Pas en cache, récupération depuis API...');
     const direct = await fetchPhoenixUrl(tidalId);
     memoryCache.set(filePath, direct);
+    
+    // Sauvegarder dans la table pour les prochaines fois
+    await supabase
+      .from('tidal_audio_links')
+      .upsert({
+        tidal_id: tidalId,
+        audio_url: direct,
+        quality: 'LOSSLESS',
+        source: 'frankfurt',
+        last_verified_at: new Date().toISOString()
+      });
+    console.log('💾 Lien sauvegardé dans tidal_audio_links');
+    
     return direct;
   }
   
@@ -303,8 +331,34 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     console.log('🔍 Pas de Tidal ID, recherche automatique pour:', songTitle, '-', songArtist);
     const foundTidalId = await searchTidalId(songTitle, songArtist);
     if (foundTidalId) {
+      // Vérifier d'abord en cache
+      const { data: cachedLink } = await supabase
+        .from('tidal_audio_links')
+        .select('audio_url')
+        .eq('tidal_id', foundTidalId)
+        .single();
+
+      if (cachedLink) {
+        console.log('✅ URL trouvée en cache DB (auto-search)');
+        memoryCache.set(filePath, cachedLink.audio_url);
+        return cachedLink.audio_url;
+      }
+
       const direct = await fetchPhoenixUrl(foundTidalId);
       memoryCache.set(filePath, direct);
+      
+      // Sauvegarder dans la table
+      await supabase
+        .from('tidal_audio_links')
+        .upsert({
+          tidal_id: foundTidalId,
+          audio_url: direct,
+          quality: 'LOSSLESS',
+          source: 'frankfurt',
+          last_verified_at: new Date().toISOString()
+        });
+      console.log('💾 Lien sauvegardé dans tidal_audio_links (auto-search)');
+      
       return direct;
     }
     console.warn('⚠️ Recherche Tidal automatique échouée, fallback vers Supabase');
