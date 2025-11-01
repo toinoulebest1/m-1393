@@ -207,10 +207,20 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
     // Cas où Phoenix renvoie un tableau (observé dans les logs)
     if (Array.isArray(data)) {
+      // Priorité absolue: chercher l'élément qui contient OriginalTrackUrl
+      for (const item of data) {
+        if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
+          console.log('✅ Phoenix OriginalTrackUrl (array):', item.OriginalTrackUrl);
+          return item.OriginalTrackUrl;
+        }
+      }
+      
+      // Fallback: autres champs ou manifest
       for (const item of data) {
         const direct = pickDirect(item);
-        if (direct) {
-          console.log('✅ Phoenix OriginalTrackUrl (array):', direct);
+        // Ignorer les URLs tidal.com/track qui sont des pages web
+        if (direct && !direct.includes('tidal.com/track/') && !direct.includes('www.tidal.com')) {
+          console.log('✅ Phoenix URL (array fallback):', direct);
           return direct;
         }
         if (item?.manifest) {
