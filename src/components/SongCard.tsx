@@ -15,7 +15,6 @@ import { rgbToClass } from "@/utils/colorExtractor";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AutoplayManager } from "@/utils/autoplayManager";
 import { toast } from "@/hooks/use-toast";
-import { WandAnimation } from "@/components/WandAnimation";
 
 interface ContextMenuItem {
   label: string;
@@ -105,10 +104,6 @@ export const SongCard = ({
 
   // Get color class for gradient if available
   const colorClass = isCurrentSong && dominantColor ? rgbToClass(dominantColor) : '';
-  
-  // Vérifier si c'est la chanson Dumbledore's Farewell
-  const isDumbledoreSong = song.title?.toLowerCase().includes("dumbledore") && 
-                          (song.artist?.toLowerCase().includes("hooper") || song.artist?.toLowerCase().includes("nicholas"));
 
   return (
     <div
@@ -121,8 +116,6 @@ export const SongCard = ({
       style={bgStyle}
       onClick={handlePlay}
     >
-      {/* Animation de baguette magique pour Dumbledore's Farewell */}
-      <WandAnimation isActive={isCurrentSong && isDumbledoreSong && isPlaying} />
       <div className="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative group">
         {song.imageUrl ? (
           <img
