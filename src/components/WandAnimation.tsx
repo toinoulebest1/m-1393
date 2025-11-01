@@ -28,12 +28,12 @@ export const WandAnimation = ({ isActive }: WandAnimationProps) => {
   if (!isActive) return null;
 
   return createPortal(
-    <div className="fixed inset-0 pointer-events-none select-none overflow-hidden" style={{ zIndex: -10 }}>
+    <div className="fixed inset-0 pointer-events-none select-none overflow-hidden" style={{ zIndex: 1 }}>
       <img 
         src={wands[currentWandIndex]} 
         alt="" 
         aria-hidden="true"
-        className="w-full h-full object-contain opacity-20 animate-fade-in"
+        className="w-full h-full object-contain opacity-30 animate-fade-in"
       />
     </div>,
     document.body
