@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -8,15 +7,9 @@ import { Pause, Play, SkipForward, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { SoundEffects, SoundType } from "@/components/SoundEffects";
+import { fetchGameSongs, type GameSong } from "@/services/gameSongsService";
 
-type Song = {
-  id: string;
-  title: string;
-  artist: string;
-  url: string;
-  imageUrl?: string;
-  duration: string;
-};
+type Song = GameSong;
 
 type GameMode = "artist" | "title" | "both";
 
@@ -42,30 +35,15 @@ export function BlindTestGame() {
   const soundTimeoutRef = useRef<number | null>(null);
   
   useEffect(() => {
-    const fetchSongs = async () => {
+    const loadSongs = async () => {
       try {
-        const { data, error } = await supabase
-          .from("songs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (error) {
-          console.error("Error fetching songs:", error);
-          toast.error("Erreur lors du chargement des chansons");
-          return;
-        }
-
-        if (data && data.length > 0) {
-          const formattedSongs: Song[] = data.map(song => ({
-            id: song.id,
-            title: song.title,
-            artist: song.artist || '',
-            url: song.file_path,
-            imageUrl: song.image_url,
-            duration: song.duration || '0:00'
-          }));
-          setSongs(formattedSongs);
+        const gameSongs = await fetchGameSongs(20);
+        
+        if (gameSongs.length < 4) {
+          toast.error("Pas assez de chansons disponibles. Essayez de rechercher des musiques sur Deezer.");
+        } else {
+          setSongs(gameSongs);
+          console.log(`✅ ${gameSongs.length} chansons chargées pour le jeu (${gameSongs.filter(s => s.isDeezer).length} Deezer)`);
         }
       } catch (error) {
         console.error("Exception while fetching songs:", error);
@@ -75,7 +53,7 @@ export function BlindTestGame() {
       }
     };
 
-    fetchSongs();
+    loadSongs();
   }, []);
 
   const shuffleArray = <T,>(array: T[]): T[] => {

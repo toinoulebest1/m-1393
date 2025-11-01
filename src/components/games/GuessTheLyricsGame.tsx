@@ -386,6 +386,8 @@ export function GuessTheLyricsGame() {
 
   const fetchSongsWithLyrics = async () => {
     try {
+      // Note: Ce jeu nécessite des paroles, donc uniquement des chansons locales pour l'instant
+      // TODO: Implémenter la récupération de paroles depuis LRCLIB pour les tracks Deezer
       const { data, error } = await supabase
         .from("songs")
         .select(`
