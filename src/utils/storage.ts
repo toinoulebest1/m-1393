@@ -91,11 +91,17 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
     let bestPopularity = -1;
     
     for (const track of results) {
-      const trackArtist = (track.artist?.name || track.artists?.[0]?.name || '').toLowerCase().trim();
-      const popularity = track.popularity || 0;
+      const trackArtist = String(
+        track.artist?.name ||
+        (Array.isArray(track.artists) ? track.artists[0]?.name : undefined) ||
+        track.artist_name ||
+        track.artist ||
+        ''
+      ).toLowerCase().trim();
+      const popularity = track.popularity || track.popularityScore || 0;
       
       // Vérifier si l'artiste correspond
-      if (trackArtist.includes(normalizedArtist) || normalizedArtist.includes(trackArtist)) {
+      if (trackArtist && (trackArtist.includes(normalizedArtist) || normalizedArtist.includes(trackArtist))) {
         if (popularity > bestPopularity) {
           bestMatch = track;
           bestPopularity = popularity;
@@ -112,8 +118,10 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
       }, results[0]);
     }
     
-    if (bestMatch?.id) {
-      console.log('✅ Tidal ID trouvé:', bestMatch.id, 'pour', query);
+    const getMatchId = (obj: any) => obj?.id ?? obj?.trackId ?? obj?.tidalId ?? null;
+    const matchId = bestMatch ? getMatchId(bestMatch) : null;
+    if (matchId) {
+      console.log('✅ Tidal ID trouvé:', matchId, 'pour', query);
       
       // Sauvegarder automatiquement le tidal_id dans la DB si possible
       try {
@@ -127,7 +135,7 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
         if (songs && songs.length > 0) {
           await supabase
             .from('songs')
-            .update({ tidal_id: bestMatch.id.toString() })
+            .update({ tidal_id: matchId.toString() })
             .eq('id', songs[0].id);
           console.log('💾 Tidal ID sauvegardé dans la DB');
         }
@@ -135,7 +143,7 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
         console.warn('⚠️ Impossible de sauvegarder le tidal_id:', e);
       }
       
-      return bestMatch.id.toString();
+      return matchId.toString();
     }
     
     console.warn('⚠️ Aucun ID Tidal trouvé dans les résultats');
@@ -149,29 +157,101 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
 
-  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl
+  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
     const api = `https://phoenix.squid.wtf/track/?id=${tid}&quality=LOSSLESS`;
     console.log('🎵 Phoenix API:', api);
     const res = await fetch(api, { headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
 
+    // Helper interne: extraire depuis un manifest éventuel
+    const extractFromManifest = async (manifest: string): Promise<string | null> => {
+      try {
+        const decoded = atob(manifest);
+        // Essayer JSON d'abord
+        try {
+          const mObj = JSON.parse(decoded);
+          const direct = mObj?.OriginalTrackUrl || mObj?.originalTrackUrl || mObj?.original_url || mObj?.url || (Array.isArray(mObj?.urls) ? mObj.urls[0] : null);
+          if (typeof direct === 'string') return direct;
+        } catch {}
+        // Fallback: regex URL
+        const match = decoded.match(/https?:\/\/[^"'\s]+/);
+        if (match) return match[0];
+      } catch {
+        // Peut déjà être du texte non base64
+        const match = manifest.match(/https?:\/\/[^"'\s]+/);
+        if (match) return match[0];
+      }
+      return null;
+    };
+
+    // Helper interne: choisir la propriété directe si présente
+    const pickDirect = (obj: any): string | null => {
+      const direct = obj?.OriginalTrackUrl || obj?.originalTrackUrl || obj?.original_url || obj?.url;
+      return typeof direct === 'string' ? direct : null;
+    };
+
     let data: any;
+    let rawText: string | null = null;
     try {
       data = await res.json();
     } catch (e) {
-      const text = await res.text();
-      console.warn('⚠️ Phoenix non-JSON réponse:', text.slice(0, 200));
-      throw new Error('Phoenix a renvoyé une réponse inattendue');
+      rawText = await res.text();
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        console.warn('⚠️ Phoenix non-JSON réponse:', rawText?.slice(0, 200));
+        throw new Error('Phoenix a renvoyé une réponse inattendue');
+      }
     }
 
-    const direct = data?.OriginalTrackUrl || data?.originalTrackUrl || data?.original_url || data?.url;
-    if (!direct || typeof direct !== 'string') {
-      console.error('❌ Phoenix JSON sans OriginalTrackUrl:', data);
+    // Cas où Phoenix renvoie un tableau (observé dans les logs)
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        const direct = pickDirect(item);
+        if (direct) {
+          console.log('✅ Phoenix OriginalTrackUrl (array):', direct);
+          return direct;
+        }
+        if (item?.manifest) {
+          const fromManifest = await extractFromManifest(item.manifest);
+          if (fromManifest) {
+            console.log('✅ Phoenix URL (manifest):', fromManifest);
+            return fromManifest;
+          }
+        }
+      }
+      console.error('❌ Phoenix JSON sans OriginalTrackUrl (array):', data);
       throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
     }
-    console.log('✅ Phoenix OriginalTrackUrl:', direct);
-    return direct;
+
+    // Objet standard
+    const directTop = pickDirect(data);
+    if (directTop) {
+      console.log('✅ Phoenix OriginalTrackUrl:', directTop);
+      return directTop;
+    }
+
+    // Exploration des champs imbriqués
+    if (data && typeof data === 'object') {
+      for (const key of Object.keys(data)) {
+        const val: any = (data as any)[key];
+        if (val && typeof val === 'object') {
+          const d = pickDirect(val);
+          if (d) {
+            console.log('✅ Phoenix OriginalTrackUrl (nested):', d);
+            return d;
+          }
+          if (val?.manifest) {
+            const fromManifest = await extractFromManifest(val.manifest);
+            if (fromManifest) return fromManifest;
+          }
+        }
+      }
+    }
+
+    console.error('❌ Phoenix JSON sans OriginalTrackUrl:', data);
+    throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
   };
   
   // 0. Phoenix prioritaire si un tidal_id est fourni
