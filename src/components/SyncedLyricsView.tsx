@@ -258,13 +258,20 @@ export const SyncedLyricsView: React.FC = () => {
       return;
     }
     
+    // Skip DB lookups for non-UUID IDs (e.g., Deezer tracks)
+    if (songId.startsWith('deezer-')) {
+      setIsLoadingLyrics(false);
+      setIsChangingSong(false);
+      return;
+    }
+    
     try {
       // Get lyrics from Supabase
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
         .eq('song_id', songId)
-        .single();
+        .maybeSingle();
         
       if (error || !data) {
         setIsLoadingLyrics(false);
@@ -343,16 +350,19 @@ export const SyncedLyricsView: React.FC = () => {
       // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
       const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
       
-      // Save lyrics to database
-      const { error: insertError } = await supabase
-        .from('lyrics')
-        .upsert({
-          song_id: currentSong.id,
-          content: lyricsContent,
-        });
-
-      if (insertError) {
-        throw insertError;
+      // Save lyrics to database only for local songs with valid UUID
+      if (currentSong.id && !currentSong.id.startsWith('deezer-')) {
+        const { error: insertError } = await supabase
+          .from('lyrics')
+          .upsert({
+            song_id: currentSong.id,
+            content: lyricsContent,
+          });
+        if (insertError) {
+          throw insertError;
+        }
+      } else {
+        console.log('SyncedLyricsView: Skipping DB save for non-UUID song ID', currentSong.id);
       }
 
       // Refresh lyrics
