@@ -40,6 +40,61 @@ const FRENCH_SONGS = [
   { title: "Evidemment", artist: "Jul" },
 ];
 
+// Fonction pour chercher une pochette sur Deezer
+async function searchDeezerCover(title: string, artist: string): Promise<string | null> {
+  try {
+    const query = `${artist} ${title}`;
+    const searchUrl = `https://api.deezer.com/search?q=${encodeURIComponent(query)}`;
+    
+    const res = await fetch(searchUrl);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    
+    if (data?.data && data.data.length > 0) {
+      const track = data.data[0];
+      const coverUrl = track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || track.album?.cover;
+      
+      if (coverUrl) {
+        console.log(`🖼️ Pochette Deezer trouvée pour ${title}`);
+        return coverUrl;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`❌ Erreur recherche Deezer pour ${title}:`, error);
+    return null;
+  }
+}
+
+// Fonction pour chercher les paroles sur lrclib
+async function searchLrcLibLyrics(title: string, artist: string): Promise<string | null> {
+  try {
+    const searchUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
+    
+    const res = await fetch(searchUrl);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    
+    if (Array.isArray(data) && data.length > 0) {
+      const lyrics = data[0];
+      const syncedLyrics = lyrics.syncedLyrics || lyrics.plainLyrics;
+      
+      if (syncedLyrics) {
+        console.log(`📝 Paroles trouvées pour ${title}`);
+        return syncedLyrics;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`❌ Erreur recherche paroles pour ${title}:`, error);
+    return null;
+  }
+}
+
 // Fonction pour chercher un titre sur Tidal
 async function searchTidalId(title: string, artist: string): Promise<string | null> {
   const queries = [
@@ -144,19 +199,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Récupérer les métadonnées depuis Tidal
-        const frankfurtUrl = `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
-        const tidalRes = await fetch(frankfurtUrl, { headers: { Accept: 'application/json' } });
-        
-        let imageUrl = null;
-        if (tidalRes.ok) {
-          const tidalData = await tidalRes.json();
-          if (Array.isArray(tidalData) && tidalData[0]?.album?.cover) {
-            imageUrl = tidalData[0].album.cover;
-          } else if (tidalData?.album?.cover) {
-            imageUrl = tidalData.album.cover;
-          }
-        }
+        // Chercher la pochette sur Deezer
+        const imageUrl = await searchDeezerCover(song.title, song.artist);
 
         // Ajouter la chanson dans la base
         const { data: newSong, error: insertError } = await supabaseClient
@@ -176,6 +220,23 @@ serve(async (req) => {
           console.error(`❌ Erreur insertion ${song.title}:`, insertError);
           errors.push(`${song.title} - ${song.artist}`);
           continue;
+        }
+
+        // Chercher et ajouter les paroles
+        const lyrics = await searchLrcLibLyrics(song.title, song.artist);
+        if (lyrics && newSong) {
+          const { error: lyricsError } = await supabaseClient
+            .from('lyrics')
+            .insert({
+              song_id: newSong.id,
+              content: lyrics,
+            });
+
+          if (lyricsError) {
+            console.error(`⚠️ Erreur ajout paroles pour ${song.title}:`, lyricsError);
+          } else {
+            console.log(`📝 Paroles ajoutées pour ${song.title}`);
+          }
         }
 
         console.log(`✅ Chanson ajoutée: ${song.title}`);
