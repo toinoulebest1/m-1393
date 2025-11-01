@@ -47,13 +47,23 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 export const searchTidalId = async (title: string, artist: string): Promise<string | null> => {
   try {
     const query = `${artist} ${title}`.trim();
-    const searchUrl = `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`;
-    console.log('🔎 Recherche Tidal automatique:', searchUrl);
+    // Essayer Frankfurt en priorité
+    let searchUrl = `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`;
+    console.log('🔎 Recherche Tidal (Frankfurt priorité):', searchUrl);
     
-    const res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+    let res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+    
+    // Fallback sur Phoenix si Frankfurt échoue
     if (!res.ok) {
-      console.warn('⚠️ Échec recherche Tidal:', res.status);
-      return null;
+      console.warn('⚠️ Échec recherche Frankfurt, fallback Phoenix');
+      searchUrl = `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`;
+      console.log('🔎 Recherche Tidal (Phoenix fallback):', searchUrl);
+      res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+      
+      if (!res.ok) {
+        console.warn('⚠️ Échec recherche Tidal:', res.status);
+        return null;
+      }
     }
     
     const data = await res.json();
@@ -159,10 +169,27 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
 
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
-    const api = `https://phoenix.squid.wtf/track/?id=${tid}&quality=LOSSLESS`;
-    console.log('🎵 Phoenix API:', api);
-    const res = await fetch(api, { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
+    // Essayer Frankfurt en priorité
+    const frankfurtApi = `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=LOSSLESS`;
+    console.log('🎵 Frankfurt API (priorité):', frankfurtApi);
+    
+    let res: Response;
+    let usingFrankfurt = true;
+    
+    try {
+      res = await fetch(frankfurtApi, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Frankfurt API error: ${res.status}`);
+    } catch (error) {
+      console.warn('⚠️ Frankfurt API échec, fallback Phoenix:', error);
+      // Fallback sur Phoenix
+      const phoenixApi = `https://phoenix.squid.wtf/track/?id=${tid}&quality=LOSSLESS`;
+      console.log('🎵 Phoenix API (fallback):', phoenixApi);
+      res = await fetch(phoenixApi, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
+      usingFrankfurt = false;
+    }
+    
+    console.log(`✅ Utilisation de ${usingFrankfurt ? 'Frankfurt' : 'Phoenix'} API`);
 
     // Helper interne: extraire depuis un manifest éventuel
     const extractFromManifest = async (manifest: string): Promise<string | null> => {
