@@ -232,21 +232,11 @@ const Search = () => {
         // Search on Deezer separately
         let deezerResult = null;
         if (query.trim()) {
-          // For wildcard search, make multiple parallel requests to get diverse results
           if (isWildcardSearch) {
-            const queries = ["pop", "rock", "hip hop", "electronic", "jazz", "rap", "metal", "indie", "soul", "reggae"];
-            const deezerPromises = queries.map(q => 
-              supabase.functions.invoke('deezer-search', {
-                body: { query: q, limit: 50 }
-              })
-            );
-            
-            const allResults = await Promise.all(deezerPromises);
-            const allTracks = allResults
-              .filter(r => !r.error && r.data?.data)
-              .flatMap(r => r.data.data);
-            
-            deezerResult = { data: { data: allTracks } };
+            // Pour *, récupérer le maximum de musiques possibles sans filtrage
+            deezerResult = await supabase.functions.invoke('deezer-search', {
+              body: { query: "a", limit: 1000 } // Recherche très large avec limite maximale
+            });
           } else {
             deezerResult = await supabase.functions.invoke('deezer-search', {
               body: { query, limit: 50 }
@@ -364,21 +354,11 @@ const Search = () => {
         // Also search Deezer for non-genre filters
         let deezerResult = null;
         if (searchFilter !== "genre" && query.trim()) {
-          // For wildcard search, make multiple parallel requests to get diverse results
           if (isWildcardSearch) {
-            const queries = ["pop", "rock", "hip hop", "electronic", "jazz", "rap", "metal", "indie", "soul", "reggae"];
-            const deezerPromises = queries.map(q => 
-              supabase.functions.invoke('deezer-search', {
-                body: { query: q, limit: 50 }
-              })
-            );
-            
-            const allResults = await Promise.all(deezerPromises);
-            const allTracks = allResults
-              .filter(r => !r.error && r.data?.data)
-              .flatMap(r => r.data.data);
-            
-            deezerResult = { data: { data: allTracks } };
+            // Pour *, récupérer le maximum de musiques possibles sans filtrage
+            deezerResult = await supabase.functions.invoke('deezer-search', {
+              body: { query: "a", limit: 1000 } // Recherche très large avec limite maximale
+            });
           } else {
             deezerResult = await supabase.functions.invoke('deezer-search', {
               body: { query, limit: 50 }
