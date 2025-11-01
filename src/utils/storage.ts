@@ -57,7 +57,28 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
     }
     
     const data = await res.json();
-    const results = data?.tracks || data?.results || [];
+    console.log('📦 Réponse Phoenix complète:', data);
+    console.log('📦 Type de data:', typeof data, Array.isArray(data));
+    console.log('📦 Clés disponibles:', Object.keys(data || {}));
+    
+    // Phoenix peut retourner directement un tableau ou un objet avec diverses clés
+    let results = [];
+    if (Array.isArray(data)) {
+      results = data;
+    } else if (data?.tracks) {
+      results = data.tracks;
+    } else if (data?.results) {
+      results = data.results;
+    } else if (data?.data) {
+      results = data.data;
+    } else if (data?.items) {
+      results = data.items;
+    }
+    
+    console.log('📦 Nombre de résultats trouvés:', results.length);
+    if (results.length > 0) {
+      console.log('📦 Premier résultat exemple:', results[0]);
+    }
     
     if (!results || results.length === 0) {
       console.warn('⚠️ Aucun résultat Tidal trouvé pour:', query);
