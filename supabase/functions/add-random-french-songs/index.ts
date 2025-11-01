@@ -228,6 +228,7 @@ serve(async (req) => {
     const selectedSongs = shuffled.slice(0, count);
 
     const addedSongs: string[] = [];
+    const addedSongIds: string[] = [];
     const errors: string[] = [];
 
     for (const song of selectedSongs) {
@@ -298,6 +299,7 @@ serve(async (req) => {
 
         console.log(`✅ Chanson ajoutée: ${song.title}`);
         addedSongs.push(`${song.title} - ${song.artist}`);
+        addedSongIds.push(newSong.id);
 
       } catch (error) {
         console.error(`❌ Erreur traitement ${song.title}:`, error);
@@ -310,6 +312,7 @@ serve(async (req) => {
         success: true,
         count: addedSongs.length,
         addedSongs,
+        addedSongIds,
         errors: errors.length > 0 ? errors : undefined,
       }),
       {
