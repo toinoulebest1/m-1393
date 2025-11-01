@@ -74,9 +74,9 @@ export const Sidebar = () => {
       label: t('common.metadata')
     });
     links.push({
-      to: "/dropbox-settings",
+      to: "/add-songs",
       icon: CloudUpload,
-      label: "Dropbox"
+      label: "Ajouter des chansons"
     });
     links.push({
       to: "/maintenance-admin",

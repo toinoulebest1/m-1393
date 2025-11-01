@@ -4,3 +4,6 @@ project_id = "pwknncursthenghqgevl"
 [functions.send-weekly-reports]
 verify_jwt = false
 
+[functions.add-random-french-songs]
+verify_jwt = true
+
