@@ -64,7 +64,7 @@ export const MusicDiscovery = () => {
         let query = supabase
           .from('songs')
           .select('*')
-          .limit(12);
+          .limit(20);
 
         // Filtrer par genre si disponible
         if (allGenres.size > 0) {
@@ -73,13 +73,23 @@ export const MusicDiscovery = () => {
 
         const { data: songs } = await query;
 
-        if (songs) {
+        // Si aucune chanson trouvée avec les préférences, récupérer des chansons aléatoires
+        let finalSongs = songs;
+        if (!songs || songs.length === 0) {
+          const { data: randomSongs } = await supabase
+            .from('songs')
+            .select('*')
+            .limit(20);
+          finalSongs = randomSongs;
+        }
+
+        if (finalSongs && finalSongs.length > 0) {
           // Exclure les chansons déjà dans l'historique récent
           const recentSongIds = new Set(
             recentHistory?.map((item: any) => item.songs?.id).filter(Boolean)
           );
           
-          const filteredSongs = songs
+          const filteredSongs = finalSongs
             .filter(song => !recentSongIds.has(song.id))
             .map(song => ({
               id: song.id,
