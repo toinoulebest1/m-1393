@@ -219,6 +219,9 @@ export const useAudioControl = ({
       } catch (error) {
         console.error("💥 Erreur récupération:", error);
         
+        // IMPORTANT: Débloquer immédiatement l'interface
+        setIsChangingSong(false);
+        
         // Revenir à la musique précédente si elle existait
         if (previousSong) {
           console.log("🔄 Retour à la musique précédente:", previousSong.title);
@@ -233,11 +236,15 @@ export const useAudioControl = ({
               setIsPlaying(true);
             } catch (playError) {
               console.error("Erreur restauration lecture:", playError);
+              setIsPlaying(false);
             }
+          } else {
+            setIsPlaying(false);
           }
+        } else {
+          setIsPlaying(false);
         }
         
-        setIsChangingSong(false);
         handlePlayError(error as any, song);
       }
     } else if (audioRef.current) {
