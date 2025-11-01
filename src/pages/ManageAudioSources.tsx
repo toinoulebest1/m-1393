@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,78 +6,79 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { Search, Save, AlertCircle } from "lucide-react";
+import { Search, Save, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-interface Song {
-  id: string;
+interface DeezerTrack {
+  id: number;
   title: string;
-  artist: string;
-  file_path: string;
-  image_url: string | null;
+  artist: {
+    name: string;
+  };
+  album: {
+    cover_medium: string;
+  };
+  duration: number;
 }
 
 const ManageAudioSources = () => {
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-  const [newSourceUrl, setNewSourceUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [deezerResults, setDeezerResults] = useState<DeezerTrack[]>([]);
+  const [selectedTrack, setSelectedTrack] = useState<DeezerTrack | null>(null);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    fetchSongs();
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredSongs(songs);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = songs.filter((song) => {
-        const title = song.title?.toLowerCase() || "";
-        const artist = song.artist?.toLowerCase() || "";
-        return title.includes(query) || artist.includes(query);
-      });
-      setFilteredSongs(filtered);
-    }
-  }, [searchQuery, songs]);
-
-  const fetchSongs = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("songs")
-        .select("id, title, artist, file_path, image_url")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setSongs(data || []);
-      setFilteredSongs(data || []);
-    } catch (error) {
-      console.error("Erreur lors du chargement des chansons:", error);
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les chansons",
+        description: "Veuillez entrer un terme de recherche",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("deezer-search", {
+        body: { query: searchQuery },
+      });
+
+      if (error) throw error;
+
+      if (data?.data) {
+        setDeezerResults(data.data);
+        if (data.data.length === 0) {
+          toast({
+            title: "Aucun résultat",
+            description: "Aucune chanson trouvée sur Deezer",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors de la recherche Deezer:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de rechercher sur Deezer",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
   };
 
-  const handleSelectSong = (song: Song) => {
-    setSelectedSong(song);
-    setNewSourceUrl(song.file_path);
+  const handleSelectTrack = (track: DeezerTrack) => {
+    setSelectedTrack(track);
+    setAudioUrl("");
   };
 
-  const handleSaveSource = async () => {
-    if (!selectedSong || !newSourceUrl.trim()) {
+  const handleSaveAudioLink = async () => {
+    if (!selectedTrack || !audioUrl.trim()) {
       toast({
         title: "Erreur",
-        description: "Veuillez entrer une URL valide",
+        description: "Veuillez sélectionner une chanson et entrer une URL audio",
         variant: "destructive",
       });
       return;
@@ -85,33 +86,51 @@ const ManageAudioSources = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("songs")
-        .update({ file_path: newSourceUrl.trim() })
-        .eq("id", selectedSong.id);
+      // Vérifier si un lien existe déjà pour ce tidal_id
+      const { data: existing } = await supabase
+        .from("tidal_audio_links")
+        .select("id")
+        .eq("tidal_id", selectedTrack.id.toString())
+        .maybeSingle();
 
-      if (error) throw error;
+      if (existing) {
+        // Mettre à jour le lien existant
+        const { error } = await supabase
+          .from("tidal_audio_links")
+          .update({
+            audio_url: audioUrl.trim(),
+            last_verified_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (error) throw error;
+      } else {
+        // Créer un nouveau lien
+        const { error } = await supabase
+          .from("tidal_audio_links")
+          .insert({
+            tidal_id: selectedTrack.id.toString(),
+            audio_url: audioUrl.trim(),
+            quality: "LOSSLESS",
+            source: "manual",
+            last_verified_at: new Date().toISOString(),
+          });
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Succès",
-        description: "La source audio a été mise à jour",
+        description: "Le lien audio a été enregistré",
       });
 
-      // Mettre à jour la liste locale
-      setSongs(
-        songs.map((song) =>
-          song.id === selectedSong.id
-            ? { ...song, file_path: newSourceUrl.trim() }
-            : song
-        )
-      );
-      
-      setSelectedSong({ ...selectedSong, file_path: newSourceUrl.trim() });
+      setAudioUrl("");
+      setSelectedTrack(null);
     } catch (error) {
-      console.error("Erreur lors de la mise à jour:", error);
+      console.error("Erreur lors de l'enregistrement:", error);
       toast({
         title: "Erreur",
-        description: "Impossible de mettre à jour la source audio",
+        description: "Impossible d'enregistrer le lien audio",
         variant: "destructive",
       });
     } finally {
@@ -132,49 +151,67 @@ const ManageAudioSources = () => {
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Liste des chansons */}
+          {/* Recherche Deezer */}
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle>Rechercher une chanson</CardTitle>
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Titre ou artiste..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+              <CardTitle>Rechercher sur Deezer</CardTitle>
+              <div className="flex gap-2 mt-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Titre ou artiste..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="pl-10"
+                  />
+                </div>
+                <Button onClick={handleSearch} disabled={isSearching}>
+                  {isSearching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Recherche...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Rechercher
+                    </>
+                  )}
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {isLoading ? (
-                  <p className="text-muted-foreground text-center py-8">Chargement...</p>
-                ) : filteredSongs.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Aucune chanson trouvée</p>
+                {deezerResults.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    {isSearching ? "Recherche en cours..." : "Recherchez une chanson sur Deezer"}
+                  </p>
                 ) : (
-                  filteredSongs.map((song) => (
+                  deezerResults.map((track) => (
                     <div
-                      key={song.id}
-                      onClick={() => handleSelectSong(song)}
+                      key={track.id}
+                      onClick={() => handleSelectTrack(track)}
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                        selectedSong?.id === song.id
+                        selectedTrack?.id === track.id
                           ? "bg-primary/20 border-2 border-primary"
                           : "bg-muted/50 hover:bg-muted border-2 border-transparent"
                       }`}
                     >
                       <img
-                        src={song.image_url || "https://picsum.photos/48/48"}
-                        alt={song.title}
+                        src={track.album.cover_medium}
+                        alt={track.title}
                         className="w-12 h-12 rounded object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{song.title}</p>
-                        <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
+                        <p className="font-medium truncate">{track.title}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {track.artist.name}
+                        </p>
                       </div>
-                      {!song.file_path && (
-                        <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, "0")}
+                      </p>
                     </div>
                   ))
                 )}
@@ -182,68 +219,68 @@ const ManageAudioSources = () => {
             </CardContent>
           </Card>
 
-          {/* Formulaire de mise à jour */}
+          {/* Formulaire d'ajout de lien audio */}
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle>Modifier la source audio</CardTitle>
-              {selectedSong && (
+              <CardTitle>Ajouter un lien audio manuel</CardTitle>
+              {selectedTrack && (
                 <CardDescription>
-                  {selectedSong.title} - {selectedSong.artist}
+                  {selectedTrack.title} - {selectedTrack.artist.name}
                 </CardDescription>
               )}
             </CardHeader>
             <CardContent>
-              {selectedSong ? (
+              {selectedTrack ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <img
-                      src={selectedSong.image_url || "https://picsum.photos/64/64"}
-                      alt={selectedSong.title}
+                      src={selectedTrack.album.cover_medium}
+                      alt={selectedTrack.title}
                       className="w-16 h-16 rounded object-cover"
                     />
-                    <div>
-                      <p className="font-semibold">{selectedSong.title}</p>
-                      <p className="text-sm text-muted-foreground">{selectedSong.artist}</p>
+                    <div className="flex-1">
+                      <p className="font-semibold">{selectedTrack.title}</p>
+                      <p className="text-sm text-muted-foreground">{selectedTrack.artist.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ID Deezer: {selectedTrack.id}
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="source-url">URL de la source audio</Label>
+                    <Label htmlFor="audio-url">URL du fichier audio</Label>
                     <Textarea
-                      id="source-url"
-                      placeholder="https://example.com/audio.mp3"
-                      value={newSourceUrl}
-                      onChange={(e) => setNewSourceUrl(e.target.value)}
+                      id="audio-url"
+                      placeholder="https://example.com/audio.mp3 ou lien Dropbox/OneDrive..."
+                      value={audioUrl}
+                      onChange={(e) => setAudioUrl(e.target.value)}
                       className="min-h-[120px] font-mono text-sm"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Entrez l'URL complète du fichier audio (Dropbox, OneDrive, etc.)
+                      Entrez l'URL complète du fichier audio (Dropbox, OneDrive, serveur direct, etc.)
                     </p>
                   </div>
 
                   <Button
-                    onClick={handleSaveSource}
-                    disabled={isSaving || !newSourceUrl.trim()}
+                    onClick={handleSaveAudioLink}
+                    disabled={isSaving || !audioUrl.trim()}
                     className="w-full"
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? "Enregistrement..." : "Enregistrer la source"}
+                    {isSaving ? "Enregistrement..." : "Enregistrer le lien audio"}
                   </Button>
 
-                  {selectedSong.file_path && (
-                    <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">
-                        Source actuelle:
-                      </p>
-                      <p className="text-xs font-mono break-all">{selectedSong.file_path}</p>
-                    </div>
-                  )}
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-xs text-blue-200">
+                      💡 Ce lien sera sauvegardé dans la table tidal_audio_links et associé à l'ID Deezer {selectedTrack.id}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <Search className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">
-                    Sélectionnez une chanson dans la liste pour modifier sa source audio
+                    Recherchez et sélectionnez une chanson Deezer pour ajouter un lien audio manuel
                   </p>
                 </div>
               )}
