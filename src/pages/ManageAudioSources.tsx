@@ -35,11 +35,12 @@ const ManageAudioSources = () => {
     if (searchQuery.trim() === "") {
       setFilteredSongs(songs);
     } else {
-      const filtered = songs.filter(
-        (song) =>
-          song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          song.artist.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const query = searchQuery.toLowerCase();
+      const filtered = songs.filter((song) => {
+        const title = song.title?.toLowerCase() || "";
+        const artist = song.artist?.toLowerCase() || "";
+        return title.includes(query) || artist.includes(query);
+      });
       setFilteredSongs(filtered);
     }
   }, [searchQuery, songs]);
