@@ -43,7 +43,89 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   return data.path;
 };
 
-export const getAudioFileUrl = async (filePath: string, tidalId?: string): Promise<string> => {
+// Fonction pour chercher automatiquement un titre sur Tidal
+export const searchTidalId = async (title: string, artist: string): Promise<string | null> => {
+  try {
+    const query = `${artist} ${title}`.trim();
+    const searchUrl = `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`;
+    console.log('🔎 Recherche Tidal automatique:', searchUrl);
+    
+    const res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
+    if (!res.ok) {
+      console.warn('⚠️ Échec recherche Tidal:', res.status);
+      return null;
+    }
+    
+    const data = await res.json();
+    const results = data?.tracks || data?.results || [];
+    
+    if (!results || results.length === 0) {
+      console.warn('⚠️ Aucun résultat Tidal trouvé pour:', query);
+      return null;
+    }
+    
+    // Trouver le meilleur résultat : même artiste + meilleure popularité
+    const normalizedArtist = artist.toLowerCase().trim();
+    let bestMatch = null;
+    let bestPopularity = -1;
+    
+    for (const track of results) {
+      const trackArtist = (track.artist?.name || track.artists?.[0]?.name || '').toLowerCase().trim();
+      const popularity = track.popularity || 0;
+      
+      // Vérifier si l'artiste correspond
+      if (trackArtist.includes(normalizedArtist) || normalizedArtist.includes(trackArtist)) {
+        if (popularity > bestPopularity) {
+          bestMatch = track;
+          bestPopularity = popularity;
+        }
+      }
+    }
+    
+    // Si pas de correspondance exacte, prendre le premier résultat avec la meilleure popularité
+    if (!bestMatch && results.length > 0) {
+      bestMatch = results.reduce((best: any, current: any) => {
+        const currentPop = current.popularity || 0;
+        const bestPop = best.popularity || 0;
+        return currentPop > bestPop ? current : best;
+      }, results[0]);
+    }
+    
+    if (bestMatch?.id) {
+      console.log('✅ Tidal ID trouvé:', bestMatch.id, 'pour', query);
+      
+      // Sauvegarder automatiquement le tidal_id dans la DB si possible
+      try {
+        const { data: songs } = await supabase
+          .from('songs')
+          .select('id')
+          .ilike('title', title)
+          .ilike('artist', artist)
+          .limit(1);
+          
+        if (songs && songs.length > 0) {
+          await supabase
+            .from('songs')
+            .update({ tidal_id: bestMatch.id.toString() })
+            .eq('id', songs[0].id);
+          console.log('💾 Tidal ID sauvegardé dans la DB');
+        }
+      } catch (e) {
+        console.warn('⚠️ Impossible de sauvegarder le tidal_id:', e);
+      }
+      
+      return bestMatch.id.toString();
+    }
+    
+    console.warn('⚠️ Aucun ID Tidal trouvé dans les résultats');
+    return null;
+  } catch (error) {
+    console.error('❌ Erreur recherche Tidal:', error);
+    return null;
+  }
+};
+
+export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
 
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl
@@ -76,6 +158,18 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string): Promi
     const direct = await fetchPhoenixUrl(tidalId);
     memoryCache.set(filePath, direct);
     return direct;
+  }
+  
+  // 0-auto. Si pas de tidal_id mais on a titre + artiste, chercher automatiquement
+  if (!tidalId && songTitle && songArtist) {
+    console.log('🔍 Pas de Tidal ID, recherche automatique pour:', songTitle, '-', songArtist);
+    const foundTidalId = await searchTidalId(songTitle, songArtist);
+    if (foundTidalId) {
+      const direct = await fetchPhoenixUrl(foundTidalId);
+      memoryCache.set(filePath, direct);
+      return direct;
+    }
+    console.warn('⚠️ Recherche Tidal automatique échouée, fallback vers Supabase');
   }
 
   // 0-bis. Si l'URL est déjà un lien Phoenix, extraire l'id et récupérer l'URL directe

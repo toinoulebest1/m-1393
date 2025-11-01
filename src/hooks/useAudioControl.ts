@@ -69,7 +69,12 @@ export const useAudioControl = ({
         // Récupération ultra-rapide de l'URL audio
         let audioUrl: string;
         try {
-          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(song.url, song.tidal_id);
+          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+            song.url, 
+            song.tidal_id,
+            song.title,
+            song.artist
+          );
           const elapsed = performance.now() - startTime;
           console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
         } catch (error: any) {
