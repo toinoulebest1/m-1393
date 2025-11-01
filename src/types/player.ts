@@ -12,6 +12,7 @@ export interface Song {
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
   tidal_id?: string; // Tidal track ID for Phoenix streaming
+  isDeezer?: boolean; // Flag for Deezer tracks
 }
 
 export interface FavoriteStat {

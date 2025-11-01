@@ -3,6 +3,7 @@ import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
+import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
 
 interface UseAudioControlProps {
@@ -177,6 +178,17 @@ export const useAudioControl = ({
               console.error('Impossible d\'enregistrer l\'historique:', e);
             }
           })();
+          
+          // Récupération des paroles en arrière-plan pour les musiques Deezer/Tidal
+          if (song.isDeezer || song.tidal_id) {
+            fetchLyricsInBackground(
+              song.id,
+              song.title,
+              song.artist,
+              song.duration,
+              song.album_name
+            );
+          }
           
           // Préchargement de la chanson suivante en arrière-plan
           setTimeout(() => preloadNextTracks(), 1000);

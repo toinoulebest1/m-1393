@@ -272,6 +272,7 @@ const Search = () => {
             url: track.preview,
             imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
             bitrate: 'Preview',
+            album_name: track.album?.title,
             isDeezer: true
           }));
           formattedResults.push(...deezerSongs);
@@ -377,6 +378,7 @@ const Search = () => {
             url: track.preview,
             imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
             bitrate: 'Preview',
+            album_name: track.album?.title,
             isDeezer: true
           }));
           formattedResults.push(...deezerSongs);
