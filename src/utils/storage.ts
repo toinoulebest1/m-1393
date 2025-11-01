@@ -44,13 +44,15 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 // Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives
-export const searchTidalId = async (title: string, artist: string): Promise<string | null> => {
+export const searchTidalId = async (title: any, artist: any): Promise<string | null> => {
+  const safeTitle = String(title ?? '').trim();
+  const safeArtist = String(artist ?? '').trim();
   // Utiliser le format "titre, artiste" avec virgule pour plus de précision
   const searchQueries = [
-    `${title}, ${artist}`.trim(), // 1. Titre, artiste (format optimal - priorité)
-    `${title} ${artist}`.trim(), // 2. Titre + artiste
-    `${artist} ${title}`.trim(), // 3. Artiste + titre
-    title.trim(), // 4. Titre seul (en dernier recours)
+    `${safeTitle}, ${safeArtist}`.trim(), // 1. Titre, artiste (format optimal - priorité)
+    `${safeTitle} ${safeArtist}`.trim(), // 2. Titre + artiste
+    `${safeArtist} ${safeTitle}`.trim(), // 3. Artiste + titre
+    safeTitle, // 4. Titre seul (en dernier recours)
   ].filter(q => q.length > 0);
   
   console.log('🔎 Recherche Tidal avec', searchQueries.length, 'combinaisons');
@@ -97,18 +99,17 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
         continue; // Essayer la prochaine combinaison
       }
     
-      // Sélection stricte par artiste et titre
-      const normalize = (s: string) => s
-        ?.toLowerCase()
-        ?.normalize('NFD')
-        ?.replace(/[\u0300-\u036f]/g, '')
-        ?.replace(/[^a-z0-9\s]/g, ' ')
-        ?.replace(/\s+/g, ' ')
-        ?.trim();
-      const simplifyTitle = (s: string) => normalize(String(s || '')).split(/\s*-\s*|\(|\[|\{/)[0];
+      const normalize = (s: any) => String(s ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const simplifyTitle = (s: any) => normalize(s).split(/\s*-\s*|\(|\[|\{/)[0];
 
-      const expectedArtist = normalize(artist);
-      const expectedTitle = simplifyTitle(title);
+      const expectedArtist = normalize(safeArtist);
+      const expectedTitle = simplifyTitle(safeTitle);
       const aliases = new Set<string>([
         expectedArtist,
         expectedArtist.replace(/^maitre\s+/,'').trim(), // "maitre gims" -> "gims"
@@ -169,8 +170,8 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
           const { data: songs } = await supabase
             .from('songs')
             .select('id')
-            .ilike('title', title)
-            .ilike('artist', artist)
+            .ilike('title', safeTitle)
+            .ilike('artist', safeArtist)
             .limit(1);
             
           if (songs && songs.length > 0) {
