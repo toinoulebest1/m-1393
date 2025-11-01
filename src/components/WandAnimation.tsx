@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import wandGif from '@/assets/wand-animation.gif';
 import wandGif2 from '@/assets/wand-animation-2.gif';
 import wandGif5 from '@/assets/wand-animation-5.gif';
@@ -26,13 +27,15 @@ export const WandAnimation = ({ isActive }: WandAnimationProps) => {
 
   if (!isActive) return null;
 
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-[-1] flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 pointer-events-none select-none overflow-hidden z-0">
       <img 
         src={wands[currentWandIndex]} 
-        alt="Magic wand animation" 
-        className="w-full h-full object-contain opacity-50 animate-fade-in"
+        alt="" 
+        aria-hidden="true"
+        className="w-full h-full object-cover opacity-50 animate-fade-in"
       />
-    </div>
+    </div>,
+    document.body
   );
 };
