@@ -325,7 +325,7 @@ export const useAudioControl = ({
           artist: data.artist || currentSong.artist,
           imageUrl: data.image_url || currentSong.imageUrl,
           genre: data.genre || currentSong.genre,
-          tidal_id: data.tidal_id || currentSong.tidal_id,
+          tidal_id: (data as any).tidal_id || currentSong.tidal_id,
         };
         
         setCurrentSong(updatedSong);
