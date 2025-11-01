@@ -297,33 +297,38 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     for (const quality of qualities) {
       console.log(`🎵 Tentative qualité ${quality}...`);
       
-      // Essayer Frankfurt en priorité
-      const frankfurtApi = `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}`;
-      console.log('🎵 Frankfurt API:', frankfurtApi);
+      // Liste des APIs à essayer (ordre de priorité)
+      const apis = [
+        { name: 'Frankfurt', url: `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}` },
+        { name: 'London', url: `https://london.monochrome.tf/track/?id=${tid}&quality=${quality}` },
+        { name: 'Phoenix', url: `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}` }
+      ];
       
-      let res: Response;
-      let usingFrankfurt = true;
+      let res: Response | null = null;
+      let successApi: string | null = null;
       
-      try {
-        res = await fetch(frankfurtApi, { headers: { Accept: 'application/json' } });
-        if (!res.ok) throw new Error(`Frankfurt API error: ${res.status}`);
-      } catch (error) {
-        console.warn(`⚠️ Frankfurt API échec (${quality}), fallback Phoenix:`, error);
-        // Fallback sur Phoenix
-        const phoenixApi = `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}`;
-        console.log('🎵 Phoenix API (fallback):', phoenixApi);
+      // Essayer chaque API dans l'ordre
+      for (const api of apis) {
+        console.log(`🎵 ${api.name} API:`, api.url);
         try {
-          res = await fetch(phoenixApi, { headers: { Accept: 'application/json' } });
-          if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
-          usingFrankfurt = false;
-        } catch (phoenixError) {
-          lastError = phoenixError as Error;
-          console.warn(`⚠️ Phoenix API aussi en échec (${quality})`);
-          continue; // Essayer la qualité suivante
+          res = await fetch(api.url, { headers: { Accept: 'application/json' } });
+          if (!res.ok) throw new Error(`${api.name} API error: ${res.status}`);
+          successApi = api.name;
+          break; // API réussie, sortir de la boucle
+        } catch (error) {
+          console.warn(`⚠️ ${api.name} API échec (${quality}):`, error);
+          lastError = error as Error;
+          // Continuer avec l'API suivante
         }
       }
       
-      console.log(`✅ Utilisation de ${usingFrankfurt ? 'Frankfurt' : 'Phoenix'} API avec qualité ${quality}`);
+      // Si aucune API n'a fonctionné pour cette qualité, essayer la qualité suivante
+      if (!res || !successApi) {
+        console.warn(`⚠️ Toutes les APIs ont échoué pour la qualité ${quality}`);
+        continue;
+      }
+      
+      console.log(`✅ Utilisation de ${successApi} API avec qualité ${quality}`);
 
       // Parser la réponse
       let data: any;
