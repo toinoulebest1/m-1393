@@ -11,7 +11,8 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="relative z-10 flex h-screen overflow-hidden bg-spotify-dark text-white">
+    <div className="relative flex h-screen overflow-hidden bg-spotify-dark text-white">
+      <div id="wand-bg-layer" className="absolute inset-0 z-0 pointer-events-none" />
       {!hideNavbar && <Sidebar />}
       <div className={cn(
         "relative z-10 flex-1 flex flex-col overflow-hidden",

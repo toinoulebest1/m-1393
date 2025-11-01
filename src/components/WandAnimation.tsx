@@ -27,8 +27,14 @@ export const WandAnimation = ({ isActive }: WandAnimationProps) => {
 
   if (!isActive) return null;
 
+  const container = typeof document !== 'undefined'
+    ? (document.getElementById('wand-bg-layer') ?? document.body)
+    : null;
+
+  if (!container) return null;
+
   return createPortal(
-    <div className="fixed inset-0 pointer-events-none select-none overflow-hidden" style={{ zIndex: 0 }}>
+    <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
       <img 
         src={wands[currentWandIndex]} 
         alt="" 
@@ -36,6 +42,6 @@ export const WandAnimation = ({ isActive }: WandAnimationProps) => {
         className="w-full h-full object-cover opacity-30 animate-fade-in"
       />
     </div>,
-    document.body
+    container
   );
 };
