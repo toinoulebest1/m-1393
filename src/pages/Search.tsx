@@ -240,7 +240,8 @@ const Search = () => {
           duration: song.duration || '0:00',
           url: song.file_path,
           imageUrl: song.image_url,
-          bitrate: '320 kbps'
+          bitrate: '320 kbps',
+          tidal_id: (song as any).tidal_id
         }));
 
         // Filter playlists that the current user can view (only if user is authenticated)
@@ -315,7 +316,8 @@ const Search = () => {
           duration: song.duration || '0:00',
           url: song.file_path,
           imageUrl: song.image_url,
-          bitrate: '320 kbps'
+          bitrate: '320 kbps',
+          tidal_id: (song as any).tidal_id
         }));
         setResults(formattedResults);
         setPlaylistResults([]);

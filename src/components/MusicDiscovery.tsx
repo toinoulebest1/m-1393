@@ -89,7 +89,8 @@ export const MusicDiscovery = () => {
               url: song.file_path,
               duration: song.duration || "0:00",
               genre: song.genre,
-              albumName: song.album_name
+              albumName: song.album_name,
+              tidal_id: (song as any).tidal_id
             }));
 
           // Mélanger et limiter à 8 suggestions

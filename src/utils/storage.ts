@@ -45,13 +45,58 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 
 export const getAudioFileUrl = async (filePath: string, tidalId?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
+
+  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl
+  const fetchPhoenixUrl = async (tid: string): Promise<string> => {
+    const api = `https://phoenix.squid.wtf/track/?id=${tid}&quality=LOSSLESS`;
+    console.log('🎵 Phoenix API:', api);
+    const res = await fetch(api, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`Phoenix API error: ${res.status}`);
+
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (e) {
+      const text = await res.text();
+      console.warn('⚠️ Phoenix non-JSON réponse:', text.slice(0, 200));
+      throw new Error('Phoenix a renvoyé une réponse inattendue');
+    }
+
+    const direct = data?.OriginalTrackUrl || data?.originalTrackUrl || data?.original_url || data?.url;
+    if (!direct || typeof direct !== 'string') {
+      console.error('❌ Phoenix JSON sans OriginalTrackUrl:', data);
+      throw new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+    }
+    console.log('✅ Phoenix OriginalTrackUrl:', direct);
+    return direct;
+  };
   
-  // 🎵 PHOENIX/TIDAL: Si un tidal_id est fourni, utiliser Phoenix directement
+  // 0. Phoenix prioritaire si un tidal_id est fourni
   if (tidalId) {
-    const phoenixUrl = `https://phoenix.squid.wtf/track/?id=${tidalId}&quality=LOSSLESS`;
-    console.log('🎵 Utilisation Phoenix/Tidal:', phoenixUrl);
-    memoryCache.set(filePath, phoenixUrl);
-    return phoenixUrl;
+    const direct = await fetchPhoenixUrl(tidalId);
+    memoryCache.set(filePath, direct);
+    return direct;
+  }
+
+  // 0-bis. Si l'URL est déjà un lien Phoenix, extraire l'id et récupérer l'URL directe
+  try {
+    if (filePath.includes('phoenix.squid.wtf/track')) {
+      const urlObj = new URL(filePath);
+      const maybeId = urlObj.searchParams.get('id');
+      if (maybeId) {
+        const direct = await fetchPhoenixUrl(maybeId);
+        memoryCache.set(filePath, direct);
+        return direct;
+      }
+    }
+  } catch (_) {}
+
+  // 0-ter. Si le chemin commence par "tidal:{id}", utiliser Phoenix
+  if (filePath.startsWith('tidal:')) {
+    const extractedTidalId = filePath.replace('tidal:', '');
+    const direct = await fetchPhoenixUrl(extractedTidalId);
+    memoryCache.set(filePath, direct);
+    return direct;
   }
 
   // 1. Vérifier le cache mémoire d'abord
@@ -64,39 +109,9 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string): Promi
   // 2. Extraire l'ID du fichier (enlever les préfixes comme "audio/")
   const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
   
-  // 2.5 Vérifier si le filePath contient un tidal_id (format: "tidal:{id}")
-  if (filePath.startsWith('tidal:')) {
-    const extractedTidalId = filePath.replace('tidal:', '');
-    const phoenixUrl = `https://phoenix.squid.wtf/track/?id=${extractedTidalId}&quality=LOSSLESS`;
-    console.log('🎵 Utilisation Phoenix/Tidal (from path):', phoenixUrl);
-    memoryCache.set(filePath, phoenixUrl);
-    return phoenixUrl;
-  }
-
-  console.log('🔍 Recherche lien Dropbox pour:', localId);
+  console.log('🔍 Recherche lien Dropbox désactivé. localId:', localId);
   
-  // 3. DROPBOX TEMPORAIREMENT DÉSACTIVÉ - Commenté
-  /*
-  try {
-    const { data: dropboxFile, error: dropboxError } = await supabase
-      .from('dropbox_files')
-      .select('shared_link')
-      .eq('local_id', localId)
-      .maybeSingle();
-
-    if (dropboxFile?.shared_link) {
-      console.log('✅ Lien Dropbox trouvé dans DB:', dropboxFile.shared_link);
-      memoryCache.set(filePath, dropboxFile.shared_link);
-      return dropboxFile.shared_link;
-    }
-    
-    console.log('❌ Aucun lien Dropbox en DB pour:', localId);
-  } catch (error) {
-    console.warn('⚠️ Erreur requête dropbox_files:', error);
-  }
-  */
-  
-  // 4. Fallback vers Supabase Storage si pas de lien Dropbox
+  // 4. Fallback vers Supabase Storage
   console.log('📦 Fallback Supabase Storage');
   try {
     const { data, error } = await supabase.storage

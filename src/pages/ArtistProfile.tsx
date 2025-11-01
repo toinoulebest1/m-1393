@@ -138,7 +138,8 @@ const ArtistProfile = () => {
         duration: dbSong.duration || "3:00",
         url: dbSong.file_path,
         imageUrl: dbSong.image_url || track.album.cover_medium,
-        genre: dbSong.genre
+        genre: dbSong.genre,
+        tidal_id: (dbSong as any).tidal_id
       };
 
       console.log("Playing local song:", localSong);
