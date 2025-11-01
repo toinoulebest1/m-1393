@@ -233,6 +233,25 @@ export const SyncedLyricsView: React.FC = () => {
     }
   }, [currentSong?.id]);
 
+  // Auto-generate lyrics if not found in DB
+  useEffect(() => {
+    // Conditions pour lancer la génération automatique :
+    // 1. On a une chanson en cours
+    // 2. On n'est pas en train de charger/générer
+    // 3. On n'a pas de paroles
+    // 4. Pas d'erreur en cours
+    if (
+      currentSong && 
+      !isLoadingLyrics && 
+      !isGenerating && 
+      !lyricsText && 
+      !error
+    ) {
+      console.log('SyncedLyricsView: Auto-generating lyrics for', currentSong.title);
+      generateLyrics();
+    }
+  }, [currentSong?.id, isLoadingLyrics, lyricsText]);
+
   // Animation effects setup
   useEffect(() => {
     setAnimationStage("entry");
