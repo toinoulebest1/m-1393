@@ -201,6 +201,46 @@ export const searchTidalId = async (title: string, artist: string): Promise<stri
 export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
 
+  // 0. Si c'est une URL Deezer, chercher automatiquement sur Tidal
+  if (filePath.includes('dzcdn.net') || filePath.includes('deezer.com')) {
+    console.log('🎵 Détection Deezer, recherche automatique sur Tidal...');
+    
+    if (!songTitle || !songArtist) {
+      throw new Error('Titre et artiste requis pour les musiques Deezer');
+    }
+    
+    // Chercher le Tidal ID
+    let foundTidalId = tidalId;
+    
+    if (!foundTidalId) {
+      // D'abord chercher dans la DB
+      const { data: existingSong } = await supabase
+        .from('songs')
+        .select('tidal_id')
+        .ilike('title', songTitle)
+        .ilike('artist', songArtist)
+        .not('tidal_id', 'is', null)
+        .limit(1)
+        .single();
+      
+      foundTidalId = existingSong?.tidal_id;
+      
+      // Si pas trouvé, chercher via l'API
+      if (!foundTidalId) {
+        console.log('🔎 Recherche Tidal ID pour:', songTitle, '-', songArtist);
+        foundTidalId = await searchTidalId(songTitle, songArtist);
+      }
+    }
+    
+    if (!foundTidalId) {
+      throw new Error(`Impossible de trouver cette musique sur Tidal: ${songTitle} - ${songArtist}`);
+    }
+    
+    // Maintenant qu'on a le Tidal ID, passer au flow normal
+    tidalId = foundTidalId;
+    console.log('✅ Tidal ID trouvé pour Deezer:', tidalId);
+  }
+
   // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
     // Essayer Frankfurt en priorité
