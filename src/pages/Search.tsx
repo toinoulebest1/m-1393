@@ -17,7 +17,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import { searchArtist } from "@/services/deezerApi";
 import { formatRelativeTime } from "@/utils/dateUtils";
-import { useInstantPlayback } from "@/hooks/useInstantPlayback";
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -47,8 +46,8 @@ const Search = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Préchargement instantané des URLs audio pour les résultats
-  useInstantPlayback(results);
+  // Préchargement désactivé sur demande de l'utilisateur
+  // useInstantPlayback(results);
   
   // Restaurer la position de scroll au retour
   useEffect(() => {
