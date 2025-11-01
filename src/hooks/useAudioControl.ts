@@ -50,8 +50,9 @@ export const useAudioControl = ({
       const previousSong = currentSong;
       const previousAudioState = {
         currentTime: audioRef.current.currentTime,
-        isPlaying: !audioRef.current.paused
-      };
+        isPlaying: !audioRef.current.paused,
+        src: audioRef.current.src
+      } as const;
       
       setCurrentSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
@@ -229,7 +230,14 @@ export const useAudioControl = ({
           localStorage.setItem('currentSong', JSON.stringify(previousSong));
           
           // Restaurer l'état audio si la musique jouait
-          if (previousAudioState.isPlaying && audioRef.current.src) {
+          if (previousAudioState.isPlaying) {
+            // Restaurer la source précédente si elle existait
+            if (previousAudioState.src) {
+              audioRef.current.src = previousAudioState.src;
+              audioRef.current.preload = 'auto';
+              audioRef.current.crossOrigin = 'anonymous';
+              audioRef.current.volume = volume / 100;
+            }
             audioRef.current.currentTime = previousAudioState.currentTime;
             try {
               await audioRef.current.play();
@@ -312,9 +320,11 @@ export const useAudioControl = ({
       toast.error(`Erreur: ${error.message}`);
     }
     
-    setIsPlaying(false);
+    const audio = audioRef.current;
+    const stillPlaying = audio && !audio.paused && !!audio.src;
+    setIsPlaying(!!stillPlaying);
     setIsChangingSong(false);
-  }, [setIsPlaying, setIsChangingSong]);
+  }, [audioRef, setIsPlaying, setIsChangingSong]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
