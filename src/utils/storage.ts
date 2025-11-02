@@ -333,29 +333,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 1: Vérifier d'abord le cache si on a un deezerId
-  if (deezerId) {
-    try {
-      const { data: cachedLink } = await supabase
-        .from('tidal_audio_links')
-        .select('audio_url, expires_at')
-        .eq('tidal_id', deezerId)
-        .eq('source', 'deezmate')
-        .single();
-      
-      if (cachedLink?.audio_url && cachedLink.expires_at) {
-        const expiresAt = new Date(cachedLink.expires_at);
-        if (expiresAt > new Date()) {
-          console.log('🔥 CACHE HIT: Lien Deezmate récupéré du cache');
-          return cachedLink.audio_url;
-        }
-      }
-    } catch (error) {
-      // Pas de cache, on continue
-    }
-  }
-
-  // ÉTAPE 2: API Deezmate si un deezerId est fourni
+  // ÉTAPE 1: API Deezmate si un deezerId est fourni
   if (deezerId) {
     console.log('🎵 Essai API Deezmate avec ID:', deezerId);
     try {
@@ -369,27 +347,6 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
           console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
-          
-          // Sauvegarder en arrière-plan avec logs d'erreur
-          const expiresAt = new Date();
-          expiresAt.setHours(expiresAt.getHours() + 23);
-          
-          supabase.from('tidal_audio_links').upsert({
-            tidal_id: deezerId,
-            audio_url: flacUrl,
-            quality: 'LOSSLESS',
-            source: 'deezmate',
-            expires_at: expiresAt.toISOString(),
-            last_verified_at: new Date().toISOString()
-          }, {
-            onConflict: 'tidal_id'
-          }).then(({ error }) => {
-            if (error) {
-              console.error('❌ Erreur sauvegarde cache Deezmate:', error);
-            } else {
-              console.log('✅ Lien Deezmate sauvegardé en cache');
-            }
-          });
           
           // Sauvegarder l'ID Deezer dans la table songs si on a un songId
           if (songId) {
@@ -430,33 +387,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       if (foundDeezerId) {
         console.log('🎵 ID Deezer trouvé:', foundDeezerId);
         
-        // Vérifier le cache d'abord
-        try {
-          const { data: cachedLink } = await supabase
-            .from('tidal_audio_links')
-            .select('audio_url, expires_at')
-            .eq('tidal_id', foundDeezerId)
-            .eq('source', 'deezmate')
-            .single();
-          
-          if (cachedLink?.audio_url && cachedLink.expires_at) {
-            const expiresAt = new Date(cachedLink.expires_at);
-            if (expiresAt > new Date()) {
-              console.log('🔥 CACHE HIT: Lien Deezmate du cache');
-              
-              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-              }
-              
-              return cachedLink.audio_url;
-            }
-          }
-        } catch (error) {
-          // Pas de cache
-        }
-        
-        // Appel Deezmate
+        // Appel Deezmate direct (pas de cache car expire en 1 min)
         try {
           const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
           console.log('📡 Appel Deezmate:', url);
@@ -468,27 +399,6 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
               console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
-              
-              // Sauvegarder en arrière-plan avec logs d'erreur
-              const expiresAt = new Date();
-              expiresAt.setHours(expiresAt.getHours() + 23);
-              
-              supabase.from('tidal_audio_links').upsert({
-                tidal_id: foundDeezerId,
-                audio_url: flacUrl,
-                quality: 'LOSSLESS',
-                source: 'deezmate',
-                expires_at: expiresAt.toISOString(),
-                last_verified_at: new Date().toISOString()
-              }, {
-                onConflict: 'tidal_id'
-              }).then(({ error }) => {
-                if (error) {
-                  console.error('❌ Erreur sauvegarde cache Deezmate:', error);
-                } else {
-                  console.log('✅ Lien Deezmate sauvegardé en cache');
-                }
-              });
               
               // Sauvegarder l'ID Deezer dans la table songs si on a un songId
               if (songId) {
