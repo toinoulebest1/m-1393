@@ -220,61 +220,78 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         { name: 'Phoenix', url: `https://phoenix.squid.wtf/track/?id=${tid}&quality=${quality}` }
       ];
       
-      let res: Response | null = null;
-      let successApi: string | null = null;
-      
-      // Essayer chaque API dans l'ordre
+      // Essayer chaque API dans l'ordre et ne s'arrêter que lorsqu'un lien VALIDE est trouvé
+      let foundUrl: string | null = null;
       for (const api of apis) {
         console.log(`🎵 ${api.name} API:`, api.url);
         try {
-          res = await fetch(api.url, { headers: { Accept: 'application/json' } });
-          if (!res.ok) throw new Error(`${api.name} API error: ${res.status}`);
-          successApi = api.name;
-          break; // API réussie, sortir de la boucle
+          const res = await fetch(api.url, { headers: { Accept: 'application/json' } });
+          if (!res.ok) {
+            console.warn(`⚠️ ${api.name} API error: ${res.status}`);
+            continue;
+          }
+
+          const data = await res.json();
+
+          // Tentative directe (top-level)
+          const directTop = pickDirect(data);
+          if (directTop) {
+            const invalid = directTop.includes('amz-pr-fa.audio.tidal.com') || directTop.includes('tidal.com/track/') || directTop.includes('www.tidal.com');
+            if (!invalid) {
+              console.log(`✅ ${api.name} OriginalTrackUrl (${quality}):`, directTop);
+              foundUrl = directTop;
+              break;
+            } else {
+              console.warn(`⚠️ ${api.name} a renvoyé un lien invalide (${quality}): ${directTop}`);
+            }
+          }
+
+          // Exploration des champs imbriqués + manifest
+          if (data && typeof data === 'object') {
+            outer: for (const key of Object.keys(data)) {
+              const val: any = (data as any)[key];
+              if (val && typeof val === 'object') {
+                const d = pickDirect(val);
+                if (d) {
+                  const invalid = d.includes('amz-pr-fa.audio.tidal.com') || d.includes('tidal.com/track/') || d.includes('www.tidal.com');
+                  if (!invalid) {
+                    console.log(`✅ ${api.name} OriginalTrackUrl (nested, ${quality}):`, d);
+                    foundUrl = d;
+                    break outer;
+                  } else {
+                    console.warn(`⚠️ ${api.name} lien nested invalide (${quality}): ${d}`);
+                  }
+                }
+                if (val?.manifest) {
+                  const fromManifest = await extractFromManifest(val.manifest);
+                  if (fromManifest) {
+                    const invalid = fromManifest.includes('amz-pr-fa.audio.tidal.com') || fromManifest.includes('tidal.com/track/') || fromManifest.includes('www.tidal.com');
+                    if (!invalid) {
+                      console.log(`✅ ${api.name} URL depuis manifest (${quality}):`, fromManifest);
+                      foundUrl = fromManifest;
+                      break outer;
+                    } else {
+                      console.warn(`⚠️ ${api.name} manifest invalide (${quality}): ${fromManifest}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
         } catch (error) {
           console.warn(`⚠️ ${api.name} API échec (${quality}):`, error);
           lastError = error as Error;
-          // Continuer avec l'API suivante
+          // Essayer l'API suivante
         }
-      }
-      
-      // Si aucune API n'a fonctionné pour cette qualité, essayer la qualité suivante
-      if (!res || !successApi) {
-        console.warn(`⚠️ Toutes les APIs ont échoué pour la qualité ${quality}`);
-        continue;
-      }
-      
-      console.log(`✅ Utilisation de ${successApi} API avec qualité ${quality}`);
-      
-      const data = await res.json();
 
-      // Tentative directe
-      const directTop = pickDirect(data);
-      if (directTop) {
-        console.log(`✅ Phoenix OriginalTrackUrl (${quality}):`, directTop);
-        return directTop;
+        if (foundUrl) break; // URL valide trouvée, sortir de la boucle APIs
       }
 
-      // Exploration des champs imbriqués
-      if (data && typeof data === 'object') {
-        for (const key of Object.keys(data)) {
-          const val: any = (data as any)[key];
-          if (val && typeof val === 'object') {
-            const d = pickDirect(val);
-            if (d) {
-              console.log(`✅ Phoenix OriginalTrackUrl (nested, ${quality}):`, d);
-              return d;
-            }
-            if (val?.manifest) {
-              const fromManifest = await extractFromManifest(val.manifest);
-              if (fromManifest) return fromManifest;
-            }
-          }
-        }
+      if (foundUrl) {
+        return foundUrl; // Retourner l'URL valide trouvée pour cette qualité
       }
 
-      console.warn(`⚠️ Phoenix JSON sans OriginalTrackUrl (${quality})`);
-      lastError = new Error('OriginalTrackUrl introuvable dans la réponse Phoenix');
+      console.warn(`⚠️ Aucune API n'a fourni de lien valide pour la qualité ${quality}`);
       // Continuer avec la qualité suivante
     }
     
