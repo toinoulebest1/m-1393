@@ -558,17 +558,6 @@ export const SyncedLyricsView: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toggleFavorite(currentSong)}
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
-              >
-                <Heart 
-                  className="h-3.5 w-3.5" 
-                  fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
-                />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setVolume(volume === 0 ? 50 : 0)}
                 className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0"
               >
@@ -588,6 +577,17 @@ export const SyncedLyricsView: React.FC = () => {
               <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">
                 {volume}%
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleFavorite(currentSong)}
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
+              >
+                <Heart 
+                  className="h-3.5 w-3.5" 
+                  fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
+                />
+              </Button>
             </div>
             
             {/* Playback controls */}
