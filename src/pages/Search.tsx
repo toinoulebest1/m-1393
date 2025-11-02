@@ -282,17 +282,31 @@ const Search = () => {
 
         // Add Deezer results
         if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
-          const deezerSongs = deezerResult.data.data.map((track: any) => ({
-            id: `deezer-${track.id}`,
-            title: track.title,
-            artist: track.artist?.name || '',
-            duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
-            url: track.preview,
-            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
-            bitrate: 'Preview',
-            album_name: track.album?.title,
-            isDeezer: true
-          }));
+          const deezerSongs = deezerResult.data.data.map((track: any) => {
+            // Extraire tous les artistes depuis le titre si feat/ft est présent
+            let artistName = track.artist?.name || '';
+            
+            // Si le titre contient feat/ft, essayer d'extraire tous les artistes
+            if (track.title) {
+              const featMatch = track.title.match(/\(feat\.?\s+([^)]+)\)|\(ft\.?\s+([^)]+)\)/i);
+              if (featMatch) {
+                const featArtist = featMatch[1] || featMatch[2];
+                artistName = `${artistName} & ${featArtist}`;
+              }
+            }
+            
+            return {
+              id: `deezer-${track.id}`,
+              title: track.title,
+              artist: artistName,
+              duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
+              url: track.preview,
+              imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
+              bitrate: 'Preview',
+              album_name: track.album?.title,
+              isDeezer: true
+            };
+          });
           formattedResults.push(...deezerSongs);
         }
 
@@ -406,17 +420,31 @@ const Search = () => {
         
         // Add Deezer results
         if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
-          const deezerSongs = deezerResult.data.data.map((track: any) => ({
-            id: `deezer-${track.id}`,
-            title: track.title,
-            artist: track.artist?.name || '',
-            duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
-            url: track.preview,
-            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
-            bitrate: 'Preview',
-            album_name: track.album?.title,
-            isDeezer: true
-          }));
+          const deezerSongs = deezerResult.data.data.map((track: any) => {
+            // Extraire tous les artistes depuis le titre si feat/ft est présent
+            let artistName = track.artist?.name || '';
+            
+            // Si le titre contient feat/ft, essayer d'extraire tous les artistes
+            if (track.title) {
+              const featMatch = track.title.match(/\(feat\.?\s+([^)]+)\)|\(ft\.?\s+([^)]+)\)/i);
+              if (featMatch) {
+                const featArtist = featMatch[1] || featMatch[2];
+                artistName = `${artistName} & ${featArtist}`;
+              }
+            }
+            
+            return {
+              id: `deezer-${track.id}`,
+              title: track.title,
+              artist: artistName,
+              duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
+              url: track.preview,
+              imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
+              bitrate: 'Preview',
+              album_name: track.album?.title,
+              isDeezer: true
+            };
+          });
           formattedResults.push(...deezerSongs);
         }
         
