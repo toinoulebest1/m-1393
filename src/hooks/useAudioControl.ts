@@ -201,6 +201,12 @@ export const useAudioControl = ({
                 );
               }
               
+              // Vérifier que la chanson n'a pas changé entre temps
+              if (currentSong?.id !== song.id) {
+                console.warn("⚠️ Chanson changée pendant la recherche, abandon du rechargement");
+                return;
+              }
+              
               if (newAudioUrl && newAudioUrl !== audio.src) {
                 console.log("✅ Nouveau lien obtenu:", newAudioUrl.substring(0, 100) + "...");
                 const currentTime = audio.currentTime;
