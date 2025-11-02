@@ -138,7 +138,7 @@ export const SongCard = ({
 
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="text-base font-medium truncate">{song.title}</div>
-        <div className="text-xs text-muted-foreground truncate">
+        <div className="text-xs text-muted-foreground" title={song.artist || "Artiste inconnu"}>
           {song.artist || "Artiste inconnu"}
         </div>
       </div>

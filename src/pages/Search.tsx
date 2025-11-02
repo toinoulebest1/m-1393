@@ -283,22 +283,34 @@ const Search = () => {
         // Add Deezer results
         if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
           const deezerSongs = deezerResult.data.data.map((track: any) => {
-            // Extraire tous les artistes depuis le titre si feat/ft est présent
-            let artistName = track.artist?.name || '';
-            
-            // Si le titre contient feat/ft, essayer d'extraire tous les artistes
+            // Tenter d'utiliser les contributeurs retournés par l'API (enrichis côté Edge)
+            let names: string[] = [];
+            if (Array.isArray(track._contributors_names) && track._contributors_names.length > 0) {
+              names = track._contributors_names;
+            } else if (Array.isArray(track.contributors) && track.contributors.length > 0) {
+              names = track.contributors.map((c: any) => c?.name).filter(Boolean);
+              const main = track.artist?.name;
+              if (main && !names.includes(main)) names.unshift(main);
+            } else if (track.artist?.name) {
+              names = [track.artist.name];
+            }
+
+            // Extraire aussi depuis le titre (feat/ft)
             if (track.title) {
               const featMatch = track.title.match(/\(feat\.?\s+([^)]+)\)|\(ft\.?\s+([^)]+)\)/i);
               if (featMatch) {
-                const featArtist = featMatch[1] || featMatch[2];
-                artistName = `${artistName} & ${featArtist}`;
+                const featArtist = (featMatch[1] || featMatch[2] || '').split(/,|&|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
+                names.push(...featArtist);
               }
             }
+
+            // Dédupliquer et joindre
+            const artistName = Array.from(new Set(names.filter(Boolean))).join(' & ');
             
             return {
               id: `deezer-${track.id}`,
               title: track.title,
-              artist: artistName,
+              artist: artistName || track.artist?.name || '',
               duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
               url: track.preview,
               imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
@@ -421,22 +433,34 @@ const Search = () => {
         // Add Deezer results
         if (deezerResult && !deezerResult.error && deezerResult.data?.data) {
           const deezerSongs = deezerResult.data.data.map((track: any) => {
-            // Extraire tous les artistes depuis le titre si feat/ft est présent
-            let artistName = track.artist?.name || '';
-            
-            // Si le titre contient feat/ft, essayer d'extraire tous les artistes
+            // Tenter d'utiliser les contributeurs retournés par l'API (enrichis côté Edge)
+            let names: string[] = [];
+            if (Array.isArray(track._contributors_names) && track._contributors_names.length > 0) {
+              names = track._contributors_names;
+            } else if (Array.isArray(track.contributors) && track.contributors.length > 0) {
+              names = track.contributors.map((c: any) => c?.name).filter(Boolean);
+              const main = track.artist?.name;
+              if (main && !names.includes(main)) names.unshift(main);
+            } else if (track.artist?.name) {
+              names = [track.artist.name];
+            }
+
+            // Extraire aussi depuis le titre (feat/ft)
             if (track.title) {
               const featMatch = track.title.match(/\(feat\.?\s+([^)]+)\)|\(ft\.?\s+([^)]+)\)/i);
               if (featMatch) {
-                const featArtist = featMatch[1] || featMatch[2];
-                artistName = `${artistName} & ${featArtist}`;
+                const featArtist = (featMatch[1] || featMatch[2] || '').split(/,|&|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
+                names.push(...featArtist);
               }
             }
+
+            // Dédupliquer et joindre
+            const artistName = Array.from(new Set(names.filter(Boolean))).join(' & ');
             
             return {
               id: `deezer-${track.id}`,
               title: track.title,
-              artist: artistName,
+              artist: artistName || track.artist?.name || '',
               duration: Math.floor(track.duration / 60) + ':' + String(track.duration % 60).padStart(2, '0'),
               url: track.preview,
               imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
