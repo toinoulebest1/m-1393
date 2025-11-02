@@ -326,8 +326,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       if (res.ok) {
         const data = await res.json();
         
-        // Extraire le lien FLAC du JSON
-        const flacUrl = data?.flac || data?.FLAC;
+        // Extraire le lien FLAC du JSON (dans data.links.flac)
+        const flacUrl = data?.links?.flac || data?.links?.FLAC;
         
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
           console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
@@ -373,8 +373,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           if (res.ok) {
             const data = await res.json();
             
-            // Extraire le lien FLAC du JSON
-            const flacUrl = data?.flac || data?.FLAC;
+            // Extraire le lien FLAC du JSON (dans data.links.flac)
+            const flacUrl = data?.links?.flac || data?.links?.FLAC;
             
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
               console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
