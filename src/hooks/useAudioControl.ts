@@ -312,34 +312,40 @@ export const useAudioControl = ({
         // IMPORTANT: Débloquer immédiatement l'interface
         setIsChangingSong(false);
         
-        // Revenir à la musique précédente si elle existait
-        if (previousSong) {
-          console.log("🔄 Retour à la musique précédente:", previousSong.title);
-          setCurrentSong(previousSong);
-          localStorage.setItem('currentSong', JSON.stringify(previousSong));
-          
-          // Restaurer l'état audio si la musique jouait
-          if (previousAudioState.isPlaying) {
-            // Restaurer la source précédente si elle existait
-            if (previousAudioState.src) {
-              audioRef.current.src = previousAudioState.src;
-              audioRef.current.preload = 'auto';
-              audioRef.current.crossOrigin = 'anonymous';
-              audioRef.current.volume = volume / 100;
-            }
-            audioRef.current.currentTime = previousAudioState.currentTime;
-            try {
-              await audioRef.current.play();
-              setIsPlaying(true);
-            } catch (playError) {
-              console.error("Erreur restauration lecture:", playError);
+        // Si erreur média non supportée, ne pas revenir immédiatement à la précédente
+        const isMediaNotSupported = (error as any)?.name === 'NotSupportedError' || (error as any)?.message?.toLowerCase?.().includes('not suitable');
+        if (!isMediaNotSupported) {
+          // Revenir à la musique précédente si elle existait
+          if (previousSong) {
+            console.log("🔄 Retour à la musique précédente:", previousSong.title);
+            setCurrentSong(previousSong);
+            localStorage.setItem('currentSong', JSON.stringify(previousSong));
+            
+            // Restaurer l'état audio si la musique jouait
+            if (previousAudioState.isPlaying) {
+              // Restaurer la source précédente si elle existait
+              if (previousAudioState.src) {
+                audioRef.current.src = previousAudioState.src;
+                audioRef.current.preload = 'auto';
+                audioRef.current.crossOrigin = 'anonymous';
+                audioRef.current.volume = volume / 100;
+              }
+              audioRef.current.currentTime = previousAudioState.currentTime;
+              try {
+                await audioRef.current.play();
+                setIsPlaying(true);
+              } catch (playError) {
+                console.error("Erreur restauration lecture:", playError);
+                setIsPlaying(false);
+              }
+            } else {
               setIsPlaying(false);
             }
           } else {
             setIsPlaying(false);
           }
         } else {
-          setIsPlaying(false);
+          console.log("⏳ Erreur média: tentative de récupération sans changer de chanson");
         }
         
         handlePlayError(error as any, song);
