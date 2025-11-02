@@ -370,11 +370,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
           console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
           
-          // Sauvegarder en arrière-plan (sans attendre)
+          // Sauvegarder en arrière-plan avec logs d'erreur
           const expiresAt = new Date();
           expiresAt.setHours(expiresAt.getHours() + 23);
           
-          void supabase.from('tidal_audio_links').upsert({
+          supabase.from('tidal_audio_links').upsert({
             tidal_id: deezerId,
             audio_url: flacUrl,
             quality: 'LOSSLESS',
@@ -383,6 +383,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             last_verified_at: new Date().toISOString()
           }, {
             onConflict: 'tidal_id'
+          }).then(({ error }) => {
+            if (error) {
+              console.error('❌ Erreur sauvegarde cache Deezmate:', error);
+            } else {
+              console.log('✅ Lien Deezmate sauvegardé en cache');
+            }
           });
           
           // Sauvegarder l'ID Deezer dans la table songs si on a un songId
@@ -463,11 +469,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
               console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
               
-              // Sauvegarder en arrière-plan
+              // Sauvegarder en arrière-plan avec logs d'erreur
               const expiresAt = new Date();
               expiresAt.setHours(expiresAt.getHours() + 23);
               
-              void supabase.from('tidal_audio_links').upsert({
+              supabase.from('tidal_audio_links').upsert({
                 tidal_id: foundDeezerId,
                 audio_url: flacUrl,
                 quality: 'LOSSLESS',
@@ -476,6 +482,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
                 last_verified_at: new Date().toISOString()
               }, {
                 onConflict: 'tidal_id'
+              }).then(({ error }) => {
+                if (error) {
+                  console.error('❌ Erreur sauvegarde cache Deezmate:', error);
+                } else {
+                  console.log('✅ Lien Deezmate sauvegardé en cache');
+                }
               });
               
               // Sauvegarder l'ID Deezer dans la table songs si on a un songId
