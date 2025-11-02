@@ -581,7 +581,15 @@ export const SyncedLyricsView: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => toggleFavorite(currentSong)}
+                onClick={async () => {
+                  const wasFavorite = favorites.some(f => f.id === currentSong.id);
+                  await toggleFavorite(currentSong);
+                  if (wasFavorite) {
+                    toast.success("Retiré des favoris");
+                  } else {
+                    toast.success("Ajouté aux favoris ❤️");
+                  }
+                }}
                 className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
               >
                 <Heart 
