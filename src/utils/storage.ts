@@ -271,7 +271,7 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
 // Récupère l'URL audio depuis un Tidal ID
 export const getTidalAudioUrl = async (tidalId: string): Promise<string | null> => {
   try {
-    console.log('🎵 Récupération URL audio Tidal pour ID:', tidalId);
+    console.log('🎵 [TIDAL] Récupération URL audio pour ID:', tidalId);
     
     const apis = [
       `https://frankfurt.monochrome.tf/dl/${tidalId}`,
@@ -280,36 +280,56 @@ export const getTidalAudioUrl = async (tidalId: string): Promise<string | null> 
 
     for (const url of apis) {
       try {
+        console.log('📡 [TIDAL] Tentative:', url);
         const res = await fetch(url, { 
           headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(10000)
         });
         
-        if (!res.ok) continue;
+        console.log('📥 [TIDAL] Status:', res.status, 'pour', url);
         
+        if (!res.ok) {
+          console.warn('⚠️ [TIDAL] HTTP error:', res.status);
+          continue;
+        }
+        
+        const contentType = res.headers.get('content-type');
+        console.log('📄 [TIDAL] Content-Type:', contentType);
+        
+        // Si c'est un fichier audio direct (pas JSON)
+        if (contentType?.includes('audio') || contentType?.includes('octet-stream')) {
+          console.log('✅ [TIDAL] URL audio directe obtenue:', url);
+          return url; // L'URL elle-même est l'audio
+        }
+        
+        // Sinon, parser le JSON
         const data = await res.json();
+        console.log('📦 [TIDAL] Réponse JSON:', data);
         
         // Extraire l'URL audio de différentes structures possibles
-        const audioUrl = data?.url || data?.audioUrl || data?.streamUrl || data?.link || data?.downloadUrl;
+        const audioUrl = data?.url || data?.audioUrl || data?.streamUrl || data?.link || data?.downloadUrl || data?.file;
         
         if (audioUrl && typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
-          console.log('✅ URL audio Tidal obtenue:', audioUrl);
+          console.log('✅ [TIDAL] URL audio obtenue:', audioUrl);
           return audioUrl;
         }
         
         // Parfois l'URL est dans un objet "data"
         if (data?.data?.url) {
-          console.log('✅ URL audio Tidal obtenue (nested):', data.data.url);
+          console.log('✅ [TIDAL] URL audio obtenue (nested):', data.data.url);
           return data.data.url;
         }
+        
+        console.warn('⚠️ [TIDAL] Aucune URL audio trouvée dans la réponse');
       } catch (error) {
-        console.warn('⚠️ Erreur API Tidal:', url, error);
+        console.warn('⚠️ [TIDAL] Erreur API:', url, error);
       }
     }
     
+    console.warn('❌ [TIDAL] Toutes les APIs ont échoué');
     return null;
   } catch (error) {
-    console.warn('⚠️ Erreur récupération URL Tidal:', error);
+    console.warn('❌ [TIDAL] Erreur récupération URL:', error);
     return null;
   }
 };
@@ -471,38 +491,51 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
 
   // ========== FALLBACK: TIDAL ==========
   // Si Deezer a échoué, essayer Tidal
+  console.log('🔍 [FALLBACK] Vérification conditions Tidal - Title:', !!songTitle, 'Artist:', !!songArtist);
+  
   if (songTitle && songArtist) {
-    console.log('🎵 Tentative fallback Tidal...');
+    console.log('🎵 [TIDAL] Tentative fallback Tidal pour:', songTitle, '-', songArtist);
     
     try {
       // Chercher le Tidal ID (ou utiliser celui fourni)
       let foundTidalId = tidalId;
       
       if (!foundTidalId) {
+        console.log('🔍 [TIDAL] Recherche Tidal ID...');
         const tidalIds = await searchTidalIds(songTitle, songArtist, 1);
         foundTidalId = tidalIds[0] || null;
+        console.log('🔍 [TIDAL] IDs trouvés:', tidalIds);
+      } else {
+        console.log('✅ [TIDAL] Tidal ID déjà fourni:', foundTidalId);
       }
       
       if (foundTidalId) {
-        console.log('🎵 Tidal ID trouvé:', foundTidalId);
+        console.log('🎵 [TIDAL] Tidal ID sélectionné:', foundTidalId);
         
         // Essayer de récupérer l'URL audio depuis les APIs Tidal
         const tidalUrl = await getTidalAudioUrl(foundTidalId);
         
         if (tidalUrl) {
-          console.log('✅ URL Tidal obtenue:', tidalUrl);
+          console.log('✅ [TIDAL] URL obtenue avec succès:', tidalUrl);
           
           // Sauvegarder le Tidal ID dans la table songs si on a un songId
           if (songId) {
+            console.log('💾 [TIDAL] Sauvegarde Tidal ID dans la DB');
             void supabase.from('songs').update({ tidal_id: foundTidalId }).eq('id', songId);
           }
           
           return tidalUrl;
+        } else {
+          console.warn('❌ [TIDAL] Échec récupération URL pour ID:', foundTidalId);
         }
+      } else {
+        console.warn('❌ [TIDAL] Aucun Tidal ID trouvé');
       }
     } catch (error) {
-      console.warn('⚠️ Erreur fallback Tidal:', error);
+      console.error('❌ [TIDAL] Erreur fallback:', error);
     }
+  } else {
+    console.log('⚠️ [TIDAL] Fallback impossible - Titre ou artiste manquant');
   }
 
   // ========== FALLBACK: STORAGE LOCAL UNIQUEMENT ==========
