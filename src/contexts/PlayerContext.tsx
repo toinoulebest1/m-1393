@@ -671,15 +671,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // Fonction pour changer la position (seek) - synchronise état et audio
-  const seekTo = useCallback((newProgress: number) => {
-    if (audioRef.current && !isNaN(audioRef.current.duration)) {
-      const time = (newProgress / 100) * audioRef.current.duration;
-      audioRef.current.currentTime = time;
-      setProgress(newProgress);
-    }
-  }, [setProgress]);
-
   // L'objet context complet avec l'égaliseur - Fix type mapping
   const playerContext: PlayerContextType = {
     currentSong,
@@ -704,7 +695,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     play,
     pause,
     setVolume,
-    setProgress: seekTo,
+    setProgress,
     nextSong,
     previousSong,
     addToQueue,
