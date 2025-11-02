@@ -542,21 +542,6 @@ export const SyncedLyricsView: React.FC = () => {
               </span>
             </div>
             
-            {/* Favorite button */}
-            <div className="flex justify-center mb-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => toggleFavorite(currentSong)}
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-10 w-10"
-              >
-                <Heart 
-                  className="h-5 w-5" 
-                  fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
-                />
-              </Button>
-            </div>
-            
             {/* Progress bar */}
             <div className="flex items-center mb-4">
               <Slider
@@ -568,8 +553,19 @@ export const SyncedLyricsView: React.FC = () => {
               />
             </div>
             
-            {/* Volume control */}
+            {/* Volume control with favorite button */}
             <div className="flex items-center space-x-2 mb-3 px-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleFavorite(currentSong)}
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
+              >
+                <Heart 
+                  className="h-3.5 w-3.5" 
+                  fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
+                />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
