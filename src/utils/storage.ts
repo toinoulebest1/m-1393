@@ -318,7 +318,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       try {
         const { data: cachedLink } = await supabase
           .from('tidal_audio_links')
-          .select('audio_url')
+          .select('audio_url, expires_at')
           .eq('tidal_id', tid)
           .maybeSingle();
         
@@ -327,9 +327,14 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
                                cachedLink.audio_url.includes('tidal.com/track/') ||
                                cachedLink.audio_url.includes('www.tidal.com');
           
-          if (!isInvalidLink) {
+          // Vérifier si le lien n'est pas expiré
+          const isExpired = cachedLink.expires_at && new Date(cachedLink.expires_at) < new Date();
+          
+          if (!isInvalidLink && !isExpired) {
             console.log(`✅ Lien valide trouvé en cache DB (ID: ${tid}):`, cachedLink.audio_url);
             return cachedLink.audio_url; // Retourner immédiatement le lien en cache
+          } else if (isExpired) {
+            console.warn(`⏰ Lien expiré en cache pour ID ${tid}, rafraîchissement depuis l'API...`);
           } else {
             console.warn(`⚠️ Lien invalide en cache pour ID ${tid}, continuer la recherche API`);
           }
@@ -354,6 +359,10 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         
         console.log(`✅ Lien audio valide obtenu avec ID #${i + 1}: ${tid}`);
         
+        // Calculer la date d'expiration (23h à partir de maintenant, car liens Tidal expirent après 24h)
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 23);
+        
         // Sauvegarder uniquement les liens audio directs valides
         await supabase
           .from('tidal_audio_links')
@@ -362,9 +371,10 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
             audio_url: audioUrl,
             quality: 'LOSSLESS',
             source: 'frankfurt',
-            last_verified_at: new Date().toISOString()
+            last_verified_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString()
           });
-        console.log('💾 Lien audio valide sauvegardé dans tidal_audio_links');
+        console.log('💾 Lien audio valide sauvegardé dans tidal_audio_links (expire dans 23h)');
         
         return audioUrl;
       } catch (error) {
@@ -382,7 +392,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
     try {
       const { data: manualLink, error } = await supabase
         .from('tidal_audio_links')
-        .select('audio_url')
+        .select('audio_url, expires_at')
         .eq('tidal_id', tidalId)
         .maybeSingle();
 
@@ -394,8 +404,15 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
                              manualLink.audio_url.includes('tidal.com/track/') ||
                              manualLink.audio_url.includes('www.tidal.com');
         
-        if (isInvalidLink) {
-          console.warn('⚠️ Lien invalide en cache, recherche alternatives...');
+        // Vérifier si le lien n'est pas expiré
+        const isExpired = manualLink.expires_at && new Date(manualLink.expires_at) < new Date();
+        
+        if (isInvalidLink || isExpired) {
+          if (isExpired) {
+            console.warn('⏰ Lien expiré en cache, rafraîchissement...');
+          } else {
+            console.warn('⚠️ Lien invalide en cache, recherche alternatives...');
+          }
           
           // Si on a titre + artiste, chercher des IDs alternatifs
           if (songTitle && songArtist) {
