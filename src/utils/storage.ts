@@ -331,6 +331,28 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
           console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+          
+          // Sauvegarder le lien dans tidal_audio_links
+          try {
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 23); // Expire dans 23h
+            
+            await supabase.from('tidal_audio_links').upsert({
+              tidal_id: deezerId,
+              audio_url: flacUrl,
+              quality: 'LOSSLESS',
+              source: 'deezmate',
+              expires_at: expiresAt.toISOString(),
+              last_verified_at: new Date().toISOString()
+            }, {
+              onConflict: 'tidal_id'
+            });
+            
+            console.log('💾 Lien Deezmate sauvegardé dans tidal_audio_links');
+          } catch (saveError) {
+            console.warn('⚠️ Erreur sauvegarde lien Deezmate:', saveError);
+          }
+          
           return flacUrl;
         } else {
           console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
@@ -378,6 +400,28 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
               console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+              
+              // Sauvegarder le lien dans tidal_audio_links
+              try {
+                const expiresAt = new Date();
+                expiresAt.setHours(expiresAt.getHours() + 23); // Expire dans 23h
+                
+                await supabase.from('tidal_audio_links').upsert({
+                  tidal_id: foundDeezerId,
+                  audio_url: flacUrl,
+                  quality: 'LOSSLESS',
+                  source: 'deezmate',
+                  expires_at: expiresAt.toISOString(),
+                  last_verified_at: new Date().toISOString()
+                }, {
+                  onConflict: 'tidal_id'
+                });
+                
+                console.log('💾 Lien Deezmate sauvegardé dans tidal_audio_links');
+              } catch (saveError) {
+                console.warn('⚠️ Erreur sauvegarde lien Deezmate:', saveError);
+              }
+              
               return flacUrl;
             } else {
               console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
