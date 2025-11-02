@@ -314,7 +314,14 @@ export const getTidalAudioUrl = async (tidalId: string): Promise<string | null> 
         const data = await res.json();
         console.log('📦 [TIDAL] Réponse JSON:', data);
         
-        // Extraire l'URL audio de différentes structures possibles
+        // L'API Tidal retourne un tableau avec l'URL dans le 3ème objet
+        if (Array.isArray(data) && data[2]?.OriginalTrackUrl) {
+          const audioUrl = data[2].OriginalTrackUrl;
+          console.log('✅ [TIDAL] URL audio trouvée dans OriginalTrackUrl:', audioUrl);
+          return audioUrl;
+        }
+        
+        // Extraire l'URL audio de différentes structures possibles (fallback)
         const audioUrl = data?.url || data?.audioUrl || data?.streamUrl || data?.link || data?.downloadUrl || data?.file;
         
         if (audioUrl && typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
