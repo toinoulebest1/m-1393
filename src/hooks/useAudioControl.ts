@@ -106,9 +106,9 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming instantané - pas de préchargement
+        // Configuration streaming avec preload
         console.log("⚡ Démarrage instantané");
-        audio.preload = "none"; // Pas de préchargement, streaming immédiat
+        audio.preload = "auto"; // Preload activé pour permettre la navigation
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
