@@ -292,27 +292,29 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       try {
         const audioUrl = await fetchPhoenixUrl(tid);
         
-        // Vérifier si le lien est valide (pas amz-pr-fa)
-        if (audioUrl.includes('amz-pr-fa.audio.tidal.com')) {
-          console.warn(`⚠️ Lien amz-pr-fa détecté (ID: ${tid}), essayer prochain ID...`);
+        // Vérifier si le lien est valide (pas amz-pr-fa ni URL web Tidal)
+        const isInvalidLink = audioUrl.includes('amz-pr-fa.audio.tidal.com') || 
+                             audioUrl.includes('tidal.com/track/') ||
+                             audioUrl.includes('www.tidal.com');
+        
+        if (isInvalidLink) {
+          console.warn(`⚠️ Lien invalide détecté (ID: ${tid}): ${audioUrl}, essayer prochain ID...`);
           continue; // Essayer le prochain ID sans sauvegarder
         }
         
-        console.log(`✅ Lien valide obtenu avec ID #${i + 1}: ${tid}`);
+        console.log(`✅ Lien audio valide obtenu avec ID #${i + 1}: ${tid}`);
         
-        // NE sauvegarder que si le lien est valide (pas amz-pr-fa)
-        if (!audioUrl.includes('amz-pr-fa.audio.tidal.com')) {
-          await supabase
-            .from('tidal_audio_links')
-            .upsert({
-              tidal_id: tid,
-              audio_url: audioUrl,
-              quality: 'LOSSLESS',
-              source: 'frankfurt',
-              last_verified_at: new Date().toISOString()
-            });
-          console.log('💾 Lien valide sauvegardé dans tidal_audio_links');
-        }
+        // Sauvegarder uniquement les liens audio directs valides
+        await supabase
+          .from('tidal_audio_links')
+          .upsert({
+            tidal_id: tid,
+            audio_url: audioUrl,
+            quality: 'LOSSLESS',
+            source: 'frankfurt',
+            last_verified_at: new Date().toISOString()
+          });
+        console.log('💾 Lien audio valide sauvegardé dans tidal_audio_links');
         
         return audioUrl;
       } catch (error) {
@@ -335,11 +337,15 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
         .maybeSingle();
 
       if (!error && manualLink?.audio_url) {
-        console.log('✅ Lien manuel trouvé dans tidal_audio_links:', manualLink.audio_url);
+        console.log('✅ Lien trouvé dans tidal_audio_links:', manualLink.audio_url);
         
-        // Vérifier si le lien est valide (pas amz-pr-fa)
-        if (manualLink.audio_url.includes('amz-pr-fa.audio.tidal.com')) {
-          console.warn('⚠️ Lien manuel amz-pr-fa détecté, recherche alternatives...');
+        // Vérifier si le lien est valide (pas amz-pr-fa ni URL web Tidal)
+        const isInvalidLink = manualLink.audio_url.includes('amz-pr-fa.audio.tidal.com') || 
+                             manualLink.audio_url.includes('tidal.com/track/') ||
+                             manualLink.audio_url.includes('www.tidal.com');
+        
+        if (isInvalidLink) {
+          console.warn('⚠️ Lien invalide en cache, recherche alternatives...');
           
           // Si on a titre + artiste, chercher des IDs alternatifs
           if (songTitle && songArtist) {
@@ -352,12 +358,12 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
               console.log(`🔄 Réessai avec ${otherIds.length} IDs alternatifs`);
               return await fetchWithFallback(otherIds);
             } else {
-              console.warn('⚠️ Aucun ID alternatif trouvé, utilisation lien amz-pr-fa');
-              return manualLink.audio_url;
+              console.warn('⚠️ Aucun ID alternatif trouvé');
+              throw new Error('Aucun lien audio valide trouvé pour cette musique');
             }
           } else {
             console.warn('⚠️ Pas de titre/artiste, impossible de chercher alternatives');
-            return manualLink.audio_url;
+            throw new Error('Lien audio invalide et pas de métadonnées pour chercher des alternatives');
           }
         }
         
@@ -424,8 +430,10 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       
       if (manualLink2?.audio_url) {
         console.log('✅ Lien manuel trouvé (post-détection Tidal):', manualLink2.audio_url);
-        // Si le lien manuel pointe vers amz-pr-fa, relancer une recherche avec d'autres IDs (exclure l'ID courant)
-        if (manualLink2.audio_url.includes('amz-pr-fa.audio.tidal.com')) {
+        // Vérifier si le lien est invalide (amz-pr-fa ou URL web Tidal)
+        if (manualLink2.audio_url.includes('amz-pr-fa.audio.tidal.com') || 
+            manualLink2.audio_url.includes('tidal.com/track/') ||
+            manualLink2.audio_url.includes('www.tidal.com')) {
           console.warn('⚠️ Lien manuel amz-pr-fa détecté (post-détection), recherche d’IDs alternatifs...');
           if (songTitle && songArtist && tidalId) {
             const alternativeIds = await searchTidalIds(songTitle, songArtist, 5);
@@ -434,7 +442,8 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
               console.log(`🔄 Réessai avec ${otherIds.length} IDs alternatifs (post-détection)`);
               return await fetchWithFallback(otherIds);
             } else {
-              console.warn('⚠️ Aucun ID alternatif trouvé (post-détection), conservation du lien amz-pr-fa');
+              console.warn('⚠️ Aucun ID alternatif trouvé (post-détection)');
+              throw new Error('Aucun lien audio valide trouvé pour cette musique');
             }
           }
         }
@@ -486,7 +495,11 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       const direct = await fetchPhoenixUrl(tidalId);
       
       // Vérifier si le lien est valide avant de sauvegarder
-      if (!direct.includes('amz-pr-fa.audio.tidal.com')) {
+      const isInvalidLink = direct.includes('amz-pr-fa.audio.tidal.com') || 
+                           direct.includes('tidal.com/track/') ||
+                           direct.includes('www.tidal.com');
+      
+      if (!isInvalidLink) {
         await supabase
           .from('tidal_audio_links')
           .upsert({
@@ -496,9 +509,9 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
             source: 'frankfurt',
             last_verified_at: new Date().toISOString()
           });
-        console.log('💾 Lien valide sauvegardé dans tidal_audio_links');
+        console.log('💾 Lien audio valide sauvegardé dans tidal_audio_links');
       } else {
-        console.warn('⚠️ Lien amz-pr-fa non sauvegardé');
+        console.warn('⚠️ Lien invalide non sauvegardé:', direct);
       }
       
       return direct;
