@@ -67,12 +67,13 @@ export const useAudioControl = ({
       }
 
       try {
-        const startTime = performance.now();
-        console.log("🚀 Récupération URL ultra-rapide...");
-        
+        console.log("⚡ Configuration audio");
         const audio = audioRef.current;
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
+        
+        console.log("🚀 Récupération URL ultra-rapide...");
+        const startTime = performance.now();
         
         // Récupération ultra-rapide de l'URL audio
         let audioUrl: string;
@@ -106,9 +107,9 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming avec preload
+        // Configuration streaming instantané comme Spotify
         console.log("⚡ Démarrage instantané");
-        audio.preload = "auto"; // Preload activé pour permettre la navigation
+        audio.preload = "auto"; // Chargement immédiat
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
@@ -118,19 +119,11 @@ export const useAudioControl = ({
             message: audioError?.message,
             src: audio.src
           });
-          const errorSongId = song.id;
-          const originalSrc = audio.src;
           
           // Si c'est une erreur réseau ou abort (lien expiré/invalide)
           if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
               audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
               audioError?.code === MediaError.MEDIA_ERR_DECODE) {
-            // Anti-réentrée: éviter de lancer plusieurs récupérations en parallèle
-            if ((audio as any).dataset?.recovering === '1') {
-              console.log('⏳ Récupération déjà en cours, on ignore cette erreur');
-              return;
-            }
-            (audio as any).dataset = { ...(audio as any).dataset, recovering: '1' } as DOMStringMap;
             
             console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
             
@@ -151,70 +144,14 @@ export const useAudioControl = ({
             // Récupérer un nouveau lien
             try {
               console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
-              
-              // Si l'URL actuelle était Deezer/Deezmate, forcer le passage à Tidal
-              const isDeezerUrl = audio.src.includes('purr.rip') || 
-                                 audio.src.includes('deezer') || 
-                                 audio.src.includes('deezmate') ||
-                                 audio.src.includes('dzcdn.net');
-              
-              let newAudioUrl: string | null = null;
-              
-              if (isDeezerUrl && song.title && song.artist) {
-                console.log("🎵 [FALLBACK] URL Deezer échouée, essai Tidal...");
-                
-                // Importer les fonctions Tidal depuis storage.ts
-                const { searchTidalIds, getTidalAudioUrl } = await import('@/utils/storage');
-                
-                // Essayer de récupérer l'URL via Tidal
-                try {
-                  // Chercher le Tidal ID
-                  let foundTidalId = song.tidal_id;
-                  
-                  if (!foundTidalId) {
-                    console.log("🔍 [TIDAL] Recherche Tidal ID...");
-                    const tidalIds = await searchTidalIds(song.title, song.artist, 1);
-                    foundTidalId = tidalIds[0] || null;
-                  }
-                  
-                  if (foundTidalId) {
-                    console.log("🎵 [TIDAL] ID trouvé:", foundTidalId);
-                    newAudioUrl = await getTidalAudioUrl(foundTidalId);
-                    
-                    if (newAudioUrl) {
-                      console.log("✅ [TIDAL] Nouvelle URL obtenue via Tidal");
-                      
-                      // Sauvegarder le Tidal ID dans la DB
-                      const { supabase } = await import('@/integrations/supabase/client');
-                      await supabase
-                        .from('songs')
-                        .update({ tidal_id: foundTidalId })
-                        .eq('id', song.id);
-                    }
-                  }
-                } catch (tidalError) {
-                  console.error("❌ [TIDAL] Échec aussi:", tidalError);
-                }
-              }
-              
-              // Si Tidal n'a pas fonctionné ou ce n'était pas une URL Deezer, réessayer normalement
-              if (!newAudioUrl) {
-                newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                  song.url, 
-                  song.deezer_id,
-                  song.tidal_id,
-                  song.title,
-                  song.artist,
-                  song.id
-                );
-              }
-              
-              // Vérifier que la source audio n'a pas été modifiée entre-temps (évite les conflits si la chanson change)
-              if (audio.src !== originalSrc) {
-                console.warn("⚠️ Source audio changée pendant la recherche, abandon du rechargement");
-                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
-                return;
-              }
+              const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                song.url, 
+                song.deezer_id,
+                song.tidal_id,
+                song.title,
+                song.artist,
+                song.id
+              );
               
               if (newAudioUrl && newAudioUrl !== audio.src) {
                 console.log("✅ Nouveau lien obtenu:", newAudioUrl.substring(0, 100) + "...");
@@ -229,28 +166,20 @@ export const useAudioControl = ({
                 audio.currentTime = currentTime;
                 
                 if (wasPlaying) {
-                  try {
-                    await audio.play();
-                    console.log("✅ Lecture reprise avec le nouveau lien");
-                    setIsPlaying(true);
-                  } catch (playError) {
-                    console.error("❌ Erreur reprise lecture:", playError);
-                  }
+                  await audio.play();
+                  console.log("✅ Lecture reprise avec le nouveau lien");
                 }
                 
                 // Remettre le listener
                 audio.addEventListener('error', handleAudioError);
-                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
               } else {
                 console.warn("⚠️ Nouveau lien identique ou vide");
-                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
               toast.error("Impossible de recharger la musique", {
                 description: "Le lien audio n'est plus disponible"
               });
-              (audio as any).dataset && ((audio as any).dataset.recovering = '0');
             }
           }
         };
@@ -260,9 +189,52 @@ export const useAudioControl = ({
         audio.addEventListener('error', handleAudioError);
         audio.src = audioUrl;
         
-        // Démarrage INSTANTANÉ avec AutoplayManager
+        // Démarrage INSTANTANÉ sans attendre - comme Spotify
+        // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
+        try {
+          // Si déjà quelques données disponibles, on démarre directement
+          if (audio.readyState >= 2) {
+            console.log("✅ Données déjà disponibles, démarrage immédiat");
+          } else {
+            // Sinon on attend juste loadeddata (premier frame)
+            await new Promise<void>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
+                resolve(); // On essaie quand même
+              }, 2000); // 2s max (très court)
+              
+              const onLoadedData = () => {
+                clearTimeout(timeout);
+                audio.removeEventListener('loadeddata', onLoadedData);
+                audio.removeEventListener('error', onError);
+                console.log("✅ Premières données chargées");
+                resolve();
+              };
+              
+              const onError = () => {
+                clearTimeout(timeout);
+                audio.removeEventListener('loadeddata', onLoadedData);
+                audio.removeEventListener('error', onError);
+                reject(new Error('Erreur chargement audio'));
+              };
+              
+              audio.addEventListener('loadeddata', onLoadedData, { once: true });
+              audio.addEventListener('error', onError, { once: true });
+              
+              // Check immédiat
+              if (audio.readyState >= 2) {
+                onLoadedData();
+              }
+            });
+          }
+        } catch (error) {
+          console.warn("⚠️ Erreur attente données:", error);
+          // On continue quand même, le navigateur gérera
+        }
+        
+        // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
+        console.log("🚀 Démarrage lecture avec AutoplayManager...");
         const playStartTime = performance.now();
-        console.log("🚀 Lecture immédiate...");
         
         const success = await AutoplayManager.playAudio(audio);
         
@@ -306,7 +278,8 @@ export const useAudioControl = ({
             );
           }
           
-          // Préchargement désactivé
+          // Préchargement de la chanson suivante en arrière-plan
+          setTimeout(() => preloadNextTracks(), 1000);
           
           // Changement terminé
           changeTimeoutRef.current = window.setTimeout(() => {
@@ -329,40 +302,34 @@ export const useAudioControl = ({
         // IMPORTANT: Débloquer immédiatement l'interface
         setIsChangingSong(false);
         
-        // Si erreur média non supportée, ne pas revenir immédiatement à la précédente
-        const isMediaNotSupported = (error as any)?.name === 'NotSupportedError' || (error as any)?.message?.toLowerCase?.().includes('not suitable');
-        if (!isMediaNotSupported) {
-          // Revenir à la musique précédente si elle existait
-          if (previousSong) {
-            console.log("🔄 Retour à la musique précédente:", previousSong.title);
-            setCurrentSong(previousSong);
-            localStorage.setItem('currentSong', JSON.stringify(previousSong));
-            
-            // Restaurer l'état audio si la musique jouait
-            if (previousAudioState.isPlaying) {
-              // Restaurer la source précédente si elle existait
-              if (previousAudioState.src) {
-                audioRef.current.src = previousAudioState.src;
-                audioRef.current.preload = 'auto';
-                audioRef.current.crossOrigin = 'anonymous';
-                audioRef.current.volume = volume / 100;
-              }
-              audioRef.current.currentTime = previousAudioState.currentTime;
-              try {
-                await audioRef.current.play();
-                setIsPlaying(true);
-              } catch (playError) {
-                console.error("Erreur restauration lecture:", playError);
-                setIsPlaying(false);
-              }
-            } else {
+        // Revenir à la musique précédente si elle existait
+        if (previousSong) {
+          console.log("🔄 Retour à la musique précédente:", previousSong.title);
+          setCurrentSong(previousSong);
+          localStorage.setItem('currentSong', JSON.stringify(previousSong));
+          
+          // Restaurer l'état audio si la musique jouait
+          if (previousAudioState.isPlaying) {
+            // Restaurer la source précédente si elle existait
+            if (previousAudioState.src) {
+              audioRef.current.src = previousAudioState.src;
+              audioRef.current.preload = 'auto';
+              audioRef.current.crossOrigin = 'anonymous';
+              audioRef.current.volume = volume / 100;
+            }
+            audioRef.current.currentTime = previousAudioState.currentTime;
+            try {
+              await audioRef.current.play();
+              setIsPlaying(true);
+            } catch (playError) {
+              console.error("Erreur restauration lecture:", playError);
               setIsPlaying(false);
             }
           } else {
             setIsPlaying(false);
           }
         } else {
-          console.log("⏳ Erreur média: tentative de récupération sans changer de chanson");
+          setIsPlaying(false);
         }
         
         handlePlayError(error as any, song);
