@@ -577,6 +577,7 @@ export const SyncedLyricsView: React.FC = () => {
               <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">
                 {volume}%
               </span>
+              <div className="flex-grow" />
               <Button
                 variant="ghost"
                 size="icon"
