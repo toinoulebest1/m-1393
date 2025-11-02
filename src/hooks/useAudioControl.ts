@@ -108,6 +108,62 @@ export const useAudioControl = ({
         // Configuration streaming instantané comme Spotify
         console.log("⚡ Démarrage instantané");
         audio.preload = "auto"; // Chargement immédiat
+        
+        // Gestionnaire d'erreur pour détecter les liens expirés/invalides
+        const handleAudioError = async (e: Event) => {
+          const audioError = (e.target as HTMLAudioElement).error;
+          console.error("❌ Erreur audio détectée:", audioError?.message, audioError?.code);
+          
+          // Si c'est une erreur réseau ou abort (lien expiré/invalide)
+          if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
+              audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+              audioError?.message?.includes('ABORT') ||
+              audioError?.message?.includes('NS_BINDING_ABORTED')) {
+            
+            console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
+            
+            // Supprimer le lien expiré du cache si c'est un lien Tidal
+            if (song.tidal_id && audioUrl.includes('tidal.com')) {
+              try {
+                const { supabase } = await import('@/integrations/supabase/client');
+                await supabase
+                  .from('tidal_audio_links')
+                  .delete()
+                  .eq('tidal_id', song.tidal_id);
+                console.log("🗑️ Lien expiré supprimé du cache");
+              } catch (err) {
+                console.error("Erreur suppression cache:", err);
+              }
+            }
+            
+            // Récupérer un nouveau lien
+            try {
+              console.log("🔄 Récupération d'un nouveau lien...");
+              const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                song.url, 
+                song.tidal_id,
+                song.title,
+                song.artist
+              );
+              
+              if (newAudioUrl && newAudioUrl !== audioUrl) {
+                console.log("✅ Nouveau lien obtenu, rechargement...");
+                const currentTime = audio.currentTime;
+                audio.src = newAudioUrl;
+                audio.currentTime = currentTime;
+                await audio.play();
+                console.log("✅ Lecture reprise avec le nouveau lien");
+              }
+            } catch (reloadError) {
+              console.error("❌ Impossible de recharger le lien:", reloadError);
+              toast.error("Impossible de recharger la musique", {
+                description: "Le lien audio n'est plus disponible"
+              });
+            }
+          }
+        };
+        
+        audio.addEventListener('error', handleAudioError, { once: true });
         audio.src = audioUrl;
         
         // Démarrage INSTANTANÉ sans attendre - comme Spotify
