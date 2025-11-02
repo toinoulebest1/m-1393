@@ -7,6 +7,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Fonction pour normaliser le texte en enlevant les accents
+function normalizeText(text: string): string {
+  return text
+    .normalize('NFD') // Décompose les caractères accentués
+    .replace(/[\u0300-\u036f]/g, '') // Supprime les diacritiques
+    .toLowerCase()
+    .trim();
+}
+
+// Fonction pour générer des variantes orthographiques
+function generateTextVariants(text: string): string[] {
+  const variants = [
+    text, // Original
+    normalizeText(text), // Sans accents
+    text.replace(/'/g, "'"), // Apostrophe droite vs courbe
+    normalizeText(text).replace(/'/g, "'"),
+  ];
+  // Retourner uniquement les variantes uniques
+  return [...new Set(variants)];
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -27,6 +48,11 @@ serve(async (req) => {
       );
     }
     
+    // Générer des variantes du titre et de l'artiste
+    const titleVariants = generateTextVariants(songTitle);
+    const artistVariants = generateTextVariants(artist);
+    const albumVariants = albumName ? generateTextVariants(albumName) : [undefined];
+    
     // Try with exact duration first, then with ±2 seconds tolerance
     const durationsToTry = duration 
       ? [Math.round(duration), Math.round(duration) - 2, Math.round(duration) + 2]
@@ -34,39 +60,51 @@ serve(async (req) => {
     
     let lyricsResponse;
     let foundWithDuration = null;
+    let successfulParams = null;
     
-    for (const tryDuration of durationsToTry) {
-      const tryParams = new URLSearchParams({
-        artist_name: artist,
-        track_name: songTitle,
-      });
-      
-      if (albumName) {
-        tryParams.append('album_name', albumName);
-      }
-      
-      if (tryDuration !== undefined) {
-        tryParams.append('duration', tryDuration.toString());
-      }
-      
-      const apiUrl = `https://lrclib.net/api/get?${tryParams.toString()}`;
-      console.log('Fetching lyrics from LRCLIB:', apiUrl);
-      
-      lyricsResponse = await fetch(apiUrl, {
-        headers: {
-          'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
+    // Essayer toutes les combinaisons de variantes
+    for (const titleVariant of titleVariants) {
+      for (const artistVariant of artistVariants) {
+        for (const albumVariant of albumVariants) {
+          for (const tryDuration of durationsToTry) {
+            const tryParams = new URLSearchParams({
+              artist_name: artistVariant,
+              track_name: titleVariant,
+            });
+            
+            if (albumVariant) {
+              tryParams.append('album_name', albumVariant);
+            }
+            
+            if (tryDuration !== undefined) {
+              tryParams.append('duration', tryDuration.toString());
+            }
+            
+            const apiUrl = `https://lrclib.net/api/get?${tryParams.toString()}`;
+            console.log('Fetching lyrics from LRCLIB:', apiUrl);
+            
+            lyricsResponse = await fetch(apiUrl, {
+              headers: {
+                'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
+              }
+            });
+            
+            if (lyricsResponse.ok) {
+              foundWithDuration = tryDuration;
+              successfulParams = { titleVariant, artistVariant, albumVariant };
+              console.log(`Found lyrics with: title="${titleVariant}", artist="${artistVariant}", duration=${tryDuration}`);
+              break;
+            }
+            
+            if (lyricsResponse.status !== 404) {
+              throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
+            }
+          }
+          if (lyricsResponse?.ok) break;
         }
-      });
-      
-      if (lyricsResponse.ok) {
-        foundWithDuration = tryDuration;
-        console.log(`Found lyrics with duration: ${tryDuration}`);
-        break;
+        if (lyricsResponse?.ok) break;
       }
-      
-      if (lyricsResponse.status !== 404) {
-        throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
-      }
+      if (lyricsResponse?.ok) break;
     }
     
     if (!lyricsResponse || !lyricsResponse.ok) {
