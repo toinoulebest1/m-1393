@@ -108,13 +108,19 @@ export const usePlayerFavorites = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.log("No session found, cannot toggle favorite");
-        return;
+        throw new Error("Vous devez être connecté pour ajouter aux favoris");
       }
 
       console.log("=== TOGGLE FAVORITE DEBUG ===");
+      console.log("Song object:", song);
       console.log("Song ID:", song.id);
       console.log("User ID:", session.user.id);
       console.log("Current favorites:", favorites.map(f => f.id));
+      
+      if (!song.id) {
+        console.error("Song has no ID!");
+        throw new Error("La chanson n'a pas d'identifiant valide");
+      }
 
       // Vérifier si le favori existe déjà dans la base de données
       const { data: existingFavorite, error: checkError } = await supabase
@@ -170,20 +176,29 @@ export const usePlayerFavorites = () => {
 
         if (!existingSong) {
           console.log("Song doesn't exist in DB, creating it");
+          
+          // Préparer les données de la chanson
+          const songData: any = {
+            id: song.id,
+            title: song.title || 'Sans titre',
+            artist: song.artist || 'Artiste inconnu',
+            file_path: song.url || '',
+            duration: song.duration || '0:00',
+            image_url: song.imageUrl || null,
+            album_name: song.album_name || null,
+            tidal_id: song.tidal_id || null,
+            genre: song.genre || null
+          };
+          
+          console.log("Inserting song data:", songData);
+          
           const { error: songInsertError } = await supabase
             .from('songs')
-            .insert({
-              id: song.id,
-              title: song.title,
-              artist: song.artist,
-              file_path: song.url,
-              duration: song.duration,
-              image_url: song.imageUrl
-            });
+            .insert(songData);
 
           if (songInsertError) {
             console.error("Erreur lors de l'ajout de la chanson:", songInsertError);
-            return;
+            throw new Error("Impossible d'ajouter la chanson à la base de données");
           }
         }
 
@@ -198,7 +213,7 @@ export const usePlayerFavorites = () => {
 
         if (favoriteError) {
           console.error("Erreur lors de l'ajout aux favoris:", favoriteError);
-          return;
+          throw new Error("Impossible d'ajouter aux favoris");
         }
 
         // Mettre à jour l'état local
@@ -212,6 +227,7 @@ export const usePlayerFavorites = () => {
       console.log("==============================");
     } catch (error) {
       console.error("Erreur lors de la gestion des favoris:", error);
+      throw error; // Propager l'erreur pour que le composant puisse l'afficher
     }
   }, [favorites]);
 

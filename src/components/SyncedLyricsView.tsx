@@ -582,12 +582,16 @@ export const SyncedLyricsView: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 onClick={async () => {
-                  const wasFavorite = favorites.some(f => f.id === currentSong.id);
-                  await toggleFavorite(currentSong);
-                  if (wasFavorite) {
-                    toast.success("Retiré des favoris");
-                  } else {
-                    toast.success("Ajouté aux favoris ❤️");
+                  try {
+                    const wasFavorite = favorites.some(f => f.id === currentSong.id);
+                    await toggleFavorite(currentSong);
+                    if (wasFavorite) {
+                      toast.success("Retiré des favoris");
+                    } else {
+                      toast.success("Ajouté aux favoris ❤️");
+                    }
+                  } catch (error: any) {
+                    toast.error(error.message || "Erreur lors de l'ajout aux favoris");
                   }
                 }}
                 className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
