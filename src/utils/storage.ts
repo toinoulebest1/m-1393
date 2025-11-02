@@ -189,6 +189,75 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
   return ids.length > 0 ? ids[0] : null;
 };
 
+// Recherche l'ID Deezer à partir d'un ISRC
+export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | null> => {
+  try {
+    console.log('🔍 Recherche Deezer ID via ISRC:', isrc);
+    const response = await fetch(`https://api.deezer.com/track/isrc:${isrc}`);
+    
+    if (!response.ok) {
+      console.warn('⚠️ API Deezer ISRC error:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.id) {
+      console.log('✅ Deezer ID trouvé:', data.id);
+      return String(data.id);
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('⚠️ Erreur recherche Deezer par ISRC:', error);
+    return null;
+  }
+};
+
+// Recherche l'ISRC d'un track Tidal
+export const searchTidalIsrc = async (title: string, artist: string): Promise<string | null> => {
+  try {
+    const query = `${title}, ${artist}`;
+    const apis = [
+      `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
+      `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
+    ];
+
+    for (const url of apis) {
+      try {
+        const res = await fetch(url, { 
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (!res.ok) continue;
+        
+        const data = await res.json();
+        let tracks = [];
+        
+        if (Array.isArray(data)) tracks = data;
+        else if (data?.items) tracks = data.items;
+        else if (data?.tracks) tracks = data.tracks;
+        
+        // Prendre le premier résultat qui a un ISRC
+        for (const track of tracks.slice(0, 3)) {
+          if (track?.isrc) {
+            console.log('✅ ISRC trouvé:', track.isrc, 'pour', title);
+            return track.isrc;
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Erreur API:', url, error);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('⚠️ Erreur recherche ISRC:', error);
+    return null;
+  }
+};
+
 export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, tidalId?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Tidal ID:', tidalId);
 
@@ -209,6 +278,41 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       console.warn('⚠️ Deezmate API error:', res.status);
     } catch (error) {
       console.warn('⚠️ Deezmate API échec:', error);
+    }
+  }
+
+  // Si pas de deezerId mais on a titre + artiste, essayer de trouver l'ID Deezer via ISRC
+  if (!deezerId && songTitle && songArtist) {
+    console.log('🔎 Tentative recherche Deezer ID via ISRC...');
+    try {
+      // Chercher l'ISRC via Tidal
+      const isrc = await searchTidalIsrc(songTitle, songArtist);
+      
+      if (isrc) {
+        // Chercher l'ID Deezer via l'ISRC
+        const foundDeezerId = await searchDeezerIdFromIsrc(isrc);
+        
+        if (foundDeezerId) {
+          console.log('🎵 ID Deezer trouvé via ISRC:', foundDeezerId);
+          // Essayer Deezmate avec cet ID
+          try {
+            const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
+            const res = await fetch(url);
+            
+            if (res.ok) {
+              const audioUrl = await res.text();
+              if (audioUrl && audioUrl.startsWith('http')) {
+                console.log('✅ Deezmate URL obtenue via ISRC:', audioUrl);
+                return audioUrl;
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ Deezmate via ISRC échec:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur recherche Deezer via ISRC:', error);
     }
   }
 
