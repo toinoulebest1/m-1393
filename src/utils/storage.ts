@@ -66,6 +66,12 @@ export const searchTidalIds = async (title: any, artist: any, maxResults: number
     expectedArtist.replace('gims','maitre gims').trim(),
   ]);
 
+  const apis = [
+    'https://katze.qqdl.site/search/',
+    'https://frankfurt.monochrome.tf/search/',
+    'https://phoenix.squid.wtf/search/'
+  ];
+
   const extractTidalId = (obj: any): string | null => {
     if (!obj || typeof obj !== 'object') return null;
     if (obj.tidalId) return String(obj.tidalId);
@@ -123,6 +129,7 @@ export const searchTidalIds = async (title: any, artist: any, maxResults: number
   // Fonction pour rechercher sur toutes les APIs en parallèle
   const searchAll = async (query: string) => {
     const apis = [
+      `https://katze.qqdl.site/search/?s=${encodeURIComponent(query)}`,
       `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
       `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
     ];
@@ -274,6 +281,7 @@ export const getTidalAudioUrl = async (tidalId: string): Promise<string | null> 
     console.log('🎵 [TIDAL] Récupération URL audio pour ID:', tidalId);
     
     const apis = [
+      `https://katze.qqdl.site/dl/${tidalId}`,
       `https://frankfurt.monochrome.tf/dl/${tidalId}`,
       `https://phoenix.squid.wtf/dl/${tidalId}`
     ];
@@ -339,6 +347,7 @@ export const searchTidalIsrc = async (title: string, artist: string): Promise<st
   try {
     const query = `${title}, ${artist}`;
     const apis = [
+      `https://katze.qqdl.site/search/?s=${encodeURIComponent(query)}`,
       `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
       `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
     ];
