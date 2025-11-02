@@ -16,6 +16,42 @@ function normalizeText(text: string): string {
     .trim();
 }
 
+// Fonction pour extraire les variantes d'artistes
+function generateArtistVariants(artist: string): string[] {
+  const variants = new Set<string>();
+  
+  // Ajouter l'artiste original
+  variants.add(artist);
+  variants.add(normalizeText(artist));
+  
+  // Séparateurs courants pour plusieurs artistes
+  const separators = [' & ', ' feat. ', ' feat ', ' ft. ', ' ft ', ' x ', ' X ', ', '];
+  
+  for (const separator of separators) {
+    if (artist.includes(separator)) {
+      // Prendre le premier artiste
+      const firstArtist = artist.split(separator)[0].trim();
+      variants.add(firstArtist);
+      variants.add(normalizeText(firstArtist));
+      
+      // Aussi essayer avec tous les artistes séparés par le séparateur standard
+      const allArtists = artist.split(separator).map(a => a.trim()).join(' & ');
+      variants.add(allArtists);
+      variants.add(normalizeText(allArtists));
+      break;
+    }
+  }
+  
+  // Variantes d'apostrophes
+  const apostropheVariants = [...variants].flatMap(v => [
+    v,
+    v.replace(/'/g, "'"),
+    v.replace(/'/g, "'"),
+  ]);
+  
+  return [...new Set(apostropheVariants)];
+}
+
 // Fonction pour générer des variantes orthographiques
 function generateTextVariants(text: string): string[] {
   const variants = [
@@ -50,8 +86,11 @@ serve(async (req) => {
     
     // Générer des variantes du titre et de l'artiste
     const titleVariants = generateTextVariants(songTitle);
-    const artistVariants = generateTextVariants(artist);
+    const artistVariants = generateArtistVariants(artist);
     const albumVariants = albumName ? generateTextVariants(albumName) : [undefined];
+    
+    console.log(`Trying ${titleVariants.length} title variants, ${artistVariants.length} artist variants`);
+    console.log('Artist variants:', artistVariants);
     
     // Try with exact duration first, then with ±2 seconds tolerance
     const durationsToTry = duration 
