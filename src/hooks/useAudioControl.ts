@@ -119,6 +119,9 @@ export const useAudioControl = ({
             src: audio.src
           });
           
+          // Capturer l'ID de la chanson en cours d'erreur pour comparaison ultérieure
+          const errorSongId = song.id;
+          
           // Si c'est une erreur réseau ou abort (lien expiré/invalide)
           if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
               audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
@@ -201,8 +204,8 @@ export const useAudioControl = ({
                 );
               }
               
-              // Vérifier que la chanson n'a pas changé entre temps
-              if (currentSong?.id !== song.id) {
+              // Vérifier que la chanson en cours correspond toujours à celle en erreur
+              if (currentSong?.id !== errorSongId) {
                 console.warn("⚠️ Chanson changée pendant la recherche, abandon du rechargement");
                 return;
               }
@@ -220,8 +223,13 @@ export const useAudioControl = ({
                 audio.currentTime = currentTime;
                 
                 if (wasPlaying) {
-                  await audio.play();
-                  console.log("✅ Lecture reprise avec le nouveau lien");
+                  try {
+                    await audio.play();
+                    console.log("✅ Lecture reprise avec le nouveau lien");
+                    setIsPlaying(true);
+                  } catch (playError) {
+                    console.error("❌ Erreur reprise lecture:", playError);
+                  }
                 }
                 
                 // Remettre le listener
