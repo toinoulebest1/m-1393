@@ -11,8 +11,6 @@ export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
   private static requestCount = 0;
   private static preloadedFromDB = false;
-  private static deezmateCache = new Map<string, { url: string, timestamp: number }>();
-  private static DEEZMATE_CACHE_TTL = 50000; // 50 secondes (expire à 60s)
 
   /**
    * Préchargement massif depuis la DB au démarrage
@@ -58,16 +56,6 @@ export class UltraFastStreaming {
     
     console.log("🚀 Ultra-fast streaming:", songUrl);
     
-    // 0. Cache Deezmate si deezerId disponible (< 1ms)
-    if (deezerId) {
-      const cached = this.deezmateCache.get(deezerId);
-      if (cached && (Date.now() - cached.timestamp) < this.DEEZMATE_CACHE_TTL) {
-        const elapsed = performance.now() - startTime;
-        console.log("⚡ DEEZMATE CACHE:", elapsed.toFixed(2), "ms");
-        return cached.url;
-      }
-    }
-    
     // Si on a un tidal_id, vérifier d'abord avec le format tidal:{id}
     if (tidalId) {
       const tidalKey = `tidal:${tidalId}`;
@@ -111,7 +99,7 @@ export class UltraFastStreaming {
       const result = await promise;
       
       // Promouvoir vers tous les caches
-      this.promoteToAllCaches(songUrl, result, deezerId);
+      this.promoteToAllCaches(songUrl, result);
       
       return result;
     } finally {
@@ -159,15 +147,9 @@ export class UltraFastStreaming {
   /**
    * Promotion vers tous les caches
    */
-  private static promoteToAllCaches(songUrl: string, audioUrl: string, deezerId?: string): void {
+  private static promoteToAllCaches(songUrl: string, audioUrl: string): void {
     // Warm cache immédiat
     UltraFastCache.setWarm(songUrl, audioUrl);
-    
-    // Cache Deezmate si URL provient de Deezmate
-    if (deezerId && audioUrl.includes('deezmate')) {
-      this.deezmateCache.set(deezerId, { url: audioUrl, timestamp: Date.now() });
-      console.log("💾 Deezmate cached:", deezerId);
-    }
     
     // L0 cache en arrière-plan avec blob
     setTimeout(async () => {
@@ -188,17 +170,8 @@ export class UltraFastStreaming {
   /**
    * Préchargement de la chanson suivante en arrière-plan
    */
-  static async preloadNext(songUrl: string, deezerId?: string, tidalId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<void> {
+  static async preloadNext(songUrl: string): Promise<void> {
     console.log("🔮 Préchargement arrière-plan:", songUrl);
-    
-    // Vérifier cache Deezmate en premier
-    if (deezerId) {
-      const cached = this.deezmateCache.get(deezerId);
-      if (cached && (Date.now() - cached.timestamp) < this.DEEZMATE_CACHE_TTL) {
-        console.log("✅ Déjà en cache Deezmate");
-        return;
-      }
-    }
     
     // Ne précharger que si pas déjà en cache
     if (UltraFastCache.hasL0(songUrl) || UltraFastCache.getWarm(songUrl)) {
@@ -207,7 +180,7 @@ export class UltraFastStreaming {
     }
     
     try {
-      await this.getAudioUrlUltraFast(songUrl, deezerId, tidalId, songTitle, songArtist, songId);
+      await this.getAudioUrlUltraFast(songUrl);
       console.log("✅ Préchargement terminé:", songUrl);
     } catch (error) {
       console.warn("⚠️ Échec préchargement:", error);

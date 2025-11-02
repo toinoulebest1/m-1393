@@ -27,38 +27,17 @@ export const useUltraFastPlayer = ({
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Préchargement intelligent réactivé
+  // Préchargement intelligent DÉSACTIVÉ pour éviter les chargements multiples
   useEffect(() => {
-    if (!currentSong || !isPlaying) return;
+    console.log("⚠️ Préchargement intelligent désactivé pour éviter les chargements multiples");
+    return () => {};
+  }, [currentSong, isPlaying, queue]);
 
-    // Annuler le timeout précédent
-    if (preloadTimeoutRef.current) {
-      clearTimeout(preloadTimeoutRef.current);
-    }
-
-    // Précharger après 2 secondes de lecture
-    preloadTimeoutRef.current = window.setTimeout(() => {
-      // Prédire et précharger
-      const predictions = predictNextSongs(currentSong, queue);
-      if (predictions.length > 0) {
-        console.log("🔮 Préchargement prédictions:", predictions.length);
-        preloadPredictedSongs(predictions.slice(0, 2)); // 2 premières prédictions
-      }
-
-      // Précharger la queue
-      if (queue.length > 0) {
-        const nextInQueue = queue[0];
-        console.log("📋 Préchargement queue:", nextInQueue.title);
-        preloadPredictedSongs([nextInQueue]);
-      }
-    }, 2000);
-
-    return () => {
-      if (preloadTimeoutRef.current) {
-        clearTimeout(preloadTimeoutRef.current);
-      }
-    };
-  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs]);
+  // Préchargement queue DÉSACTIVÉ
+  useEffect(() => {
+    console.log("⚠️ Préchargement de queue désactivé");
+    return () => {};
+  }, [queue]);
 
   return {
     getCacheStats: () => ({ size: 0, maxSize: 0, entries: [] })
