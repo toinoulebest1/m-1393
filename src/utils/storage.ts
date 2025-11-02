@@ -193,7 +193,7 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
 export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | null> => {
   try {
     console.log('🔍 Recherche Deezer ID via ISRC:', isrc);
-    const response = await fetch(`https://api.deezer.com/track/isrc:${isrc}`);
+    const response = await fetch(`https://api.deezer.com/2.0/track/isrc:${isrc}`);
     
     if (!response.ok) {
       console.warn('⚠️ API Deezer ISRC error:', response.status);
@@ -294,16 +294,22 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     console.log('🎵 Essai API Deezmate avec ID:', deezerId);
     try {
       const url = `https://api.deezmate.com/dl/${deezerId}`;
+      console.log('📡 Appel Deezmate:', url);
       const res = await fetch(url);
       
       if (res.ok) {
         const audioUrl = await res.text();
-        if (audioUrl && audioUrl.startsWith('http')) {
-          console.log('✅ Deezmate URL obtenue:', audioUrl);
-          return audioUrl;
+        const trimmedUrl = audioUrl.trim();
+        
+        if (trimmedUrl && trimmedUrl.startsWith('http')) {
+          console.log('✅ Deezmate URL FLAC obtenue:', trimmedUrl);
+          return trimmedUrl;
+        } else {
+          console.warn('⚠️ Deezmate réponse invalide:', audioUrl);
         }
+      } else {
+        console.warn('⚠️ Deezmate API error:', res.status);
       }
-      console.warn('⚠️ Deezmate API error:', res.status);
     } catch (error) {
       console.warn('⚠️ Deezmate API échec:', error);
     }
@@ -333,14 +339,21 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         console.log('🎵 ID Deezer trouvé:', foundDeezerId);
         try {
           const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
+          console.log('📡 Appel Deezmate:', url);
           const res = await fetch(url);
           
           if (res.ok) {
             const audioUrl = await res.text();
-            if (audioUrl && audioUrl.startsWith('http')) {
-              console.log('✅ Deezmate URL obtenue:', audioUrl);
-              return audioUrl;
+            const trimmedUrl = audioUrl.trim();
+            
+            if (trimmedUrl && trimmedUrl.startsWith('http')) {
+              console.log('✅ Deezmate URL FLAC obtenue:', trimmedUrl);
+              return trimmedUrl;
+            } else {
+              console.warn('⚠️ Deezmate réponse invalide:', audioUrl);
             }
+          } else {
+            console.warn('⚠️ Deezmate API error:', res.status);
           }
         } catch (error) {
           console.warn('⚠️ Deezmate échec:', error);
