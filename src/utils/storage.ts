@@ -193,16 +193,19 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
 export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | null> => {
   try {
     console.log('🔍 Recherche Deezer ID via ISRC:', isrc);
-    const response = await fetch(`https://api.deezer.com/2.0/track/isrc:${isrc}`);
     
-    if (!response.ok) {
-      console.warn('⚠️ API Deezer ISRC error:', response.status);
+    const { data, error } = await supabase.functions.invoke('deezer-proxy', {
+      body: { 
+        endpoint: `/2.0/track/isrc:${isrc}`
+      }
+    });
+    
+    if (error) {
+      console.warn('⚠️ Deezer proxy error (ISRC):', error);
       return null;
     }
     
-    const data = await response.json();
-    
-    if (data.id) {
+    if (data?.id) {
       console.log('✅ Deezer ID trouvé via ISRC:', data.id);
       return String(data.id);
     }
@@ -219,17 +222,20 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
   try {
     console.log('🔍 Recherche Deezer ID par titre:', title, '- Artiste attendu:', artist);
     
-    // Chercher par titre uniquement sur l'endpoint /search/track
-    const response = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(title)}&limit=20`);
+    const { data, error } = await supabase.functions.invoke('deezer-proxy', {
+      body: { 
+        endpoint: '/search/track',
+        query: title,
+        limit: 20
+      }
+    });
     
-    if (!response.ok) {
-      console.warn('⚠️ API Deezer search error:', response.status);
+    if (error) {
+      console.warn('⚠️ Deezer proxy error (search):', error);
       return null;
     }
     
-    const data = await response.json();
-    
-    if (data.data && data.data.length > 0) {
+    if (data?.data && data.data.length > 0) {
       // Normaliser les noms pour la comparaison
       const normalizeArtist = (name: string) => 
         name.toLowerCase().trim().replace(/[^a-z0-9]/g, '');

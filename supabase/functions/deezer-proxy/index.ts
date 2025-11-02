@@ -1,31 +1,58 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    const url = new URL(req.url)
-    const query = url.searchParams.get('q')
+    const { endpoint, query, limit = 20 } = await req.json();
     
-    if (!query) {
-      return new Response('Query parameter is required', { status: 400 })
+    if (!endpoint) {
+      return new Response(
+        JSON.stringify({ error: 'Endpoint parameter is required' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    const deezerResponse = await fetch(`https://api.deezer.com/search?q=${query}`)
-    const data = await deezerResponse.json()
+    let deezerUrl = `https://api.deezer.com${endpoint}`;
+    
+    // Ajouter les paramètres de query si nécessaire
+    if (query) {
+      deezerUrl += `?q=${encodeURIComponent(query)}&limit=${limit}`;
+    }
+
+    console.log('🔍 Proxying Deezer API call:', deezerUrl);
+
+    const deezerResponse = await fetch(deezerUrl);
+    const data = await deezerResponse.json();
 
     return new Response(JSON.stringify(data), {
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
       },
-    })
+    });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    })
+    console.error('❌ Deezer proxy error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }), 
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
-})
+});
