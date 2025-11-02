@@ -203,13 +203,41 @@ export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | nul
     const data = await response.json();
     
     if (data.id) {
-      console.log('✅ Deezer ID trouvé:', data.id);
+      console.log('✅ Deezer ID trouvé via ISRC:', data.id);
       return String(data.id);
     }
     
     return null;
   } catch (error) {
     console.warn('⚠️ Erreur recherche Deezer par ISRC:', error);
+    return null;
+  }
+};
+
+// Recherche l'ID Deezer directement par titre/artiste
+export const searchDeezerIdByTitleArtist = async (title: string, artist: string): Promise<string | null> => {
+  try {
+    console.log('🔍 Recherche Deezer ID par titre/artiste:', title, '-', artist);
+    const query = `artist:"${artist}" track:"${title}"`;
+    const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
+    
+    if (!response.ok) {
+      console.warn('⚠️ API Deezer search error:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.data && data.data.length > 0) {
+      // Prendre le premier résultat
+      const track = data.data[0];
+      console.log('✅ Deezer ID trouvé par recherche:', track.id);
+      return String(track.id);
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('⚠️ Erreur recherche Deezer par titre/artiste:', error);
     return null;
   }
 };
@@ -281,38 +309,45 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // Si pas de deezerId mais on a titre + artiste, essayer de trouver l'ID Deezer via ISRC
+  // Si pas de deezerId mais on a titre + artiste, essayer de trouver l'ID Deezer
   if (!deezerId && songTitle && songArtist) {
-    console.log('🔎 Tentative recherche Deezer ID via ISRC...');
+    console.log('🔎 Tentative recherche Deezer ID...');
+    let foundDeezerId: string | null = null;
+    
     try {
-      // Chercher l'ISRC via Tidal
-      const isrc = await searchTidalIsrc(songTitle, songArtist);
+      // Méthode 1 : Recherche directe par titre/artiste sur Deezer
+      foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist);
       
-      if (isrc) {
-        // Chercher l'ID Deezer via l'ISRC
-        const foundDeezerId = await searchDeezerIdFromIsrc(isrc);
+      // Méthode 2 : Si pas trouvé, essayer via ISRC
+      if (!foundDeezerId) {
+        console.log('🔎 Recherche via ISRC...');
+        const isrc = await searchTidalIsrc(songTitle, songArtist);
         
-        if (foundDeezerId) {
-          console.log('🎵 ID Deezer trouvé via ISRC:', foundDeezerId);
-          // Essayer Deezmate avec cet ID
-          try {
-            const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
-            const res = await fetch(url);
-            
-            if (res.ok) {
-              const audioUrl = await res.text();
-              if (audioUrl && audioUrl.startsWith('http')) {
-                console.log('✅ Deezmate URL obtenue via ISRC:', audioUrl);
-                return audioUrl;
-              }
+        if (isrc) {
+          foundDeezerId = await searchDeezerIdFromIsrc(isrc);
+        }
+      }
+      
+      // Si on a trouvé un ID Deezer, essayer Deezmate
+      if (foundDeezerId) {
+        console.log('🎵 ID Deezer trouvé:', foundDeezerId);
+        try {
+          const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
+          const res = await fetch(url);
+          
+          if (res.ok) {
+            const audioUrl = await res.text();
+            if (audioUrl && audioUrl.startsWith('http')) {
+              console.log('✅ Deezmate URL obtenue:', audioUrl);
+              return audioUrl;
             }
-          } catch (error) {
-            console.warn('⚠️ Deezmate via ISRC échec:', error);
           }
+        } catch (error) {
+          console.warn('⚠️ Deezmate échec:', error);
         }
       }
     } catch (error) {
-      console.warn('⚠️ Erreur recherche Deezer via ISRC:', error);
+      console.warn('⚠️ Erreur recherche Deezer:', error);
     }
   }
 
