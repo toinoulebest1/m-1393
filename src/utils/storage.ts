@@ -281,9 +281,9 @@ export const getTidalAudioUrl = async (tidalId: string): Promise<string | null> 
     console.log('🎵 [TIDAL] Récupération URL audio pour ID:', tidalId);
     
     const apis = [
-      `https://katze.qqdl.site/dl/${tidalId}`,
-      `https://frankfurt.monochrome.tf/dl/${tidalId}`,
-      `https://phoenix.squid.wtf/dl/${tidalId}`
+      `https://katze.qqdl.site/track/?id=${tidalId}&quality=LOSSLESS`,
+      `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`,
+      `https://phoenix.squid.wtf/track/?id=${tidalId}&quality=LOSSLESS`
     ];
 
     for (const url of apis) {
