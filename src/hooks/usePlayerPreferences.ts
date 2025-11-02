@@ -67,6 +67,7 @@ export const usePlayerPreferences = () => {
         console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
         await UltraFastStreaming.getAudioUrlUltraFast(
           nextTrack.url,
+          nextTrack.deezer_id,
           nextTrack.tidal_id,
           nextTrack.title,
           nextTrack.artist

@@ -29,7 +29,25 @@ export const useInstantPlayback = (songs: any[]) => {
             }
           }
 
-          // Si on a un tidal_id, précharger l'URL audio
+          // Préchargement Deezer via Deezmate (priorité absolue)
+          if (song.deezer_id) {
+            try {
+              const deezmateUrl = `https://api.deezmate.com/dl/${song.deezer_id}`;
+              const res = await fetch(deezmateUrl);
+              
+              if (res.ok) {
+                const audioUrl = await res.text();
+                if (audioUrl && audioUrl.startsWith('http')) {
+                  console.log('✅ URL Deezmate préchargée:', song.title);
+                  return; // Pas besoin de Tidal si Deezer fonctionne
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ Préchargement Deezmate échoué:', song.title, error);
+            }
+          }
+
+          // Fallback Tidal si pas de Deezer ID ou si échec
           if (tidalId) {
             // D'abord vérifier si le lien existe déjà en base
             const { data: existingLink } = await supabase

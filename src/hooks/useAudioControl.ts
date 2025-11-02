@@ -80,6 +80,7 @@ export const useAudioControl = ({
         try {
           audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url, 
+            song.deezer_id,
             song.tidal_id,
             song.title,
             song.artist
@@ -144,6 +145,7 @@ export const useAudioControl = ({
               console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
               const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
                 song.url, 
+                song.deezer_id,
                 song.tidal_id,
                 song.title,
                 song.artist

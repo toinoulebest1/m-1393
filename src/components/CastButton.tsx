@@ -42,6 +42,7 @@ export const CastButton = () => {
       console.log('🧩 Resolving DLNA link for:', currentSong.title);
       const url = await UltraFastStreaming.getAudioUrlUltraFast(
         currentSong.url,
+        currentSong.deezer_id,
         currentSong.tidal_id,
         currentSong.title,
         currentSong.artist

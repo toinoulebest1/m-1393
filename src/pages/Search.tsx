@@ -466,7 +466,8 @@ const Search = () => {
               imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
               bitrate: 'Preview',
               album_name: track.album?.title,
-              isDeezer: true
+              isDeezer: true,
+              deezer_id: track.id  // ID Deezer pour l'API Deezmate
             };
           });
           formattedResults.push(...deezerSongs);

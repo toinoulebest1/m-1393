@@ -189,10 +189,30 @@ export const searchTidalId = async (title: any, artist: any): Promise<string | n
   return ids.length > 0 ? ids[0] : null;
 };
 
-export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTitle?: string, songArtist?: string): Promise<string> => {
-  console.log('🔍 Récupération URL pour:', filePath, 'Tidal ID:', tidalId);
+export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, tidalId?: string): Promise<string> => {
+  console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Tidal ID:', tidalId);
 
-  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste)
+  // PRIORITÉ ABSOLUE: API Deezmate si un deezerId est fourni
+  if (deezerId) {
+    console.log('🎵 Essai API Deezmate avec ID:', deezerId);
+    try {
+      const url = `https://api.deezmate.com/dl/${deezerId}`;
+      const res = await fetch(url);
+      
+      if (res.ok) {
+        const audioUrl = await res.text();
+        if (audioUrl && audioUrl.startsWith('http')) {
+          console.log('✅ Deezmate URL obtenue:', audioUrl);
+          return audioUrl;
+        }
+      }
+      console.warn('⚠️ Deezmate API error:', res.status);
+    } catch (error) {
+      console.warn('⚠️ Deezmate API échec:', error);
+    }
+  }
+
+  // Helper: Phoenix/Tidal fetch → OriginalTrackUrl (robuste) - fallback
   const fetchPhoenixUrl = async (tid: string): Promise<string> => {
     // Helper interne: extraire depuis un manifest éventuel
     const extractFromManifest = async (manifest: string): Promise<string | null> => {
