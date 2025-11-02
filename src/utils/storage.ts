@@ -306,6 +306,31 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       const tid = tidalIds[i];
       console.log(`🔄 Tentative avec Tidal ID #${i + 1}:`, tid);
       
+      // D'ABORD vérifier dans le cache DB avant de faire des requêtes API
+      try {
+        const { data: cachedLink } = await supabase
+          .from('tidal_audio_links')
+          .select('audio_url')
+          .eq('tidal_id', tid)
+          .maybeSingle();
+        
+        if (cachedLink?.audio_url) {
+          const isInvalidLink = cachedLink.audio_url.includes('amz-pr-fa.audio.tidal.com') || 
+                               cachedLink.audio_url.includes('tidal.com/track/') ||
+                               cachedLink.audio_url.includes('www.tidal.com');
+          
+          if (!isInvalidLink) {
+            console.log(`✅ Lien valide trouvé en cache DB (ID: ${tid}):`, cachedLink.audio_url);
+            return cachedLink.audio_url; // Retourner immédiatement le lien en cache
+          } else {
+            console.warn(`⚠️ Lien invalide en cache pour ID ${tid}, continuer la recherche API`);
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Erreur vérification cache pour ID ${tid}:`, error);
+      }
+      
+      // Si pas en cache ou invalide, récupérer depuis l'API
       try {
         const audioUrl = await fetchPhoenixUrl(tid);
         
