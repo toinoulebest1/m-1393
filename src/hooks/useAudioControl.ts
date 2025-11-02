@@ -143,14 +143,63 @@ export const useAudioControl = ({
             // Récupérer un nouveau lien
             try {
               console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
-              const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                song.url, 
-                song.deezer_id,
-                song.tidal_id,
-                song.title,
-                song.artist,
-                song.id
-              );
+              
+              // Si l'URL actuelle était Deezer/Deezmate, forcer le passage à Tidal
+              const isDeezerUrl = audio.src.includes('purr.rip') || 
+                                 audio.src.includes('deezer') || 
+                                 audio.src.includes('deezmate') ||
+                                 audio.src.includes('dzcdn.net');
+              
+              let newAudioUrl: string | null = null;
+              
+              if (isDeezerUrl && song.title && song.artist) {
+                console.log("🎵 [FALLBACK] URL Deezer échouée, essai Tidal...");
+                
+                // Importer les fonctions Tidal depuis storage.ts
+                const { searchTidalIds, getTidalAudioUrl } = await import('@/utils/storage');
+                
+                // Essayer de récupérer l'URL via Tidal
+                try {
+                  // Chercher le Tidal ID
+                  let foundTidalId = song.tidal_id;
+                  
+                  if (!foundTidalId) {
+                    console.log("🔍 [TIDAL] Recherche Tidal ID...");
+                    const tidalIds = await searchTidalIds(song.title, song.artist, 1);
+                    foundTidalId = tidalIds[0] || null;
+                  }
+                  
+                  if (foundTidalId) {
+                    console.log("🎵 [TIDAL] ID trouvé:", foundTidalId);
+                    newAudioUrl = await getTidalAudioUrl(foundTidalId);
+                    
+                    if (newAudioUrl) {
+                      console.log("✅ [TIDAL] Nouvelle URL obtenue via Tidal");
+                      
+                      // Sauvegarder le Tidal ID dans la DB
+                      const { supabase } = await import('@/integrations/supabase/client');
+                      await supabase
+                        .from('songs')
+                        .update({ tidal_id: foundTidalId })
+                        .eq('id', song.id);
+                    }
+                  }
+                } catch (tidalError) {
+                  console.error("❌ [TIDAL] Échec aussi:", tidalError);
+                }
+              }
+              
+              // Si Tidal n'a pas fonctionné ou ce n'était pas une URL Deezer, réessayer normalement
+              if (!newAudioUrl) {
+                newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                  song.url, 
+                  song.deezer_id,
+                  song.tidal_id,
+                  song.title,
+                  song.artist,
+                  song.id
+                );
+              }
               
               if (newAudioUrl && newAudioUrl !== audio.src) {
                 console.log("✅ Nouveau lien obtenu:", newAudioUrl.substring(0, 100) + "...");
