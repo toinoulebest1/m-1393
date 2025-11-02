@@ -118,14 +118,19 @@ export const useAudioControl = ({
             message: audioError?.message,
             src: audio.src
           });
-          
-          // Capturer l'ID de la chanson en cours d'erreur pour comparaison ultérieure
           const errorSongId = song.id;
+          const originalSrc = audio.src;
           
           // Si c'est une erreur réseau ou abort (lien expiré/invalide)
           if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
               audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
               audioError?.code === MediaError.MEDIA_ERR_DECODE) {
+            // Anti-réentrée: éviter de lancer plusieurs récupérations en parallèle
+            if ((audio as any).dataset?.recovering === '1') {
+              console.log('⏳ Récupération déjà en cours, on ignore cette erreur');
+              return;
+            }
+            (audio as any).dataset = { ...(audio as any).dataset, recovering: '1' } as DOMStringMap;
             
             console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
             
@@ -204,9 +209,10 @@ export const useAudioControl = ({
                 );
               }
               
-              // Vérifier que la chanson en cours correspond toujours à celle en erreur
-              if (currentSong?.id !== errorSongId) {
-                console.warn("⚠️ Chanson changée pendant la recherche, abandon du rechargement");
+              // Vérifier que la source audio n'a pas été modifiée entre-temps (évite les conflits si la chanson change)
+              if (audio.src !== originalSrc) {
+                console.warn("⚠️ Source audio changée pendant la recherche, abandon du rechargement");
+                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
                 return;
               }
               
@@ -234,14 +240,17 @@ export const useAudioControl = ({
                 
                 // Remettre le listener
                 audio.addEventListener('error', handleAudioError);
+                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
               } else {
                 console.warn("⚠️ Nouveau lien identique ou vide");
+                (audio as any).dataset && ((audio as any).dataset.recovering = '0');
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
               toast.error("Impossible de recharger la musique", {
                 description: "Le lien audio n'est plus disponible"
               });
+              (audio as any).dataset && ((audio as any).dataset.recovering = '0');
             }
           }
         };
