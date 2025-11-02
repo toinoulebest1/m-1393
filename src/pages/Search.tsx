@@ -233,12 +233,12 @@ const Search = () => {
         let deezerResult = null;
         if (query.trim()) {
           if (isWildcardSearch) {
-            // Pour *, faire 20 requêtes parallèles avec des offsets différents pour récupérer 2000 musiques
+            // Pour *, faire 3 requêtes parallèles optimisées
             const requests = [];
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < 3; i++) {
               requests.push(
                 supabase.functions.invoke('deezer-search', {
-                  body: { query: "a", limit: 100, index: i * 100 }
+                  body: { query: "a", limit: 50, index: i * 50 }
                 })
               );
             }
@@ -368,12 +368,12 @@ const Search = () => {
         let deezerResult = null;
         if (searchFilter !== "genre" && query.trim()) {
           if (isWildcardSearch) {
-            // Pour *, faire 20 requêtes parallèles avec des offsets différents pour récupérer 2000 musiques
+            // Pour *, faire 3 requêtes parallèles optimisées
             const requests = [];
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < 3; i++) {
               requests.push(
                 supabase.functions.invoke('deezer-search', {
-                  body: { query: "a", limit: 100, index: i * 100 }
+                  body: { query: "a", limit: 50, index: i * 50 }
                 })
               );
             }
