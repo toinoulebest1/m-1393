@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites } = usePlayer();
   const navigate = useNavigate();
   const location = useLocation();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
@@ -540,6 +540,21 @@ export const SyncedLyricsView: React.FC = () => {
               <span className="text-spotify-neutral">
                 {formatDuration(currentSong?.duration)}
               </span>
+            </div>
+            
+            {/* Favorite button */}
+            <div className="flex justify-center mb-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleFavorite(currentSong)}
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-10 w-10"
+              >
+                <Heart 
+                  className="h-5 w-5" 
+                  fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
+                />
+              </Button>
             </div>
             
             {/* Progress bar */}
