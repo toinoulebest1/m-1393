@@ -67,13 +67,12 @@ export const useAudioControl = ({
       }
 
       try {
-        console.log("⚡ Configuration audio");
+        const startTime = performance.now();
+        console.log("🚀 Récupération URL ultra-rapide...");
+        
         const audio = audioRef.current;
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
-        
-        console.log("🚀 Récupération URL ultra-rapide...");
-        const startTime = performance.now();
         
         // Récupération ultra-rapide de l'URL audio
         let audioUrl: string;
@@ -107,9 +106,9 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming instantané comme Spotify
+        // Configuration streaming instantané - pas de préchargement
         console.log("⚡ Démarrage instantané");
-        audio.preload = "auto"; // Chargement immédiat
+        audio.preload = "none"; // Pas de préchargement, streaming immédiat
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
@@ -189,12 +188,9 @@ export const useAudioControl = ({
         audio.addEventListener('error', handleAudioError);
         audio.src = audioUrl;
         
-        // Démarrage INSTANTANÉ - pas d'attente
-        console.log("🔄 Début du chargement audio");
-        
-        // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
-        console.log("🚀 Démarrage lecture avec AutoplayManager...");
+        // Démarrage INSTANTANÉ avec AutoplayManager
         const playStartTime = performance.now();
+        console.log("🚀 Lecture immédiate...");
         
         const success = await AutoplayManager.playAudio(audio);
         
