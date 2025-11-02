@@ -42,8 +42,8 @@ export const useInstantPlayback = (songs: any[]) => {
               // Lien déjà en DB
               console.log('✅ URL déjà en DB:', song.title);
             } else {
-              // Récupérer depuis l'API Frankfurt en priorité
-              const frankfurtUrl = `https://frankfurt.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
+              // Récupérer depuis l'API Ohio en priorité
+              const frankfurtUrl = `https://ohio.monochrome.tf/track/?id=${tidalId}&quality=LOSSLESS`;
               
               try {
                 const res = await fetch(frankfurtUrl, { headers: { Accept: 'application/json' } });

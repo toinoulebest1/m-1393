@@ -230,6 +230,7 @@ export const getAudioFileUrl = async (filePath: string, tidalId?: string, songTi
       
       // Liste des APIs à essayer (ordre de priorité)
       const apis = [
+        { name: 'Ohio', url: `https://ohio.monochrome.tf/track/?id=${tid}&quality=${quality}` },
         { name: 'Frankfurt', url: `https://frankfurt.monochrome.tf/track/?id=${tid}&quality=${quality}` },
         { name: 'London', url: `https://london.monochrome.tf/track/?id=${tid}&quality=${quality}` },
         { name: 'Katze', url: `https://katze.qqdl.site/track/?id=${tid}&quality=${quality}` },
