@@ -298,14 +298,16 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       const res = await fetch(url);
       
       if (res.ok) {
-        const audioUrl = await res.text();
-        const trimmedUrl = audioUrl.trim();
+        const data = await res.json();
         
-        if (trimmedUrl && trimmedUrl.startsWith('http')) {
-          console.log('✅ Deezmate URL FLAC obtenue:', trimmedUrl);
-          return trimmedUrl;
+        // Extraire le lien FLAC du JSON
+        const flacUrl = data?.flac || data?.FLAC;
+        
+        if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
+          console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+          return flacUrl;
         } else {
-          console.warn('⚠️ Deezmate réponse invalide:', audioUrl);
+          console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
         }
       } else {
         console.warn('⚠️ Deezmate API error:', res.status);
@@ -343,14 +345,16 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           const res = await fetch(url);
           
           if (res.ok) {
-            const audioUrl = await res.text();
-            const trimmedUrl = audioUrl.trim();
+            const data = await res.json();
             
-            if (trimmedUrl && trimmedUrl.startsWith('http')) {
-              console.log('✅ Deezmate URL FLAC obtenue:', trimmedUrl);
-              return trimmedUrl;
+            // Extraire le lien FLAC du JSON
+            const flacUrl = data?.flac || data?.FLAC;
+            
+            if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
+              console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+              return flacUrl;
             } else {
-              console.warn('⚠️ Deezmate réponse invalide:', audioUrl);
+              console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
             }
           } else {
             console.warn('⚠️ Deezmate API error:', res.status);
