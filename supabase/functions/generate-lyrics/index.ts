@@ -27,42 +27,57 @@ serve(async (req) => {
       );
     }
     
-    // Build LRCLIB API URL with required and optional parameters
-    const params = new URLSearchParams({
-      artist_name: artist,
-      track_name: songTitle,
-    });
+    // Try with exact duration first, then with ±2 seconds tolerance
+    const durationsToTry = duration 
+      ? [Math.round(duration), Math.round(duration) - 2, Math.round(duration) + 2]
+      : [undefined];
     
-    if (albumName) {
-      params.append('album_name', albumName);
-    }
+    let lyricsResponse;
+    let foundWithDuration = null;
     
-    if (duration) {
-      params.append('duration', Math.round(duration).toString());
-    }
-    
-    const apiUrl = `https://lrclib.net/api/get?${params.toString()}`;
-    console.log('Fetching lyrics from LRCLIB:', apiUrl);
-    
-    const lyricsResponse = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
-      }
-    });
-    
-    if (!lyricsResponse.ok) {
-      if (lyricsResponse.status === 404) {
-        console.log('Lyrics not found for:', songTitle, 'by', artist);
-        return new Response(
-          JSON.stringify({ 
-            lyrics: `Aucune parole trouvée pour "${songTitle}" par ${artist}.`,
-            syncedLyrics: null
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    for (const tryDuration of durationsToTry) {
+      const tryParams = new URLSearchParams({
+        artist_name: artist,
+        track_name: songTitle,
+      });
+      
+      if (albumName) {
+        tryParams.append('album_name', albumName);
       }
       
-      throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
+      if (tryDuration !== undefined) {
+        tryParams.append('duration', tryDuration.toString());
+      }
+      
+      const apiUrl = `https://lrclib.net/api/get?${tryParams.toString()}`;
+      console.log('Fetching lyrics from LRCLIB:', apiUrl);
+      
+      lyricsResponse = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
+        }
+      });
+      
+      if (lyricsResponse.ok) {
+        foundWithDuration = tryDuration;
+        console.log(`Found lyrics with duration: ${tryDuration}`);
+        break;
+      }
+      
+      if (lyricsResponse.status !== 404) {
+        throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
+      }
+    }
+    
+    if (!lyricsResponse || !lyricsResponse.ok) {
+      console.log('Lyrics not found for:', songTitle, 'by', artist);
+      return new Response(
+        JSON.stringify({ 
+          lyrics: `Aucune parole trouvée pour "${songTitle}" par ${artist}.`,
+          syncedLyrics: null
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const lyricsData = await lyricsResponse.json();
