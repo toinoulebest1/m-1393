@@ -312,8 +312,26 @@ export const searchTidalIsrc = async (title: string, artist: string): Promise<st
   }
 };
 
-export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, tidalId?: string): Promise<string> => {
-  console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Tidal ID:', tidalId);
+export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, tidalId?: string, songId?: string): Promise<string> => {
+  console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
+
+  // ÉTAPE 0: Si on a un songId mais pas de deezerId, chercher dans la DB
+  if (songId && !deezerId) {
+    try {
+      const { data: songData } = await supabase
+        .from('songs')
+        .select('deezer_id')
+        .eq('id', songId)
+        .single();
+      
+      if (songData?.deezer_id) {
+        console.log('🔥 ID Deezer trouvé dans la DB:', songData.deezer_id);
+        deezerId = songData.deezer_id;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur recherche deezer_id:', error);
+    }
+  }
 
   // ÉTAPE 1: Vérifier d'abord le cache si on a un deezerId
   if (deezerId) {
@@ -367,6 +385,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             onConflict: 'tidal_id'
           });
           
+          // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+          }
+          
           return flacUrl;
         } else {
           console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
@@ -414,6 +437,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             const expiresAt = new Date(cachedLink.expires_at);
             if (expiresAt > new Date()) {
               console.log('🔥 CACHE HIT: Lien Deezmate du cache');
+              
+              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+              }
+              
               return cachedLink.audio_url;
             }
           }
@@ -448,6 +477,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
               }, {
                 onConflict: 'tidal_id'
               });
+              
+              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+              }
               
               return flacUrl;
             } else {

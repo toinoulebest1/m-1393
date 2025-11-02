@@ -83,7 +83,8 @@ export const useAudioControl = ({
             song.deezer_id,
             song.tidal_id,
             song.title,
-            song.artist
+            song.artist,
+            song.id
           );
           const elapsed = performance.now() - startTime;
           console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
@@ -148,7 +149,8 @@ export const useAudioControl = ({
                 song.deezer_id,
                 song.tidal_id,
                 song.title,
-                song.artist
+                song.artist,
+                song.id
               );
               
               if (newAudioUrl && newAudioUrl !== audio.src) {

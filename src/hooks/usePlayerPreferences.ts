@@ -70,7 +70,8 @@ export const usePlayerPreferences = () => {
           nextTrack.deezer_id,
           nextTrack.tidal_id,
           nextTrack.title,
-          nextTrack.artist
+          nextTrack.artist,
+          nextTrack.id
         );
         console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }

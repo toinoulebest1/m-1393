@@ -202,7 +202,8 @@ export class PredictivePreloader {
             song.deezer_id,
             song.tidal_id,
             song.title,
-            song.artist
+            song.artist,
+            song.id
           );
           console.log("✅ Prédiction préchargée:", song.title);
         } catch (error) {

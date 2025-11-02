@@ -962,6 +962,7 @@ export type Database = {
           album_name: string | null
           artist: string | null
           created_at: string
+          deezer_id: string | null
           duration: string | null
           file_path: string
           genre: string | null
@@ -975,6 +976,7 @@ export type Database = {
           album_name?: string | null
           artist?: string | null
           created_at?: string
+          deezer_id?: string | null
           duration?: string | null
           file_path: string
           genre?: string | null
@@ -988,6 +990,7 @@ export type Database = {
           album_name?: string | null
           artist?: string | null
           created_at?: string
+          deezer_id?: string | null
           duration?: string | null
           file_path?: string
           genre?: string | null

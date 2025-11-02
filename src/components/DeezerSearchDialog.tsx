@@ -65,6 +65,12 @@ const DeezerSearchDialog = ({
     try {
       setLoading(true);
       const updates: any = {};
+      
+      // Sauvegarder l'ID Deezer pour accélérer les prochaines lectures
+      if (track.id) {
+        updates.deezer_id = String(track.id);
+      }
+      
       if (track.album?.cover_xl) {
         updates.image_url = track.album.cover_xl;
       }
