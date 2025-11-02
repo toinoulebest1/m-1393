@@ -217,9 +217,10 @@ export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | nul
 // Recherche l'ID Deezer directement par titre/artiste
 export const searchDeezerIdByTitleArtist = async (title: string, artist: string): Promise<string | null> => {
   try {
-    console.log('🔍 Recherche Deezer ID par titre/artiste:', title, '-', artist);
-    const query = `artist:"${artist}" track:"${title}"`;
-    const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
+    console.log('🔍 Recherche Deezer ID par titre:', title, '- Artiste attendu:', artist);
+    
+    // Chercher par titre uniquement sur l'endpoint /search/track
+    const response = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(title)}&limit=20`);
     
     if (!response.ok) {
       console.warn('⚠️ API Deezer search error:', response.status);
@@ -229,9 +230,28 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
     const data = await response.json();
     
     if (data.data && data.data.length > 0) {
-      // Prendre le premier résultat
+      // Normaliser les noms pour la comparaison
+      const normalizeArtist = (name: string) => 
+        name.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+      
+      const normalizedSearchArtist = normalizeArtist(artist);
+      
+      // Trouver la meilleure correspondance avec l'artiste
+      for (const track of data.data) {
+        const trackArtistName = track.artist?.name || '';
+        const normalizedTrackArtist = normalizeArtist(trackArtistName);
+        
+        // Correspondance exacte ou partielle
+        if (normalizedTrackArtist.includes(normalizedSearchArtist) || 
+            normalizedSearchArtist.includes(normalizedTrackArtist)) {
+          console.log('✅ Deezer ID trouvé avec correspondance artiste:', track.id, '-', trackArtistName);
+          return String(track.id);
+        }
+      }
+      
+      // Si aucune correspondance exacte, prendre le premier résultat
       const track = data.data[0];
-      console.log('✅ Deezer ID trouvé par recherche:', track.id);
+      console.log('⚠️ Aucune correspondance artiste, premier résultat utilisé:', track.id, '-', track.artist?.name);
       return String(track.id);
     }
     
