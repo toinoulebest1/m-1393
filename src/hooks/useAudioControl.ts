@@ -109,28 +109,31 @@ export const useAudioControl = ({
         console.log("⚡ Démarrage instantané");
         audio.preload = "auto"; // Chargement immédiat
         
-        // Gestionnaire d'erreur pour détecter les liens expirés/invalides
+        // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
           const audioError = (e.target as HTMLAudioElement).error;
-          console.error("❌ Erreur audio détectée:", audioError?.message, audioError?.code);
+          console.error("❌ Erreur audio détectée:", {
+            code: audioError?.code,
+            message: audioError?.message,
+            src: audio.src
+          });
           
           // Si c'est une erreur réseau ou abort (lien expiré/invalide)
           if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
               audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
-              audioError?.message?.includes('ABORT') ||
-              audioError?.message?.includes('NS_BINDING_ABORTED')) {
+              audioError?.code === MediaError.MEDIA_ERR_DECODE) {
             
             console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
             
             // Supprimer le lien expiré du cache si c'est un lien Tidal
-            if (song.tidal_id && audioUrl.includes('tidal.com')) {
+            if (song.tidal_id && audio.src.includes('tidal.com')) {
               try {
                 const { supabase } = await import('@/integrations/supabase/client');
                 await supabase
                   .from('tidal_audio_links')
                   .delete()
                   .eq('tidal_id', song.tidal_id);
-                console.log("🗑️ Lien expiré supprimé du cache");
+                console.log("🗑️ Lien expiré supprimé du cache pour tidal_id:", song.tidal_id);
               } catch (err) {
                 console.error("Erreur suppression cache:", err);
               }
@@ -138,7 +141,7 @@ export const useAudioControl = ({
             
             // Récupérer un nouveau lien
             try {
-              console.log("🔄 Récupération d'un nouveau lien...");
+              console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
               const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
                 song.url, 
                 song.tidal_id,
@@ -146,13 +149,27 @@ export const useAudioControl = ({
                 song.artist
               );
               
-              if (newAudioUrl && newAudioUrl !== audioUrl) {
-                console.log("✅ Nouveau lien obtenu, rechargement...");
+              if (newAudioUrl && newAudioUrl !== audio.src) {
+                console.log("✅ Nouveau lien obtenu:", newAudioUrl.substring(0, 100) + "...");
                 const currentTime = audio.currentTime;
+                const wasPlaying = !audio.paused;
+                
+                // Retirer l'ancien listener pour éviter la boucle
+                audio.removeEventListener('error', handleAudioError);
+                
                 audio.src = newAudioUrl;
+                audio.load();
                 audio.currentTime = currentTime;
-                await audio.play();
-                console.log("✅ Lecture reprise avec le nouveau lien");
+                
+                if (wasPlaying) {
+                  await audio.play();
+                  console.log("✅ Lecture reprise avec le nouveau lien");
+                }
+                
+                // Remettre le listener
+                audio.addEventListener('error', handleAudioError);
+              } else {
+                console.warn("⚠️ Nouveau lien identique ou vide");
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
@@ -163,7 +180,9 @@ export const useAudioControl = ({
           }
         };
         
-        audio.addEventListener('error', handleAudioError, { once: true });
+        // Ajouter le listener permanent (pas once pour capturer les erreurs pendant la lecture)
+        audio.removeEventListener('error', handleAudioError); // Supprimer l'ancien si existant
+        audio.addEventListener('error', handleAudioError);
         audio.src = audioUrl;
         
         // Démarrage INSTANTANÉ sans attendre - comme Spotify
