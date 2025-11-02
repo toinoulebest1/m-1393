@@ -671,12 +671,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
-  // Wrapper pour setProgress qui met à jour à la fois l'UI et l'audio
-  const handleSetProgress = useCallback((value: number) => {
-    setProgress(value);
-    updateProgress(value);
-  }, [setProgress, updateProgress]);
-
   // L'objet context complet avec l'égaliseur - Fix type mapping
   const playerContext: PlayerContextType = {
     currentSong,
@@ -701,7 +695,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     play,
     pause,
     setVolume,
-    setProgress: handleSetProgress,
+    setProgress,
     nextSong,
     previousSong,
     addToQueue,
