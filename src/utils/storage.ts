@@ -123,7 +123,8 @@ export const searchTidalIds = async (title: any, artist: any, maxResults: number
           const candId = extractTidalId(track);
           if (!candId) return null;
 
-          const candTitle = simplifyTitle(track.title || track.name || track.trackName || '');
+          const rawTitle = String(track.title || track.name || track.trackName || '').toLowerCase();
+          const candTitle = simplifyTitle(rawTitle);
           const artistsList: string[] = [];
           if (track.artist?.name) artistsList.push(track.artist.name);
           if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
@@ -136,14 +137,21 @@ export const searchTidalIds = async (title: any, artist: any, maxResults: number
           const titleExact = candTitle === expectedTitle;
           const titleStarts = candTitle.startsWith(expectedTitle);
           const titleIncludes = candTitle.includes(expectedTitle);
+          
+          // Pénaliser fortement les versions/remixes/feat
+          const hasUnwantedWords = /remix|version|feat|ft\.|featuring|edit|radio|extended|acoustic|live|cover|instrumental/i.test(rawTitle);
 
           let score = 0;
           if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
-          if (titleExact) score += 30; else if (titleStarts) score += 15; else if (titleIncludes) score += 10;
+          // Prioriser FORTEMENT les titres exacts
+          if (titleExact) score += 200; else if (titleStarts) score += 50; else if (titleIncludes) score += 20;
           const popularity = track.popularity || track.popularityScore || 0;
           score += Math.min(5, Math.floor(popularity / 20));
+          
+          // Grosse pénalité pour les versions/remixes
+          if (hasUnwantedWords) score -= 100;
 
-          return { id: candId, score, track };
+          return { id: candId, score, track, hasUnwantedWords };
         })
         .filter(Boolean)
         .sort((a: any, b: any) => b.score - a.score);
