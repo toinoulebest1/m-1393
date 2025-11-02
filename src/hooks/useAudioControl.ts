@@ -154,28 +154,6 @@ export const useAudioControl = ({
                 const currentTime = audio.currentTime;
                 const wasPlaying = !audio.paused;
                 
-                // Mettre à jour Supabase avec le nouveau lien pour éviter de retomber sur l'ancien
-                if (song.tidal_id) {
-                  try {
-                    const { supabase } = await import('@/integrations/supabase/client');
-                    const expiresAt = new Date();
-                    expiresAt.setHours(expiresAt.getHours() + 23);
-                    await supabase
-                      .from('tidal_audio_links')
-                      .upsert({
-                        tidal_id: song.tidal_id,
-                        audio_url: newAudioUrl,
-                        quality: 'LOSSLESS',
-                        source: 'frankfurt',
-                        last_verified_at: new Date().toISOString(),
-                        expires_at: expiresAt.toISOString()
-                      });
-                    console.log("💾 Supabase mis à jour avec le nouveau lien (expire dans 23h)");
-                  } catch (dbErr) {
-                    console.error("⚠️ Échec mise à jour Supabase:", dbErr);
-                  }
-                }
-                
                 // Retirer l'ancien listener pour éviter la boucle
                 audio.removeEventListener('error', handleAudioError);
                 
