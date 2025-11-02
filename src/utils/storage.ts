@@ -43,152 +43,143 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   return data.path;
 };
 
-// Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives (OPTIMISÉE)
-// Retourne PLUSIEURS IDs Tidal alternatifs pour avoir des fallbacks
+// Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives (SIMULTANÉ)
+// Lance toutes les recherches en parallèle et retourne dès qu'un résultat valide est trouvé
 export const searchTidalIds = async (title: any, artist: any, maxResults: number = 3): Promise<string[]> => {
   const safeTitle = String(title ?? '').trim();
   const safeArtist = String(artist ?? '').trim();
   
-  // Réduire à 2 combinaisons prioritaires pour accélérer
   const searchQueries = [
     `${safeTitle}, ${safeArtist}`.trim(),
     `${safeTitle} ${safeArtist}`.trim(),
   ].filter(q => q.length > 0);
   
-  console.log('🔎 Recherche Tidal IDs (optimisée) avec', searchQueries.length, 'combinaisons');
+  console.log('🚀 Recherche Tidal SIMULTANÉE avec', searchQueries.length, 'combinaisons');
   
-  const foundIds: string[] = [];
-  
-  // Fonction pour essayer une requête sur les deux APIs en parallèle
-  const trySearch = async (query: string) => {
+  const normalize = (s: any) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const simplifyTitle = (s: any) => normalize(s).split(/\s*-\s*|\(|\[|\{/)[0];
+  const expectedArtist = normalize(safeArtist);
+  const expectedTitle = simplifyTitle(safeTitle);
+  const aliases = new Set<string>([
+    expectedArtist,
+    expectedArtist.replace(/^maitre\s+/,'').trim(),
+    expectedArtist.replace('gims','maitre gims').trim(),
+  ]);
+
+  const extractTidalId = (obj: any): string | null => {
+    if (!obj || typeof obj !== 'object') return null;
+    if (obj.tidalId) return String(obj.tidalId);
+    if (obj.tidal_id) return String(obj.tidal_id);
+    if (obj.tidal?.id) return String(obj.tidal.id);
+    const provider = (obj.service || obj.provider || obj.platform || obj.source || '').toString().toLowerCase();
+    if (provider === 'tidal') {
+      const direct = obj.id ?? obj.trackId ?? null;
+      if (direct) return String(direct);
+    }
+    const link = obj.url || obj.link || obj.permalink || obj.webUrl || obj.web_url || '';
+    if (typeof link === 'string') {
+      const m1 = link.match(/tidal\.com\/.*track\/(\d+)/i);
+      if (m1?.[1]) return m1[1];
+      const m2 = link.match(/[?&]trackId=(\d+)/i);
+      if (m2?.[1]) return m2[1];
+    }
+    if (obj.data && typeof obj.data === 'object') {
+      const nested = extractTidalId(obj.data);
+      if (nested) return nested;
+    }
+    return null;
+  };
+
+  const scoreTrack = (track: any): { id: string; score: number } | null => {
+    const candId = extractTidalId(track);
+    if (!candId) return null;
+
+    const rawTitle = String(track.title || track.name || track.trackName || '').toLowerCase();
+    const candTitle = simplifyTitle(rawTitle);
+    const artistsList: string[] = [];
+    if (track.artist?.name) artistsList.push(track.artist.name);
+    if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
+    if (track.artist_name) artistsList.push(track.artist_name);
+    if (track.artist) artistsList.push(track.artist);
+    const candArtists = artistsList.map(normalize).filter(Boolean);
+
+    const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
+    const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
+    const titleExact = candTitle === expectedTitle;
+    const titleStarts = candTitle.startsWith(expectedTitle);
+    const titleIncludes = candTitle.includes(expectedTitle);
+    const hasUnwantedWords = /remix|version|feat|ft\.|featuring|edit|radio|extended|acoustic|live|cover|instrumental/i.test(rawTitle);
+
+    let score = 0;
+    if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
+    if (titleExact) score += 200; else if (titleStarts) score += 50; else if (titleIncludes) score += 20;
+    const popularity = track.popularity || track.popularityScore || 0;
+    score += Math.min(5, Math.floor(popularity / 20));
+    if (hasUnwantedWords) score -= 100;
+
+    return { id: candId, score };
+  };
+
+  // Fonction pour rechercher sur toutes les APIs en parallèle
+  const searchAll = async (query: string) => {
+    const apis = [
+      `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
+      `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
+    ];
+
     try {
-      const [res1, res2] = await Promise.allSettled([
-        fetch(`https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`, { 
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(5000) // Timeout 5s
-        }),
-        fetch(`https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`, { 
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(5000) // Timeout 5s
-        })
-      ]);
-      
-      // Prendre le premier résultat valide
-      for (const result of [res1, res2]) {
-        if (result.status === 'fulfilled' && result.value.ok) {
-          return await result.value.json();
+      const results = await Promise.allSettled(
+        apis.map(url => 
+          fetch(url, { 
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(5000)
+          }).then(res => res.ok ? res.json() : null)
+        )
+      );
+
+      const allTracks: any[] = [];
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          const data = result.value;
+          let tracks = [];
+          if (Array.isArray(data)) tracks = data;
+          else if (data?.tracks) tracks = data.tracks;
+          else if (data?.results) tracks = data.results;
+          else if (data?.data) tracks = data.data;
+          else if (data?.items) tracks = data.items;
+          allTracks.push(...tracks);
         }
       }
-      return null;
+
+      return allTracks.slice(0, 30); // Limiter pour performance
     } catch (error) {
-      console.error('❌ Erreur recherche Tidal:', error);
-      return null;
+      console.error('❌ Erreur recherche:', error);
+      return [];
     }
   };
-  
-  for (let i = 0; i < searchQueries.length && foundIds.length < maxResults; i++) {
-    const query = searchQueries[i];
-    console.log(`🔎 Tentative ${i + 1}/${searchQueries.length}:`, query);
-    
-    const data = await trySearch(query);
-    if (!data) continue;
-    
-    let results = [];
-    if (Array.isArray(data)) results = data;
-    else if (data?.tracks) results = data.tracks;
-    else if (data?.results) results = data.results;
-    else if (data?.data) results = data.data;
-    else if (data?.items) results = data.items;
-    
-    if (!results || results.length === 0) continue;
-    
-    const normalize = (s: any) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    const simplifyTitle = (s: any) => normalize(s).split(/\s*-\s*|\(|\[|\{/)[0];
-    const expectedArtist = normalize(safeArtist);
-    const expectedTitle = simplifyTitle(safeTitle);
-    const aliases = new Set<string>([
-      expectedArtist,
-      expectedArtist.replace(/^maitre\s+/,'').trim(),
-      expectedArtist.replace('gims','maitre gims').trim(),
-    ]);
 
-    const extractTidalId = (obj: any): string | null => {
-      if (!obj || typeof obj !== 'object') return null;
-      if (obj.tidalId) return String(obj.tidalId);
-      if (obj.tidal_id) return String(obj.tidal_id);
-      if (obj.tidal?.id) return String(obj.tidal.id);
-      const provider = (obj.service || obj.provider || obj.platform || obj.source || '').toString().toLowerCase();
-      if (provider === 'tidal') {
-        const direct = obj.id ?? obj.trackId ?? null;
-        if (direct) return String(direct);
-      }
-      const link = obj.url || obj.link || obj.permalink || obj.webUrl || obj.web_url || '';
-      if (typeof link === 'string') {
-        const m1 = link.match(/tidal\.com\/.*track\/(\d+)/i);
-        if (m1?.[1]) return m1[1];
-        const m2 = link.match(/[?&]trackId=(\d+)/i);
-        if (m2?.[1]) return m2[1];
-      }
-      if (obj.data && typeof obj.data === 'object') {
-        const nested = extractTidalId(obj.data);
-        if (nested) return nested;
-      }
-      return null;
-    };
+  // Lancer TOUTES les recherches en parallèle
+  const allSearchPromises = searchQueries.map(query => searchAll(query));
+  const allResults = await Promise.all(allSearchPromises);
 
-    // Calculer le score pour tous les résultats (limiter à 20 premiers pour performance)
-    const scoredResults = results
-      .slice(0, 20)
-      .map((track: any) => {
-        const candId = extractTidalId(track);
-        if (!candId) return null;
+  // Combiner et scorer tous les résultats
+  const allTracks = allResults.flat();
+  const scoredResults = allTracks
+    .map(scoreTrack)
+    .filter((r): r is { id: string; score: number } => r !== null)
+    .sort((a, b) => b.score - a.score);
 
-        const rawTitle = String(track.title || track.name || track.trackName || '').toLowerCase();
-        const candTitle = simplifyTitle(rawTitle);
-        const artistsList: string[] = [];
-        if (track.artist?.name) artistsList.push(track.artist.name);
-        if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
-        if (track.artist_name) artistsList.push(track.artist_name);
-        if (track.artist) artistsList.push(track.artist);
-        const candArtists = artistsList.map(normalize).filter(Boolean);
-
-        const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
-        const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
-        const titleExact = candTitle === expectedTitle;
-        const titleStarts = candTitle.startsWith(expectedTitle);
-        const titleIncludes = candTitle.includes(expectedTitle);
-        
-        // Pénaliser fortement les versions/remixes/feat
-        const hasUnwantedWords = /remix|version|feat|ft\.|featuring|edit|radio|extended|acoustic|live|cover|instrumental/i.test(rawTitle);
-
-        let score = 0;
-        if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
-        // Prioriser FORTEMENT les titres exacts
-        if (titleExact) score += 200; else if (titleStarts) score += 50; else if (titleIncludes) score += 20;
-        const popularity = track.popularity || track.popularityScore || 0;
-        score += Math.min(5, Math.floor(popularity / 20));
-        
-        // Grosse pénalité pour les versions/remixes
-        if (hasUnwantedWords) score -= 100;
-
-        return { id: candId, score, track, hasUnwantedWords };
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => b.score - a.score);
-
-    // Ajouter les meilleurs résultats uniques
-    for (const result of scoredResults) {
-      if (result && !foundIds.includes(result.id)) {
-        foundIds.push(result.id);
-        console.log(`✅ Tidal ID trouvé #${foundIds.length}:`, result.id, 'score:', result.score);
-        if (foundIds.length >= maxResults) break;
-      }
+  // Retourner les meilleurs résultats uniques
+  const foundIds: string[] = [];
+  for (const result of scoredResults) {
+    if (!foundIds.includes(result.id)) {
+      foundIds.push(result.id);
+      console.log(`✅ Tidal ID #${foundIds.length}:`, result.id, 'score:', result.score);
+      if (foundIds.length >= maxResults) break;
     }
-    
-    if (foundIds.length >= maxResults) break;
   }
   
-  console.log(`📋 Total IDs trouvés: ${foundIds.length}`, foundIds);
+  console.log(`📋 Total: ${foundIds.length} IDs`, foundIds);
   return foundIds;
 };
 
