@@ -189,48 +189,8 @@ export const useAudioControl = ({
         audio.addEventListener('error', handleAudioError);
         audio.src = audioUrl;
         
-        // Démarrage INSTANTANÉ sans attendre - comme Spotify
-        // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
-        try {
-          // Si déjà quelques données disponibles, on démarre directement
-          if (audio.readyState >= 2) {
-            console.log("✅ Données déjà disponibles, démarrage immédiat");
-          } else {
-            // Sinon on attend juste loadeddata (premier frame)
-            await new Promise<void>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
-                resolve(); // On essaie quand même
-              }, 2000); // 2s max (très court)
-              
-              const onLoadedData = () => {
-                clearTimeout(timeout);
-                audio.removeEventListener('loadeddata', onLoadedData);
-                audio.removeEventListener('error', onError);
-                console.log("✅ Premières données chargées");
-                resolve();
-              };
-              
-              const onError = () => {
-                clearTimeout(timeout);
-                audio.removeEventListener('loadeddata', onLoadedData);
-                audio.removeEventListener('error', onError);
-                reject(new Error('Erreur chargement audio'));
-              };
-              
-              audio.addEventListener('loadeddata', onLoadedData, { once: true });
-              audio.addEventListener('error', onError, { once: true });
-              
-              // Check immédiat
-              if (audio.readyState >= 2) {
-                onLoadedData();
-              }
-            });
-          }
-        } catch (error) {
-          console.warn("⚠️ Erreur attente données:", error);
-          // On continue quand même, le navigateur gérera
-        }
+        // Démarrage INSTANTANÉ - pas d'attente
+        console.log("🔄 Début du chargement audio");
         
         // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
         console.log("🚀 Démarrage lecture avec AutoplayManager...");
@@ -278,8 +238,7 @@ export const useAudioControl = ({
             );
           }
           
-          // Préchargement de la chanson suivante en arrière-plan
-          setTimeout(() => preloadNextTracks(), 1000);
+          // Préchargement désactivé
           
           // Changement terminé
           changeTimeoutRef.current = window.setTimeout(() => {
