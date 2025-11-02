@@ -2,10 +2,22 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Music, Mic2, Trophy, ListMusic, Heart, History, Search, Gamepad2, Sparkles, Play, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Landing = () => {
   const navigate = useNavigate();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Vérifier si l'utilisateur est déjà connecté
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/home");
+      }
+    };
+    checkSession();
+  }, [navigate]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
