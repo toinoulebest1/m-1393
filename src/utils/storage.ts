@@ -196,21 +196,14 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       const shareLink = `https://www.deezer.com/track/${deezerId}`;
       const flacUrl = `https://flacdownloader.com/flac/download?t=${encodeURIComponent(shareLink)}&f=FLAC`;
       console.log('📡 Appel flacdownloader:', flacUrl);
+      console.log('✅ flacdownloader URL FLAC obtenue:', flacUrl);
       
-      // Vérifier que l'URL est accessible
-      const testRes = await fetch(flacUrl, { method: 'HEAD' });
-      if (testRes.ok) {
-        console.log('✅ flacdownloader URL FLAC obtenue:', flacUrl);
-        
-        // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-        if (songId) {
-          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-        }
-        
-        return flacUrl;
-      } else {
-        console.warn('⚠️ flacdownloader API error:', testRes.status);
+      // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+      if (songId) {
+        void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
       }
+      
+      return flacUrl;
     } catch (error) {
       console.warn('⚠️ flacdownloader API échec:', error);
     }
@@ -275,21 +268,14 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           const shareLink = `https://www.deezer.com/track/${foundDeezerId}`;
           const flacUrl = `https://flacdownloader.com/flac/download?t=${encodeURIComponent(shareLink)}&f=FLAC`;
           console.log('📡 Appel flacdownloader:', flacUrl);
+          console.log('✅ flacdownloader URL FLAC obtenue:', flacUrl);
           
-          // Vérifier que l'URL est accessible
-          const testRes = await fetch(flacUrl, { method: 'HEAD' });
-          if (testRes.ok) {
-            console.log('✅ flacdownloader URL FLAC obtenue:', flacUrl);
-            
-            // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-            if (songId) {
-              void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-            }
-            
-            return flacUrl;
-          } else {
-            console.warn('⚠️ flacdownloader API error:', testRes.status);
+          // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
           }
+          
+          return flacUrl;
         } catch (error) {
           console.warn('⚠️ flacdownloader API échec:', error);
         }
