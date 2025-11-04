@@ -61,3 +61,6 @@ verify_jwt = false
 
 [functions.purge-all-songs]
 verify_jwt = false
+
+[functions.flacdownloader-proxy]
+verify_jwt = false
