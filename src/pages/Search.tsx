@@ -334,6 +334,11 @@ const Search = () => {
           formattedResults.push(...deezerSongs);
         }
 
+        // Dédupliquer les résultats par ID
+        const uniqueResults = Array.from(
+          new Map(formattedResults.map(song => [song.id, song])).values()
+        );
+
         // Filter playlists that the current user can view (only if user is authenticated)
         const visiblePlaylists = [];
         if (playlistResult.data && user) {
@@ -376,7 +381,7 @@ const Search = () => {
             }
           }
         }
-        setResults(formattedResults);
+        setResults(uniqueResults);
         setPlaylistResults(visiblePlaylists);
       } else {
         // Search in songs only for title, artist, genre filters
@@ -490,14 +495,18 @@ const Search = () => {
               imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium,
               bitrate: 'Preview',
               album_name: track.album?.title,
-              isDeezer: true,
-              deezer_id: track.id  // ID Deezer pour l'API Deezmate
+              isDeezer: true
             };
           });
           formattedResults.push(...deezerSongs);
         }
         
-        setResults(formattedResults);
+        // Dédupliquer les résultats par ID
+        const uniqueResults = Array.from(
+          new Map(formattedResults.map(song => [song.id, song])).values()
+        );
+        
+        setResults(uniqueResults);
         setPlaylistResults([]);
       }
     } catch (error) {
