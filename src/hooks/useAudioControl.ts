@@ -19,6 +19,7 @@ interface UseAudioControlProps {
   changeTimeoutRef: React.MutableRefObject<number | null>;
   setNextSongPreloaded: (value: boolean) => void;
   preloadNextTracks: () => Promise<void>;
+  setDisplayedSong: (song: Song | null) => void;
 }
 
 export const useAudioControl = ({
@@ -32,7 +33,8 @@ export const useAudioControl = ({
   setIsPlaying,
   changeTimeoutRef,
   setNextSongPreloaded,
-  preloadNextTracks
+  preloadNextTracks,
+  setDisplayedSong
 }: UseAudioControlProps) => {
 
   const play = useCallback(async (song?: Song) => {
@@ -56,6 +58,7 @@ export const useAudioControl = ({
       } as const;
       
       setCurrentSong(song);
+      setDisplayedSong(song); // ✅ Mise à jour immédiate de l'affichage
       localStorage.setItem('currentSong', JSON.stringify(song));
       setNextSongPreloaded(false);
       

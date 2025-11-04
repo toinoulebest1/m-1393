@@ -98,7 +98,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsPlaying,
     changeTimeoutRef,
     setNextSongPreloaded,
-    preloadNextTracks
+    preloadNextTracks,
+    setDisplayedSong
   });
 
   // Wrapper function for setVolume that updates both state and audio element
