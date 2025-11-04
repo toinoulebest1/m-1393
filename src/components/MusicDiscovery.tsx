@@ -35,7 +35,10 @@ export const MusicDiscovery = () => {
         }
 
         if (data?.data && Array.isArray(data.data)) {
-          const formattedSongs = data.data.slice(0, 8).map((track: any) => ({
+          // Mélanger aléatoirement les résultats Deezer
+          const shuffledData = [...data.data].sort(() => Math.random() - 0.5);
+          
+          const formattedSongs = shuffledData.slice(0, 8).map((track: any) => ({
             id: `deezer-${track.id}`,
             title: track.title,
             artist: track.artist?.name || "Artiste inconnu",

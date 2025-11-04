@@ -268,7 +268,13 @@ const Search = () => {
           throw playlistResult.error;
         }
         
-        const formattedResults = songResult.data.map(song => ({
+        // Mélanger les résultats locaux si recherche wildcard
+        const localSongs = songResult.data;
+        if (isWildcardSearch) {
+          localSongs.sort(() => Math.random() - 0.5);
+        }
+        
+        const formattedResults = localSongs.map(song => ({
           id: song.id,
           title: song.title,
           artist: song.artist || '',
@@ -418,7 +424,13 @@ const Search = () => {
           }
         }
         
-        const formattedResults = data.map(song => ({
+        // Mélanger les résultats si recherche wildcard
+        const songs = data || [];
+        if (isWildcardSearch) {
+          songs.sort(() => Math.random() - 0.5);
+        }
+        
+        const formattedResults = songs.map(song => ({
           id: song.id,
           title: song.title,
           artist: song.artist || '',
