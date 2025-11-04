@@ -5,7 +5,7 @@ import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
-import { cacheCurrentSong } from '@/utils/audioCache';
+import { cacheCurrentSong, getFromCache } from '@/utils/audioCache';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -77,9 +77,62 @@ export const useAudioControl = ({
         console.log("🚀 Récupération URL ultra-rapide...");
         const startTime = performance.now();
         
-        // Récupération ultra-rapide de l'URL audio
+        // Vérifier d'abord le cache local (IndexedDB)
         let audioUrl: string;
-        try {
+        const cachedSongInfo = localStorage.getItem('cachedCurrentSong');
+        
+        if (cachedSongInfo) {
+          try {
+            const { songId: cachedSongId } = JSON.parse(cachedSongInfo);
+            
+            // Si c'est la même chanson qu'en cache
+            if (cachedSongId === song.id) {
+              console.log("🔍 Vérification cache IndexedDB pour:", song.id);
+              const cachedUrl = await getFromCache(song.url);
+              
+              if (cachedUrl) {
+                audioUrl = cachedUrl;
+                const elapsed = performance.now() - startTime;
+                console.log("✅ ⚡ CACHE HIT! URL récupérée depuis IndexedDB en:", elapsed.toFixed(1), "ms");
+              } else {
+                console.log("⚠️ Cache introuvable, récupération réseau...");
+                audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                  song.url, 
+                  song.deezer_id,
+                  song.title,
+                  song.artist,
+                  song.id
+                );
+                const elapsed = performance.now() - startTime;
+                console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+              }
+            } else {
+              // Chanson différente, récupérer depuis le réseau
+              audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                song.url, 
+                song.deezer_id,
+                song.title,
+                song.artist,
+                song.id
+              );
+              const elapsed = performance.now() - startTime;
+              console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+            }
+          } catch (cacheError) {
+            console.warn("⚠️ Erreur lecture cache:", cacheError);
+            // Fallback réseau
+            audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+              song.url, 
+              song.deezer_id,
+              song.title,
+              song.artist,
+              song.id
+            );
+            const elapsed = performance.now() - startTime;
+            console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+          }
+        } else {
+          // Pas de cache, récupération normale
           audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url, 
             song.deezer_id,
@@ -89,6 +142,13 @@ export const useAudioControl = ({
           );
           const elapsed = performance.now() - startTime;
           console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+        }
+        
+        // Gestion des erreurs si pas d'URL
+        try {
+          if (!audioUrl || typeof audioUrl !== 'string') {
+            throw new Error('URL audio non disponible');
+          }
         } catch (error: any) {
           console.error("❌ Erreur récupération audio:", error.message);
           
@@ -102,10 +162,6 @@ export const useAudioControl = ({
           }
           
           throw error;
-        }
-
-        if (!audioUrl || typeof audioUrl !== 'string') {
-          throw new Error('URL audio non disponible');
         }
 
         // Configuration streaming instantané optimisé

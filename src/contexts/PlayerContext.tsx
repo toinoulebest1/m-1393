@@ -10,6 +10,7 @@ import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
+import { getFromCache } from '@/utils/audioCache';
 
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -304,13 +305,41 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("🎵 Restauration de:", song.title);
           setIsAudioReady(false);
           
-          const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-            song.url,
-            song.deezer_id,
-            song.tidal_id,
-            song.title,
-            song.artist
-          );
+          // Vérifier le cache d'abord
+          let audioUrl: string | null = null;
+          const cachedSongInfo = localStorage.getItem('cachedCurrentSong');
+          
+          if (cachedSongInfo) {
+            try {
+              const { songId: cachedSongId } = JSON.parse(cachedSongInfo);
+              
+              // Si c'est la même chanson qu'en cache
+              if (cachedSongId === song.id) {
+                console.log("🔍 Vérification cache IndexedDB pour:", song.id);
+                const cachedUrl = await getFromCache(song.url);
+                
+                if (cachedUrl) {
+                  audioUrl = cachedUrl;
+                  console.log("✅ ⚡ CACHE HIT! Chanson chargée depuis IndexedDB!");
+                }
+              }
+            } catch (cacheError) {
+              console.warn("⚠️ Erreur lecture cache:", cacheError);
+            }
+          }
+          
+          // Si pas en cache, récupérer depuis le réseau
+          if (!audioUrl) {
+            console.log("📡 Récupération depuis le réseau...");
+            audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+              song.url,
+              song.deezer_id,
+              song.tidal_id,
+              song.title,
+              song.artist
+            );
+          }
+          
           if (!audioUrl || typeof audioUrl !== 'string') return;
 
           // Configuration audio avec gestion d'état
