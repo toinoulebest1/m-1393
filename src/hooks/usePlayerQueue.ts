@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Song } from '@/types/player';
 import { toast } from 'sonner';
+import { useGenreBasedQueue } from './useGenreBasedQueue';
 
 interface UsePlayerQueueProps {
   currentSong: Song | null;
@@ -15,6 +16,8 @@ export const usePlayerQueue = ({
   setIsChangingSong,
   play
 }: UsePlayerQueueProps) => {
+  const { fetchSimilarSongsByGenre } = useGenreBasedQueue();
+  
   // État de la file d'attente
   const [queue, setQueueInternal] = useState<Song[]>(() => {
     const savedQueue = localStorage.getItem('queue');
@@ -123,11 +126,26 @@ export const usePlayerQueue = ({
         console.log("Repeating playlist from beginning");
         await play(queue[0]);
       } else {
-        toast.info("Fin de la playlist");
+        // 🎵 Charger automatiquement des chansons du même genre
+        console.log("🎵 Chargement de chansons similaires par genre...");
+        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
+        
+        if (similarSongs.length > 0) {
+          console.log(`✅ ${similarSongs.length} chansons similaires ajoutées à la queue`);
+          setQueueInternal(prevQueue => {
+            const newQueue = [...prevQueue, ...similarSongs];
+            localStorage.setItem('queue', JSON.stringify(newQueue));
+            return newQueue;
+          });
+          // Jouer la première chanson similaire
+          await play(similarSongs[0]);
+        } else {
+          toast.info("Fin de la playlist - Aucune chanson similaire trouvée");
+        }
       }
     }
     console.log("=====================");
-  }, [currentSong, isChangingSong, queue, play, repeatMode]);
+  }, [currentSong, isChangingSong, queue, play, repeatMode, fetchSimilarSongsByGenre]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
