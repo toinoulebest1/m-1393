@@ -98,26 +98,13 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Promotion vers tous les caches
+   * Promotion vers warm cache uniquement (URLs légères)
+   * L0 cache désactivé pour éviter le téléchargement de Blobs lourds
    */
   private static promoteToAllCaches(songUrl: string, audioUrl: string): void {
-    // Warm cache immédiat
+    // Warm cache uniquement (< 0.5ms, ultra-léger)
     UltraFastCache.setWarm(songUrl, audioUrl);
-    
-    // L0 cache en arrière-plan avec blob
-    setTimeout(async () => {
-      try {
-        const response = await fetch(audioUrl);
-        if (response.ok) {
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          UltraFastCache.setL0(songUrl, blobUrl, blob);
-          console.log("📦 L0 cache promoted:", songUrl);
-        }
-      } catch (error) {
-        console.warn("⚠️ L0 promotion failed:", error);
-      }
-    }, 10);
+    console.log("🔥 URL promue vers warm cache:", songUrl);
   }
 
   /**
