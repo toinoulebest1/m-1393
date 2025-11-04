@@ -225,13 +225,16 @@ export const useAudioControl = ({
                       audio.crossOrigin = '';
                       audio.src = flacUrl;
                       audio.load();
-                      audio.currentTime = currentTime;
                       
                       if (wasPlaying) {
-                        await waitForCanPlay(2000).catch(() => {});
+                        await waitForCanPlay(3000).catch(() => {});
+                        audio.currentTime = currentTime;
                         await audio.play().catch(err => console.warn('play() failed after Deezmate', err));
                         console.log("✅ Lecture reprise avec Deezmate");
                         toast.success("Source audio basculée");
+                      } else {
+                        await waitForCanPlay(3000).catch(() => {});
+                        audio.currentTime = currentTime;
                       }
                       
                       audio.addEventListener('error', handleAudioError);
@@ -264,15 +267,18 @@ export const useAudioControl = ({
                   audio.removeEventListener('error', handleAudioError);
                   audio.src = data.preview;
                   audio.load();
-                  audio.currentTime = currentTime;
                   
                   if (wasPlaying) {
-                    await waitForCanPlay(2000).catch(() => {});
+                    await waitForCanPlay(3000).catch(() => {});
+                    audio.currentTime = currentTime;
                     await audio.play().catch(err => console.warn('play() failed after preview', err));
                     console.log("✅ Lecture reprise avec preview Deezer");
                     toast.info("Qualité audio réduite", {
                       description: "Basculé vers l'aperçu Deezer"
                     });
+                  } else {
+                    await waitForCanPlay(3000).catch(() => {});
+                    audio.currentTime = currentTime;
                   }
                   
                   audio.addEventListener('error', handleAudioError);
@@ -298,12 +304,15 @@ export const useAudioControl = ({
                 audio.removeEventListener('error', handleAudioError);
                 audio.src = newAudioUrl;
                 audio.load();
-                audio.currentTime = currentTime;
                 
                 if (wasPlaying) {
-                  await waitForCanPlay(2000).catch(() => {});
+                  await waitForCanPlay(3000).catch(() => {});
+                  audio.currentTime = currentTime;
                   await audio.play().catch(err => console.warn('play() failed after classic fallback', err));
                   console.log("✅ Lecture reprise");
+                } else {
+                  await waitForCanPlay(3000).catch(() => {});
+                  audio.currentTime = currentTime;
                 }
                 
                 audio.addEventListener('error', handleAudioError);
