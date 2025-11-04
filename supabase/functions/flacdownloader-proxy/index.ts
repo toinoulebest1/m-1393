@@ -80,11 +80,9 @@ Deno.serve(async (req: Request) => {
     // Prepare response headers, forwarding media-related ones
     const outHeaders = new Headers(corsHeaders);
     const passThroughHeaders = [
-      'content-type',
       'content-length',
       'content-range',
       'accept-ranges',
-      'content-disposition',
       'cache-control',
       'etag',
       'last-modified',
@@ -95,8 +93,13 @@ Deno.serve(async (req: Request) => {
       if (v) outHeaders.set(h, v);
     }
 
+    // ✅ Forcer le bon Content-Type pour le lecteur audio
+    outHeaders.set('content-type', 'audio/flac');
+    
+    // ✅ Forcer inline pour éviter le téléchargement
+    outHeaders.set('content-disposition', 'inline');
+    
     // Default sensible headers if missing
-    if (!outHeaders.get('content-type')) outHeaders.set('content-type', 'audio/flac');
     if (!outHeaders.get('accept-ranges')) outHeaders.set('accept-ranges', 'bytes');
     if (!outHeaders.get('cache-control')) outHeaders.set('cache-control', 'private, max-age=60');
 
