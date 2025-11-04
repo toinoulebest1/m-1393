@@ -4,12 +4,21 @@ import { SongCard } from "./SongCard";
 import { Sparkles } from "lucide-react";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 
-const POPULAR_SEARCH_TERMS = [
-  "top français",
-  "hits 2024",
-  "pop française",
-  "rap français",
-  "musique tendance"
+const DIVERSE_GENRES = [
+  "rock",
+  "jazz",
+  "electronic",
+  "classical",
+  "reggae",
+  "metal",
+  "blues",
+  "country",
+  "latin",
+  "soul",
+  "funk",
+  "indie",
+  "folk",
+  "r&b"
 ];
 
 export const MusicDiscovery = () => {
@@ -20,38 +29,46 @@ export const MusicDiscovery = () => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        // Sélectionner un terme de recherche aléatoire
-        const randomTerm = POPULAR_SEARCH_TERMS[Math.floor(Math.random() * POPULAR_SEARCH_TERMS.length)];
+        // Sélectionner 4 genres aléatoires différents
+        const shuffledGenres = [...DIVERSE_GENRES].sort(() => Math.random() - 0.5);
+        const selectedGenres = shuffledGenres.slice(0, 4);
         
-        // Rechercher des chansons via l'API Deezer
-        const { data, error } = await supabase.functions.invoke('deezer-search', {
-          body: { query: randomTerm }
-        });
-
-        if (error) {
-          console.error("Erreur lors de la recherche Deezer:", error);
-          setLoading(false);
-          return;
+        console.log("🎵 Genres sélectionnés pour la découverte:", selectedGenres);
+        
+        // Faire une recherche pour chaque genre (2 musiques par genre = 8 total)
+        const searchPromises = selectedGenres.map(genre => 
+          supabase.functions.invoke('deezer-search', {
+            body: { query: genre, limit: 10 }
+          })
+        );
+        
+        const results = await Promise.all(searchPromises);
+        
+        const allTracks = [];
+        for (const result of results) {
+          if (!result.error && result.data?.data && Array.isArray(result.data.data)) {
+            // Prendre 2 musiques aléatoires de chaque genre
+            const shuffled = [...result.data.data].sort(() => Math.random() - 0.5);
+            allTracks.push(...shuffled.slice(0, 2));
+          }
         }
+        
+        // Mélanger le résultat final pour mélanger les genres
+        const finalTracks = allTracks.sort(() => Math.random() - 0.5).slice(0, 8);
+        
+        const formattedSongs = finalTracks.map((track: any) => ({
+          id: `deezer-${track.id}`,
+          title: track.title,
+          artist: track.artist?.name || "Artiste inconnu",
+          imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || "",
+          url: track.preview || "",
+          duration: track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : "0:00",
+          genre: "",
+          albumName: track.album?.title || "",
+          deezer_id: track.id
+        }));
 
-        if (data?.data && Array.isArray(data.data)) {
-          // Mélanger aléatoirement les résultats Deezer
-          const shuffledData = [...data.data].sort(() => Math.random() - 0.5);
-          
-          const formattedSongs = shuffledData.slice(0, 8).map((track: any) => ({
-            id: `deezer-${track.id}`,
-            title: track.title,
-            artist: track.artist?.name || "Artiste inconnu",
-            imageUrl: track.album?.cover_xl || track.album?.cover_big || track.album?.cover_medium || "",
-            url: track.preview || "",
-            duration: track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : "0:00",
-            genre: "",
-            albumName: track.album?.title || "",
-            deezer_id: track.id
-          }));
-
-          setSuggestedSongs(formattedSongs);
-        }
+        setSuggestedSongs(formattedSongs);
       } catch (error) {
         console.error("Erreur lors de la récupération des suggestions:", error);
       } finally {

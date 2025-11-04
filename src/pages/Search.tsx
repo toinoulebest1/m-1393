@@ -216,6 +216,9 @@ const Search = () => {
         let songQuery = supabase.from('songs').select('*');
         if (!isWildcardSearch) {
           songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
+        } else {
+          // Pour wildcard, récupérer TOUTES les musiques (limite haute)
+          songQuery = songQuery.limit(500);
         }
         console.log("Song query built for search filter 'all'");
         promises.push(songQuery);
@@ -268,10 +271,13 @@ const Search = () => {
           throw playlistResult.error;
         }
         
-        // Mélanger les résultats locaux si recherche wildcard
-        const localSongs = songResult.data;
-        if (isWildcardSearch) {
-          localSongs.sort(() => Math.random() - 0.5);
+        // Mélanger et sélectionner aléatoirement si recherche wildcard
+        let localSongs = songResult.data || [];
+        if (isWildcardSearch && localSongs.length > 0) {
+          // Mélanger toutes les musiques puis en prendre 20 au hasard
+          localSongs = localSongs
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 20);
         }
         
         const formattedResults = localSongs.map(song => ({
@@ -385,6 +391,9 @@ const Search = () => {
               queryBuilder = queryBuilder.eq('genre', selectedGenre);
             }
           }
+        } else {
+          // Pour wildcard, récupérer TOUTES les musiques (limite haute)
+          queryBuilder = queryBuilder.limit(500);
         }
         
         const {
@@ -424,10 +433,13 @@ const Search = () => {
           }
         }
         
-        // Mélanger les résultats si recherche wildcard
-        const songs = data || [];
-        if (isWildcardSearch) {
-          songs.sort(() => Math.random() - 0.5);
+        // Mélanger et sélectionner aléatoirement si recherche wildcard
+        let songs = data || [];
+        if (isWildcardSearch && songs.length > 0) {
+          // Mélanger toutes les musiques puis en prendre 20 au hasard
+          songs = songs
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 20);
         }
         
         const formattedResults = songs.map(song => ({
