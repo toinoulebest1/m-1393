@@ -180,12 +180,11 @@ export const useAudioControl = ({
             src: audio.src
           });
           
-          // Si c'est une erreur réseau ou format (lien expiré/invalide/404)
-          if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
-              audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
-              audioError?.code === MediaError.MEDIA_ERR_DECODE) {
+          // Si c'est une erreur audio (n'importe quel code) ou erreur de demuxer Chrome
+          if (audioError?.code || audioError?.message?.includes('DEMUXER_ERROR')) {
             
-            console.log("🔄 Erreur détectée, tentative de récupération via Deezmate...");
+            console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
+            console.log("🎯 PRIORITÉ: Tentative Deezmate en premier...");
             
             // PRIORITÉ: Essayer Deezmate en premier si on a un deezer_id
             try {
