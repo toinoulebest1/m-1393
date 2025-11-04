@@ -302,30 +302,48 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (savedSong) {
         const song = JSON.parse(savedSong);
         try {
-          console.log("🎵 Restauration de:", song.title);
+          console.log("🎵 Restauration de:", song.title, "ID:", song.id);
           setIsAudioReady(false);
           
           // Vérifier le cache d'abord
           let audioUrl: string | null = null;
           const cachedSongInfo = localStorage.getItem('cachedCurrentSong');
           
+          console.log("📦 cachedSongInfo:", cachedSongInfo);
+          
           if (cachedSongInfo) {
             try {
-              const { songId: cachedSongId } = JSON.parse(cachedSongInfo);
+              const parsedCacheInfo = JSON.parse(cachedSongInfo);
+              console.log("📦 Parsed cache info:", parsedCacheInfo);
+              const { songId: cachedSongId, url: cachedUrl } = parsedCacheInfo;
+              
+              console.log("🔍 Comparaison:", {
+                currentSongId: song.id,
+                cachedSongId: cachedSongId,
+                match: cachedSongId === song.id
+              });
               
               // Si c'est la même chanson qu'en cache
               if (cachedSongId === song.id) {
-                console.log("🔍 Vérification cache IndexedDB pour:", song.id);
-                const cachedUrl = await getFromCache(song.url);
+                console.log("🔍 Vérification cache IndexedDB pour:", song.id, "URL:", cachedUrl || song.url);
+                const cachedAudioUrl = await getFromCache(cachedUrl || song.url);
                 
-                if (cachedUrl) {
-                  audioUrl = cachedUrl;
+                console.log("📦 Résultat getFromCache:", cachedAudioUrl ? "TROUVÉ" : "NON TROUVÉ");
+                
+                if (cachedAudioUrl) {
+                  audioUrl = cachedAudioUrl;
                   console.log("✅ ⚡ CACHE HIT! Chanson chargée depuis IndexedDB!");
+                } else {
+                  console.log("⚠️ Cache IndexedDB vide pour cette chanson");
                 }
+              } else {
+                console.log("⚠️ Song ID différent, skip cache");
               }
             } catch (cacheError) {
-              console.warn("⚠️ Erreur lecture cache:", cacheError);
+              console.error("❌ Erreur lecture cache:", cacheError);
             }
+          } else {
+            console.log("⚠️ Pas de cachedSongInfo dans localStorage");
           }
           
           // Si pas en cache, récupérer depuis le réseau
@@ -340,7 +358,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             );
           }
           
-          if (!audioUrl || typeof audioUrl !== 'string') return;
+          if (!audioUrl || typeof audioUrl !== 'string') {
+            console.log("❌ Pas d'URL audio disponible");
+            return;
+          }
 
           // Configuration audio avec gestion d'état
           audioRef.current.src = audioUrl;
