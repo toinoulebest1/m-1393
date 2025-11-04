@@ -147,28 +147,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 1: flacdownloader en PRIORITÉ si un deezerId est fourni
+  // ÉTAPE 1: Deezmate en PRIORITÉ (ultra-rapide)
   if (deezerId) {
-    console.log('🎵 Essai API flacdownloader (priorité) avec ID:', deezerId);
-    try {
-      const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
-      console.log('📡 Appel flacdownloader:', proxyUrl);
-      
-      // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-      if (songId) {
-        void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-      }
-      
-      return proxyUrl;
-    } catch (error) {
-      console.warn('⚠️ flacdownloader API échec, passage à Deezmate:', error);
-    }
-
-    // FALLBACK: Deezmate si flacdownloader échoue
-    console.log('🎵 Essai API Deezmate (fallback) avec ID:', deezerId);
+    console.log('🎵 Deezmate (priorité) ID:', deezerId);
     try {
       const url = `https://api.deezmate.com/dl/${deezerId}`;
-      console.log('📡 Appel Deezmate:', url);
       const res = await fetch(url);
       
       if (res.ok) {
@@ -176,34 +159,33 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         const flacUrl = data?.links?.flac || data?.links?.FLAC;
         
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-          console.log('✅ Deezmate URL FLAC obtenue, vérification...:', flacUrl);
+          console.log('✅ Deezmate URL:', flacUrl);
           
-          // Vérifier que l'URL Deezmate fonctionne vraiment
-          try {
-            const testRes = await fetch(flacUrl, { method: 'HEAD' });
-            if (testRes.ok) {
-              console.log('✅ URL Deezmate validée');
-              
-              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-              }
-              
-              return flacUrl;
-            } else {
-              console.warn('⚠️ URL Deezmate invalide (HTTP', testRes.status, ')');
-            }
-          } catch (testError) {
-            console.warn('⚠️ Test URL Deezmate échoué:', testError);
+          // Sauvegarder l'ID Deezer
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
           }
-        } else {
-          console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
+          
+          // Retour immédiat sans vérification pour vitesse max
+          return flacUrl;
         }
-      } else {
-        console.warn('⚠️ Deezmate API error:', res.status);
       }
     } catch (error) {
-      console.warn('⚠️ Deezmate API échec:', error);
+      console.warn('⚠️ Deezmate échec:', error);
+    }
+
+    // FALLBACK: flacdownloader si Deezmate échoue
+    console.log('🎵 Fallback flacdownloader ID:', deezerId);
+    try {
+      const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
+      
+      if (songId) {
+        void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+      }
+      
+      return proxyUrl;
+    } catch (error) {
+      console.warn('⚠️ flacdownloader échec:', error);
     }
   }
 
@@ -215,29 +197,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       // Recherche directe Deezer ID
       const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
       
-      // Si on a trouvé un ID Deezer, essayer flacdownloader en PRIORITÉ
+      // Si on a trouvé un ID Deezer, essayer Deezmate (ultra-rapide)
       if (foundDeezerId) {
-        console.log('🎵 ID Deezer trouvé:', foundDeezerId);
+        console.log('🎵 Deezmate ID trouvé:', foundDeezerId);
         
-        // PRIORITÉ: API flacdownloader.com
-        try {
-          const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
-          console.log('📡 Appel flacdownloader (priorité):', proxyUrl);
-          
-          // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-          }
-          
-          return proxyUrl;
-        } catch (error) {
-          console.warn('⚠️ flacdownloader API échec, passage à Deezmate:', error);
-        }
-        
-        // FALLBACK: Deezmate si flacdownloader échoue
         try {
           const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
-          console.log('📡 Appel Deezmate (fallback):', url);
           const res = await fetch(url);
           
           if (res.ok) {
@@ -245,34 +210,32 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             const flacUrl = data?.links?.flac || data?.links?.FLAC;
             
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-              console.log('✅ Deezmate URL FLAC obtenue, vérification...:', flacUrl);
+              console.log('✅ Deezmate URL:', flacUrl);
               
-              // Vérifier que l'URL Deezmate fonctionne vraiment
-              try {
-                const testRes = await fetch(flacUrl, { method: 'HEAD' });
-                if (testRes.ok) {
-                  console.log('✅ URL Deezmate validée');
-                  
-                  // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-                  if (songId) {
-                    void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-                  }
-                  
-                  return flacUrl;
-                } else {
-                  console.warn('⚠️ URL Deezmate invalide (HTTP', testRes.status, ')');
-                }
-              } catch (testError) {
-                console.warn('⚠️ Test URL Deezmate échoué:', testError);
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
               }
-            } else {
-              console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
+              
+              // Retour immédiat pour vitesse max
+              return flacUrl;
             }
-          } else {
-            console.warn('⚠️ Deezmate API error:', res.status);
           }
         } catch (error) {
           console.warn('⚠️ Deezmate échec:', error);
+        }
+
+        // FALLBACK: flacdownloader
+        console.log('🎵 Fallback flacdownloader');
+        try {
+          const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
+          
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+          }
+          
+          return proxyUrl;
+        } catch (error) {
+          console.warn('⚠️ flacdownloader échec:', error);
         }
       }
     } catch (error) {
