@@ -95,117 +95,6 @@ async function searchLrcLibLyrics(title: string, artist: string): Promise<string
   }
 }
 
-// Fonction pour chercher un titre sur Tidal
-async function searchTidalId(title: string, artist: string): Promise<string | null> {
-  // Utiliser le format "titre, artiste" avec virgule pour plus de précision
-  const queries = [
-    `${title}, ${artist}`.trim(), // 1. Titre, artiste (format optimal - priorité)
-    `${title} ${artist}`.trim(), // 2. Titre + artiste
-    `${artist} ${title}`.trim(), // 3. Artiste + titre
-    title.trim(), // 4. Titre seul (en dernier recours)
-  ].filter(q => q.length > 0);
-
-  for (const query of queries) {
-    try {
-      // Essayer Frankfurt en priorité
-      let searchUrl = `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`;
-      let res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
-
-      // Fallback sur Phoenix si Frankfurt échoue
-      if (!res.ok) {
-        searchUrl = `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`;
-        res = await fetch(searchUrl, { headers: { Accept: 'application/json' } });
-        
-        if (!res.ok) continue;
-      }
-
-      const data = await res.json();
-      let results = [];
-      
-      if (Array.isArray(data)) {
-        results = data;
-      } else if (data?.tracks) {
-        results = data.tracks;
-      } else if (data?.results) {
-        results = data.results;
-      } else if (data?.data) {
-        results = data.data;
-      } else if (data?.items) {
-        results = data.items;
-      }
-
-      if (results && results.length > 0) {
-        const normalize = (s: string) => s
-          ?.toLowerCase()
-          ?.normalize('NFD')
-          ?.replace(/[\u0300-\u036f]/g, '')
-          ?.replace(/[^a-z0-9\s]/g, ' ')
-          ?.replace(/\s+/g, ' ')
-          ?.trim();
-        const simplifyTitle = (s: string) => normalize(String(s || '')).split(/\s*-\s*|\(|\[|\{/)[0];
-
-        const expectedArtist = normalize(artist);
-        const expectedTitle = simplifyTitle(title);
-        const aliases = new Set<string>([
-          expectedArtist,
-          expectedArtist.replace(/^maitre\s+/,'').trim(), // "maitre gims" -> "gims"
-          expectedArtist.replace('gims','maitre gims').trim(),
-        ]);
-
-        let best: any = null;
-        let bestScore = -1;
-
-        for (const tr of results as any[]) {
-          const candId = tr?.id ?? tr?.trackId ?? tr?.tidalId ?? null;
-          if (!candId) continue;
-
-          const candTitle = simplifyTitle(tr?.title || tr?.name || tr?.trackName || '');
-
-          const artistsList: string[] = [];
-          if (tr?.artist?.name) artistsList.push(tr.artist.name);
-          if (Array.isArray(tr?.artists)) artistsList.push(...tr.artists.map((a: any) => a?.name).filter(Boolean));
-          if (tr?.artist_name) artistsList.push(tr.artist_name);
-          if (tr?.artist) artistsList.push(tr.artist);
-          const candArtists = artistsList.map(normalize).filter(Boolean);
-
-          const hasExactArtist = candArtists.some(a => aliases.has(a));
-          const hasPartialArtist = candArtists.some(a => a?.includes(expectedArtist) || expectedArtist.includes(a));
-
-          const titleExact = candTitle === expectedTitle;
-          const titleStarts = candTitle.startsWith(expectedTitle);
-          const titleIncludes = candTitle.includes(expectedTitle);
-
-          let score = 0;
-          if (hasExactArtist) score += 100;
-          else if (hasPartialArtist) score += 50;
-
-          if (titleExact) score += 30;
-          else if (titleStarts) score += 15;
-          else if (titleIncludes) score += 10;
-
-          const popularity = tr?.popularity || tr?.popularityScore || 0;
-          score += Math.min(5, Math.floor(popularity / 20));
-
-          if (score > bestScore) {
-            bestScore = score;
-            best = tr;
-          }
-        }
-
-        if (best) {
-          const bestId = best?.id ?? best?.trackId ?? best?.tidalId;
-          console.log(`✅ Tidal ID choisi avec correspondance stricte: ${bestId}`);
-          return String(bestId);
-        }
-      }
-    } catch (error) {
-      console.error(`❌ Erreur recherche ${query}:`, error);
-      continue;
-    }
-  }
-
-  return null;
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -248,26 +137,16 @@ serve(async (req) => {
           continue;
         }
 
-        // Chercher le Tidal ID
-        const tidalId = await searchTidalId(song.title, song.artist);
-
-        if (!tidalId) {
-          console.warn(`⚠️ Tidal ID introuvable pour: ${song.title}`);
-          errors.push(`${song.title} - ${song.artist}`);
-          continue;
-        }
-
         // Chercher la pochette sur Deezer
         const imageUrl = await searchDeezerCover(song.title, song.artist);
 
-        // Ajouter la chanson dans la base
+        // Ajouter la chanson dans la base (sans Tidal ID)
         const { data: newSong, error: insertError } = await supabaseClient
           .from('songs')
           .insert({
             title: song.title,
             artist: song.artist,
-            file_path: `tidal:${tidalId}`,
-            tidal_id: tidalId,
+            file_path: `audio/${song.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.mp3`,
             image_url: imageUrl,
             duration: '3:30', // Durée par défaut
           })

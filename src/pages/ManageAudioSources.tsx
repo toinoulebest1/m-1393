@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
-import { searchTidalId } from "@/utils/storage";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -87,117 +87,11 @@ const ManageAudioSources = () => {
 
     setIsSaving(true);
     try {
-      console.log('🔍 Recherche chanson dans DB:', selectedTrack.title, '-', selectedTrack.artist.name);
-      
-      // 1. D'abord chercher dans songs si la chanson existe déjà avec un tidal_id
-      const { data: existingSongs } = await supabase
-        .from('songs')
-        .select('id, tidal_id, title, artist')
-        .ilike('title', selectedTrack.title)
-        .ilike('artist', selectedTrack.artist.name)
-        .limit(5);
-
-      console.log('📊 Chansons trouvées:', existingSongs);
-
-      let tidalId: string | null = null;
-      let songId: string | null = null;
-
-      // Chercher une chanson avec un tidal_id existant
-      const songWithTidalId = existingSongs?.find(s => s.tidal_id);
-      if (songWithTidalId) {
-        tidalId = songWithTidalId.tidal_id;
-        songId = songWithTidalId.id;
-        console.log('✅ Tidal ID trouvé dans songs:', tidalId);
-      } else if (existingSongs && existingSongs.length > 0) {
-        // Chanson trouvée mais sans tidal_id, on va le chercher
-        songId = existingSongs[0].id;
-        console.log('🔍 Chanson trouvée sans Tidal ID, recherche API...');
-        tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
-        
-        if (tidalId) {
-          // Sauvegarder le tidal_id dans songs
-          console.log('💾 Sauvegarde Tidal ID dans songs:', tidalId);
-          await supabase
-            .from('songs')
-            .update({ tidal_id: tidalId })
-            .eq('id', songId);
-          console.log('✅ Tidal ID sauvegardé dans songs');
-        }
-      } else {
-        // Aucune chanson trouvée, chercher juste le Tidal ID
-        console.log('⚠️ Chanson non trouvée dans songs, recherche Tidal ID uniquement...');
-        tidalId = await searchTidalId(selectedTrack.title, selectedTrack.artist.name);
-      }
-      
-      if (!tidalId) {
-        toast({
-          title: "Erreur",
-          description: "Impossible de trouver l'ID Tidal correspondant",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      console.log('✅ Tidal ID final:', tidalId);
-
-      // Vérifier si un lien existe déjà pour ce tidal_id
-      console.log('🔍 Vérification lien existant pour Tidal ID:', tidalId);
-      const { data: existing, error: checkError } = await supabase
-        .from("tidal_audio_links")
-        .select("id, tidal_id, audio_url")
-        .eq("tidal_id", tidalId)
-        .maybeSingle();
-
-      console.log('📊 Résultat vérification:', { existing, checkError });
-
-      if (existing) {
-        // Mettre à jour le lien existant
-        console.log('🔄 Mise à jour lien existant ID:', existing.id);
-        const { error } = await supabase
-          .from("tidal_audio_links")
-          .update({
-            audio_url: audioUrl.trim(),
-            last_verified_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
-
-        if (error) {
-          console.error('❌ Erreur mise à jour:', error);
-          throw error;
-        }
-        console.log('✅ Lien mis à jour avec succès');
-      } else {
-        // Créer un nouveau lien
-        console.log('➕ Création nouveau lien pour Tidal ID:', tidalId);
-        const { data: insertData, error } = await supabase
-          .from("tidal_audio_links")
-          .insert({
-            tidal_id: tidalId,
-            audio_url: audioUrl.trim(),
-            quality: "LOSSLESS",
-            source: "manual",
-            last_verified_at: new Date().toISOString(),
-          })
-          .select();
-
-        if (error) {
-          console.error('❌ Erreur insertion:', error);
-          throw error;
-        }
-        console.log('✅ Nouveau lien créé:', insertData);
-      }
-
       toast({
-        title: "Succès",
-        description: `Le lien audio a été enregistré avec l'ID Tidal ${tidalId}`,
+        title: "Information",
+        description: "Cette fonctionnalité n'est plus disponible (API Tidal supprimée)",
+        variant: "destructive",
       });
-
-      // Mettre à jour le cache pour utilisation immédiate
-      const { UltraFastCache } = await import("@/utils/ultraFastCache");
-      UltraFastCache.setWarm(`tidal:${tidalId}`, audioUrl.trim());
-      console.log('💾 Cache mis à jour pour tidal:' + tidalId);
-
       setAudioUrl("");
       setSelectedTrack(null);
     } catch (error) {
@@ -346,7 +240,7 @@ const ManageAudioSources = () => {
 
                   <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                     <p className="text-xs text-blue-200">
-                      💡 Ce lien sera sauvegardé dans la table tidal_audio_links et associé à l'ID Deezer {selectedTrack.id}
+                      ⚠️ Cette fonctionnalité n'est plus disponible (API Tidal supprimée)
                     </p>
                   </div>
                 </div>

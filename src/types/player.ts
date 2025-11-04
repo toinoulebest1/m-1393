@@ -11,7 +11,6 @@ export interface Song {
   user_id?: string;
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
-  tidal_id?: string; // Tidal track ID for Phoenix streaming
   deezer_id?: string; // Deezer track ID for Deezmate API
   isDeezer?: boolean; // Flag for Deezer tracks
 }

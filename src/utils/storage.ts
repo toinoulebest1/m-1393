@@ -43,151 +43,6 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   return data.path;
 };
 
-// Fonction pour chercher automatiquement un titre sur Tidal avec plusieurs tentatives (SIMULTANÉ)
-// Lance toutes les recherches en parallèle et retourne dès qu'un résultat valide est trouvé
-export const searchTidalIds = async (title: any, artist: any, maxResults: number = 3): Promise<string[]> => {
-  const safeTitle = String(title ?? '').trim();
-  const safeArtist = String(artist ?? '').trim();
-  
-  const searchQueries = [
-    `${safeTitle}, ${safeArtist}`.trim(),
-    `${safeTitle} ${safeArtist}`.trim(),
-  ].filter(q => q.length > 0);
-  
-  console.log('🚀 Recherche Tidal SIMULTANÉE avec', searchQueries.length, 'combinaisons');
-  
-  const normalize = (s: any) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const simplifyTitle = (s: any) => normalize(s).split(/\s*-\s*|\(|\[|\{/)[0];
-  const expectedArtist = normalize(safeArtist);
-  const expectedTitle = simplifyTitle(safeTitle);
-  const aliases = new Set<string>([
-    expectedArtist,
-    expectedArtist.replace(/^maitre\s+/,'').trim(),
-    expectedArtist.replace('gims','maitre gims').trim(),
-  ]);
-
-  const extractTidalId = (obj: any): string | null => {
-    if (!obj || typeof obj !== 'object') return null;
-    if (obj.tidalId) return String(obj.tidalId);
-    if (obj.tidal_id) return String(obj.tidal_id);
-    if (obj.tidal?.id) return String(obj.tidal.id);
-    const provider = (obj.service || obj.provider || obj.platform || obj.source || '').toString().toLowerCase();
-    if (provider === 'tidal') {
-      const direct = obj.id ?? obj.trackId ?? null;
-      if (direct) return String(direct);
-    }
-    const link = obj.url || obj.link || obj.permalink || obj.webUrl || obj.web_url || '';
-    if (typeof link === 'string') {
-      const m1 = link.match(/tidal\.com\/.*track\/(\d+)/i);
-      if (m1?.[1]) return m1[1];
-      const m2 = link.match(/[?&]trackId=(\d+)/i);
-      if (m2?.[1]) return m2[1];
-    }
-    if (obj.data && typeof obj.data === 'object') {
-      const nested = extractTidalId(obj.data);
-      if (nested) return nested;
-    }
-    return null;
-  };
-
-  const scoreTrack = (track: any): { id: string; score: number } | null => {
-    const candId = extractTidalId(track);
-    if (!candId) return null;
-
-    const rawTitle = String(track.title || track.name || track.trackName || '').toLowerCase();
-    const candTitle = simplifyTitle(rawTitle);
-    const artistsList: string[] = [];
-    if (track.artist?.name) artistsList.push(track.artist.name);
-    if (Array.isArray(track.artists)) artistsList.push(...track.artists.map((a: any) => a?.name).filter(Boolean));
-    if (track.artist_name) artistsList.push(track.artist_name);
-    if (track.artist) artistsList.push(track.artist);
-    const candArtists = artistsList.map(normalize).filter(Boolean);
-
-    const hasExactArtist = candArtists.some((a: string) => aliases.has(a));
-    const hasPartialArtist = candArtists.some((a: string) => a.includes(expectedArtist) || expectedArtist.includes(a));
-    const titleExact = candTitle === expectedTitle;
-    const titleStarts = candTitle.startsWith(expectedTitle);
-    const titleIncludes = candTitle.includes(expectedTitle);
-    const hasUnwantedWords = /remix|version|feat|ft\.|featuring|edit|radio|extended|acoustic|live|cover|instrumental/i.test(rawTitle);
-
-    let score = 0;
-    if (hasExactArtist) score += 100; else if (hasPartialArtist) score += 50;
-    if (titleExact) score += 200; else if (titleStarts) score += 50; else if (titleIncludes) score += 20;
-    const popularity = track.popularity || track.popularityScore || 0;
-    score += Math.min(5, Math.floor(popularity / 20));
-    if (hasUnwantedWords) score -= 100;
-
-    return { id: candId, score };
-  };
-
-  // Fonction pour rechercher sur toutes les APIs en parallèle
-  const searchAll = async (query: string) => {
-    const apis = [
-      `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
-      `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
-    ];
-
-    try {
-      const results = await Promise.allSettled(
-        apis.map(url => 
-          fetch(url, { 
-            headers: { Accept: 'application/json' },
-            signal: AbortSignal.timeout(5000)
-          }).then(res => res.ok ? res.json() : null)
-        )
-      );
-
-      const allTracks: any[] = [];
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value) {
-          const data = result.value;
-          let tracks = [];
-          if (Array.isArray(data)) tracks = data;
-          else if (data?.tracks) tracks = data.tracks;
-          else if (data?.results) tracks = data.results;
-          else if (data?.data) tracks = data.data;
-          else if (data?.items) tracks = data.items;
-          allTracks.push(...tracks);
-        }
-      }
-
-      return allTracks.slice(0, 30); // Limiter pour performance
-    } catch (error) {
-      console.error('❌ Erreur recherche:', error);
-      return [];
-    }
-  };
-
-  // Lancer TOUTES les recherches en parallèle
-  const allSearchPromises = searchQueries.map(query => searchAll(query));
-  const allResults = await Promise.all(allSearchPromises);
-
-  // Combiner et scorer tous les résultats
-  const allTracks = allResults.flat();
-  const scoredResults = allTracks
-    .map(scoreTrack)
-    .filter((r): r is { id: string; score: number } => r !== null)
-    .sort((a, b) => b.score - a.score);
-
-  // Retourner les meilleurs résultats uniques
-  const foundIds: string[] = [];
-  for (const result of scoredResults) {
-    if (!foundIds.includes(result.id)) {
-      foundIds.push(result.id);
-      console.log(`✅ Tidal ID #${foundIds.length}:`, result.id, 'score:', result.score);
-      if (foundIds.length >= maxResults) break;
-    }
-  }
-  
-  console.log(`📋 Total: ${foundIds.length} IDs`, foundIds);
-  return foundIds;
-};
-
-// Version simple qui retourne juste le premier ID (pour compatibilité)
-export const searchTidalId = async (title: any, artist: any): Promise<string | null> => {
-  const ids = await searchTidalIds(title, artist, 1);
-  return ids.length > 0 ? ids[0] : null;
-};
 
 // Recherche l'ID Deezer à partir d'un ISRC
 export const searchDeezerIdFromIsrc = async (isrc: string): Promise<string | null> => {
@@ -268,51 +123,8 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
   }
 };
 
-// Recherche l'ISRC d'un track Tidal
-export const searchTidalIsrc = async (title: string, artist: string): Promise<string | null> => {
-  try {
-    const query = `${title}, ${artist}`;
-    const apis = [
-      `https://frankfurt.monochrome.tf/search/?s=${encodeURIComponent(query)}`,
-      `https://phoenix.squid.wtf/search/?s=${encodeURIComponent(query)}`
-    ];
 
-    for (const url of apis) {
-      try {
-        const res = await fetch(url, { 
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(5000)
-        });
-        
-        if (!res.ok) continue;
-        
-        const data = await res.json();
-        let tracks = [];
-        
-        if (Array.isArray(data)) tracks = data;
-        else if (data?.items) tracks = data.items;
-        else if (data?.tracks) tracks = data.tracks;
-        
-        // Prendre le premier résultat qui a un ISRC
-        for (const track of tracks.slice(0, 3)) {
-          if (track?.isrc) {
-            console.log('✅ ISRC trouvé:', track.isrc, 'pour', title);
-            return track.isrc;
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ Erreur API:', url, error);
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.warn('⚠️ Erreur recherche ISRC:', error);
-    return null;
-  }
-};
-
-export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, tidalId?: string, songId?: string): Promise<string> => {
+export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
 
   // ========== PRIORITÉ ABSOLUE: DEEZER/DEEZMATE ==========
@@ -372,18 +184,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     console.log('🔎 Recherche parallèle Deezer ID...');
     
     try {
-      // Lancer les deux recherches en parallèle
-      const [deezerIdDirect, isrcResult] = await Promise.all([
-        searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null),
-        searchTidalIsrc(songTitle, songArtist).catch(() => null)
-      ]);
-      
-      let foundDeezerId = deezerIdDirect;
-      
-      // Si pas trouvé directement mais on a un ISRC, chercher via ISRC
-      if (!foundDeezerId && isrcResult) {
-        foundDeezerId = await searchDeezerIdFromIsrc(isrcResult).catch(() => null);
-      }
+      // Recherche directe Deezer ID
+      const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
       
       // Si on a trouvé un ID Deezer, essayer Deezmate
       if (foundDeezerId) {

@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { searchTidalId } from '@/utils/storage';
 
 // Précharge instantanée des URLs audio pour lecture ultra-rapide
 export const useInstantPlayback = (songs: any[]) => {
@@ -12,98 +11,22 @@ export const useInstantPlayback = (songs: any[]) => {
       const preloadPromises = songs.slice(0, 10).map(async (song) => {
         try {
 
-          let tidalId = song.tidal_id;
-
-          // Si pas de tidal_id, le chercher et le sauvegarder immédiatement
-          if (!tidalId && song.title && song.artist) {
-            console.log('🚀 Préchargement Tidal ID pour:', song.title);
-            tidalId = await searchTidalId(song.title, song.artist);
-            
-            if (tidalId) {
-              // Mettre à jour la DB en arrière-plan (fire & forget)
-              supabase
-                .from('songs')
-                .update({ tidal_id: tidalId })
-                .eq('id', song.id)
-                .then(() => console.log('💾 Tidal ID sauvegardé:', song.title));
+      // Préchargement Deezer via Deezmate (priorité absolue)
+      if (song.deezer_id) {
+        try {
+          const deezmateUrl = `https://api.deezmate.com/dl/${song.deezer_id}`;
+          const res = await fetch(deezmateUrl);
+          
+          if (res.ok) {
+            const audioUrl = await res.text();
+            if (audioUrl && audioUrl.startsWith('http')) {
+              console.log('✅ URL Deezmate préchargée:', song.title);
             }
           }
-
-          // Préchargement Deezer via Deezmate (priorité absolue)
-          if (song.deezer_id) {
-            try {
-              const deezmateUrl = `https://api.deezmate.com/dl/${song.deezer_id}`;
-              const res = await fetch(deezmateUrl);
-              
-              if (res.ok) {
-                const audioUrl = await res.text();
-                if (audioUrl && audioUrl.startsWith('http')) {
-                  console.log('✅ URL Deezmate préchargée:', song.title);
-                  return; // Pas besoin de Tidal si Deezer fonctionne
-                }
-              }
-            } catch (error) {
-              console.warn('⚠️ Préchargement Deezmate échoué:', song.title, error);
-            }
-          }
-
-          // Fallback Tidal si pas de Deezer ID ou si échec
-          if (tidalId) {
-            // D'abord vérifier si le lien existe déjà en base
-            const { data: existingLink } = await supabase
-              .from('tidal_audio_links')
-              .select('audio_url, created_at')
-              .eq('tidal_id', tidalId)
-              .single();
-
-            if (existingLink) {
-              // Lien déjà en DB
-              console.log('✅ URL déjà en DB:', song.title);
-            } else {
-              // Récupérer depuis l'API Katze en priorité
-              const frankfurtUrl = `https://katze.qqdl.site/track/?id=${tidalId}&quality=LOSSLESS`;
-              
-              try {
-                const res = await fetch(frankfurtUrl, { headers: { Accept: 'application/json' } });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  
-                  // Extraire l'URL audio
-                  let audioUrl: string | null = null;
-                  
-                  if (Array.isArray(data)) {
-                    for (const item of data) {
-                      if (item?.OriginalTrackUrl && typeof item.OriginalTrackUrl === 'string') {
-                        audioUrl = item.OriginalTrackUrl;
-                        break;
-                      }
-                    }
-                  } else if (data?.OriginalTrackUrl) {
-                    audioUrl = data.OriginalTrackUrl;
-                  }
-                  
-                  if (audioUrl) {
-                    console.log('✅ URL préchargée:', song.title);
-                    
-                    // Sauvegarder dans Supabase pour utilisation future
-                    supabase
-                      .from('tidal_audio_links')
-                      .upsert({
-                        tidal_id: tidalId,
-                        audio_url: audioUrl,
-                        quality: 'LOSSLESS',
-                        source: 'frankfurt',
-                        last_verified_at: new Date().toISOString()
-                      })
-                      .then(() => console.log('💾 Lien sauvegardé en DB:', song.title));
-                  }
-                }
-              } catch (error) {
-                console.warn('⚠️ Préchargement échoué:', song.title, error);
-              }
-            }
-          }
+        } catch (error) {
+          console.warn('⚠️ Préchargement Deezmate échoué:', song.title, error);
+        }
+      }
         } catch (error) {
           console.warn('⚠️ Erreur préchargement:', song.title, error);
         }

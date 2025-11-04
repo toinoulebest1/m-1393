@@ -68,7 +68,7 @@ export const usePlayerPreferences = () => {
         await UltraFastStreaming.getAudioUrlUltraFast(
           nextTrack.url,
           nextTrack.deezer_id,
-          nextTrack.tidal_id,
+          
           nextTrack.title,
           nextTrack.artist,
           nextTrack.id

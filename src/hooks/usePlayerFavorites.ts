@@ -186,7 +186,7 @@ export const usePlayerFavorites = () => {
             duration: song.duration || '0:00',
             image_url: song.imageUrl || null,
             album_name: song.album_name || null,
-            tidal_id: song.tidal_id || null,
+            
             genre: song.genre || null
           };
           

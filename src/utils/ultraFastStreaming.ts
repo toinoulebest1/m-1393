@@ -10,62 +10,15 @@ import { supabase } from '@/integrations/supabase/client';
 export class UltraFastStreaming {
   private static promisePool = new Map<string, Promise<string>>();
   private static requestCount = 0;
-  private static preloadedFromDB = false;
-
-  /**
-   * Préchargement massif depuis la DB au démarrage
-   */
-  static async preloadFromDatabase(): Promise<void> {
-    if (this.preloadedFromDB) return;
-    
-    console.log("🚀 Préchargement URLs depuis tidal_audio_links...");
-    
-    try {
-      // Récupérer toutes les URLs en cache depuis la DB
-      const { data: cachedLinks } = await supabase
-        .from('tidal_audio_links')
-        .select('tidal_id, audio_url')
-        .limit(100);
-      
-      if (cachedLinks && cachedLinks.length > 0) {
-        // Charger directement dans le warm cache
-        for (const link of cachedLinks) {
-          // Utiliser tidal:{id} comme clé pour correspondre au format des songs
-          UltraFastCache.setWarm(`tidal:${link.tidal_id}`, link.audio_url);
-        }
-        console.log(`✅ ${cachedLinks.length} URLs préchargées dans le warm cache`);
-      }
-      
-      this.preloadedFromDB = true;
-    } catch (error) {
-      console.error("⚠️ Échec préchargement DB:", error);
-    }
-  }
 
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
    */
-  static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, tidalId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
+  static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
     const startTime = performance.now();
     this.requestCount++;
     
-    // Précharger depuis la DB au premier appel
-    if (!this.preloadedFromDB) {
-      await this.preloadFromDatabase();
-    }
-    
     console.log("🚀 Ultra-fast streaming:", songUrl);
-    
-    // Si on a un tidal_id, vérifier d'abord avec le format tidal:{id}
-    if (tidalId) {
-      const tidalKey = `tidal:${tidalId}`;
-      const warmResult = UltraFastCache.getWarm(tidalKey);
-      if (warmResult) {
-        const elapsed = performance.now() - startTime;
-        console.log("🔥 TIDAL WARM CACHE:", elapsed.toFixed(2), "ms");
-        return warmResult;
-      }
-    }
 
     // 1. L0 Cache instantané (< 0.1ms)
     if (UltraFastCache.hasL0(songUrl)) {
@@ -92,7 +45,7 @@ export class UltraFastStreaming {
     }
 
     // 4. Streaming ultra-agressif
-    const promise = this.streamingDirect(songUrl, startTime, deezerId, tidalId, songTitle, songArtist, songId);
+    const promise = this.streamingDirect(songUrl, startTime, deezerId, songTitle, songArtist, songId);
     this.promisePool.set(songUrl, promise);
 
     try {
@@ -110,11 +63,11 @@ export class UltraFastStreaming {
   /**
    * Streaming direct optimisé
    */
-  private static async streamingDirect(songUrl: string, startTime: number, deezerId?: string, tidalId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
+  private static async streamingDirect(songUrl: string, startTime: number, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
     console.log("🚀 Streaming direct");
 
     try {
-      const result = await this.tryNetwork(songUrl, deezerId, tidalId, songTitle, songArtist, songId);
+      const result = await this.tryNetwork(songUrl, deezerId, songTitle, songArtist, songId);
       if (result) {
         const elapsed = performance.now() - startTime;
         console.log("🌐 NETWORK DIRECT:", elapsed.toFixed(2), "ms");
@@ -131,9 +84,9 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide
    */
-  private static async tryNetwork(songUrl: string, deezerId?: string, tidalId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string | null> {
+  private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string | null> {
     try {
-      const url = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, tidalId, songId);
+      const url = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, songId);
       if (typeof url === 'string') {
         return url;
       }

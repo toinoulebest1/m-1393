@@ -237,7 +237,6 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
           currentSong.url,
           currentSong.deezer_id,
-          currentSong.tidal_id,
           currentSong.title,
           currentSong.artist
         );

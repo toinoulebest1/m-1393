@@ -19,7 +19,6 @@ interface Song {
   url: string;
   imageUrl?: string;
   genre?: string;
-  tidal_id?: string;
 }
 
 interface SongPickerProps {
@@ -58,8 +57,7 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
         duration: song.duration || '0:00',
         url: song.file_path,
         imageUrl: song.image_url,
-        genre: song.genre,
-        tidal_id: (song as any).tidal_id
+        genre: song.genre
       }));
       
       setSongs(formattedSongs);
@@ -98,8 +96,7 @@ export function SongPicker({ onSelectionConfirmed, maxHeight = '400px' }: SongPi
         duration: song.duration || '0:00',
         url: song.file_path,
         imageUrl: song.image_url,
-        genre: song.genre,
-        tidal_id: (song as any).tidal_id
+        genre: song.genre
       }));
       
       setSongs(formattedSongs);

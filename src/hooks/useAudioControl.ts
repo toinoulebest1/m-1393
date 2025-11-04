@@ -81,7 +81,6 @@ export const useAudioControl = ({
           audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url, 
             song.deezer_id,
-            song.tidal_id,
             song.title,
             song.artist,
             song.id
@@ -127,27 +126,12 @@ export const useAudioControl = ({
             
             console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
             
-            // Supprimer le lien expiré du cache si c'est un lien Tidal
-            if (song.tidal_id && audio.src.includes('tidal.com')) {
-              try {
-                const { supabase } = await import('@/integrations/supabase/client');
-                await supabase
-                  .from('tidal_audio_links')
-                  .delete()
-                  .eq('tidal_id', song.tidal_id);
-                console.log("🗑️ Lien expiré supprimé du cache pour tidal_id:", song.tidal_id);
-              } catch (err) {
-                console.error("Erreur suppression cache:", err);
-              }
-            }
-            
             // Récupérer un nouveau lien
             try {
               console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
               const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
                 song.url, 
                 song.deezer_id,
-                song.tidal_id,
                 song.title,
                 song.artist,
                 song.id
@@ -266,8 +250,8 @@ export const useAudioControl = ({
             }
           })();
           
-          // Récupération des paroles en arrière-plan pour les musiques Deezer/Tidal
-          if (song.isDeezer || song.tidal_id) {
+          // Récupération des paroles en arrière-plan pour les musiques Deezer
+          if (song.isDeezer) {
             fetchLyricsInBackground(
               song.id,
               song.title,
@@ -466,7 +450,7 @@ export const useAudioControl = ({
           artist: data.artist || currentSong.artist,
           imageUrl: data.image_url || currentSong.imageUrl,
           genre: data.genre || currentSong.genre,
-          tidal_id: (data as any).tidal_id || currentSong.tidal_id,
+          
         };
         
         setCurrentSong(updatedSong);
