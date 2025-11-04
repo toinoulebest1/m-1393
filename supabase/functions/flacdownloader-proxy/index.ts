@@ -35,11 +35,11 @@ Deno.serve(async (req: Request) => {
 
     // Forward Range header for seek support
     const headers: HeadersInit = {
-      'accept': '*/*',
+      'accept': 'audio/*',
       'user-agent': req.headers.get('user-agent') ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'referer': 'https://www.deezer.com/',
+      'origin': 'https://www.deezer.com',
     };
-
     const range = req.headers.get('range');
     if (range) {
       headers['range'] = range;
@@ -54,10 +54,12 @@ Deno.serve(async (req: Request) => {
     });
 
     console.log(`📡 Response status: ${upstream.status} ${upstream.statusText}`);
-    console.log(`📦 Content-Type: ${upstream.headers.get('content-type')}`);
-    console.log(`📏 Content-Length: ${upstream.headers.get('content-length')}`);
+    const respType = upstream.headers.get('content-type') || '';
+    const respLen = upstream.headers.get('content-length') || 'unknown';
+    console.log(`📦 Content-Type: ${respType}`);
+    console.log(`📏 Content-Length: ${respLen}`);
     
-    // Si erreur, logger le body
+    // Si erreur HTTP explicite
     if (upstream.status >= 400) {
       const errorText = await upstream.text();
       console.log(`❌ Error response body: ${errorText.substring(0, 500)}`);
@@ -65,6 +67,14 @@ Deno.serve(async (req: Request) => {
         status: upstream.status, 
         headers: corsHeaders 
       });
+    }
+
+    // Bloquer les réponses non audio (ex: HTML challenge, JSON d'erreur)
+    if (!(respType.toLowerCase().startsWith('audio/') || respType.toLowerCase().includes('octet-stream'))) {
+      let snippet = '';
+      try { snippet = (await upstream.text()).slice(0, 500); } catch {}
+      console.log('❌ Non-audio response from upstream:', respType, snippet);
+      return new Response(`Upstream content-type not audio (${respType})`, { status: 502, headers: corsHeaders });
     }
 
     // Prepare response headers, forwarding media-related ones

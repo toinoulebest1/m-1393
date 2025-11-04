@@ -171,6 +171,18 @@ export const useAudioControl = ({
         // Le navigateur buffera en arrière-plan
         audio.src = audioUrl;
         
+        // Petit helper pour attendre la lisibilité
+        const waitForCanPlay = (timeoutMs = 2000) => new Promise<void>((resolve, reject) => {
+          if (audio.readyState >= 3) return resolve();
+          let done = false;
+          const cleanup = () => { if (done) return; done = true; audio.removeEventListener('canplay', onCanPlay); audio.removeEventListener('error', onErr); clearTimeout(timer); };
+          const onCanPlay = () => { cleanup(); resolve(); };
+          const onErr = () => { cleanup(); reject(new Error('audio error before canplay')); };
+          const timer = setTimeout(() => { cleanup(); reject(new Error('canplay timeout')); }, timeoutMs);
+          audio.addEventListener('canplay', onCanPlay, { once: true });
+          audio.addEventListener('error', onErr, { once: true });
+        });
+        
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
           const audioError = (e.target as HTMLAudioElement).error;
@@ -210,12 +222,14 @@ export const useAudioControl = ({
                       const wasPlaying = !audio.paused;
                       
                       audio.removeEventListener('error', handleAudioError);
+                      audio.crossOrigin = '';
                       audio.src = flacUrl;
                       audio.load();
                       audio.currentTime = currentTime;
                       
                       if (wasPlaying) {
-                        await audio.play();
+                        await waitForCanPlay(2000).catch(() => {});
+                        await audio.play().catch(err => console.warn('play() failed after Deezmate', err));
                         console.log("✅ Lecture reprise avec Deezmate");
                         toast.success("Source audio basculée");
                       }
@@ -253,7 +267,8 @@ export const useAudioControl = ({
                   audio.currentTime = currentTime;
                   
                   if (wasPlaying) {
-                    await audio.play();
+                    await waitForCanPlay(2000).catch(() => {});
+                    await audio.play().catch(err => console.warn('play() failed after preview', err));
                     console.log("✅ Lecture reprise avec preview Deezer");
                     toast.info("Qualité audio réduite", {
                       description: "Basculé vers l'aperçu Deezer"
@@ -286,7 +301,8 @@ export const useAudioControl = ({
                 audio.currentTime = currentTime;
                 
                 if (wasPlaying) {
-                  await audio.play();
+                  await waitForCanPlay(2000).catch(() => {});
+                  await audio.play().catch(err => console.warn('play() failed after classic fallback', err));
                   console.log("✅ Lecture reprise");
                 }
                 
