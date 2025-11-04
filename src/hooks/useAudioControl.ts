@@ -5,6 +5,7 @@ import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -73,21 +74,40 @@ export const useAudioControl = ({
         audio.volume = volume / 100;
         audio.preload = "auto"; // Force preload auto pour la chanson courante
         
-        console.log("🚀 Récupération URL ultra-rapide...");
+        // PARALLÉLISATION: Charger URL + Métadonnées DB en parallèle
+        console.log("🚀 Récupération URL + DB en parallèle...");
         const startTime = performance.now();
         
-        // Récupération ultra-rapide de l'URL audio
         let audioUrl: string;
+        let songMetadata: any = null;
+        
         try {
-          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-            song.url, 
-            song.deezer_id,
-            song.title,
-            song.artist,
-            song.id
-          );
+          [audioUrl, songMetadata] = await Promise.all([
+            // URL audio
+            UltraFastStreaming.getAudioUrlUltraFast(
+              song.url, 
+              song.deezer_id,
+              song.title,
+              song.artist,
+              song.id
+            ),
+            // Métadonnées DB (paroles, infos supplémentaires)
+            (async () => {
+              try {
+                const { data } = await supabase
+                  .from('songs')
+                  .select('*')
+                  .eq('id', song.id)
+                  .single();
+                return data;
+              } catch {
+                return null;
+              }
+            })()
+          ]);
+          
           const elapsed = performance.now() - startTime;
-          console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+          console.log(`⚡ URL + DB obtenues en ${elapsed.toFixed(1)}ms (parallèle)`);
         } catch (error: any) {
           console.error("❌ Erreur récupération audio:", error.message);
           
