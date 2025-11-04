@@ -34,7 +34,21 @@ declare global {
 }
 
 export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentSong, isPlaying, progress, getCurrentAudioElement } = usePlayerContext();
+  // Utiliser usePlayerContext avec un try-catch pour éviter les erreurs de hot reload
+  let playerContext;
+  try {
+    playerContext = usePlayerContext();
+  } catch (error) {
+    // Si le PlayerContext n'est pas encore disponible, continuer sans
+    console.warn('⚠️ PlayerContext not ready yet');
+    playerContext = null;
+  }
+  
+  const currentSong = playerContext?.currentSong;
+  const isPlaying = playerContext?.isPlaying;
+  const progress = playerContext?.progress;
+  const getCurrentAudioElement = playerContext?.getCurrentAudioElement || (() => null);
+  
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [activeDevice, setActiveDevice] = useState<CastDevice | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
