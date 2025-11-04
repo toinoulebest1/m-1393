@@ -82,7 +82,8 @@ const Auth = () => {
 
         <div className="bg-spotify-card/30 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-xl hover:border-spotify-accent/30 transition-all duration-500">
           <SupabaseAuth 
-            supabaseClient={supabase} 
+            supabaseClient={supabase}
+            providers={['google', 'github', 'azure']}
             appearance={{
               theme: ThemeSupa,
               variables: {
@@ -129,12 +130,14 @@ const Auth = () => {
                 sign_in: {
                   email_label: 'Email',
                   password_label: 'Mot de passe',
-                  button_label: 'Se connecter'
+                  button_label: 'Se connecter',
+                  social_provider_text: 'Se connecter avec {{provider}}'
                 },
                 sign_up: {
                   email_label: 'Email',
                   password_label: 'Mot de passe',
-                  button_label: "S'inscrire"
+                  button_label: "S'inscrire",
+                  social_provider_text: "S'inscrire avec {{provider}}"
                 }
               }
             }} 
