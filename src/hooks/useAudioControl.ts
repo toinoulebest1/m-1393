@@ -229,9 +229,101 @@ export const useAudioControl = ({
           }
         };
         
-        // Ajouter le listener permanent (pas once pour capturer les erreurs pendant la lecture)
-        audio.removeEventListener('error', handleAudioError); // Supprimer l'ancien si existant
+        // Gestionnaire de stalled (buffering bloqué) - Chrome specific
+        const handleStalled = async () => {
+          console.warn("⚠️ Buffering bloqué (stalled), tentative de rechargement...");
+          
+          try {
+            const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+              song.url, 
+              song.deezer_id,
+              song.title,
+              song.artist,
+              song.id
+            );
+            
+            if (newAudioUrl && newAudioUrl !== audio.src) {
+              const currentTime = audio.currentTime;
+              const wasPlaying = !audio.paused;
+              
+              audio.removeEventListener('stalled', handleStalled);
+              audio.src = newAudioUrl;
+              audio.load();
+              audio.currentTime = currentTime;
+              
+              if (wasPlaying) {
+                await audio.play();
+                console.log("✅ Lecture reprise après stalled");
+              }
+              
+              audio.addEventListener('stalled', handleStalled);
+            }
+          } catch (error) {
+            console.error("❌ Erreur rechargement après stalled:", error);
+          }
+        };
+        
+        // Renouvellement préventif des liens Deezer toutes les 20 secondes (avant expiration)
+        let renewalInterval: number | null = null;
+        const setupLinkRenewal = () => {
+          if (renewalInterval) clearInterval(renewalInterval);
+          
+          // Pour les liens Deezer (preview temporaires), renouveler toutes les 20s
+          if (song.isDeezer || audioUrl.includes('dzcdn.net')) {
+            console.log("🔄 Activation renouvellement automatique des liens Deezer");
+            
+            renewalInterval = window.setInterval(async () => {
+              if (!audio.paused && !audio.ended) {
+                console.log("🔄 Renouvellement préventif du lien (éviter expiration)...");
+                
+                try {
+                  const newUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                    song.url,
+                    song.deezer_id,
+                    song.title,
+                    song.artist,
+                    song.id
+                  );
+                  
+                  if (newUrl && newUrl !== audio.src) {
+                    const currentTime = audio.currentTime;
+                    audio.src = newUrl;
+                    audio.currentTime = currentTime;
+                    console.log("✅ Lien renouvelé avec succès");
+                  }
+                } catch (error) {
+                  console.error("❌ Erreur renouvellement préventif:", error);
+                }
+              }
+            }, 20000); // Renouveler toutes les 20 secondes
+          }
+        };
+        
+        // Nettoyage du renouvellement quand la chanson change/se termine
+        const cleanupRenewal = () => {
+          if (renewalInterval) {
+            clearInterval(renewalInterval);
+            renewalInterval = null;
+            console.log("🧹 Renouvellement automatique arrêté");
+          }
+        };
+        
+        audio.addEventListener('ended', cleanupRenewal);
+        audio.addEventListener('pause', () => {
+          // Arrêter le renouvellement si en pause trop longtemps
+          setTimeout(() => {
+            if (audio.paused) cleanupRenewal();
+          }, 30000);
+        });
+        
+        // Ajouter les listeners
+        audio.removeEventListener('error', handleAudioError);
+        audio.removeEventListener('stalled', handleStalled);
         audio.addEventListener('error', handleAudioError);
+        audio.addEventListener('stalled', handleStalled);
+        
+        // Activer le renouvellement automatique
+        setupLinkRenewal();
         
         // Démarrage INSTANTANÉ sans attendre - streaming progressif
         // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
