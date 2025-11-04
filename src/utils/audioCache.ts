@@ -195,12 +195,55 @@ export const getAudioCacheStats = async (): Promise<{
 };
 
 /**
+ * Met en cache UNIQUEMENT la chanson en cours de lecture
+ * Supprime toutes les autres chansons du cache
+ */
+export const cacheCurrentSong = async (url: string, blob: Blob, songId: string): Promise<void> => {
+  try {
+    const db = await initAudioCache();
+    
+    // Récupérer toutes les entrées du cache
+    const allFiles = await db.getAll('audio-files');
+    
+    // Supprimer toutes les entrées SAUF celle qu'on va ajouter
+    for (const file of allFiles) {
+      if (file.url !== url) {
+        await db.delete('audio-files', file.url);
+        console.log(`🗑️ Ancienne chanson supprimée du cache: ${file.url}`);
+      }
+    }
+    
+    // Ajouter la chanson actuelle
+    const now = Date.now();
+    await db.put('audio-files', {
+      url,
+      blob,
+      timestamp: now,
+      lastAccessed: now,
+      size: blob.size
+    });
+    
+    // Sauvegarder l'info dans localStorage pour persistance après refresh
+    localStorage.setItem('cachedCurrentSong', JSON.stringify({
+      url,
+      songId,
+      timestamp: now
+    }));
+    
+    console.log(`💾 Chanson actuelle mise en cache: ${url} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+  } catch (error) {
+    console.error('Erreur lors de la mise en cache de la chanson actuelle:', error);
+  }
+};
+
+/**
  * Vide complètement le cache audio
  */
 export const clearAudioCache = async (): Promise<void> => {
   try {
     const db = await initAudioCache();
     await db.clear('audio-files');
+    localStorage.removeItem('cachedCurrentSong');
     console.log('Cache audio vidé avec succès');
   } catch (error) {
     console.error('Erreur lors du vidage du cache audio:', error);

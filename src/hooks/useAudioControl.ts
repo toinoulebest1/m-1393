@@ -5,6 +5,7 @@ import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
+import { cacheCurrentSong } from '@/utils/audioCache';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -235,6 +236,19 @@ export const useAudioControl = ({
           console.log("⚡ Temps total:", totalElapsed.toFixed(1), "ms");
           
           setIsPlaying(true);
+
+          // Mettre la chanson en cache (en arrière-plan, sans bloquer)
+          ;(async () => {
+            try {
+              const response = await fetch(audioUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                await cacheCurrentSong(audioUrl, blob, song.id);
+              }
+            } catch (e) {
+              console.warn('Impossible de mettre en cache:', e);
+            }
+          })();
 
           // Enregistrer dans l'historique de lecture (asynchrone, sans bloquer l'UI)
           ;(async () => {
