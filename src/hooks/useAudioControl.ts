@@ -185,7 +185,7 @@ export const useAudioControl = ({
               const timeout = setTimeout(() => {
                 console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
                 resolve(); // On essaie quand même
-              }, 2000); // 2s max (très court)
+              }, 500); // 500ms max - optimisé pour démarrage rapide
               
               const onLoadedData = () => {
                 clearTimeout(timeout);
@@ -239,11 +239,22 @@ export const useAudioControl = ({
               const { supabase } = await import('@/integrations/supabase/client');
               const { data: { session } } = await supabase.auth.getSession();
               if (session?.user?.id) {
-                const { error } = await supabase.from('play_history').insert({
-                  user_id: session.user.id,
-                  song_id: song.id,
-                });
-                if (error) console.error("Erreur enregistrement historique:", error);
+                // Vérifier que le song existe avant d'insérer (évite erreur FK)
+                const { data: existingSong } = await supabase
+                  .from('songs')
+                  .select('id')
+                  .eq('id', song.id)
+                  .single();
+                
+                if (existingSong) {
+                  const { error } = await supabase.from('play_history').insert({
+                    user_id: session.user.id,
+                    song_id: song.id,
+                  });
+                  if (error) console.error("Erreur enregistrement historique:", error);
+                } else {
+                  console.warn("⚠️ Song non trouvé dans la BDD, historique non enregistré:", song.id);
+                }
               }
             } catch (e) {
               console.error('Impossible d\'enregistrer l\'historique:', e);
