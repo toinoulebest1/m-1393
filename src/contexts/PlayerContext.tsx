@@ -69,16 +69,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   } = queueHook;
 
   // Hook ultra-rapide pour le préchargement intelligent - APRÈS usePlayerQueue
-  // Calculer l'index actuel dans la queue
-  const currentIndex = currentSong 
-    ? queue.findIndex(song => song.id === currentSong.id)
-    : -1;
-  
   const { getCacheStats } = useUltraFastPlayer({
     currentSong,
     queue,
-    isPlaying,
-    currentIndex
+    isPlaying
   });
 
 

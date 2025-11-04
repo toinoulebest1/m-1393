@@ -1,23 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { useIntelligentPreloader } from './useIntelligentPreloader';
-import { predictiveUrlGenerator } from '@/utils/predictiveUrlGenerator';
+// import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 
 interface UseUltraFastPlayerProps {
   currentSong: Song | null;
   queue: Song[];
   isPlaying: boolean;
-  currentIndex: number;
 }
 
 export const useUltraFastPlayer = ({
   currentSong,
   queue,
-  isPlaying,
-  currentIndex
+  isPlaying
 }: UseUltraFastPlayerProps) => {
-  const { recordTransition } = useIntelligentPreloader();
+  const { recordTransition, predictNextSongs, preloadPredictedSongs } = useIntelligentPreloader();
   const previousSongRef = useRef<Song | null>(null);
+  const preloadTimeoutRef = useRef<number | null>(null);
 
   // Enregistrer les transitions entre chansons
   useEffect(() => {
@@ -28,23 +27,19 @@ export const useUltraFastPlayer = ({
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Génération prédictive d'URLs pour les prochaines chansons
+  // Préchargement intelligent DÉSACTIVÉ pour éviter les chargements multiples
   useEffect(() => {
-    if (!isPlaying || !currentSong || queue.length === 0) return;
+    console.log("⚠️ Préchargement intelligent désactivé pour éviter les chargements multiples");
+    return () => {};
+  }, [currentSong, isPlaying, queue]);
 
-    console.log("🔮 Démarrage génération prédictive URLs");
-    
-    // Délai de 500ms pour ne pas surcharger au démarrage
-    const timeoutId = window.setTimeout(() => {
-      predictiveUrlGenerator.pregenerateUrls(queue, currentIndex).catch(err => {
-        console.warn("⚠️ Erreur génération prédictive:", err);
-      });
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [currentSong, isPlaying, queue, currentIndex]);
+  // Préchargement queue DÉSACTIVÉ
+  useEffect(() => {
+    console.log("⚠️ Préchargement de queue désactivé");
+    return () => {};
+  }, [queue]);
 
   return {
-    getCacheStats: () => predictiveUrlGenerator.getStats()
+    getCacheStats: () => ({ size: 0, maxSize: 0, entries: [] })
   };
 };

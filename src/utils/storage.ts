@@ -4,9 +4,6 @@ import { getPreGeneratedDropboxLink, generateAndSaveDropboxLinkAdvanced } from '
 import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
 import { circuitBreaker } from './circuitBreaker';
-import { keepAliveManager } from './keepAliveManager';
-import { predictiveUrlGenerator } from './predictiveUrlGenerator';
-import { Song } from '@/types/player';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
@@ -131,30 +128,6 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
 export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
 
-  // ========== PRIORITÉ ABSOLUE: CACHE PRÉDICTIF RAM ==========
-  
-  // ÉTAPE -1: Vérifier le cache prédictif en RAM
-  if (songId) {
-    try {
-      const mockSong: Song = {
-        id: songId,
-        url: filePath,
-        deezer_id: deezerId,
-        title: songTitle || '',
-        artist: songArtist || ''
-      };
-      
-      const cachedUrl = await predictiveUrlGenerator.getOrGenerateUrl(mockSong);
-      
-      if (cachedUrl) {
-        console.log("✅ URL trouvée dans le cache prédictif RAM");
-        return cachedUrl;
-      }
-    } catch (error) {
-      console.warn("⚠️ Erreur cache prédictif, fallback normal");
-    }
-  }
-
   // ========== PRIORITÉ ABSOLUE: DEEZER/DEEZMATE ==========
   
   // ÉTAPE 0: Si on a un songId mais pas de deezerId, chercher dans la DB
@@ -175,13 +148,13 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 1: Race Condition - Appels parallèles avec Circuit Breaker + Keep-Alive
+  // ÉTAPE 1: Race Condition - Appels parallèles avec Circuit Breaker
   if (deezerId) {
-    console.log('🏁 Race Condition: Deezmate vs flacdownloader (Keep-Alive)');
+    console.log('🏁 Race Condition: Deezmate vs flacdownloader');
     
     const promises: Promise<string | null>[] = [];
     
-    // Deezmate (si circuit fermé) avec Keep-Alive
+    // Deezmate (si circuit fermé)
     if (!circuitBreaker.isOpen('deezmate')) {
       promises.push(
         (async () => {
@@ -190,9 +163,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           
           try {
             const url = `https://api.deezmate.com/dl/${deezerId}`;
-            const res = await keepAliveManager.createFetchWithKeepAlive(url, { 
-              signal: controller.signal 
-            });
+            const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timeout);
             
             if (res.ok) {
