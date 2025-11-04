@@ -150,6 +150,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
   // ÉTAPE 1: Deezmate en PRIORITÉ (ultra-rapide)
   if (deezerId) {
     console.log('🎵 Deezmate (priorité) ID:', deezerId);
+    
+    let deezmateSuccess = false;
     try {
       const url = `https://api.deezmate.com/dl/${deezerId}`;
       const res = await fetch(url);
@@ -166,26 +168,33 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
           }
           
-          // Retour immédiat sans vérification pour vitesse max
+          deezmateSuccess = true;
           return flacUrl;
+        } else {
+          console.warn('⚠️ Deezmate réponse invalide');
         }
+      } else {
+        console.warn('⚠️ Deezmate erreur HTTP:', res.status);
       }
     } catch (error) {
       console.warn('⚠️ Deezmate échec:', error);
     }
 
-    // FALLBACK: flacdownloader si Deezmate échoue
-    console.log('🎵 Fallback flacdownloader ID:', deezerId);
-    try {
-      const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
-      
-      if (songId) {
-        void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+    // FALLBACK: flacdownloader si Deezmate a échoué
+    if (!deezmateSuccess) {
+      console.log('🔄 Fallback vers flacdownloader ID:', deezerId);
+      try {
+        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
+        
+        if (songId) {
+          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+        }
+        
+        console.log('✅ Utilisation flacdownloader');
+        return proxyUrl;
+      } catch (error) {
+        console.warn('⚠️ flacdownloader échec:', error);
       }
-      
-      return proxyUrl;
-    } catch (error) {
-      console.warn('⚠️ flacdownloader échec:', error);
     }
   }
 
@@ -201,6 +210,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       if (foundDeezerId) {
         console.log('🎵 Deezmate ID trouvé:', foundDeezerId);
         
+        let deezmateSuccess = false;
         try {
           const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
           const res = await fetch(url);
@@ -216,26 +226,33 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
                 void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
               }
               
-              // Retour immédiat pour vitesse max
+              deezmateSuccess = true;
               return flacUrl;
+            } else {
+              console.warn('⚠️ Deezmate réponse invalide');
             }
+          } else {
+            console.warn('⚠️ Deezmate erreur HTTP:', res.status);
           }
         } catch (error) {
           console.warn('⚠️ Deezmate échec:', error);
         }
 
-        // FALLBACK: flacdownloader
-        console.log('🎵 Fallback flacdownloader');
-        try {
-          const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
-          
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+        // FALLBACK: flacdownloader si Deezmate a échoué
+        if (!deezmateSuccess) {
+          console.log('🔄 Fallback vers flacdownloader');
+          try {
+            const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
+            
+            if (songId) {
+              void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+            }
+            
+            console.log('✅ Utilisation flacdownloader');
+            return proxyUrl;
+          } catch (error) {
+            console.warn('⚠️ flacdownloader échec:', error);
           }
-          
-          return proxyUrl;
-        } catch (error) {
-          console.warn('⚠️ flacdownloader échec:', error);
         }
       }
     } catch (error) {
