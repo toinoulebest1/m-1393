@@ -3,6 +3,7 @@ import { isDropboxEnabled, isDropboxEnabledForReading, uploadFileToDropbox, getD
 import { getPreGeneratedDropboxLink, generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
 import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
+import { circuitBreaker } from './circuitBreaker';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
@@ -147,53 +148,93 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 1: Deezmate en PRIORITÉ (ultra-rapide)
+  // ÉTAPE 1: Race Condition - Appels parallèles avec Circuit Breaker
   if (deezerId) {
-    console.log('🎵 Deezmate (priorité) ID:', deezerId);
+    console.log('🏁 Race Condition: Deezmate vs flacdownloader');
     
-    let deezmateSuccess = false;
-    try {
-      const url = `https://api.deezmate.com/dl/${deezerId}`;
-      const res = await fetch(url);
-      
-      if (res.ok) {
-        const data = await res.json();
-        const flacUrl = data?.links?.flac || data?.links?.FLAC;
-        
-        if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-          console.log('✅ Deezmate URL:', flacUrl);
+    const promises: Promise<string | null>[] = [];
+    
+    // Deezmate (si circuit fermé)
+    if (!circuitBreaker.isOpen('deezmate')) {
+      promises.push(
+        (async () => {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 300); // Timeout 300ms
           
-          // Sauvegarder l'ID Deezer
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+          try {
+            const url = `https://api.deezmate.com/dl/${deezerId}`;
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeout);
+            
+            if (res.ok) {
+              const data = await res.json();
+              const flacUrl = data?.links?.flac || data?.links?.FLAC;
+              
+              if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
+                console.log('✅ Deezmate gagne la race!');
+                circuitBreaker.recordSuccess('deezmate');
+                
+                if (songId) {
+                  void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+                }
+                
+                return flacUrl;
+              }
+            }
+            
+            circuitBreaker.recordFailure('deezmate');
+            return null;
+          } catch (error) {
+            clearTimeout(timeout);
+            circuitBreaker.recordFailure('deezmate');
+            console.warn('⚠️ Deezmate timeout/échec');
+            return null;
           }
-          
-          deezmateSuccess = true;
-          return flacUrl;
-        } else {
-          console.warn('⚠️ Deezmate réponse invalide');
-        }
-      } else {
-        console.warn('⚠️ Deezmate erreur HTTP:', res.status);
-      }
-    } catch (error) {
-      console.warn('⚠️ Deezmate échec:', error);
+        })()
+      );
     }
-
-    // FALLBACK: flacdownloader si Deezmate a échoué
-    if (!deezmateSuccess) {
-      console.log('🔄 Fallback vers flacdownloader ID:', deezerId);
+    
+    // flacdownloader (si circuit fermé)
+    if (!circuitBreaker.isOpen('flacdownloader')) {
+      promises.push(
+        (async () => {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 300); // Timeout 300ms
+          
+          try {
+            const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
+            
+            // Juste retourner l'URL du proxy (pas besoin de fetch)
+            clearTimeout(timeout);
+            console.log('✅ flacdownloader gagne la race!');
+            circuitBreaker.recordSuccess('flacdownloader');
+            
+            if (songId) {
+              void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+            }
+            
+            return proxyUrl;
+          } catch (error) {
+            clearTimeout(timeout);
+            circuitBreaker.recordFailure('flacdownloader');
+            return null;
+          }
+        })()
+      );
+    }
+    
+    // Race: prendre la première réponse valide
+    if (promises.length > 0) {
       try {
-        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
+        const result = await Promise.race(
+          promises.map(p => p.then(url => url ? { url } : Promise.reject()))
+        );
         
-        if (songId) {
-          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+        if (result.url) {
+          return result.url;
         }
-        
-        console.log('✅ Utilisation flacdownloader');
-        return proxyUrl;
       } catch (error) {
-        console.warn('⚠️ flacdownloader échec:', error);
+        console.warn('⚠️ Aucune API n\'a répondu à temps');
       }
     }
   }
@@ -206,52 +247,86 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       // Recherche directe Deezer ID
       const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
       
-      // Si on a trouvé un ID Deezer, essayer Deezmate (ultra-rapide)
+      // Si on a trouvé un ID Deezer, utiliser Race Condition
       if (foundDeezerId) {
-        console.log('🎵 Deezmate ID trouvé:', foundDeezerId);
+        console.log('🏁 Race Condition avec ID trouvé:', foundDeezerId);
         
-        let deezmateSuccess = false;
-        try {
-          const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
-          const res = await fetch(url);
-          
-          if (res.ok) {
-            const data = await res.json();
-            const flacUrl = data?.links?.flac || data?.links?.FLAC;
-            
-            if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-              console.log('✅ Deezmate URL:', flacUrl);
+        const promises: Promise<string | null>[] = [];
+        
+        // Deezmate (si circuit fermé)
+        if (!circuitBreaker.isOpen('deezmate')) {
+          promises.push(
+            (async () => {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 300);
               
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+              try {
+                const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeout);
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  const flacUrl = data?.links?.flac || data?.links?.FLAC;
+                  
+                  if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
+                    console.log('✅ Deezmate race win!');
+                    circuitBreaker.recordSuccess('deezmate');
+                    
+                    if (songId) {
+                      void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                    }
+                    
+                    return flacUrl;
+                  }
+                }
+                
+                circuitBreaker.recordFailure('deezmate');
+                return null;
+              } catch (error) {
+                clearTimeout(timeout);
+                circuitBreaker.recordFailure('deezmate');
+                return null;
               }
-              
-              deezmateSuccess = true;
-              return flacUrl;
-            } else {
-              console.warn('⚠️ Deezmate réponse invalide');
-            }
-          } else {
-            console.warn('⚠️ Deezmate erreur HTTP:', res.status);
-          }
-        } catch (error) {
-          console.warn('⚠️ Deezmate échec:', error);
+            })()
+          );
         }
-
-        // FALLBACK: flacdownloader si Deezmate a échoué
-        if (!deezmateSuccess) {
-          console.log('🔄 Fallback vers flacdownloader');
+        
+        // flacdownloader (si circuit fermé)
+        if (!circuitBreaker.isOpen('flacdownloader')) {
+          promises.push(
+            (async () => {
+              try {
+                const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
+                
+                console.log('✅ flacdownloader race win!');
+                circuitBreaker.recordSuccess('flacdownloader');
+                
+                if (songId) {
+                  void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                }
+                
+                return proxyUrl;
+              } catch (error) {
+                circuitBreaker.recordFailure('flacdownloader');
+                return null;
+              }
+            })()
+          );
+        }
+        
+        // Race
+        if (promises.length > 0) {
           try {
-            const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
+            const result = await Promise.race(
+              promises.map(p => p.then(url => url ? { url } : Promise.reject()))
+            );
             
-            if (songId) {
-              void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+            if (result.url) {
+              return result.url;
             }
-            
-            console.log('✅ Utilisation flacdownloader');
-            return proxyUrl;
           } catch (error) {
-            console.warn('⚠️ flacdownloader échec:', error);
+            console.warn('⚠️ Aucune API n\'a répondu à temps (recherche)');
           }
         }
       }

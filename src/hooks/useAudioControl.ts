@@ -71,6 +71,7 @@ export const useAudioControl = ({
         const audio = audioRef.current;
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
+        audio.preload = "auto"; // Force preload auto pour la chanson courante
         
         console.log("🚀 Récupération URL ultra-rapide...");
         const startTime = performance.now();
@@ -106,9 +107,12 @@ export const useAudioControl = ({
           throw new Error('URL audio non disponible');
         }
 
-        // Configuration streaming instantané comme Spotify
+        // Configuration streaming instantané optimisé
         console.log("⚡ Démarrage instantané");
-        audio.preload = "auto"; // Chargement immédiat
+        
+        // Démarrage ULTRA-RAPIDE sans attendre loadeddata
+        // Le navigateur buffera en arrière-plan
+        audio.src = audioUrl;
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
         const handleAudioError = async (e: Event) => {
@@ -171,9 +175,8 @@ export const useAudioControl = ({
         // Ajouter le listener permanent (pas once pour capturer les erreurs pendant la lecture)
         audio.removeEventListener('error', handleAudioError); // Supprimer l'ancien si existant
         audio.addEventListener('error', handleAudioError);
-        audio.src = audioUrl;
         
-        // Démarrage INSTANTANÉ sans attendre - comme Spotify
+        // Démarrage INSTANTANÉ sans attendre - streaming progressif
         // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
         try {
           // Si déjà quelques données disponibles, on démarre directement
@@ -185,7 +188,7 @@ export const useAudioControl = ({
               const timeout = setTimeout(() => {
                 console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
                 resolve(); // On essaie quand même
-              }, 500); // 500ms max - optimisé pour démarrage rapide
+              }, 300); // 300ms max - timeout agressif pour démarrage rapide
               
               const onLoadedData = () => {
                 clearTimeout(timeout);
