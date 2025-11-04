@@ -160,14 +160,26 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         const flacUrl = data?.links?.flac || data?.links?.FLAC;
         
         if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-          console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+          console.log('✅ Deezmate URL FLAC obtenue, vérification...:', flacUrl);
           
-          // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+          // Vérifier que l'URL Deezmate fonctionne vraiment
+          try {
+            const testRes = await fetch(flacUrl, { method: 'HEAD' });
+            if (testRes.ok) {
+              console.log('✅ URL Deezmate validée');
+              
+              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+              }
+              
+              return flacUrl;
+            } else {
+              console.warn('⚠️ URL Deezmate invalide (HTTP', testRes.status, '), passage au fallback');
+            }
+          } catch (testError) {
+            console.warn('⚠️ Test URL Deezmate échoué:', testError);
           }
-          
-          return flacUrl;
         } else {
           console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
         }
@@ -227,14 +239,26 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             const flacUrl = data?.links?.flac || data?.links?.FLAC;
             
             if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-              console.log('✅ Deezmate URL FLAC obtenue:', flacUrl);
+              console.log('✅ Deezmate URL FLAC obtenue, vérification...:', flacUrl);
               
-              // Sauvegarder l'ID Deezer dans la table songs si on a un songId
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+              // Vérifier que l'URL Deezmate fonctionne vraiment
+              try {
+                const testRes = await fetch(flacUrl, { method: 'HEAD' });
+                if (testRes.ok) {
+                  console.log('✅ URL Deezmate validée');
+                  
+                  // Sauvegarder l'ID Deezer dans la table songs si on a un songId
+                  if (songId) {
+                    void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                  }
+                  
+                  return flacUrl;
+                } else {
+                  console.warn('⚠️ URL Deezmate invalide (HTTP', testRes.status, '), passage au fallback');
+                }
+              } catch (testError) {
+                console.warn('⚠️ Test URL Deezmate échoué:', testError);
               }
-              
-              return flacUrl;
             } else {
               console.warn('⚠️ Deezmate réponse invalide (pas de FLAC):', data);
             }
