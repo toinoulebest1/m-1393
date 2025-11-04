@@ -184,16 +184,31 @@ export const useAudioControl = ({
         });
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
+        let isHandlingError = false; // Flag pour éviter les boucles
         const handleAudioError = async (e: Event) => {
           const audioError = (e.target as HTMLAudioElement).error;
+          
+          // Ignorer les erreurs "aborted" (code 1) - changement de chanson normal
+          if (audioError?.code === 1) {
+            console.log("⚠️ Chargement annulé (changement de chanson)");
+            return;
+          }
+          
           console.error("❌ Erreur audio détectée:", {
             code: audioError?.code,
             message: audioError?.message,
             src: audio.src
           });
           
-          // Si c'est une erreur audio (n'importe quel code) ou erreur de demuxer Chrome
+          // Éviter les boucles de fallback
+          if (isHandlingError) {
+            console.log("⚠️ Erreur déjà en cours de traitement, ignoré");
+            return;
+          }
+          
+          // Si c'est une erreur audio (n'importe quel code sauf aborted) ou erreur de demuxer Chrome
           if (audioError?.code || audioError?.message?.includes('DEMUXER_ERROR')) {
+            isHandlingError = true;
             
             console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
             console.log("🎯 PRIORITÉ: Tentative Deezmate en premier...");
@@ -238,6 +253,7 @@ export const useAudioControl = ({
                       }
                       
                       audio.addEventListener('error', handleAudioError);
+                      isHandlingError = false; // Reset flag
                       return; // Success, sortir
                     }
                   }
@@ -282,6 +298,7 @@ export const useAudioControl = ({
                   }
                   
                   audio.addEventListener('error', handleAudioError);
+                  isHandlingError = false; // Reset flag
                   return;
                 }
               }
@@ -316,15 +333,18 @@ export const useAudioControl = ({
                 }
                 
                 audio.addEventListener('error', handleAudioError);
+                isHandlingError = false; // Reset flag
               } else {
                 console.warn("⚠️ Aucune alternative disponible");
                 toast.error("Musique temporairement indisponible");
+                isHandlingError = false; // Reset flag
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
               toast.error("Impossible de recharger la musique", {
                 description: "Le lien audio n'est plus disponible"
               });
+              isHandlingError = false; // Reset flag
             }
           }
         };
