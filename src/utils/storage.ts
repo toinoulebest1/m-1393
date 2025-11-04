@@ -199,24 +199,37 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       promises.push(
         (async () => {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 300); // Timeout 300ms
+          const timeout = setTimeout(() => controller.abort(), 500); // Timeout 500ms
           
           try {
             const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
             
-            // Juste retourner l'URL du proxy (pas besoin de fetch)
+            // Vérifier que le proxy fonctionne avec un HEAD request
+            const testResponse = await fetch(proxyUrl, { 
+              method: 'HEAD',
+              signal: controller.signal 
+            });
+            
             clearTimeout(timeout);
-            console.log('✅ flacdownloader gagne la race!');
-            circuitBreaker.recordSuccess('flacdownloader');
             
-            if (songId) {
-              void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+            if (testResponse.ok) {
+              console.log('✅ flacdownloader gagne la race (proxy testé)!');
+              circuitBreaker.recordSuccess('flacdownloader');
+              
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+              }
+              
+              return proxyUrl;
+            } else {
+              console.warn('⚠️ flacdownloader proxy retourne:', testResponse.status);
+              circuitBreaker.recordFailure('flacdownloader');
+              return null;
             }
-            
-            return proxyUrl;
           } catch (error) {
             clearTimeout(timeout);
             circuitBreaker.recordFailure('flacdownloader');
+            console.warn('⚠️ flacdownloader proxy échec:', error);
             return null;
           }
         })()
@@ -296,19 +309,38 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         if (!circuitBreaker.isOpen('flacdownloader')) {
           promises.push(
             (async () => {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 500);
+              
               try {
                 const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
                 
-                console.log('✅ flacdownloader race win!');
-                circuitBreaker.recordSuccess('flacdownloader');
+                // Vérifier que le proxy fonctionne
+                const testResponse = await fetch(proxyUrl, { 
+                  method: 'HEAD',
+                  signal: controller.signal 
+                });
                 
-                if (songId) {
-                  void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                clearTimeout(timeout);
+                
+                if (testResponse.ok) {
+                  console.log('✅ flacdownloader race win (proxy testé)!');
+                  circuitBreaker.recordSuccess('flacdownloader');
+                  
+                  if (songId) {
+                    void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                  }
+                  
+                  return proxyUrl;
+                } else {
+                  console.warn('⚠️ flacdownloader proxy retourne:', testResponse.status);
+                  circuitBreaker.recordFailure('flacdownloader');
+                  return null;
                 }
-                
-                return proxyUrl;
               } catch (error) {
+                clearTimeout(timeout);
                 circuitBreaker.recordFailure('flacdownloader');
+                console.warn('⚠️ flacdownloader proxy échec:', error);
                 return null;
               }
             })()
@@ -335,10 +367,31 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ========== FALLBACK: STORAGE LOCAL UNIQUEMENT ==========
-  // Si pas de deezerId trouvé, on passe directement au storage local (Supabase)
+  // ========== FALLBACK: DEEZER PREVIEW PUIS STORAGE LOCAL ==========
   
-  console.log('⚠️ Aucun lien Deezmate disponible, fallback vers storage local...');
+  console.log('⚠️ Aucun lien haute qualité disponible');
+  
+  // Si on a un deezerId, essayer d'obtenir le lien preview Deezer
+  if (deezerId) {
+    try {
+      console.log('🔄 Tentative récupération lien preview Deezer...');
+      const { data, error } = await supabase.functions.invoke('deezer-proxy', {
+        body: { 
+          endpoint: `/track/${deezerId}`
+        }
+      });
+      
+      if (!error && data?.preview) {
+        console.log('✅ Lien preview Deezer récupéré');
+        return data.preview;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur récupération preview Deezer:', error);
+    }
+  }
+  
+  // Fallback vers storage local
+  console.log('⚠️ Fallback vers storage local...');
   
   // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
   const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;

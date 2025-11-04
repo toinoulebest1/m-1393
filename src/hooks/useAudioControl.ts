@@ -180,23 +180,64 @@ export const useAudioControl = ({
             src: audio.src
           });
           
-          // Si c'est une erreur réseau ou abort (lien expiré/invalide)
+          // Si c'est une erreur réseau ou format (lien expiré/invalide/404)
           if (audioError?.code === MediaError.MEDIA_ERR_NETWORK || 
               audioError?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
               audioError?.code === MediaError.MEDIA_ERR_DECODE) {
             
-            console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
+            console.log("🔄 Erreur détectée, tentative de récupération...");
             
-            // Récupérer un nouveau lien
+            // Récupérer un nouveau lien avec force refresh (bypass cache)
             try {
               console.log("🔄 Récupération d'un nouveau lien pour:", song.title);
-              const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                song.url, 
-                song.deezer_id,
-                song.title,
-                song.artist,
-                song.id
-              );
+              
+              // Forcer le passage par Deezer preview si le proxy a échoué
+              let newAudioUrl: string;
+              
+              if (audio.src.includes('flacdownloader-proxy')) {
+                console.log("🔄 Proxy a échoué, force Deezer preview...");
+                
+                // Essayer d'obtenir le lien preview Deezer directement
+                if (song.deezer_id) {
+                  const { supabase } = await import('@/integrations/supabase/client');
+                  const { data, error } = await supabase.functions.invoke('deezer-proxy', {
+                    body: { 
+                      endpoint: `/track/${song.deezer_id}`
+                    }
+                  });
+                  
+                  if (!error && data?.preview) {
+                    newAudioUrl = data.preview;
+                    console.log("✅ Lien preview Deezer obtenu");
+                  } else {
+                    // Fallback sur le système classique
+                    newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                      song.url, 
+                      song.deezer_id,
+                      song.title,
+                      song.artist,
+                      song.id
+                    );
+                  }
+                } else {
+                  newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                    song.url, 
+                    song.deezer_id,
+                    song.title,
+                    song.artist,
+                    song.id
+                  );
+                }
+              } else {
+                // Recharger normalement
+                newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+                  song.url, 
+                  song.deezer_id,
+                  song.title,
+                  song.artist,
+                  song.id
+                );
+              }
               
               if (newAudioUrl && newAudioUrl !== audio.src) {
                 console.log("✅ Nouveau lien obtenu:", newAudioUrl.substring(0, 100) + "...");
@@ -219,6 +260,7 @@ export const useAudioControl = ({
                 audio.addEventListener('error', handleAudioError);
               } else {
                 console.warn("⚠️ Nouveau lien identique ou vide");
+                toast.error("Musique temporairement indisponible");
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
