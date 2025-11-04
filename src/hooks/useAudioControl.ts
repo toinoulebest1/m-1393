@@ -170,6 +170,11 @@ export const useAudioControl = ({
         // Configuration streaming instantané optimisé
         console.log("⚡ Démarrage instantané");
         
+        // Réinitialiser proprement la source précédente pour éviter les plays interrompus
+        audio.pause();
+        audio.src = '';
+        try { audio.load(); } catch {}
+        
         // Démarrage ULTRA-RAPIDE sans attendre loadeddata
         // Le navigateur buffera en arrière-plan
         audio.src = audioUrl;
@@ -495,7 +500,25 @@ export const useAudioControl = ({
         console.log("🚀 Démarrage lecture avec AutoplayManager...");
         const playStartTime = performance.now();
         
-        const success = await AutoplayManager.playAudio(audio);
+        let success = false;
+        try {
+          success = await AutoplayManager.playAudio(audio);
+        } catch (err: any) {
+          const errMsg = String(err?.message || err);
+          if (errMsg.includes('interrupted by a new load request')) {
+            console.warn('⚠️ play() interrompu par un nouveau chargement - attente de playing');
+            // Attendre que le navigateur stabilise la lecture
+            await new Promise<void>((resolve) => {
+              const onPlaying = () => { audio.removeEventListener('playing', onPlaying); resolve(); };
+              audio.addEventListener('playing', onPlaying, { once: true });
+              // Sécurité: si déjà en lecture
+              if (!audio.paused) { audio.removeEventListener('playing', onPlaying); resolve(); }
+            });
+            success = true;
+          } else {
+            throw err;
+          }
+        }
         
         if (success) {
           const playElapsed = performance.now() - playStartTime;
@@ -579,44 +602,53 @@ export const useAudioControl = ({
           });
         }
         
-      } catch (error) {
-        console.error("💥 Erreur récupération:", error);
-        
-        // IMPORTANT: Débloquer immédiatement l'interface
-        setIsChangingSong(false);
-        
-        // Revenir à la musique précédente si elle existait
-        if (previousSong) {
-          console.log("🔄 Retour à la musique précédente:", previousSong.title);
-          setCurrentSong(previousSong);
-          localStorage.setItem('currentSong', JSON.stringify(previousSong));
+        } catch (error) {
+          const errMsg = (error as any)?.message ? String((error as any).message) : String(error);
+          // Cas fréquent sur Chrome: play() interrompu par un nouveau chargement
+          if (errMsg.includes('interrupted by a new load request')) {
+            console.warn('⚠️ play() interrompu par un nouveau chargement - pas de rollback');
+            setIsChangingSong(false);
+            setIsPlaying(!audioRef.current?.paused);
+            return;
+          }
+
+          console.error("💥 Erreur récupération:", error);
           
-          // Restaurer l'état audio si la musique jouait
-          if (previousAudioState.isPlaying) {
-            // Restaurer la source précédente si elle existait
-            if (previousAudioState.src) {
-              audioRef.current.src = previousAudioState.src;
-              audioRef.current.preload = 'auto';
-              audioRef.current.crossOrigin = 'anonymous';
-              audioRef.current.volume = volume / 100;
-            }
-            audioRef.current.currentTime = previousAudioState.currentTime;
-            try {
-              await audioRef.current.play();
-              setIsPlaying(true);
-            } catch (playError) {
-              console.error("Erreur restauration lecture:", playError);
+          // IMPORTANT: Débloquer immédiatement l'interface
+          setIsChangingSong(false);
+          
+          // Revenir à la musique précédente si elle existait
+          if (previousSong) {
+            console.log("🔄 Retour à la musique précédente:", previousSong.title);
+            setCurrentSong(previousSong);
+            localStorage.setItem('currentSong', JSON.stringify(previousSong));
+            
+            // Restaurer l'état audio si la musique jouait
+            if (previousAudioState.isPlaying) {
+              // Restaurer la source précédente si elle existait
+              if (previousAudioState.src) {
+                audioRef.current.src = previousAudioState.src;
+                audioRef.current.preload = 'auto';
+                audioRef.current.crossOrigin = 'anonymous';
+                audioRef.current.volume = volume / 100;
+              }
+              audioRef.current.currentTime = previousAudioState.currentTime;
+              try {
+                await audioRef.current.play();
+                setIsPlaying(true);
+              } catch (playError) {
+                console.error("Erreur restauration lecture:", playError);
+                setIsPlaying(false);
+              }
+            } else {
               setIsPlaying(false);
             }
           } else {
             setIsPlaying(false);
           }
-        } else {
-          setIsPlaying(false);
+          
+          handlePlayError(error as any, song);
         }
-        
-        handlePlayError(error as any, song);
-      }
     } else if (audioRef.current) {
       // Reprise avec gestion autoplay
       console.log("⚡ Reprise avec gestion autoplay");
