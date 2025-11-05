@@ -207,7 +207,7 @@ export const getAudioCacheStats = async (): Promise<{
  * Met en cache UNIQUEMENT la chanson en cours de lecture
  * Garde les 2 dernières chansons pour permettre le retour en arrière si erreur
  */
-export const cacheCurrentSong = async (url: string, blob: Blob, songId: string): Promise<void> => {
+export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, title?: string): Promise<void> => {
   try {
     console.log("💾 cacheCurrentSong appelé - URL:", url, "Song ID:", songId, "Blob size:", (blob.size / 1024 / 1024).toFixed(2), "MB");
     
@@ -248,10 +248,11 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string):
     const cacheInfo = {
       url,
       songId,
+      title: title || 'Unknown',
       timestamp: now
     };
     localStorage.setItem('cachedCurrentSong', JSON.stringify(cacheInfo));
-    console.log("💾 localStorage mis à jour:", cacheInfo);
+    console.log("💾 localStorage mis à jour avec titre:", cacheInfo);
     
     console.log(`✅ Chanson actuelle mise en cache avec succès: ${url.substring(0, 50)}... (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
   } catch (error) {

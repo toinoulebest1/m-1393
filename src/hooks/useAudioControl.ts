@@ -41,6 +41,9 @@ export const useAudioControl = ({
     if (song && (!currentSong || song.id !== currentSong.id)) {
       // ✅ TOUJOURS arrêter tous les audios avant de commencer
       console.log("🛑 Arrêt complet de tous les audios avant nouvelle lecture");
+      console.log("Nouvelle chanson:", song.title);
+      console.log("Chanson actuelle:", currentSong?.title);
+      
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -60,14 +63,16 @@ export const useAudioControl = ({
       // Sauvegarder la musique précédente au cas où il y a une erreur
       const previousSong = currentSong;
       const previousAudioState = {
-        currentTime: audioRef.current.currentTime,
-        isPlaying: !audioRef.current.paused,
-        src: audioRef.current.src
+        currentTime: audioRef.current?.currentTime || 0,
+        isPlaying: audioRef.current ? !audioRef.current.paused : false,
+        src: audioRef.current?.src || ''
       } as const;
       
+      // ✅ Mettre à jour l'état ET l'affichage EN MÊME TEMPS
       setCurrentSong(song);
-      setDisplayedSong(song); // ✅ Mise à jour immédiate de l'affichage
+      setDisplayedSong(song);
       localStorage.setItem('currentSong', JSON.stringify(song));
+      console.log("✅ État synchronisé - Affichage:", song.title);
       setNextSongPreloaded(false);
       
       // Enregistrer l'interaction utilisateur IMMÉDIATEMENT
@@ -85,65 +90,23 @@ export const useAudioControl = ({
         audio.volume = volume / 100;
         audio.preload = "auto"; // Force preload auto pour la chanson courante
         
-        console.log("🚀 Récupération URL ultra-rapide...");
+        console.log("🚀 Récupération URL ultra-rapide pour:", song.title, "ID:", song.id);
         const startTime = performance.now();
         
-        // Vérifier d'abord le cache local (IndexedDB)
+        // ✅ SIMPLIFIÉ: Vérifier directement le cache avec l'URL de la chanson demandée
+        // Ne plus se fier à cachedCurrentSong qui peut être désynchronisé
         let audioUrl: string;
-        const cachedSongInfo = localStorage.getItem('cachedCurrentSong');
         
-        if (cachedSongInfo) {
-          try {
-            const { songId: cachedSongId } = JSON.parse(cachedSongInfo);
-            
-            // Si c'est la même chanson qu'en cache
-            if (cachedSongId === song.id) {
-              console.log("🔍 Vérification cache IndexedDB pour:", song.id);
-              const cachedUrl = await getFromCache(song.url);
-              
-              if (cachedUrl) {
-                audioUrl = cachedUrl;
-                const elapsed = performance.now() - startTime;
-                console.log("✅ ⚡ CACHE HIT! URL récupérée depuis IndexedDB en:", elapsed.toFixed(1), "ms");
-              } else {
-                console.log("⚠️ Cache introuvable, récupération réseau...");
-                audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                  song.url, 
-                  song.deezer_id,
-                  song.title,
-                  song.artist,
-                  song.id
-                );
-                const elapsed = performance.now() - startTime;
-                console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
-              }
-            } else {
-              // Chanson différente, récupérer depuis le réseau
-              audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                song.url, 
-                song.deezer_id,
-                song.title,
-                song.artist,
-                song.id
-              );
-              const elapsed = performance.now() - startTime;
-              console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
-            }
-          } catch (cacheError) {
-            console.warn("⚠️ Erreur lecture cache:", cacheError);
-            // Fallback réseau
-            audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-              song.url, 
-              song.deezer_id,
-              song.title,
-              song.artist,
-              song.id
-            );
-            const elapsed = performance.now() - startTime;
-            console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
-          }
+        console.log("🔍 Vérification cache IndexedDB pour:", song.title);
+        const cachedUrl = await getFromCache(song.url);
+        
+        if (cachedUrl) {
+          audioUrl = cachedUrl;
+          const elapsed = performance.now() - startTime;
+          console.log("✅ ⚡ CACHE HIT! URL récupérée depuis IndexedDB en:", elapsed.toFixed(1), "ms");
+          console.log("✅ Chanson depuis cache:", song.title, "ID:", song.id);
         } else {
-          // Pas de cache, récupération normale
+          console.log("⚠️ Pas en cache, récupération réseau pour:", song.title);
           audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url, 
             song.deezer_id,
@@ -152,7 +115,7 @@ export const useAudioControl = ({
             song.id
           );
           const elapsed = performance.now() - startTime;
-          console.log("✅ URL récupérée en:", elapsed.toFixed(1), "ms");
+          console.log("✅ URL réseau récupérée en:", elapsed.toFixed(1), "ms pour:", song.title);
         }
         
         // Gestion des erreurs si pas d'URL
@@ -176,7 +139,8 @@ export const useAudioControl = ({
         }
 
         // Configuration streaming instantané optimisé
-        console.log("⚡ Démarrage instantané");
+        console.log("⚡ Démarrage instantané de:", song.title);
+        console.log("🔗 URL audio:", audioUrl.substring(0, 50) + "...");
         
         // ✅ SÉCURITÉ: S'assurer qu'aucun audio ne joue avant de charger le nouveau
         audio.pause();
@@ -188,6 +152,7 @@ export const useAudioControl = ({
         
         // Maintenant on peut charger la nouvelle source
         audio.src = audioUrl;
+        console.log("✅ Source audio assignée pour:", song.title);
         
         // Petit helper pour attendre la lisibilité
         const waitForCanPlay = (timeoutMs = 2000) => new Promise<void>((resolve, reject) => {
@@ -545,7 +510,8 @@ export const useAudioControl = ({
               const response = await fetch(audioUrl);
               if (response.ok) {
                 const blob = await response.blob();
-                await cacheCurrentSong(audioUrl, blob, song.id);
+                await cacheCurrentSong(audioUrl, blob, song.id, song.title);
+                console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
               }
             } catch (e) {
               console.warn('Impossible de mettre en cache:', e);
