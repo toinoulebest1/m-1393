@@ -8,17 +8,20 @@ interface UseUltraFastPlayerProps {
   queue: Song[];
   isPlaying: boolean;
   setQueue: (queue: Song[] | ((prev: Song[]) => Song[])) => void;
+  getNextSong: () => Song | null;
 }
 
 export const useUltraFastPlayer = ({
   currentSong,
   queue,
   isPlaying,
-  setQueue
+  setQueue,
+  getNextSong
 }: UseUltraFastPlayerProps) => {
   const { recordTransition, predictNextSongs, preloadPredictedSongs } = useIntelligentPreloader();
   const previousSongRef = useRef<Song | null>(null);
   const preloadTimeoutRef = useRef<number | null>(null);
+  const queuePreloadTimeoutRef = useRef<number | null>(null);
 
   // Enregistrer les transitions entre chansons
   useEffect(() => {
@@ -57,11 +60,30 @@ export const useUltraFastPlayer = ({
     };
   }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs, setQueue]);
 
-  // Préchargement queue DÉSACTIVÉ
+  // Préchargement IMMÉDIAT de la chanson suivante dans la queue
   useEffect(() => {
-    console.log("⚠️ Préchargement de queue désactivé");
-    return () => {};
-  }, [queue]);
+    if (!currentSong || !isPlaying) return;
+
+    // Annuler le timeout précédent
+    if (queuePreloadTimeoutRef.current) {
+      clearTimeout(queuePreloadTimeoutRef.current);
+    }
+
+    // Précharger la chanson suivante IMMÉDIATEMENT (délai minimal pour éviter la surcharge)
+    queuePreloadTimeoutRef.current = window.setTimeout(async () => {
+      const nextSong = getNextSong();
+      if (nextSong) {
+        console.log("🚀 Préchargement IMMÉDIAT de la prochaine chanson:", nextSong.title);
+        await preloadPredictedSongs([nextSong]);
+      }
+    }, 100); // Délai minimal de 100ms pour éviter de bloquer le thread principal
+
+    return () => {
+      if (queuePreloadTimeoutRef.current) {
+        clearTimeout(queuePreloadTimeoutRef.current);
+      }
+    };
+  }, [currentSong, isPlaying, getNextSong, preloadPredictedSongs]);
 
   return {
     getCacheStats: () => ({ size: 0, maxSize: 0, entries: [] })

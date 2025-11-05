@@ -276,9 +276,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // Annuler tous les préchargements en cours
-    cancelAllPreloads();
-
     const nextPredicted = predictedNextRef.current;
     if (nextPredicted) {
       console.log("▶️ Lecture de la chanson prédite:", nextPredicted.title);
@@ -286,16 +283,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       toast.info("Pas de chanson suivante disponible");
     }
-  }, [isChangingSong, play, cancelAllPreloads]);
+  }, [isChangingSong, play]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours");
       return;
     }
-
-    // Annuler tous les préchargements en cours
-    cancelAllPreloads();
 
     if (history.length > 1) {
       // Revenir à la chanson précédente dans l'historique
@@ -305,7 +299,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       toast.info("Pas de chanson précédente");
     }
-  }, [isChangingSong, history, play, cancelAllPreloads]);
+  }, [isChangingSong, history, play]);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {
