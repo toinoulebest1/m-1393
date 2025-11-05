@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings } from "lucide-react";
+import { Home, Heart, Trophy, Music2, LogOut, History, Flag, Search, Database, Gamepad2, ListMusic, CloudUpload, Settings, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -77,6 +77,11 @@ export const Sidebar = () => {
       to: "/add-songs",
       icon: CloudUpload,
       label: "Ajouter des chansons"
+    });
+    links.push({
+      to: "/admin/history",
+      icon: Clock,
+      label: "Gestion historique"
     });
     links.push({
       to: "/maintenance-admin",

@@ -21,6 +21,7 @@ import Reports from "./pages/Reports";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
 import ManageAudioSources from "./pages/ManageAudioSources";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
+import AdminHistory from "./pages/AdminHistory";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ function App() {
                 <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
                 <Route path="/add-songs" element={<ManageAudioSources />} />
                 <Route path="/metadata-update" element={<SongMetadataUpdate />} />
+                <Route path="/admin/history" element={<AdminHistory />} />
                 <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
               </Routes>
             </CastProvider>
