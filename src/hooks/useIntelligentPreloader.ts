@@ -100,8 +100,17 @@ export const useIntelligentPreloader = () => {
       console.warn("⚠️ Erreur chargement recommandations Deezer:", error);
     }
     
-    console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => `${s.title} - ${s.artist}`));
-    return predictions.slice(0, 1); // Maximum 1 prédiction
+    // Choisir ALÉATOIREMENT 1 chanson parmi les prédictions
+    if (predictions.length > 0) {
+      const randomIndex = Math.floor(Math.random() * predictions.length);
+      const selectedSong = predictions[randomIndex];
+      console.log(`🎲 Chanson sélectionnée aléatoirement [${randomIndex + 1}/${predictions.length}]:`, 
+                 `${selectedSong.title} - ${selectedSong.artist}`);
+      return [selectedSong];
+    }
+    
+    console.log("🔮 Aucune prédiction disponible");
+    return [];
   }, []);
 
   // Préchargement ULTRA-AGRESSIF et COMPLET (sans délai)
