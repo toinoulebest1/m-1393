@@ -111,18 +111,23 @@ export const usePlayerQueue = ({
       
       // 🎵 Charger automatiquement une chanson du même genre
       console.log("🎵 Chargement d'une chanson similaire par genre...");
-      const similarSongs = await fetchSimilarSongsByGenre(currentSong, 1);
+      const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
       
-      if (similarSongs.length > 0) {
-        console.log(`✅ Chanson similaire trouvée: ${similarSongs[0].title}`);
+      // Filtrer pour exclure les chansons déjà dans la queue
+      const queueIds = new Set(queue.map(s => s.id));
+      const newSongs = similarSongs.filter(song => !queueIds.has(song.id));
+      
+      if (newSongs.length > 0) {
+        console.log(`✅ Chanson similaire trouvée: ${newSongs[0].title}`);
         setQueueInternal(prevQueue => {
-          const newQueue = [...prevQueue, similarSongs[0]];
+          const newQueue = [...prevQueue, newSongs[0]];
           localStorage.setItem('queue', JSON.stringify(newQueue));
           return newQueue;
         });
-        await play(similarSongs[0]);
+        await play(newSongs[0]);
       } else {
-        toast.info("Aucune chanson similaire trouvée");
+        console.log("⚠️ Toutes les chansons similaires sont déjà dans la queue");
+        toast.info("Aucune nouvelle chanson similaire trouvée");
       }
       return;
     }
@@ -139,19 +144,24 @@ export const usePlayerQueue = ({
       } else {
         // 🎵 Charger automatiquement une chanson du même genre
         console.log("🎵 Chargement d'une chanson similaire par genre...");
-        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 1);
+        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
         
-        if (similarSongs.length > 0) {
-          console.log(`✅ Chanson similaire trouvée: ${similarSongs[0].title}`);
+        // Filtrer pour exclure les chansons déjà dans la queue
+        const queueIds = new Set(queue.map(s => s.id));
+        const newSongs = similarSongs.filter(song => !queueIds.has(song.id));
+        
+        if (newSongs.length > 0) {
+          console.log(`✅ Chanson similaire trouvée: ${newSongs[0].title}`);
           setQueueInternal(prevQueue => {
-            const newQueue = [...prevQueue, similarSongs[0]];
+            const newQueue = [...prevQueue, newSongs[0]];
             localStorage.setItem('queue', JSON.stringify(newQueue));
             return newQueue;
           });
           // Jouer la chanson similaire
-          await play(similarSongs[0]);
+          await play(newSongs[0]);
         } else {
-          toast.info("Fin de la playlist - Aucune chanson similaire trouvée");
+          console.log("⚠️ Toutes les chansons similaires sont déjà dans la queue");
+          toast.info("Fin de la playlist - Aucune nouvelle chanson similaire trouvée");
         }
       }
     }
