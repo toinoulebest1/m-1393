@@ -38,12 +38,20 @@ export const useAudioControl = ({
 }: UseAudioControlProps) => {
 
   const play = useCallback(async (song?: Song) => {
-    if (isChangingSong) {
-      console.log("🚫 Changement déjà en cours, ignoré");
-      return;
-    }
-    
     if (song && (!currentSong || song.id !== currentSong.id)) {
+      // ✅ TOUJOURS arrêter tous les audios avant de commencer
+      console.log("🛑 Arrêt complet de tous les audios avant nouvelle lecture");
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = '';
+      }
+      if (nextAudioRef.current) {
+        nextAudioRef.current.pause();
+        nextAudioRef.current.currentTime = 0;
+        nextAudioRef.current.src = '';
+      }
+      
       setIsChangingSong(true);
       
       console.log("🎵 === DÉMARRAGE MUSIQUE ===");
@@ -170,13 +178,15 @@ export const useAudioControl = ({
         // Configuration streaming instantané optimisé
         console.log("⚡ Démarrage instantané");
         
-        // Réinitialiser proprement la source précédente pour éviter les plays interrompus
+        // ✅ SÉCURITÉ: S'assurer qu'aucun audio ne joue avant de charger le nouveau
         audio.pause();
+        audio.currentTime = 0;
         audio.src = '';
-        try { audio.load(); } catch {}
         
-        // Démarrage ULTRA-RAPIDE sans attendre loadeddata
-        // Le navigateur buffera en arrière-plan
+        // Attendre un micro-instant pour que le navigateur libère les ressources
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Maintenant on peut charger la nouvelle source
         audio.src = audioUrl;
         
         // Petit helper pour attendre la lisibilité
@@ -709,11 +719,21 @@ export const useAudioControl = ({
   }, [audioRef, setIsPlaying, setIsChangingSong]);
 
   const pause = useCallback(() => {
+    console.log("=== PAUSE DEBUG ===");
+    console.log("isChangingSong:", isChangingSong);
+    console.log("audioRef paused:", audioRef.current?.paused);
+    
     if (audioRef.current) {
       audioRef.current.pause();
+      console.log("✅ Audio mis en pause");
+    }
+    if (nextAudioRef.current && !nextAudioRef.current.paused) {
+      nextAudioRef.current.pause();
+      console.log("✅ NextAudio mis en pause aussi");
     }
     setIsPlaying(false);
-  }, [audioRef, setIsPlaying]);
+    console.log("==================");
+  }, [audioRef, nextAudioRef, setIsPlaying, isChangingSong]);
 
   const updateVolume = useCallback((newVolume: number) => {
     if (audioRef.current) {
