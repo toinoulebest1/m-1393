@@ -16,8 +16,9 @@ interface L0CacheEntry {
 let l0Cache: L0CacheEntry[] = [];
 const L0_MAX_SIZE = 3;
 
-// Pre-warmed audio URLs pour accès instantané
-const warmCache = new Map<string, string>();
+// Pre-warmed audio URLs pour accès instantané avec TTL pour éviter les URLs expirées
+const WARM_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const warmCache = new Map<string, { url: string; ts: number }>();
 
 export class UltraFastCache {
   /**
@@ -74,17 +75,24 @@ export class UltraFastCache {
   /**
    * Warm cache pour URLs pré-calculées
    */
-  static setWarm(songUrl: string, audioUrl: string): void {
-    warmCache.set(songUrl, audioUrl);
+static setWarm(songUrl: string, audioUrl: string): void {
+    warmCache.set(songUrl, { url: audioUrl, ts: Date.now() });
     console.log("🔥 WARM CACHE:", songUrl);
   }
 
-  static getWarm(songUrl: string): string | null {
-    const url = warmCache.get(songUrl);
-    if (url) {
-      console.log("🔥 WARM HIT:", songUrl);
+static getWarm(songUrl: string): string | null {
+    const entry = warmCache.get(songUrl);
+    if (!entry) return null;
+
+    // Invalider si expiré
+    if (Date.now() - entry.ts > WARM_TTL_MS) {
+      warmCache.delete(songUrl);
+      console.log("⏰ WARM EXPIRED:", songUrl);
+      return null;
     }
-    return url || null;
+
+    console.log("🔥 WARM HIT:", songUrl);
+    return entry.url;
   }
 
   /**

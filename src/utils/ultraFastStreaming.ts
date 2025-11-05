@@ -84,11 +84,26 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide
    */
-  private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string | null> {
+private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string | null> {
     try {
       const url = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, songId);
       if (typeof url === 'string') {
-        return url;
+        // Validation rapide de l'URL pour éviter les liens cassés (500) ou expirés
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1500);
+        try {
+          const head = await fetch(url, { method: 'HEAD', signal: controller.signal });
+          clearTimeout(timeout);
+          if (head.ok || head.status === 405) { // Certains endpoints ne supportent pas HEAD
+            return url;
+          }
+          console.warn("⚠️ Validation URL échouée:", head.status, songTitle || songUrl);
+          return null;
+        } catch (e) {
+          clearTimeout(timeout);
+          console.warn("⚠️ Validation URL timeout/échec:", songTitle || songUrl);
+          return null;
+        }
       }
       return null;
     } catch (error) {

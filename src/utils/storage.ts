@@ -198,17 +198,33 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     if (!circuitBreaker.isOpen('flacdownloader')) {
       promises.push(
         (async () => {
-          try {
+try {
             const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(deezerId))}`;
-            
-            console.log('✅ flacdownloader URL générée (test différé)');
-            circuitBreaker.recordSuccess('flacdownloader');
-            
-            if (songId) {
-              void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+            console.log('✅ flacdownloader URL générée (validation rapide)');
+
+            // Validation rapide (HEAD) avec timeout court pour éviter les liens 500
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 1200);
+            let ok = false;
+            try {
+              const head = await fetch(proxyUrl, { method: 'HEAD', signal: controller.signal });
+              clearTimeout(timeout);
+              ok = head.ok || head.status === 405; // Certains endpoints ne supportent pas HEAD
+            } catch (e) {
+              clearTimeout(timeout);
+              ok = false;
             }
-            
-            return proxyUrl;
+
+            if (ok) {
+              // Succès confirmé
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+              }
+              return proxyUrl;
+            } else {
+              console.warn('⚠️ flacdownloader non valide (HEAD)');
+              return null;
+            }
           } catch (error) {
             circuitBreaker.recordFailure('flacdownloader');
             console.warn('⚠️ flacdownloader proxy échec:', error);
@@ -291,17 +307,32 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         if (!circuitBreaker.isOpen('flacdownloader')) {
           promises.push(
             (async () => {
-              try {
+try {
                 const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/flacdownloader-proxy?deezerId=${encodeURIComponent(String(foundDeezerId))}`;
                 
-                console.log('✅ flacdownloader URL générée (test différé)');
-                circuitBreaker.recordSuccess('flacdownloader');
-                
-                if (songId) {
-                  void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                console.log('✅ flacdownloader URL générée (validation rapide)');
+
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 1200);
+                let ok = false;
+                try {
+                  const head = await fetch(proxyUrl, { method: 'HEAD', signal: controller.signal });
+                  clearTimeout(timeout);
+                  ok = head.ok || head.status === 405;
+                } catch (e) {
+                  clearTimeout(timeout);
+                  ok = false;
                 }
-                
-                return proxyUrl;
+
+                if (ok) {
+                  if (songId) {
+                    void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                  }
+                  return proxyUrl;
+                } else {
+                  console.warn('⚠️ flacdownloader non valide (HEAD)');
+                  return null;
+                }
               } catch (error) {
                 circuitBreaker.recordFailure('flacdownloader');
                 console.warn('⚠️ flacdownloader proxy échec:', error);
