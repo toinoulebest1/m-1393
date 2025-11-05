@@ -3,6 +3,7 @@ import { Song } from '@/types/player';
 // import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { getAudioFileUrl } from '@/utils/storage';
 import { addToCache, isInCache } from '@/utils/audioCache';
+import { useGenreBasedQueue } from './useGenreBasedQueue';
 
 interface ListeningPattern {
   songId: string;
@@ -14,6 +15,7 @@ interface ListeningPattern {
 export const useIntelligentPreloader = () => {
   const patternsRef = useRef<Map<string, ListeningPattern>>(new Map());
   const preloadingRef = useRef<Set<string>>(new Set());
+  const { fetchSimilarSongsByGenre } = useGenreBasedQueue();
 
   // Charger les patterns depuis localStorage
   useEffect(() => {
@@ -63,35 +65,36 @@ export const useIntelligentPreloader = () => {
     setTimeout(savePatterns, 100);
   }, [savePatterns]);
 
-  // Prédire les prochaines chansons probables
-  const predictNextSongs = useCallback((currentSong: Song, queue: Song[]): Song[] => {
+  // Prédire les prochaines chansons probables (basé sur le genre, pas l'historique)
+  const predictNextSongs = useCallback(async (currentSong: Song, queue: Song[]): Promise<Song[]> => {
     if (!currentSong) return [];
     
-    const pattern = patternsRef.current.get(currentSong.id);
     const predictions: Song[] = [];
     
-    // Prédictions basées sur l'historique
-    if (pattern && pattern.nextSongIds.length > 0) {
-      for (const nextId of pattern.nextSongIds.slice(0, 3)) {
-        const song = queue.find(s => s.id === nextId);
-        if (song) predictions.push(song);
-      }
-    }
-    
-    // Prédictions basées sur la file d'attente
+    // Prédictions basées sur la file d'attente existante
     const currentIndex = queue.findIndex(s => s.id === currentSong.id);
     if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-      const nextInQueue = queue.slice(currentIndex + 1, currentIndex + 4);
-      for (const song of nextInQueue) {
-        if (!predictions.some(p => p.id === song.id)) {
-          predictions.push(song);
+      const nextInQueue = queue.slice(currentIndex + 1, currentIndex + 3);
+      predictions.push(...nextInQueue);
+    }
+    
+    // Si on n'a pas assez de prédictions, charger des chansons similaires non écoutées
+    if (predictions.length < 5 && currentSong.genre) {
+      try {
+        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 5 - predictions.length);
+        for (const song of similarSongs) {
+          if (!predictions.some(p => p.id === song.id)) {
+            predictions.push(song);
+          }
         }
+      } catch (error) {
+        console.warn("⚠️ Erreur chargement chansons similaires pour prédiction:", error);
       }
     }
     
-    console.log("🔮 Prédictions:", predictions.map(s => s.title));
+    console.log("🔮 Prédictions intelligentes (genre-based):", predictions.map(s => s.title));
     return predictions.slice(0, 5); // Maximum 5 prédictions
-  }, []);
+  }, [fetchSimilarSongsByGenre]);
 
   // Préchargement ultra-agressif
   const preloadPredictedSongs = useCallback(async (predictions: Song[]) => {

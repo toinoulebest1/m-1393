@@ -27,11 +27,30 @@ export const useUltraFastPlayer = ({
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Préchargement intelligent DÉSACTIVÉ pour éviter les chargements multiples
+  // Préchargement intelligent basé sur le genre
   useEffect(() => {
-    console.log("⚠️ Préchargement intelligent désactivé pour éviter les chargements multiples");
-    return () => {};
-  }, [currentSong, isPlaying, queue]);
+    if (!currentSong || !isPlaying) return;
+
+    // Annuler le timeout précédent
+    if (preloadTimeoutRef.current) {
+      clearTimeout(preloadTimeoutRef.current);
+    }
+
+    // Délai avant préchargement (éviter de charger trop tôt)
+    preloadTimeoutRef.current = window.setTimeout(async () => {
+      console.log("🧠 Préchargement intelligent basé sur le genre...");
+      const predictions = await predictNextSongs(currentSong, queue);
+      if (predictions.length > 0) {
+        await preloadPredictedSongs(predictions);
+      }
+    }, 2000); // Attendre 2s après le début de la lecture
+
+    return () => {
+      if (preloadTimeoutRef.current) {
+        clearTimeout(preloadTimeoutRef.current);
+      }
+    };
+  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs]);
 
   // Préchargement queue DÉSACTIVÉ
   useEffect(() => {
