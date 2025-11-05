@@ -158,14 +158,30 @@ export const useIntelligentPreloader = () => {
         
         console.log(`📥 Préchargement [${index + 1}/${predictions.length}]:`, song.title);
         
-        // Récupérer l'URL audio
-        const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+        // Récupérer l'URL audio avec timeout court (3s max)
+        const urlPromise = getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('URL timeout')), 3000)
+        );
+        
+        const audioUrl = await Promise.race([urlPromise, timeoutPromise]);
         
         if (!audioUrl || typeof audioUrl !== 'string') {
           throw new Error("URL audio invalide");
         }
         
-        // Télécharger avec signal d'annulation
+        // Test rapide de l'URL (HEAD request) avant téléchargement complet
+        const headResponse = await fetch(audioUrl, { 
+          method: 'HEAD',
+          signal: controller.signal
+        });
+        
+        if (!headResponse.ok) {
+          console.log(`⚠️ URL non disponible (${headResponse.status}):`, song.title);
+          return; // Échec silencieux
+        }
+        
+        // Si HEAD OK, télécharger le fichier complet
         const response = await fetch(audioUrl, { 
           signal: controller.signal,
           cache: 'default'
@@ -188,7 +204,8 @@ export const useIntelligentPreloader = () => {
         if (error.name === 'AbortError') {
           console.log("⏹️ Préchargement annulé:", song.title);
         } else {
-          console.warn("⚠️ Échec préchargement:", song.title);
+          // Échec SILENCIEUX - ne pas impacter la lecture
+          console.log("⚠️ Préchargement ignoré (service indisponible):", song.title);
         }
       } finally {
         preloadingRef.current.delete(song.id);
