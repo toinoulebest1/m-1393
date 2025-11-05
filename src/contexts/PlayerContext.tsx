@@ -5,6 +5,7 @@ import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
+import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
@@ -67,7 +68,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [displayedSong, setDisplayedSong] = useState<Song | null>(null);
 
-  // États de répétition (sans queue)
+  // États de répétition et queue
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
 
   // Prédiction intelligente de la prochaine chanson
@@ -269,45 +270,33 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Fonctions de navigation simplifiées (sans queue)
-  const nextSong = useCallback(async () => {
-    if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours");
-      return;
-    }
-
-    // Annuler les préchargements intelligents (recommandations Deezer)
-    // Le préchargement de la chanson suivante se relancera automatiquement
-    cancelAllPreloads();
-
-    const nextPredicted = predictedNextRef.current;
-    if (nextPredicted) {
-      console.log("▶️ Lecture de la chanson prédite:", nextPredicted.title);
-      await play(nextPredicted);
-    } else {
-      toast.info("Pas de chanson suivante disponible");
-    }
-  }, [isChangingSong, play, cancelAllPreloads]);
-
-  const previousSong = useCallback(async () => {
-    if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours");
-      return;
-    }
-
-    // Annuler les préchargements intelligents (recommandations Deezer)
-    cancelAllPreloads();
-
-    if (history.length > 1) {
-      // Revenir à la chanson précédente dans l'historique
-      const prevSong = history[history.length - 2];
-      console.log("◀️ Lecture de la chanson précédente:", prevSong.title);
-      await play(prevSong);
-    } else {
-      toast.info("Pas de chanson précédente");
-    }
-  }, [isChangingSong, history, play, cancelAllPreloads]);
-
+  // Utiliser la queue avec le play original
+  const queueHook = usePlayerQueue({
+    currentSong,
+    isChangingSong,
+    setIsChangingSong,
+    play
+  });
+  
+  // Wrapper pour play qui ajoute automatiquement à la queue
+  const playWithQueue = useCallback(async (song: Song) => {
+    // Ajouter à la queue si pas déjà dedans
+    queueHook.setQueue(prevQueue => {
+      const exists = prevQueue.some(s => s.id === song.id);
+      if (!exists) {
+        console.log("➕ Ajout à la queue:", song.title);
+        return [...prevQueue, song];
+      }
+      return prevQueue;
+    });
+    
+    // Jouer la chanson
+    await play(song);
+  }, [play, queueHook.setQueue]);
+  
+  // Utiliser nextSong et previousSong de la queue
+  const nextSong = queueHook.nextSong;
+  const previousSong = queueHook.previousSong;
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {
       if (current === 'none') return 'all';
@@ -724,15 +713,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success("La chanson a été supprimée de votre bibliothèque");
   }, [currentSong, setCurrentSong, stopCurrentSong, setHistory, favorites, removeFavorite]);
 
-  // L'objet context complet sans queue
+  // L'objet context complet avec queue activée
   const playerContext: PlayerContextType = {
     currentSong,
     displayedSong,
     isPlaying,
     progress,
     volume,
-    queue: [], // Queue désactivée
-    shuffleMode: false, // Pas de shuffle sans queue
+    queue: queueHook.queue,
+    shuffleMode: queueHook.shuffleMode,
     repeatMode,
     favorites,
     searchQuery,
@@ -743,16 +732,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isAudioReady,
     stopCurrentSong,
     removeSong,
-    setQueue: () => {}, // Fonction vide
+    setQueue: queueHook.setQueue,
     setHistory,
-    play,
+    play: playWithQueue,
     pause,
     setVolume,
     setProgress,
     nextSong,
     previousSong,
-    addToQueue: () => {}, // Fonction vide
-    toggleShuffle: () => {}, // Fonction vide
+    addToQueue: queueHook.addToQueue,
+    toggleShuffle: queueHook.toggleShuffle,
     toggleRepeat,
     toggleFavorite,
     removeFavorite,
