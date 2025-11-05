@@ -337,10 +337,31 @@ const Search = () => {
           formattedResults.push(...deezerSongs);
         }
 
-        // Dédupliquer les résultats par ID
-        const uniqueResults = Array.from(
-          new Map(formattedResults.map(song => [song.id, song])).values()
-        );
+        // Dédupliquer les résultats par ID ET par titre+artiste normalisé
+        const uniqueMap = new Map();
+        const seenTitleArtist = new Set();
+        
+        formattedResults.forEach(song => {
+          const normalizedKey = `${song.title.toLowerCase().trim()}_${song.artist.toLowerCase().trim()}`;
+          
+          // Si on n'a pas encore vu cette combinaison titre+artiste
+          if (!seenTitleArtist.has(normalizedKey)) {
+            uniqueMap.set(song.id, song);
+            seenTitleArtist.add(normalizedKey);
+          } else {
+            // Si on a déjà vu cette combinaison, garder la version locale si possible
+            const existingSong = Array.from(uniqueMap.values()).find(
+              s => `${s.title.toLowerCase().trim()}_${s.artist.toLowerCase().trim()}` === normalizedKey
+            );
+            if (existingSong && !existingSong.isLocal && song.isLocal) {
+              // Remplacer la version Deezer par la version locale
+              uniqueMap.delete(existingSong.id);
+              uniqueMap.set(song.id, song);
+            }
+          }
+        });
+        
+        const uniqueResults = Array.from(uniqueMap.values());
 
         // Filter playlists that the current user can view (only if user is authenticated)
         const visiblePlaylists = [];
@@ -507,10 +528,31 @@ const Search = () => {
           formattedResults.push(...deezerSongs);
         }
         
-        // Dédupliquer les résultats par ID
-        const uniqueResults = Array.from(
-          new Map(formattedResults.map(song => [song.id, song])).values()
-        );
+        // Dédupliquer les résultats par ID ET par titre+artiste normalisé
+        const uniqueMap = new Map();
+        const seenTitleArtist = new Set();
+        
+        formattedResults.forEach(song => {
+          const normalizedKey = `${song.title.toLowerCase().trim()}_${song.artist.toLowerCase().trim()}`;
+          
+          // Si on n'a pas encore vu cette combinaison titre+artiste
+          if (!seenTitleArtist.has(normalizedKey)) {
+            uniqueMap.set(song.id, song);
+            seenTitleArtist.add(normalizedKey);
+          } else {
+            // Si on a déjà vu cette combinaison, garder la version locale si possible
+            const existingSong = Array.from(uniqueMap.values()).find(
+              s => `${s.title.toLowerCase().trim()}_${s.artist.toLowerCase().trim()}` === normalizedKey
+            );
+            if (existingSong && !existingSong.isLocal && song.isLocal) {
+              // Remplacer la version Deezer par la version locale
+              uniqueMap.delete(existingSong.id);
+              uniqueMap.set(song.id, song);
+            }
+          }
+        });
+        
+        const uniqueResults = Array.from(uniqueMap.values());
         
         setResults(uniqueResults);
         setPlaylistResults([]);
