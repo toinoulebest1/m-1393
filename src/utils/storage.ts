@@ -159,7 +159,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       promises.push(
         (async () => {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 2000); // Timeout augmenté à 2s
+          const timeout = setTimeout(() => controller.abort(), 10000); // Timeout augmenté à 10s
           
           try {
             const url = `https://api.deezmate.com/dl/${deezerId}`;
@@ -279,7 +279,7 @@ try {
           promises.push(
             (async () => {
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 2000); // Timeout augmenté
+              const timeout = setTimeout(() => controller.abort(), 10000); // Timeout augmenté à 10s
               
               try {
                 const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
