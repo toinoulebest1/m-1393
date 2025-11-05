@@ -51,13 +51,13 @@ export async function getDeezerRecommendationsByGenre(
       }
     }
 
-    // Si on a un deezerId (natif ou trouvé), utiliser la radio Deezer pour recommandations
+    // Si on a un deezerId (natif ou trouvé), utiliser l'API related pour recommandations
     if (deezerId) {
-      console.log("🎵 Récupération recommandations Deezer pour:", currentSong.title || deezerId);
+      console.log("🎵 Récupération artistes similaires Deezer pour:", currentSong.title || deezerId);
       
       const { data, error } = await supabase.functions.invoke('deezer-proxy', {
         body: { 
-          path: `/track/${deezerId}/radio`,
+          path: `/track/${deezerId}/related`,
           limit: limit * 2 // Récupérer plus pour filtrer ensuite
         }
       });
