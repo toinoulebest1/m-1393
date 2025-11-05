@@ -344,14 +344,12 @@ export const useAudioControl = ({
                 isHandlingError = false; // Reset flag
               } else {
                 console.warn("⚠️ Aucune alternative disponible");
-                toast.error("Musique temporairement indisponible");
+                toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
                 isHandlingError = false; // Reset flag
               }
             } catch (reloadError) {
               console.error("❌ Impossible de recharger le lien:", reloadError);
-              toast.error("Impossible de recharger la musique", {
-                description: "Le lien audio n'est plus disponible"
-              });
+              toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
               isHandlingError = false; // Reset flag
             }
           }
@@ -699,19 +697,9 @@ export const useAudioControl = ({
         }
       });
     } else if (error.message?.includes('Fichier audio introuvable') || error.message?.includes('not found')) {
-      toast.error("Fichier audio introuvable", {
-        description: `La chanson "${song?.title || 'inconnue'}" n'est plus disponible dans le stockage`,
-        duration: 8000,
-        action: {
-          label: "Passer",
-          onClick: () => {
-            // Passer à la chanson suivante si possible
-            console.log("Passage à la chanson suivante...");
-          }
-        }
-      });
+      toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
     } else {
-      toast.error(`Erreur: ${error.message}`);
+      toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
     }
     
     const audio = audioRef.current;
