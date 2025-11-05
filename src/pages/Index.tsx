@@ -37,6 +37,7 @@ const Index = () => {
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
   const [metadataOpacity, setMetadataOpacity] = useState(1);
+  const [previousSongData, setPreviousSongData] = useState<{ title: string; artist: string; imageUrl: string } | null>(null);
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -69,15 +70,26 @@ const Index = () => {
 
   // Gérer la transition des métadonnées pendant le crossfade
   useEffect(() => {
-    if (isChangingSong) {
+    if (isChangingSong && currentSong) {
+      // Sauvegarder les métadonnées actuelles avant le changement
+      setPreviousSongData({
+        title: currentSong.title,
+        artist: currentSong.artist,
+        imageUrl: currentSong.imageUrl || 'https://picsum.photos/300/300'
+      });
+      
+      // Fade out progressif sur 3 secondes (durée typique d'un crossfade)
       setMetadataOpacity(0);
-    } else {
+    } else if (!isChangingSong && currentSong) {
+      // Fade in progressif après le crossfade
       const timer = setTimeout(() => {
         setMetadataOpacity(1);
-      }, 150);
+        // Effacer les anciennes métadonnées après le fade in
+        setTimeout(() => setPreviousSongData(null), 3000);
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isChangingSong]);
+  }, [isChangingSong, currentSong]);
 
   // Set up MediaSession API for mobile device notifications
   useEffect(() => {
@@ -268,18 +280,42 @@ const Index = () => {
         </div>
         
         <div className="w-full flex items-center justify-center py-8">
-          {currentSong ? <div className="text-center p-6 max-w-md mx-auto transition-opacity duration-700" style={{ opacity: metadataOpacity }}>
-              <div className="w-64 h-64 mx-auto mb-8 relative">
-                <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
+          {currentSong ? (
+            <div className="text-center p-6 max-w-md mx-auto relative">
+              {/* Anciennes métadonnées (fade out) */}
+              {previousSongData && isChangingSong && (
+                <div className="absolute inset-0 transition-opacity duration-[3000ms] ease-out" style={{ opacity: 1 - metadataOpacity }}>
+                  <div className="w-64 h-64 mx-auto mb-8">
+                    <img 
+                      src={previousSongData.imageUrl} 
+                      alt="Previous album art" 
+                      className="w-full h-full object-cover rounded-lg shadow-lg"
+                    />
+                  </div>
+                  <h2 className="text-3xl font-bold mb-2 text-foreground">{previousSongData.title}</h2>
+                  <p className="text-lg text-muted-foreground mb-4">{previousSongData.artist}</p>
+                </div>
+              )}
+              
+              {/* Nouvelles métadonnées (fade in) */}
+              <div className="transition-opacity duration-[3000ms] ease-in" style={{ opacity: metadataOpacity }}>
+                <div className="w-64 h-64 mx-auto mb-8 relative">
+                  <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
+                <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
+                {currentSong.genre && (
+                  <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
+                    {currentSong.genre}
+                  </span>
+                )}
               </div>
-              <h2 className="text-2xl font-bold mb-2">{currentSong.title}</h2>
-              <h3 className="text-lg text-gray-300 mb-3">{currentSong.artist}</h3>
-              {currentSong.genre && <span className="inline-block bg-spotify-dark px-3 py-1 rounded-full text-sm text-gray-300 mb-4">
-                  {currentSong.genre}
-                </span>}
-            </div> : <div className="text-center p-6">
+            </div>
+          ) : (
+            <div className="text-center p-6">
               <p className="text-gray-400">Aucune musique en cours de lecture</p>
-            </div>}
+            </div>
+          )}
         </div>
 
         <MusicDiscovery />
