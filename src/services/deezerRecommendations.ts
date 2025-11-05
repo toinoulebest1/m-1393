@@ -50,6 +50,34 @@ export async function getDeezerRecommendationsByGenre(
           }
         }
       }
+
+      // Fallback: si aucun artistId fiable trouvé via le track, rechercher l'artiste directement
+      if (!foundArtistId && currentSong.artist) {
+        console.log("🔎 Recherche Deezer de l'artiste (fallback)...", currentSong.artist);
+        try {
+          const { data: artistSearch } = await supabase.functions.invoke('deezer-proxy', {
+            body: { path: `/search/artist`, query: currentSong.artist, limit: 1 }
+          });
+          const artistFound = (artistSearch as any)?.data?.[0];
+          if (artistFound?.id) {
+            foundArtistId = artistFound.id as number;
+            console.log("✅ Artiste trouvé via recherche directe:", artistFound.name, foundArtistId);
+            if (!usedGenre) {
+              try {
+                const { data: artistGenres2 } = await supabase.functions.invoke('deezer-proxy', {
+                  body: { path: `/artist/${foundArtistId}/genres`, limit: 1 }
+                });
+                const genreName2 = (artistGenres2 as any)?.data?.[0]?.name as string | undefined;
+                if (genreName2) usedGenre = genreName2;
+              } catch (e) {
+                console.warn("⚠️ Impossible de récupérer le genre (fallback artiste)", e);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("⚠️ Recherche artiste Deezer (fallback) échouée", e);
+        }
+      }
     }
 
     // Si on a un deezerId (natif ou trouvé), récupérer l'artiste et ses artistes similaires
@@ -106,6 +134,7 @@ export async function getDeezerRecommendationsByGenre(
           console.error("❌ Erreur API Deezer related:", relatedError);
         } else if (relatedData?.data) {
           const relatedArtists = relatedData.data;
+          console.log("👥 Artistes similaires Deezer:", relatedArtists.map((a: any) => a.name).join(", "));
           const allTracks: Song[] = [];
 
           // Pour chaque artiste similaire, récupérer des tracks
