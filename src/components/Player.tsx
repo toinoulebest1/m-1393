@@ -38,6 +38,8 @@ export const Player = () => {
     getCurrentAudioElement
   } = usePlayer();
 
+  const [metadataOpacity, setMetadataOpacity] = useState(1);
+
   // We need to get the required parameters for useAudioControl from the PlayerContext
   // For now, let's create a simplified version that just handles volume updates
   const updateVolumeDirectly = (newVolume: number) => {
@@ -94,6 +96,20 @@ export const Player = () => {
       audioElement.removeEventListener('loadedmetadata', updateProgress);
     };
   }, [getCurrentAudioElement, setProgress]);
+
+  // Gérer la transition des métadonnées pendant le crossfade
+  useEffect(() => {
+    if (isChangingSong) {
+      // Fade out des métadonnées
+      setMetadataOpacity(0);
+    } else {
+      // Fade in des métadonnées après un petit délai
+      const timer = setTimeout(() => {
+        setMetadataOpacity(1);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isChangingSong]);
 
   // Debug audio state when playing state changes
   useEffect(() => {
@@ -272,7 +288,10 @@ export const Player = () => {
       
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {displayedSong ? (
-          <div className="flex items-center space-x-4 w-56 overflow-hidden">
+          <div 
+            className="flex items-center space-x-4 w-56 overflow-hidden transition-opacity duration-700"
+            style={{ opacity: metadataOpacity }}
+          >
             <div className="w-16 h-16 rounded overflow-hidden shadow-md flex-shrink-0">
               <img
                 src={displayedSong.imageUrl || 'https://picsum.photos/100'}

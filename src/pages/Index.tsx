@@ -28,13 +28,15 @@ const Index = () => {
     previousSong,
     isPlaying,
     stopCurrentSong,
-    removeSong
+    removeSong,
+    isChangingSong
   } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
+  const [metadataOpacity, setMetadataOpacity] = useState(1);
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -64,6 +66,18 @@ const Index = () => {
     };
     extractColor();
   }, [currentSong?.imageUrl]);
+
+  // Gérer la transition des métadonnées pendant le crossfade
+  useEffect(() => {
+    if (isChangingSong) {
+      setMetadataOpacity(0);
+    } else {
+      const timer = setTimeout(() => {
+        setMetadataOpacity(1);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isChangingSong]);
 
   // Set up MediaSession API for mobile device notifications
   useEffect(() => {
@@ -254,7 +268,7 @@ const Index = () => {
         </div>
         
         <div className="w-full flex items-center justify-center py-8">
-          {currentSong ? <div className="text-center p-6 max-w-md mx-auto">
+          {currentSong ? <div className="text-center p-6 max-w-md mx-auto transition-opacity duration-700" style={{ opacity: metadataOpacity }}>
               <div className="w-64 h-64 mx-auto mb-8 relative">
                 <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
               </div>
