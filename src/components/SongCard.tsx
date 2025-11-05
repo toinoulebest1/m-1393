@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play, Radio } from "lucide-react";
+import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -108,18 +108,14 @@ export const SongCard = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer hover:bg-white/5 border border-transparent relative",
-        isCurrentSong && "border-primary/50 bg-primary/5 shadow-lg shadow-primary/10",
+        "flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer hover:bg-white/5 border border-transparent",
+        isCurrentSong && "border-muted bg-white/5",
         isCurrentSong && isPlaying && "animate-subtle-pulse",
         isCurrentSong && colorClass ? "bg-gradient-to-br" : ""
       )}
       style={bgStyle}
       onClick={handlePlay}
     >
-      {/* Indicateur de lecture en cours */}
-      {isCurrentSong && (
-        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full animate-pulse" />
-      )}
       <div className="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative group">
         {song.imageUrl ? (
           <img
@@ -141,19 +137,8 @@ export const SongCard = ({
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "text-base font-medium truncate",
-            isCurrentSong && "text-primary"
-          )}>{song.title}</div>
-          {isCurrentSong && (
-            <Radio className="h-3.5 w-3.5 text-primary flex-shrink-0 animate-pulse" />
-          )}
-        </div>
-        <div className={cn(
-          "text-xs",
-          isCurrentSong ? "text-primary/70" : "text-muted-foreground"
-        )} title={song.artist || "Artiste inconnu"}>
+        <div className="text-base font-medium truncate">{song.title}</div>
+        <div className="text-xs text-muted-foreground" title={song.artist || "Artiste inconnu"}>
           {song.artist || "Artiste inconnu"}
         </div>
       </div>
