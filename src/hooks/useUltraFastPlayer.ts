@@ -44,16 +44,6 @@ export const useUltraFastPlayer = ({
       const predictions = await predictNextSongs(currentSong, queue);
       if (predictions.length > 0) {
         // Ajouter les prédictions à la queue si elles n'y sont pas déjà
-        setQueue(prev => {
-          const newSongs = predictions.filter(pred => 
-            !prev.some(q => q.id === pred.id)
-          );
-          if (newSongs.length > 0) {
-            console.log("➕ Ajout de", newSongs.length, "prédiction(s) à la queue:", newSongs.map(s => s.title));
-            return [...prev, ...newSongs];
-          }
-          return prev;
-        });
         
         // Précharger les fichiers audio
         await preloadPredictedSongs(predictions);

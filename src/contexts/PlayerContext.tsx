@@ -6,6 +6,7 @@ import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useUltraFastPlayer } from '@/hooks/useUltraFastPlayer';
+import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
@@ -85,6 +86,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [currentSong, setQueue]);
 
+  // Prédiction intelligente de la prochaine chanson (sans modifier la queue)
+  const { predictNextSongs } = useIntelligentPreloader();
+  const predictedNextRef = useRef<Song | null>(null);
+  useEffect(() => {
+    if (!currentSong) { predictedNextRef.current = null; return; }
+    (async () => {
+      try {
+        const preds = await predictNextSongs(currentSong, queue);
+        predictedNextRef.current = preds[0] || null;
+      } catch (e) {
+        predictedNextRef.current = null;
+      }
+    })();
+  }, [currentSong, queue, predictNextSongs]);
   // Fonctions exposées à travers le contexte - définies après les hooks
   const { 
     play, 
@@ -519,7 +534,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (timeLeft <= transitionTime && timeLeft > 0 && !fadingRef.current) {
         console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
         
-        const nextSong = queueHook.getNextSong();
+        const nextSong = predictedNextRef.current || queueHook.getNextSong();
         if (!nextSong) {
           console.log("Pas de chanson suivante disponible");
           return;
