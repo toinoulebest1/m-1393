@@ -24,6 +24,7 @@ export async function getDeezerRecommendationsByGenre(
     // Déterminer ou trouver le deezer_id et le genre via Deezer si nécessaire
     let deezerId = currentSong.deezer_id;
     let usedGenre = currentSong.genre;
+    let foundArtistId: number | undefined;
 
     if (!deezerId && (currentSong.title || currentSong.artist)) {
       console.log("🔎 Recherche Deezer du track (pas de deezer_id)...");
@@ -35,12 +36,12 @@ export async function getDeezerRecommendationsByGenre(
       const found = searchData?.data?.[0] as DeezerTrack | undefined;
       if (found?.id) {
         deezerId = String(found.id);
+        foundArtistId = (found as any)?.artist?.id as number | undefined;
         // Essayer de récupérer le genre de l'artiste
-        const artistId = (found as any)?.artist?.id as number | undefined;
-        if (!usedGenre && artistId) {
+        if (!usedGenre && foundArtistId) {
           try {
             const { data: artistGenres } = await supabase.functions.invoke('deezer-proxy', {
-              body: { path: `/artist/${artistId}/genres`, limit: 1 }
+              body: { path: `/artist/${foundArtistId}/genres`, limit: 1 }
             });
             const genreName = artistGenres?.data?.[0]?.name as string | undefined;
             if (genreName) usedGenre = genreName;
@@ -51,42 +52,74 @@ export async function getDeezerRecommendationsByGenre(
       }
     }
 
-    // Si on a un deezerId (natif ou trouvé), utiliser l'API related pour recommandations
+    // Si on a un deezerId (natif ou trouvé), récupérer l'artiste et ses artistes similaires
     if (deezerId) {
       console.log("🎵 Récupération artistes similaires Deezer pour:", currentSong.title || deezerId);
       
-      const { data, error } = await supabase.functions.invoke('deezer-proxy', {
-        body: { 
-          path: `/track/${deezerId}/related`,
-          limit: limit * 2 // Récupérer plus pour filtrer ensuite
+      // Récupérer l'ID de l'artiste si on ne l'a pas déjà
+      let artistId = foundArtistId;
+      
+      if (!artistId) {
+        // Récupérer les infos de la chanson pour avoir l'artiste
+        const { data: trackData, error: trackError } = await supabase.functions.invoke('deezer-proxy', {
+          body: { path: `/track/${deezerId}` }
+        });
+        if (trackError) {
+          console.error("❌ Erreur récupération track:", trackError);
+        } else if (trackData?.artist?.id) {
+          artistId = trackData.artist.id;
         }
-      });
+      }
 
-      if (error) {
-        console.error("❌ Erreur API Deezer:", error);
-        // On tombera sur la recherche par genre DB plus bas
-      } else if (data?.data) {
-        const tracks: DeezerTrack[] = data.data;
-        
-        // Convertir les tracks Deezer en Songs
-        const recommendations: Song[] = tracks
-          .slice(0, limit)
-          .map((track: DeezerTrack) => ({
-            id: `deezer-${track.id}`,
-            title: track.title,
-            artist: track.artist.name,
-            url: `deezer:${track.id}`,
-            imageUrl: track.album.cover_medium,
-            duration: formatDuration(track.duration),
-            deezer_id: track.id.toString(),
-            isDeezer: true,
-            genre: usedGenre || currentSong.genre,
-            album_name: track.album.title
-          }));
+      if (artistId) {
+        // Récupérer les artistes similaires
+        const { data: relatedData, error: relatedError } = await supabase.functions.invoke('deezer-proxy', {
+          body: { 
+            path: `/artist/${artistId}/related`,
+            limit: Math.min(limit, 10) // Limiter le nombre d'artistes similaires
+          }
+        });
 
-        if (recommendations.length > 0) {
-          console.log("✅ Recommandations Deezer:", recommendations.length, "chansons");
-          return recommendations;
+        if (relatedError) {
+          console.error("❌ Erreur API Deezer related:", relatedError);
+        } else if (relatedData?.data) {
+          const relatedArtists = relatedData.data;
+          const recommendations: Song[] = [];
+
+          // Pour chaque artiste similaire, récupérer quelques top tracks
+          for (const artist of relatedArtists.slice(0, 5)) {
+            const { data: topTracksData } = await supabase.functions.invoke('deezer-proxy', {
+              body: { 
+                path: `/artist/${artist.id}/top`,
+                limit: 2 // 2 chansons par artiste
+              }
+            });
+
+            if (topTracksData?.data) {
+              const tracks: DeezerTrack[] = topTracksData.data;
+              tracks.forEach((track: DeezerTrack) => {
+                if (recommendations.length < limit) {
+                  recommendations.push({
+                    id: `deezer-${track.id}`,
+                    title: track.title,
+                    artist: track.artist.name,
+                    url: `deezer:${track.id}`,
+                    imageUrl: track.album.cover_medium,
+                    duration: formatDuration(track.duration),
+                    deezer_id: track.id.toString(),
+                    isDeezer: true,
+                    genre: usedGenre || currentSong.genre,
+                    album_name: track.album.title
+                  });
+                }
+              });
+            }
+          }
+
+          if (recommendations.length > 0) {
+            console.log("✅ Recommandations Deezer:", recommendations.length, "chansons de", relatedArtists.length, "artistes similaires");
+            return recommendations;
+          }
         }
       }
     }
