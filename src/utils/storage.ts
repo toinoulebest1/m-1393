@@ -159,19 +159,23 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       promises.push(
         (async () => {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 300); // Timeout 300ms
+          const timeout = setTimeout(() => controller.abort(), 2000); // Timeout augmenté à 2s
           
           try {
             const url = `https://api.deezmate.com/dl/${deezerId}`;
+            console.log('🎯 Appel Deezmate:', url);
             const res = await fetch(url, { signal: controller.signal });
             clearTimeout(timeout);
             
+            console.log('📡 Deezmate status:', res.status);
+            
             if (res.ok) {
               const data = await res.json();
+              console.log('📦 Deezmate response:', JSON.stringify(data).substring(0, 200));
               const flacUrl = data?.links?.flac || data?.links?.FLAC;
               
               if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-                console.log('✅ Deezmate gagne la race!');
+                console.log('✅ Deezmate gagne la race! URL:', flacUrl.substring(0, 50));
                 circuitBreaker.recordSuccess('deezmate');
                 
                 if (songId) {
@@ -179,7 +183,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
                 }
                 
                 return flacUrl;
+              } else {
+                console.warn('⚠️ Deezmate: pas de lien FLAC dans la réponse');
               }
+            } else {
+              console.warn('⚠️ Deezmate HTTP error:', res.status);
             }
             
             circuitBreaker.recordFailure('deezmate');
@@ -187,11 +195,13 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           } catch (error) {
             clearTimeout(timeout);
             circuitBreaker.recordFailure('deezmate');
-            console.warn('⚠️ Deezmate timeout/échec');
+            console.warn('⚠️ Deezmate timeout/échec:', error);
             return null;
           }
         })()
       );
+    } else {
+      console.warn('⚠️ Circuit breaker Deezmate est OUVERT - appels bloqués');
     }
     
     // flacdownloader (si circuit fermé)
@@ -269,19 +279,23 @@ try {
           promises.push(
             (async () => {
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 300);
+              const timeout = setTimeout(() => controller.abort(), 2000); // Timeout augmenté
               
               try {
                 const url = `https://api.deezmate.com/dl/${foundDeezerId}`;
+                console.log('🎯 Appel Deezmate (recherche):', url);
                 const res = await fetch(url, { signal: controller.signal });
                 clearTimeout(timeout);
                 
+                console.log('📡 Deezmate status (recherche):', res.status);
+                
                 if (res.ok) {
                   const data = await res.json();
+                  console.log('📦 Deezmate response (recherche):', JSON.stringify(data).substring(0, 200));
                   const flacUrl = data?.links?.flac || data?.links?.FLAC;
                   
                   if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-                    console.log('✅ Deezmate race win!');
+                    console.log('✅ Deezmate race win! URL:', flacUrl.substring(0, 50));
                     circuitBreaker.recordSuccess('deezmate');
                     
                     if (songId) {
@@ -289,7 +303,11 @@ try {
                     }
                     
                     return flacUrl;
+                  } else {
+                    console.warn('⚠️ Deezmate: pas de lien FLAC dans la réponse');
                   }
+                } else {
+                  console.warn('⚠️ Deezmate HTTP error:', res.status);
                 }
                 
                 circuitBreaker.recordFailure('deezmate');
@@ -297,10 +315,13 @@ try {
               } catch (error) {
                 clearTimeout(timeout);
                 circuitBreaker.recordFailure('deezmate');
+                console.warn('⚠️ Deezmate timeout/échec (recherche):', error);
                 return null;
               }
             })()
           );
+        } else {
+          console.warn('⚠️ Circuit breaker Deezmate est OUVERT - appels bloqués (recherche)');
         }
         
         // flacdownloader (si circuit fermé)
