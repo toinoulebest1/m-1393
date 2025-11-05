@@ -12,11 +12,13 @@ serve(async (req) => {
   }
 
   try {
-    const { endpoint, query, limit = 20 } = await req.json();
+    const { path, endpoint, query, limit = 20 } = await req.json();
     
-    if (!endpoint) {
+    const apiPath = path || endpoint;
+    
+    if (!apiPath) {
       return new Response(
-        JSON.stringify({ error: 'Endpoint parameter is required' }), 
+        JSON.stringify({ error: 'Path or endpoint parameter is required' }), 
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -24,11 +26,13 @@ serve(async (req) => {
       );
     }
 
-    let deezerUrl = `https://api.deezer.com${endpoint}`;
+    let deezerUrl = `https://api.deezer.com${apiPath}`;
     
     // Ajouter les paramètres de query si nécessaire
     if (query) {
       deezerUrl += `?q=${encodeURIComponent(query)}&limit=${limit}`;
+    } else if (limit && !apiPath.includes('?')) {
+      deezerUrl += `?limit=${limit}`;
     }
 
     console.log('🔍 Proxying Deezer API call:', deezerUrl);
