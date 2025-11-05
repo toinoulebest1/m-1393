@@ -12,13 +12,37 @@ export const useGenreBasedQueue = () => {
     try {
       console.log(`🎵 Chargement de ${limit} chansons du genre: ${currentSong.genre}`);
       
-      // Récupérer des chansons du même genre, en excluant la chanson actuelle
-      const { data, error } = await supabase
+      // Récupérer l'historique d'écoute récent de l'utilisateur (dernières 50 chansons)
+      const { data: { session } } = await supabase.auth.getSession();
+      let recentlyPlayedIds: string[] = [];
+      
+      if (session?.user?.id) {
+        const { data: historyData } = await supabase
+          .from('play_history')
+          .select('song_id')
+          .eq('user_id', session.user.id)
+          .order('played_at', { ascending: false })
+          .limit(50);
+        
+        if (historyData) {
+          recentlyPlayedIds = historyData.map(h => h.song_id);
+          console.log(`📊 ${recentlyPlayedIds.length} chansons récemment écoutées exclues`);
+        }
+      }
+      
+      // Récupérer des chansons du même genre, en excluant la chanson actuelle et l'historique
+      let query = supabase
         .from('songs')
         .select('*')
         .eq('genre', currentSong.genre)
-        .neq('id', currentSong.id)
-        .limit(limit * 2); // Charger plus pour avoir de la variété après filtrage
+        .neq('id', currentSong.id);
+      
+      // Exclure les chansons récemment écoutées
+      if (recentlyPlayedIds.length > 0) {
+        query = query.not('id', 'in', `(${recentlyPlayedIds.join(',')})`);
+      }
+      
+      const { data, error } = await query.limit(limit * 3); // Charger plus pour avoir de la variété
 
       if (error) {
         console.error("❌ Erreur lors du chargement des chansons similaires:", error);
@@ -26,8 +50,39 @@ export const useGenreBasedQueue = () => {
       }
 
       if (!data || data.length === 0) {
-        console.log("⚠️ Aucune chanson similaire trouvée");
-        return [];
+        console.log("⚠️ Aucune chanson similaire non écoutée trouvée, recherche sans filtre historique...");
+        
+        // Fallback: rechercher sans exclure l'historique si aucun résultat
+        const { data: fallbackData } = await supabase
+          .from('songs')
+          .select('*')
+          .eq('genre', currentSong.genre)
+          .neq('id', currentSong.id)
+          .limit(limit * 2);
+        
+        if (!fallbackData || fallbackData.length === 0) {
+          console.log("⚠️ Aucune chanson similaire trouvée même sans filtre");
+          return [];
+        }
+        
+        const shuffled = fallbackData
+          .sort(() => Math.random() - 0.5)
+          .slice(0, limit)
+          .map(song => ({
+            id: song.id,
+            title: song.title,
+            artist: song.artist || 'Artiste inconnu',
+            url: song.file_path,
+            imageUrl: song.image_url,
+            genre: song.genre,
+            duration: song.duration,
+            album_name: song.album_name,
+            deezer_id: song.deezer_id,
+            isDeezer: !!song.deezer_id
+          }));
+        
+        console.log(`✅ ${shuffled.length} chansons similaires chargées (fallback)`);
+        return shuffled;
       }
 
       // Mélanger aléatoirement et limiter
@@ -47,7 +102,7 @@ export const useGenreBasedQueue = () => {
           isDeezer: !!song.deezer_id
         }));
 
-      console.log(`✅ ${shuffled.length} chansons similaires chargées`);
+      console.log(`✅ ${shuffled.length} chansons similaires non écoutées chargées`);
       return shuffled;
     } catch (error) {
       console.error("❌ Erreur lors du chargement des chansons similaires:", error);

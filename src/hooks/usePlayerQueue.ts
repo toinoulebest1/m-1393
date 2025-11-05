@@ -109,9 +109,20 @@ export const usePlayerQueue = ({
         }
       }
       
-      console.log("Could not find current song in queue, playing first song");
-      if (queue.length > 0) {
-        await play(queue[0]);
+      // 🎵 Charger automatiquement une chanson du même genre
+      console.log("🎵 Chargement d'une chanson similaire par genre...");
+      const similarSongs = await fetchSimilarSongsByGenre(currentSong, 1);
+      
+      if (similarSongs.length > 0) {
+        console.log(`✅ Chanson similaire trouvée: ${similarSongs[0].title}`);
+        setQueueInternal(prevQueue => {
+          const newQueue = [...prevQueue, similarSongs[0]];
+          localStorage.setItem('queue', JSON.stringify(newQueue));
+          return newQueue;
+        });
+        await play(similarSongs[0]);
+      } else {
+        toast.info("Aucune chanson similaire trouvée");
       }
       return;
     }
@@ -126,18 +137,18 @@ export const usePlayerQueue = ({
         console.log("Repeating playlist from beginning");
         await play(queue[0]);
       } else {
-        // 🎵 Charger automatiquement des chansons du même genre
-        console.log("🎵 Chargement de chansons similaires par genre...");
-        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
+        // 🎵 Charger automatiquement une chanson du même genre
+        console.log("🎵 Chargement d'une chanson similaire par genre...");
+        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 1);
         
         if (similarSongs.length > 0) {
-          console.log(`✅ ${similarSongs.length} chansons similaires ajoutées à la queue`);
+          console.log(`✅ Chanson similaire trouvée: ${similarSongs[0].title}`);
           setQueueInternal(prevQueue => {
-            const newQueue = [...prevQueue, ...similarSongs];
+            const newQueue = [...prevQueue, similarSongs[0]];
             localStorage.setItem('queue', JSON.stringify(newQueue));
             return newQueue;
           });
-          // Jouer la première chanson similaire
+          // Jouer la chanson similaire
           await play(similarSongs[0]);
         } else {
           toast.info("Fin de la playlist - Aucune chanson similaire trouvée");
