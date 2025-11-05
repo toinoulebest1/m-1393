@@ -588,13 +588,20 @@ export const useAudioControl = ({
 
           console.error("💥 Erreur récupération:", error);
           
-          // IMPORTANT: Débloquer immédiatement l'interface
+          // IMPORTANT: Stopper COMPLÈTEMENT l'audio en erreur avant tout rollback
+          console.log("🛑 Arrêt complet de l'audio en erreur");
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current.src = '';
+          
+          // Débloquer immédiatement l'interface
           setIsChangingSong(false);
           
           // Revenir à la musique précédente si elle existait
           if (previousSong) {
             console.log("🔄 Retour à la musique précédente:", previousSong.title);
             setCurrentSong(previousSong);
+            setDisplayedSong(previousSong);
             localStorage.setItem('currentSong', JSON.stringify(previousSong));
             
             // Restaurer l'état audio si la musique jouait
