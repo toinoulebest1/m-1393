@@ -205,7 +205,7 @@ export const getAudioCacheStats = async (): Promise<{
 
 /**
  * Met en cache UNIQUEMENT la chanson en cours de lecture
- * Supprime toutes les autres chansons du cache
+ * Garde les 2 dernières chansons pour permettre le retour en arrière si erreur
  */
 export const cacheCurrentSong = async (url: string, blob: Blob, songId: string): Promise<void> => {
   try {
@@ -217,15 +217,20 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string):
     const allFiles = await db.getAll('audio-files');
     console.log("📦 Fichiers en cache avant nettoyage:", allFiles.length);
     
-    // Supprimer toutes les entrées SAUF celle qu'on va ajouter
-    for (const file of allFiles) {
-      if (file.url !== url) {
+    // Garder les 2 dernières chansons (celle en cours + 1 précédente pour rollback)
+    // Trier par lastAccessed (plus récent d'abord)
+    const sortedFiles = [...allFiles].sort((a, b) => b.lastAccessed - a.lastAccessed);
+    
+    // Supprimer uniquement les anciennes (garder les 2 plus récentes)
+    for (let i = 2; i < sortedFiles.length; i++) {
+      const file = sortedFiles[i];
+      if (file.url !== url) { // Ne pas supprimer celle qu'on va ajouter
         await db.delete('audio-files', file.url);
         console.log(`🗑️ Ancienne chanson supprimée du cache: ${file.url.substring(0, 50)}...`);
       }
     }
     
-    // Ajouter la chanson actuelle
+    // Ajouter ou mettre à jour la chanson actuelle
     const now = Date.now();
     await db.put('audio-files', {
       url,
