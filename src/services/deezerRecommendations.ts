@@ -56,6 +56,28 @@ export async function getDeezerRecommendationsByGenre(
     if (deezerId) {
       console.log("🎵 Récupération artistes similaires Deezer pour:", currentSong.title || deezerId);
       
+      // Récupérer l'historique d'écoute pour exclure les chansons déjà écoutées
+      const { data: historyData } = await supabase
+        .from('play_history')
+        .select('song_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
+        .order('played_at', { ascending: false })
+        .limit(200);
+
+      const historyDeezerIds = new Set(
+        historyData
+          ?.map(h => {
+            // Extraire le deezer_id depuis les différents formats possibles
+            if (h.song_id.startsWith('deezer-')) {
+              return h.song_id.replace('deezer-', '');
+            }
+            return null;
+          })
+          .filter(Boolean) || []
+      );
+
+      console.log("📊 Historique Deezer IDs à exclure:", historyDeezerIds.size);
+      
       // Récupérer l'ID de l'artiste si on ne l'a pas déjà
       let artistId = foundArtistId;
       
@@ -98,18 +120,21 @@ export async function getDeezerRecommendationsByGenre(
             if (tracksData?.data) {
               const tracks: DeezerTrack[] = tracksData.data;
               tracks.forEach((track: DeezerTrack) => {
-                allTracks.push({
-                  id: `deezer-${track.id}`,
-                  title: track.title,
-                  artist: track.artist.name,
-                  url: `deezer:${track.id}`,
-                  imageUrl: track.album.cover_medium,
-                  duration: formatDuration(track.duration),
-                  deezer_id: track.id.toString(),
-                  isDeezer: true,
-                  genre: usedGenre || currentSong.genre,
-                  album_name: track.album.title
-                });
+                // Exclure les chansons déjà écoutées
+                if (!historyDeezerIds.has(track.id.toString())) {
+                  allTracks.push({
+                    id: `deezer-${track.id}`,
+                    title: track.title,
+                    artist: track.artist.name,
+                    url: `deezer:${track.id}`,
+                    imageUrl: track.album.cover_medium,
+                    duration: formatDuration(track.duration),
+                    deezer_id: track.id.toString(),
+                    isDeezer: true,
+                    genre: usedGenre || currentSong.genre,
+                    album_name: track.album.title
+                  });
+                }
               });
             }
           }
