@@ -130,7 +130,7 @@ export const useIntelligentPreloader = () => {
             
             // Télécharger et mettre en cache
             console.log("📡 Préchargement:", song.title);
-            const audioUrl = await getAudioFileUrl(song.url);
+            const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
             
             if (audioUrl && typeof audioUrl === 'string') {
               // Cache mémoire DÉSACTIVÉ
