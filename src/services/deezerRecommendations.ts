@@ -84,40 +84,41 @@ export async function getDeezerRecommendationsByGenre(
           console.error("❌ Erreur API Deezer related:", relatedError);
         } else if (relatedData?.data) {
           const relatedArtists = relatedData.data;
-          const recommendations: Song[] = [];
+          const allTracks: Song[] = [];
 
-          // Pour chaque artiste similaire, récupérer quelques top tracks
+          // Pour chaque artiste similaire, récupérer des tracks
           for (const artist of relatedArtists.slice(0, 5)) {
-            const { data: topTracksData } = await supabase.functions.invoke('deezer-proxy', {
+            const { data: tracksData } = await supabase.functions.invoke('deezer-proxy', {
               body: { 
                 path: `/artist/${artist.id}/top`,
-                limit: 2 // 2 chansons par artiste
+                limit: 10 // Récupérer plusieurs chansons pour mélanger
               }
             });
 
-            if (topTracksData?.data) {
-              const tracks: DeezerTrack[] = topTracksData.data;
+            if (tracksData?.data) {
+              const tracks: DeezerTrack[] = tracksData.data;
               tracks.forEach((track: DeezerTrack) => {
-                if (recommendations.length < limit) {
-                  recommendations.push({
-                    id: `deezer-${track.id}`,
-                    title: track.title,
-                    artist: track.artist.name,
-                    url: `deezer:${track.id}`,
-                    imageUrl: track.album.cover_medium,
-                    duration: formatDuration(track.duration),
-                    deezer_id: track.id.toString(),
-                    isDeezer: true,
-                    genre: usedGenre || currentSong.genre,
-                    album_name: track.album.title
-                  });
-                }
+                allTracks.push({
+                  id: `deezer-${track.id}`,
+                  title: track.title,
+                  artist: track.artist.name,
+                  url: `deezer:${track.id}`,
+                  imageUrl: track.album.cover_medium,
+                  duration: formatDuration(track.duration),
+                  deezer_id: track.id.toString(),
+                  isDeezer: true,
+                  genre: usedGenre || currentSong.genre,
+                  album_name: track.album.title
+                });
               });
             }
           }
 
-          if (recommendations.length > 0) {
-            console.log("✅ Recommandations Deezer:", recommendations.length, "chansons de", relatedArtists.length, "artistes similaires");
+          if (allTracks.length > 0) {
+            // Mélanger et limiter les résultats pour avoir des tracks aléatoires
+            const shuffled = shuffleArray(allTracks);
+            const recommendations = shuffled.slice(0, limit);
+            console.log("✅ Recommandations Deezer:", recommendations.length, "chansons aléatoires de", relatedArtists.length, "artistes similaires");
             return recommendations;
           }
         }
