@@ -288,7 +288,10 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          tidal_id: (song as any).tidal_id,
+          genre: song.genre,
+          album_name: song.album_name,
+          deezer_id: song.deezer_id,
+          tidal_id: song.tidal_id,
           isLocal: true
         }));
 
@@ -455,7 +458,10 @@ const Search = () => {
           url: song.file_path,
           imageUrl: song.image_url,
           bitrate: '320 kbps',
-          tidal_id: (song as any).tidal_id,
+          genre: song.genre,
+          album_name: song.album_name,
+          deezer_id: song.deezer_id,
+          tidal_id: song.tidal_id,
           isLocal: true
         }));
         
