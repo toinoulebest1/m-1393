@@ -7,12 +7,14 @@ interface UseUltraFastPlayerProps {
   currentSong: Song | null;
   queue: Song[];
   isPlaying: boolean;
+  setQueue: (queue: Song[] | ((prev: Song[]) => Song[])) => void;
 }
 
 export const useUltraFastPlayer = ({
   currentSong,
   queue,
-  isPlaying
+  isPlaying,
+  setQueue
 }: UseUltraFastPlayerProps) => {
   const { recordTransition, predictNextSongs, preloadPredictedSongs } = useIntelligentPreloader();
   const previousSongRef = useRef<Song | null>(null);
@@ -41,6 +43,19 @@ export const useUltraFastPlayer = ({
       console.log("🧠 Préchargement intelligent basé sur le genre...");
       const predictions = await predictNextSongs(currentSong, queue);
       if (predictions.length > 0) {
+        // Ajouter les prédictions à la queue si elles n'y sont pas déjà
+        setQueue(prev => {
+          const newSongs = predictions.filter(pred => 
+            !prev.some(q => q.id === pred.id)
+          );
+          if (newSongs.length > 0) {
+            console.log("➕ Ajout de", newSongs.length, "prédiction(s) à la queue:", newSongs.map(s => s.title));
+            return [...prev, ...newSongs];
+          }
+          return prev;
+        });
+        
+        // Précharger les fichiers audio
         await preloadPredictedSongs(predictions);
       }
     }, 2000); // Attendre 2s après le début de la lecture
@@ -50,7 +65,7 @@ export const useUltraFastPlayer = ({
         clearTimeout(preloadTimeoutRef.current);
       }
     };
-  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs]);
+  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs, setQueue]);
 
   // Préchargement queue DÉSACTIVÉ
   useEffect(() => {

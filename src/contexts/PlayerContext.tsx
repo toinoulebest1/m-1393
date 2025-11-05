@@ -73,7 +73,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { getCacheStats } = useUltraFastPlayer({
     currentSong,
     queue,
-    isPlaying
+    isPlaying,
+    setQueue
   });
 
 
