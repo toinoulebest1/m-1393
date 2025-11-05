@@ -779,7 +779,12 @@ const Search = () => {
             <div className="space-y-2">
                   {results.map((song, index) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
-                const isCurrentSong = currentSong?.id === song.id;
+                // Compare by ID or by normalized title+artist for deduplication compatibility
+                const isCurrentSong = currentSong && (
+                  currentSong.id === song.id || 
+                  (currentSong.title.toLowerCase().trim() === song.title.toLowerCase().trim() && 
+                   currentSong.artist.toLowerCase().trim() === song.artist.toLowerCase().trim())
+                );
                 return <div key={song.id} onClick={() => handlePlay(song)}>
                         <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
                       </div>;
@@ -818,7 +823,12 @@ const Search = () => {
                   <div className="space-y-2">
                    {results.map((song, index) => {
                 const isFavorite = favorites.some(s => s.id === song.id);
-                 const isCurrentSong = currentSong?.id === song.id;
+                // Compare by ID or by normalized title+artist for deduplication compatibility
+                const isCurrentSong = currentSong && (
+                  currentSong.id === song.id || 
+                  (currentSong.title.toLowerCase().trim() === song.title.toLowerCase().trim() && 
+                   currentSong.artist.toLowerCase().trim() === song.artist.toLowerCase().trim())
+                );
                 return <div key={song.id} onClick={() => handlePlay(song)}>
                         <SongCard song={song} isCurrentSong={isCurrentSong} isFavorite={isFavorite} dominantColor={dominantColor} onLyricsClick={handleLyricsNavigation} onReportClick={() => setSongToReport(song)} contextMenuItems={songCardContextMenu(song)} />
                       </div>;
