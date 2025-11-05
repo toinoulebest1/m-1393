@@ -104,63 +104,69 @@ export const useIntelligentPreloader = () => {
     return predictions.slice(0, 1); // Maximum 1 prédiction
   }, []);
 
-  // Préchargement ultra-agressif
+  // Préchargement ULTRA-AGRESSIF et COMPLET (sans délai)
   const preloadPredictedSongs = useCallback(async (predictions: Song[]) => {
     if (predictions.length === 0) return;
     
-    console.log("🚀 Préchargement intelligent:", predictions.length, "chansons");
+    console.log("🚀 PRÉCHARGEMENT IMMÉDIAT ET COMPLET:", predictions.length, "chanson(s)");
     
     const preloadPromises = predictions.map(async (song, index) => {
-      if (preloadingRef.current.has(song.id)) return;
+      if (preloadingRef.current.has(song.id)) {
+        console.log("⏭️ Déjà en cours:", song.title);
+        return;
+      }
       preloadingRef.current.add(song.id);
       
       try {
-        // Priorité décroissante : délai plus court pour les premières chansons
-        const delay = index * 25; // 0ms, 25ms, 50ms, 75ms, 100ms
+        const startTime = performance.now();
         
-        setTimeout(async () => {
-          try {
-            // Cache mémoire DÉSACTIVÉ
-            // if (memoryCache.has(song.url)) {
-            //   console.log("⚡ Déjà en cache mémoire:", song.title);
-            //   return;
-            // }
-            
-            // Vérifier cache IndexedDB
-            if (await isInCache(song.url)) {
-              console.log("💾 Déjà en cache IndexedDB:", song.title);
-              return;
-            }
-            
-            // Télécharger et mettre en cache
-            console.log("📡 Préchargement:", song.title);
-            const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
-            
-            if (audioUrl && typeof audioUrl === 'string') {
-              // Télécharger immédiatement le fichier complet et le mettre en cache
-              console.log("⬇️ Téléchargement fichier audio pour cache:", song.title);
-              const response = await fetch(audioUrl);
-              if (response.ok) {
-                const blob = await response.blob();
-                await addToCache(song.url, blob);
-                console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
-              } else {
-                console.warn("⚠️ Échec téléchargement (HTTP", response.status, "):", song.title);
-              }
-            }
-          } catch (error) {
-            console.warn("⚠️ Erreur préchargement:", song.title, error);
-          } finally {
-            preloadingRef.current.delete(song.id);
-          }
-        }, delay);
+        // Vérifier cache IndexedDB IMMÉDIATEMENT
+        const inCache = await isInCache(song.url);
+        if (inCache) {
+          console.log("✅ Déjà en cache IndexedDB:", song.title);
+          preloadingRef.current.delete(song.id);
+          return;
+        }
+        
+        console.log(`📥 TÉLÉCHARGEMENT COMPLET [${index + 1}/${predictions.length}]:`, song.title);
+        
+        // Récupérer l'URL audio
+        const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+        
+        if (!audioUrl || typeof audioUrl !== 'string') {
+          throw new Error("URL audio invalide");
+        }
+        
+        console.log("⬇️ Téléchargement du BLOB COMPLET pour:", song.title);
+        
+        // Télécharger IMMÉDIATEMENT le fichier COMPLET
+        const response = await fetch(audioUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        }
+        
+        // Récupérer le blob COMPLET
+        const blob = await response.blob();
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+        
+        // Mettre en cache le blob complet
+        await addToCache(song.url, blob);
+        
+        const elapsed = (performance.now() - startTime).toFixed(0);
+        console.log(`✅ PRÉCHARGEMENT TERMINÉ [${elapsed}ms]:`, song.title, `(${sizeMB} MB)`);
+        console.log(`   → Chanson prête pour lecture INSTANTANÉE avec fondu enchaîné`);
+        
       } catch (error) {
-        console.warn("⚠️ Erreur préchargement setup:", song.title, error);
+        console.error("❌ ERREUR préchargement:", song.title, error);
+      } finally {
         preloadingRef.current.delete(song.id);
       }
     });
     
+    // Attendre que TOUS les préchargements soient terminés
     await Promise.allSettled(preloadPromises);
+    console.log("🎉 TOUS LES PRÉCHARGEMENTS TERMINÉS - Chansons prêtes pour lecture instantanée");
   }, []);
 
   // Nettoyage des patterns anciens (garder seulement les 30 derniers jours)
