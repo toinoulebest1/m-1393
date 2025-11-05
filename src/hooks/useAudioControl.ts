@@ -60,14 +60,6 @@ export const useAudioControl = ({
       console.log("🎵 === DÉMARRAGE MUSIQUE ===");
       console.log("🎶 Chanson:", song.title, "par", song.artist);
       
-      // Sauvegarder la musique précédente au cas où il y a une erreur
-      const previousSong = currentSong;
-      const previousAudioState = {
-        currentTime: audioRef.current?.currentTime || 0,
-        isPlaying: audioRef.current ? !audioRef.current.paused : false,
-        src: audioRef.current?.src || ''
-      } as const;
-      
       // ✅ Mettre à jour l'état ET l'affichage EN MÊME TEMPS
       setCurrentSong(song);
       setDisplayedSong(song);
@@ -473,6 +465,23 @@ export const useAudioControl = ({
         console.log("🚀 Démarrage lecture avec AutoplayManager...");
         const playStartTime = performance.now();
         
+        // Timeout de 15 secondes pour détecter si la musique ne démarre pas
+        let hasStartedPlaying = false;
+        const playbackTimeout = setTimeout(() => {
+          if (!hasStartedPlaying) {
+            console.error("❌ Timeout: La musique n'a pas démarré après 15 secondes");
+            audio.pause();
+            audio.src = '';
+            setIsChangingSong(false);
+            setIsPlaying(false);
+            
+            toast.error("Musique indisponible", {
+              description: `"${song.title}" ne peut pas être lue pour le moment. Veuillez réessayer plus tard.`,
+              duration: 5000
+            });
+          }
+        }, 15000);
+        
         let success = false;
         try {
           success = await AutoplayManager.playAudio(audio);
@@ -489,11 +498,15 @@ export const useAudioControl = ({
             });
             success = true;
           } else {
+            clearTimeout(playbackTimeout);
             throw err;
           }
         }
         
         if (success) {
+          hasStartedPlaying = true;
+          clearTimeout(playbackTimeout);
+          
           const playElapsed = performance.now() - playStartTime;
           const totalElapsed = performance.now() - startTime;
           
@@ -588,45 +601,15 @@ export const useAudioControl = ({
 
           console.error("💥 Erreur récupération:", error);
           
-          // IMPORTANT: Stopper COMPLÈTEMENT l'audio en erreur avant tout rollback
+          // IMPORTANT: Stopper COMPLÈTEMENT l'audio en erreur
           console.log("🛑 Arrêt complet de l'audio en erreur");
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
           audioRef.current.src = '';
           
-          // Débloquer immédiatement l'interface
+          // Débloquer l'interface
           setIsChangingSong(false);
-          
-          // Revenir à la musique précédente si elle existait
-          if (previousSong) {
-            console.log("🔄 Retour à la musique précédente:", previousSong.title);
-            setCurrentSong(previousSong);
-            setDisplayedSong(previousSong);
-            localStorage.setItem('currentSong', JSON.stringify(previousSong));
-            
-            // Restaurer l'état audio si la musique jouait
-            if (previousAudioState.isPlaying) {
-              // Restaurer la source précédente si elle existait
-              if (previousAudioState.src) {
-                audioRef.current.src = previousAudioState.src;
-                audioRef.current.preload = 'auto';
-                audioRef.current.crossOrigin = 'anonymous';
-                audioRef.current.volume = volume / 100;
-              }
-              audioRef.current.currentTime = previousAudioState.currentTime;
-              try {
-                await audioRef.current.play();
-                setIsPlaying(true);
-              } catch (playError) {
-                console.error("Erreur restauration lecture:", playError);
-                setIsPlaying(false);
-              }
-            } else {
-              setIsPlaying(false);
-            }
-          } else {
-            setIsPlaying(false);
-          }
+          setIsPlaying(false);
           
           handlePlayError(error as any, song);
         }
