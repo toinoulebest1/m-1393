@@ -65,8 +65,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue, setQueue,
     shuffleMode, setShuffleMode,
     repeatMode, setRepeatMode,
-    addToQueue, toggleShuffle, toggleRepeat,
-    nextSong, previousSong, getNextSong
+    addToQueue, toggleShuffle, toggleRepeat
   } = queueHook;
 
   // Hook ultra-rapide pour le préchargement intelligent - APRÈS usePlayerQueue
@@ -77,6 +76,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue
   });
 
+  // S'assurer que la chanson courante est toujours dans la queue
+  useEffect(() => {
+    if (!currentSong) return;
+    setQueue(prev => {
+      if (prev.some(s => s.id === currentSong.id)) return prev;
+      return [currentSong, ...prev];
+    });
+  }, [currentSong, setQueue]);
 
   // Fonctions exposées à travers le contexte - définies après les hooks
   const { 
@@ -512,7 +519,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (timeLeft <= transitionTime && timeLeft > 0 && !fadingRef.current) {
         console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
         
-        const nextSong = getNextSong();
+        const nextSong = queueHook.getNextSong();
         if (!nextSong) {
           console.log("Pas de chanson suivante disponible");
           return;
@@ -747,8 +754,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     pause,
     setVolume,
     setProgress,
-    nextSong,
-    previousSong,
+    nextSong: queueHook.nextSong,
+    previousSong: queueHook.previousSong,
     addToQueue,
     toggleShuffle,
     toggleRepeat,
