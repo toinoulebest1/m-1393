@@ -65,35 +65,32 @@ export const useIntelligentPreloader = () => {
   }, [savePatterns]);
 
   // Prédire les prochaines chansons probables (basé sur Deezer et genre)
-  const predictNextSongs = useCallback(async (currentSong: Song, queue: Song[]): Promise<Song[]> => {
+  const predictNextSongs = useCallback(async (currentSong: Song, recentHistory: Song[]): Promise<Song[]> => {
     if (!currentSong) return [];
     
     const predictions: Song[] = [];
     
-    // Prédictions basées sur la file d'attente existante
-    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-    if (currentIndex !== -1 && currentIndex + 1 < queue.length) {
-      const nextInQueue = queue.slice(currentIndex + 1, currentIndex + 3);
-      predictions.push(...nextInQueue);
-    }
+    // Créer un Set d'IDs récents pour exclusion rapide (20 dernières chansons)
+    const recentIds = new Set(recentHistory.slice(-20).map(s => s.id));
     
-    // Si on n'a pas assez de prédictions, utiliser l'API Deezer
-    if (predictions.length < 1) {
-      try {
-        console.log("🎵 Utilisation de l'API Deezer pour recommandations...");
-        const deezerRecommendations = await getDeezerRecommendationsByGenre(
-          currentSong, 
-          1 // Une seule chanson
-        );
-        
-        for (const song of deezerRecommendations) {
-          if (!predictions.some(p => p.id === song.id)) {
-            predictions.push(song);
-          }
+    try {
+      console.log("🎵 Utilisation de l'API Deezer pour recommandations...");
+      console.log("🚫 Exclusion de", recentIds.size, "chansons récentes");
+      
+      const deezerRecommendations = await getDeezerRecommendationsByGenre(
+        currentSong, 
+        10, // Demander plus pour compenser les exclusions
+        recentHistory
+      );
+      
+      for (const song of deezerRecommendations) {
+        // Ne pas ajouter les chansons déjà dans l'historique récent
+        if (!recentIds.has(song.id) && !predictions.some(p => p.id === song.id)) {
+          predictions.push(song);
         }
-      } catch (error) {
-        console.warn("⚠️ Erreur chargement recommandations Deezer:", error);
       }
+    } catch (error) {
+      console.warn("⚠️ Erreur chargement recommandations Deezer:", error);
     }
     
     console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => s.title));

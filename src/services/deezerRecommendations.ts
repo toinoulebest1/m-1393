@@ -18,7 +18,8 @@ interface DeezerGenreResponse {
  */
 export async function getDeezerRecommendationsByGenre(
   currentSong: Song,
-  limit: number = 10
+  limit: number = 10,
+  recentHistory: Song[] = []
 ): Promise<Song[]> {
   try {
     // Déterminer ou trouver le deezer_id et le genre via Deezer si nécessaire
@@ -104,7 +105,17 @@ export async function getDeezerRecommendationsByGenre(
           .filter(Boolean) || []
       );
 
-      console.log("📊 Historique Deezer IDs à exclure:", historyDeezerIds.size);
+      // Ajouter les IDs de l'historique récent local
+      recentHistory.forEach(song => {
+        if (song.deezer_id) {
+          historyDeezerIds.add(song.deezer_id);
+        }
+        if (song.id.startsWith('deezer-')) {
+          historyDeezerIds.add(song.id.replace('deezer-', ''));
+        }
+      });
+
+      console.log("📊 Historique total (DB + local) à exclure:", historyDeezerIds.size);
       
       // Récupérer l'ID de l'artiste si on ne l'a pas déjà
       let artistId = foundArtistId;
@@ -193,6 +204,11 @@ export async function getDeezerRecommendationsByGenre(
         .limit(200);
 
       const excludedIds = historyData?.map(h => h.song_id) || [];
+      
+      // Ajouter les IDs de l'historique récent local
+      recentHistory.forEach(song => {
+        excludedIds.push(song.id);
+      });
 
       // Chercher des chansons du même genre
       let query = supabase

@@ -90,7 +90,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     (async () => {
       try {
-        const preds = await predictNextSongs(currentSong, []);
+        const preds = await predictNextSongs(currentSong, history);
         predictedNextRef.current = preds[0] || null;
         
         if (predictedNextRef.current) {
