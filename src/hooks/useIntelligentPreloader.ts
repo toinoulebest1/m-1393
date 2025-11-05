@@ -78,12 +78,12 @@ export const useIntelligentPreloader = () => {
     }
     
     // Si on n'a pas assez de prédictions, utiliser l'API Deezer
-    if (predictions.length < 5) {
+    if (predictions.length < 1) {
       try {
         console.log("🎵 Utilisation de l'API Deezer pour recommandations...");
         const deezerRecommendations = await getDeezerRecommendationsByGenre(
           currentSong, 
-          5 - predictions.length
+          1 // Une seule chanson
         );
         
         for (const song of deezerRecommendations) {
@@ -97,7 +97,7 @@ export const useIntelligentPreloader = () => {
     }
     
     console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => s.title));
-    return predictions.slice(0, 5); // Maximum 5 prédictions
+    return predictions.slice(0, 1); // Maximum 1 prédiction
   }, []);
 
   // Préchargement ultra-agressif
