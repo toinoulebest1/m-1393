@@ -204,8 +204,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       console.warn('⚠️ Circuit breaker Deezmate est OUVERT - appels bloqués');
     }
     
-    // flacdownloader (DÉSACTIVÉ TEMPORAIREMENT)
-    if (false && !circuitBreaker.isOpen('flacdownloader')) {
+    // flacdownloader
+    if (!circuitBreaker.isOpen('flacdownloader')) {
       promises.push(
         (async () => {
 try {
@@ -324,8 +324,8 @@ try {
           console.warn('⚠️ Circuit breaker Deezmate est OUVERT - appels bloqués (recherche)');
         }
         
-        // flacdownloader (DÉSACTIVÉ TEMPORAIREMENT)
-        if (false && !circuitBreaker.isOpen('flacdownloader')) {
+        // flacdownloader
+        if (!circuitBreaker.isOpen('flacdownloader')) {
           promises.push(
             (async () => {
 try {
