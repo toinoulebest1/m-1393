@@ -133,22 +133,16 @@ export const useIntelligentPreloader = () => {
             const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
             
             if (audioUrl && typeof audioUrl === 'string') {
-              // Cache mémoire DÉSACTIVÉ
-              // memoryCache.set(song.url, audioUrl);
-              
-              // Télécharger le blob pour IndexedDB en arrière-plan
-              setTimeout(async () => {
-                try {
-                  const response = await fetch(audioUrl);
-                  if (response.ok) {
-                    const blob = await response.blob();
-                    await addToCache(song.url, blob);
-                    console.log("✅ Cache IndexedDB:", song.title);
-                  }
-                } catch (error) {
-                  console.warn("⚠️ Erreur cache IndexedDB:", error);
-                }
-              }, 50);
+              // Télécharger immédiatement le fichier complet et le mettre en cache
+              console.log("⬇️ Téléchargement fichier audio pour cache:", song.title);
+              const response = await fetch(audioUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                await addToCache(song.url, blob);
+                console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
+              } else {
+                console.warn("⚠️ Échec téléchargement (HTTP", response.status, "):", song.title);
+              }
             }
           } catch (error) {
             console.warn("⚠️ Erreur préchargement:", song.title, error);
