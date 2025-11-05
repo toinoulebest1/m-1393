@@ -73,9 +73,14 @@ export const useIntelligentPreloader = () => {
     // Créer un Set d'IDs récents pour exclusion rapide (20 dernières chansons)
     const recentIds = new Set(recentHistory.slice(-20).map(s => s.id));
     
+    // Créer un Set des artistes récents (10 derniers artistes)
+    const recentArtists = new Set(
+      recentHistory.slice(-10).map(s => s.artist.toLowerCase().trim())
+    );
+    
     try {
       console.log("🎵 Utilisation de l'API Deezer pour recommandations...");
-      console.log("🚫 Exclusion de", recentIds.size, "chansons récentes");
+      console.log("🚫 Exclusion de", recentIds.size, "chansons et", recentArtists.size, "artistes récents");
       
       const deezerRecommendations = await getDeezerRecommendationsByGenre(
         currentSong, 
@@ -85,7 +90,9 @@ export const useIntelligentPreloader = () => {
       
       for (const song of deezerRecommendations) {
         // Ne pas ajouter les chansons déjà dans l'historique récent
-        if (!recentIds.has(song.id) && !predictions.some(p => p.id === song.id)) {
+        // NI les chansons du même artiste récent
+        const artistMatch = recentArtists.has(song.artist.toLowerCase().trim());
+        if (!recentIds.has(song.id) && !artistMatch && !predictions.some(p => p.id === song.id)) {
           predictions.push(song);
         }
       }
@@ -93,7 +100,7 @@ export const useIntelligentPreloader = () => {
       console.warn("⚠️ Erreur chargement recommandations Deezer:", error);
     }
     
-    console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => s.title));
+    console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => `${s.title} - ${s.artist}`));
     return predictions.slice(0, 1); // Maximum 1 prédiction
   }, []);
 

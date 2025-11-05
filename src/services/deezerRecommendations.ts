@@ -115,7 +115,12 @@ export async function getDeezerRecommendationsByGenre(
         }
       });
 
-      console.log("📊 Historique total (DB + local) à exclure:", historyDeezerIds.size);
+      // Créer un Set des artistes récents (10 derniers)
+      const recentArtists = new Set(
+        recentHistory.slice(-10).map(s => s.artist.toLowerCase().trim())
+      );
+
+      console.log("📊 Historique total (DB + local) à exclure:", historyDeezerIds.size, "chansons et", recentArtists.size, "artistes");
       
       // Récupérer l'ID de l'artiste si on ne l'a pas déjà
       let artistId = foundArtistId;
@@ -160,8 +165,9 @@ export async function getDeezerRecommendationsByGenre(
             if (tracksData?.data) {
               const tracks: DeezerTrack[] = tracksData.data;
               tracks.forEach((track: DeezerTrack) => {
-                // Exclure les chansons déjà écoutées
-                if (!historyDeezerIds.has(track.id.toString())) {
+                // Exclure les chansons déjà écoutées ET les artistes récents
+                const artistMatch = recentArtists.has(track.artist.name.toLowerCase().trim());
+                if (!historyDeezerIds.has(track.id.toString()) && !artistMatch) {
                   allTracks.push({
                     id: `deezer-${track.id}`,
                     title: track.title,
