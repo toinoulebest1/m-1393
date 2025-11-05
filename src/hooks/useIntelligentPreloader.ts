@@ -3,7 +3,7 @@ import { Song } from '@/types/player';
 // import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 import { getAudioFileUrl } from '@/utils/storage';
 import { addToCache, isInCache } from '@/utils/audioCache';
-import { useGenreBasedQueue } from './useGenreBasedQueue';
+import { getDeezerRecommendationsByGenre } from '@/services/deezerRecommendations';
 
 interface ListeningPattern {
   songId: string;
@@ -15,7 +15,6 @@ interface ListeningPattern {
 export const useIntelligentPreloader = () => {
   const patternsRef = useRef<Map<string, ListeningPattern>>(new Map());
   const preloadingRef = useRef<Set<string>>(new Set());
-  const { fetchSimilarSongsByGenre } = useGenreBasedQueue();
 
   // Charger les patterns depuis localStorage
   useEffect(() => {
@@ -65,7 +64,7 @@ export const useIntelligentPreloader = () => {
     setTimeout(savePatterns, 100);
   }, [savePatterns]);
 
-  // Prédire les prochaines chansons probables (basé sur le genre, pas l'historique)
+  // Prédire les prochaines chansons probables (basé sur Deezer et genre)
   const predictNextSongs = useCallback(async (currentSong: Song, queue: Song[]): Promise<Song[]> => {
     if (!currentSong) return [];
     
@@ -78,23 +77,28 @@ export const useIntelligentPreloader = () => {
       predictions.push(...nextInQueue);
     }
     
-    // Si on n'a pas assez de prédictions, charger des chansons similaires non écoutées
-    if (predictions.length < 5 && currentSong.genre) {
+    // Si on n'a pas assez de prédictions, utiliser l'API Deezer
+    if (predictions.length < 5) {
       try {
-        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 5 - predictions.length);
-        for (const song of similarSongs) {
+        console.log("🎵 Utilisation de l'API Deezer pour recommandations...");
+        const deezerRecommendations = await getDeezerRecommendationsByGenre(
+          currentSong, 
+          5 - predictions.length
+        );
+        
+        for (const song of deezerRecommendations) {
           if (!predictions.some(p => p.id === song.id)) {
             predictions.push(song);
           }
         }
       } catch (error) {
-        console.warn("⚠️ Erreur chargement chansons similaires pour prédiction:", error);
+        console.warn("⚠️ Erreur chargement recommandations Deezer:", error);
       }
     }
     
-    console.log("🔮 Prédictions intelligentes (genre-based):", predictions.map(s => s.title));
+    console.log("🔮 Prédictions intelligentes (Deezer + genre):", predictions.map(s => s.title));
     return predictions.slice(0, 5); // Maximum 5 prédictions
-  }, [fetchSimilarSongsByGenre]);
+  }, []);
 
   // Préchargement ultra-agressif
   const preloadPredictedSongs = useCallback(async (predictions: Song[]) => {
