@@ -75,6 +75,45 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const predictedNextRef = useRef<Song | null>(null);
   const previousSongRef = useRef<Song | null>(null);
 
+  // Enregistrer dans l'historique Supabase quand une chanson est jouée
+  useEffect(() => {
+    if (!currentSong) return;
+    
+    // Enregistrer dans la base de données
+    const saveToHistory = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) return;
+        
+        // Ne pas enregistrer les chansons Deezer qui ne sont pas dans la base de données
+        if (currentSong.id.startsWith('deezer-')) {
+          console.log("⏭️ Chanson Deezer temporaire, pas d'enregistrement dans l'historique");
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('play_history')
+          .insert({
+            user_id: session.user.id,
+            song_id: currentSong.id,
+            played_at: new Date().toISOString()
+          });
+        
+        if (error) {
+          console.error("❌ Erreur enregistrement historique:", error);
+        } else {
+          console.log("✅ Chanson enregistrée dans l'historique:", currentSong.title);
+        }
+      } catch (error) {
+        console.error("❌ Erreur lors de l'enregistrement dans l'historique:", error);
+      }
+    };
+    
+    saveToHistory();
+  }, [currentSong?.id]);
+
   // Mettre à jour la prédiction quand la chanson change
   useEffect(() => {
     if (!currentSong) { 
