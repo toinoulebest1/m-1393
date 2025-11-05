@@ -32,35 +32,13 @@ export const useUltraFastPlayer = ({
     previousSongRef.current = currentSong;
   }, [currentSong, recordTransition]);
 
-  // Préchargement intelligent basé sur le genre
+  // Préchargement intelligent basé sur le genre - DÉSACTIVÉ pour éviter la saturation
   useEffect(() => {
-    if (!currentSong || !isPlaying) return;
+    console.log("⚠️ Préchargement intelligent Deezer désactivé (éviter saturation réseau)");
+    return () => {};
+  }, [currentSong, isPlaying]);
 
-    // Annuler le timeout précédent
-    if (preloadTimeoutRef.current) {
-      clearTimeout(preloadTimeoutRef.current);
-    }
-
-    // Délai avant préchargement (éviter de charger trop tôt)
-    preloadTimeoutRef.current = window.setTimeout(async () => {
-      console.log("🧠 Préchargement intelligent basé sur le genre...");
-      const predictions = await predictNextSongs(currentSong, queue);
-      if (predictions.length > 0) {
-        // Ajouter les prédictions à la queue si elles n'y sont pas déjà
-        
-        // Précharger les fichiers audio
-        await preloadPredictedSongs(predictions);
-      }
-    }, 2000); // Attendre 2s après le début de la lecture
-
-    return () => {
-      if (preloadTimeoutRef.current) {
-        clearTimeout(preloadTimeoutRef.current);
-      }
-    };
-  }, [currentSong, isPlaying, queue, predictNextSongs, preloadPredictedSongs, setQueue]);
-
-  // Préchargement IMMÉDIAT de la chanson suivante dans la queue
+  // Préchargement RETARDÉ de la chanson suivante (après que la musique soit bien démarrée)
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
 
@@ -69,14 +47,15 @@ export const useUltraFastPlayer = ({
       clearTimeout(queuePreloadTimeoutRef.current);
     }
 
-    // Précharger la chanson suivante IMMÉDIATEMENT (délai minimal pour éviter la surcharge)
+    // Attendre 5 secondes après le début de la lecture pour précharger
+    // Cela laisse le temps au streaming de la chanson actuelle de se stabiliser
     queuePreloadTimeoutRef.current = window.setTimeout(async () => {
       const nextSong = getNextSong();
       if (nextSong) {
-        console.log("🚀 Préchargement IMMÉDIAT de la prochaine chanson:", nextSong.title);
+        console.log("🚀 Préchargement RETARDÉ de la prochaine chanson:", nextSong.title);
         await preloadPredictedSongs([nextSong]);
       }
-    }, 100); // Délai minimal de 100ms pour éviter de bloquer le thread principal
+    }, 5000); // Attendre 5 secondes au lieu de 100ms
 
     return () => {
       if (queuePreloadTimeoutRef.current) {
