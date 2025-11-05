@@ -33,12 +33,17 @@ Deno.serve(async (req: Request) => {
     console.log(`🎯 Proxying request for deezerId: ${deezerId}`);
     console.log(`🔗 Target URL: ${target}`);
 
-    // Forward Range header for seek support
+    // Forward Range header for seek support with realistic browser headers
     const headers: HeadersInit = {
-      'accept': '*/*',
-      'user-agent': req.headers.get('user-agent') ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'accept': 'audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5',
+      'accept-language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'accept-encoding': 'identity',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       'referer': 'https://www.deezer.com/',
       'origin': 'https://www.deezer.com',
+      'sec-fetch-dest': 'audio',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'cross-site',
     };
     const range = req.headers.get('range');
     if (range) {
@@ -59,13 +64,25 @@ Deno.serve(async (req: Request) => {
     console.log(`📦 Content-Type: ${respType}`);
     console.log(`📏 Content-Length: ${respLen}`);
     
-    // Si erreur HTTP explicite
+    // Si erreur HTTP explicite ou réponse non-audio
     if (upstream.status >= 400) {
       const errorText = await upstream.text();
-      console.log(`❌ Error response body: ${errorText.substring(0, 500)}`);
-      return new Response(`Upstream error: ${upstream.status} - ${errorText.substring(0, 200)}`, { 
-        status: upstream.status, 
-        headers: corsHeaders 
+      console.log(`❌ Upstream HTTP error ${upstream.status}:`, errorText.substring(0, 500));
+      
+      // Donner un message plus explicite selon l'erreur
+      let errorMsg = 'Service temporairement indisponible';
+      if (upstream.status === 429) errorMsg = 'Trop de requêtes, réessayez plus tard';
+      else if (upstream.status === 403) errorMsg = 'Accès refusé par le service';
+      else if (upstream.status === 500) errorMsg = 'Service surchargé, réessayez dans quelques secondes';
+      else if (upstream.status === 404) errorMsg = 'Musique introuvable sur le service';
+      
+      return new Response(JSON.stringify({ 
+        error: errorMsg,
+        details: `HTTP ${upstream.status}`,
+        deezerId 
+      }), { 
+        status: 503, // Service Unavailable au lieu du status upstream
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
