@@ -12,7 +12,7 @@ export const useGenreBasedQueue = () => {
     try {
       console.log(`🎵 Chargement de ${limit} chansons du genre: ${currentSong.genre}`);
       
-      // Récupérer l'historique d'écoute récent de l'utilisateur (dernières 50 chansons)
+      // Récupérer l'historique d'écoute récent de l'utilisateur (dernières 200 chansons)
       const { data: { session } } = await supabase.auth.getSession();
       let recentlyPlayedIds: string[] = [];
       
@@ -22,7 +22,7 @@ export const useGenreBasedQueue = () => {
           .select('song_id')
           .eq('user_id', session.user.id)
           .order('played_at', { ascending: false })
-          .limit(50);
+          .limit(200);
         
         if (historyData) {
           recentlyPlayedIds = historyData.map(h => h.song_id);
@@ -42,7 +42,7 @@ export const useGenreBasedQueue = () => {
         query = query.not('id', 'in', `(${recentlyPlayedIds.join(',')})`);
       }
       
-      const { data, error } = await query.limit(limit * 3); // Charger plus pour avoir de la variété
+      const { data, error } = await query.limit(limit * 10); // Charger beaucoup plus pour avoir de la variété
 
       if (error) {
         console.error("❌ Erreur lors du chargement des chansons similaires:", error);
@@ -65,8 +65,17 @@ export const useGenreBasedQueue = () => {
           return [];
         }
         
-        const shuffled = fallbackData
-          .sort(() => Math.random() - 0.5)
+        // Mélanger avec Fisher-Yates
+        const shuffleArray = <T,>(array: T[]): T[] => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        const shuffled = shuffleArray(fallbackData)
           .slice(0, limit)
           .map(song => ({
             id: song.id,
@@ -81,13 +90,21 @@ export const useGenreBasedQueue = () => {
             isDeezer: !!song.deezer_id
           }));
         
-        console.log(`✅ ${shuffled.length} chansons similaires chargées (fallback)`);
+        console.log(`✅ ${shuffled.length} chansons similaires chargées (fallback sur ${fallbackData.length} disponibles)`);
         return shuffled;
       }
 
-      // Mélanger aléatoirement et limiter
-      const shuffled = data
-        .sort(() => Math.random() - 0.5)
+      // Mélanger avec Fisher-Yates pour vraie randomisation
+      const shuffleArray = <T,>(array: T[]): T[] => {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+
+      const shuffled = shuffleArray(data)
         .slice(0, limit)
         .map(song => ({
           id: song.id,
@@ -102,7 +119,7 @@ export const useGenreBasedQueue = () => {
           isDeezer: !!song.deezer_id
         }));
 
-      console.log(`✅ ${shuffled.length} chansons similaires non écoutées chargées`);
+      console.log(`✅ ${shuffled.length} chansons similaires non écoutées chargées (sur ${data.length} disponibles)`);
       return shuffled;
     } catch (error) {
       console.error("❌ Erreur lors du chargement des chansons similaires:", error);
