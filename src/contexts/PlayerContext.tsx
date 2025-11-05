@@ -71,7 +71,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
 
   // Prédiction intelligente de la prochaine chanson
-  const { predictNextSongs, preloadPredictedSongs, recordTransition } = useIntelligentPreloader();
+  const { predictNextSongs, preloadPredictedSongs, recordTransition, cancelAllPreloads } = useIntelligentPreloader();
   const predictedNextRef = useRef<Song | null>(null);
   const previousSongRef = useRef<Song | null>(null);
 
@@ -276,6 +276,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    // Annuler tous les préchargements en cours
+    cancelAllPreloads();
+
     const nextPredicted = predictedNextRef.current;
     if (nextPredicted) {
       console.log("▶️ Lecture de la chanson prédite:", nextPredicted.title);
@@ -283,13 +286,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       toast.info("Pas de chanson suivante disponible");
     }
-  }, [isChangingSong, play]);
+  }, [isChangingSong, play, cancelAllPreloads]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours");
       return;
     }
+
+    // Annuler tous les préchargements en cours
+    cancelAllPreloads();
 
     if (history.length > 1) {
       // Revenir à la chanson précédente dans l'historique
@@ -299,7 +305,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       toast.info("Pas de chanson précédente");
     }
-  }, [isChangingSong, history, play]);
+  }, [isChangingSong, history, play, cancelAllPreloads]);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {

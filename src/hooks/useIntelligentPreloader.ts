@@ -15,6 +15,7 @@ interface ListeningPattern {
 export const useIntelligentPreloader = () => {
   const patternsRef = useRef<Map<string, ListeningPattern>>(new Map());
   const preloadingRef = useRef<Set<string>>(new Set());
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   // Charger les patterns depuis localStorage
   useEffect(() => {
@@ -113,11 +114,25 @@ export const useIntelligentPreloader = () => {
     return [];
   }, []);
 
-  // Préchargement ULTRA-AGRESSIF et COMPLET (sans délai)
+  // Annuler tous les préchargements en cours
+  const cancelAllPreloads = useCallback(() => {
+    const count = abortControllersRef.current.size;
+    if (count > 0) {
+      console.log(`⏹️ Annulation de ${count} préchargement(s) en cours`);
+      abortControllersRef.current.forEach(controller => controller.abort());
+      abortControllersRef.current.clear();
+      preloadingRef.current.clear();
+    }
+  }, []);
+
+  // Préchargement INTELLIGENT avec annulation
   const preloadPredictedSongs = useCallback(async (predictions: Song[]) => {
     if (predictions.length === 0) return;
     
-    console.log("🚀 PRÉCHARGEMENT IMMÉDIAT ET COMPLET:", predictions.length, "chanson(s)");
+    // Annuler les préchargements précédents
+    cancelAllPreloads();
+    
+    console.log("🚀 PRÉCHARGEMENT:", predictions.length, "chanson(s)");
     
     const preloadPromises = predictions.map(async (song, index) => {
       if (preloadingRef.current.has(song.id)) {
@@ -126,18 +141,22 @@ export const useIntelligentPreloader = () => {
       }
       preloadingRef.current.add(song.id);
       
+      const controller = new AbortController();
+      abortControllersRef.current.set(song.id, controller);
+      
       try {
         const startTime = performance.now();
         
-        // Vérifier cache IndexedDB IMMÉDIATEMENT
+        // Vérifier cache IndexedDB
         const inCache = await isInCache(song.url);
         if (inCache) {
-          console.log("✅ Déjà en cache IndexedDB:", song.title);
+          console.log("✅ Déjà en cache:", song.title);
           preloadingRef.current.delete(song.id);
+          abortControllersRef.current.delete(song.id);
           return;
         }
         
-        console.log(`📥 TÉLÉCHARGEMENT COMPLET [${index + 1}/${predictions.length}]:`, song.title);
+        console.log(`📥 Préchargement [${index + 1}/${predictions.length}]:`, song.title);
         
         // Récupérer l'URL audio
         const audioUrl = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
@@ -146,37 +165,40 @@ export const useIntelligentPreloader = () => {
           throw new Error("URL audio invalide");
         }
         
-        console.log("⬇️ Téléchargement du BLOB COMPLET pour:", song.title);
-        
-        // Télécharger IMMÉDIATEMENT le fichier COMPLET
-        const response = await fetch(audioUrl);
+        // Télécharger avec signal d'annulation
+        const response = await fetch(audioUrl, { 
+          signal: controller.signal,
+          cache: 'default'
+        });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status} ${response.statusText}`);
+          throw new Error(`HTTP ${response.status}`);
         }
         
-        // Récupérer le blob COMPLET
         const blob = await response.blob();
         const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
         
-        // Mettre en cache le blob complet
+        // Mettre en cache
         await addToCache(song.url, blob);
         
         const elapsed = (performance.now() - startTime).toFixed(0);
-        console.log(`✅ PRÉCHARGEMENT TERMINÉ [${elapsed}ms]:`, song.title, `(${sizeMB} MB)`);
-        console.log(`   → Chanson prête pour lecture INSTANTANÉE avec fondu enchaîné`);
+        console.log(`✅ Préchargé [${elapsed}ms]:`, song.title, `(${sizeMB} MB)`);
         
-      } catch (error) {
-        console.error("❌ ERREUR préchargement:", song.title, error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log("⏹️ Préchargement annulé:", song.title);
+        } else {
+          console.warn("⚠️ Échec préchargement:", song.title);
+        }
       } finally {
         preloadingRef.current.delete(song.id);
+        abortControllersRef.current.delete(song.id);
       }
     });
     
-    // Attendre que TOUS les préchargements soient terminés
     await Promise.allSettled(preloadPromises);
-    console.log("🎉 TOUS LES PRÉCHARGEMENTS TERMINÉS - Chansons prêtes pour lecture instantanée");
-  }, []);
+    console.log("✅ Préchargements terminés");
+  }, [cancelAllPreloads]);
 
   // Nettoyage des patterns anciens (garder seulement les 30 derniers jours)
   const cleanupOldPatterns = useCallback(() => {
@@ -205,6 +227,7 @@ export const useIntelligentPreloader = () => {
     recordTransition,
     predictNextSongs,
     preloadPredictedSongs,
+    cancelAllPreloads,
     getPatternStats: () => ({
       totalPatterns: patternsRef.current.size,
       patterns: Array.from(patternsRef.current.values())
