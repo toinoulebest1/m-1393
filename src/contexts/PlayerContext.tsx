@@ -8,7 +8,7 @@ import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
-import { updateMediaSessionMetadata } from '@/utils/mediaSession';
+import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { getFromCache } from '@/utils/audioCache';
 
 // Contexte global et audio
@@ -466,11 +466,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           try {
             const duration = apiDurationRef.current || audioRef.current.duration;
             if (duration && !isNaN(duration) && duration !== Infinity) {
-              navigator.mediaSession.setPositionState({
-                duration: duration,
-                position: currentTime,
-                playbackRate: audioRef.current.playbackRate || 1
-              });
+              updatePositionState(duration, currentTime, audioRef.current.playbackRate);
             }
           } catch (e) {
             // Ignorer les erreurs silencieusement
@@ -502,11 +498,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           const duration = apiDurationRef.current || audioRef.current.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
-            navigator.mediaSession.setPositionState({
-              duration: duration,
-              position: audioRef.current.currentTime,
-              playbackRate: audioRef.current.playbackRate || 1
-            });
+            updatePositionState(duration, audioRef.current.currentTime, audioRef.current.playbackRate);
           }
         } catch (e) {
           // Ignorer les erreurs
@@ -521,11 +513,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           const duration = apiDurationRef.current || audioRef.current.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
-            navigator.mediaSession.setPositionState({
-              duration: duration,
-              position: audioRef.current.currentTime,
-              playbackRate: audioRef.current.playbackRate || 1
-            });
+            updatePositionState(duration, audioRef.current.currentTime, audioRef.current.playbackRate);
           }
         } catch (e) {
           // Ignorer les erreurs
@@ -545,16 +533,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         navigator.mediaSession.setActionHandler('seekbackward', (details) => {
           const skipTime = details.seekOffset || 10;
-          audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
-          updateProgress(audio.currentTime);
+          const newTime = Math.max(audio.currentTime - skipTime, 0);
+          audio.currentTime = newTime;
+          updateProgress(newTime);
+          const duration = apiDurationRef.current || audio.duration;
+          if (duration && !isNaN(duration) && duration !== Infinity) {
+            updatePositionState(duration, newTime, audio.playbackRate);
+          }
         });
       } catch (e) { console.warn("Could not set seekbackward handler"); }
 
       try {
         navigator.mediaSession.setActionHandler('seekforward', (details) => {
           const skipTime = details.seekOffset || 10;
-          audio.currentTime = Math.min(audio.currentTime + skipTime, audio.duration);
-          updateProgress(audio.currentTime);
+          const newTime = Math.min(audio.currentTime + skipTime, audio.duration);
+          audio.currentTime = newTime;
+          updateProgress(newTime);
+          const duration = apiDurationRef.current || audio.duration;
+          if (duration && !isNaN(duration) && duration !== Infinity) {
+            updatePositionState(duration, newTime, audio.playbackRate);
+          }
         });
       } catch (e) { console.warn("Could not set seekforward handler"); }
     }
@@ -701,6 +699,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               const nextTrack = predictedNextRef.current;
               if (nextTrack) {
+                // Mettre à jour la durée de l'API pour la nouvelle chanson
+                apiDurationRef.current = durationToSeconds(nextTrack.duration);
+                
                 const tempAudio = audioRef.current;
                 audioRef.current = nextAudioRef.current;
                 nextAudioRef.current = tempAudio;
