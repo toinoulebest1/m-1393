@@ -100,13 +100,37 @@ const Index = () => {
 
       // Set up media session action handlers
       if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => play());
-        navigator.mediaSession.setActionHandler('pause', () => pause());
+        navigator.mediaSession.setActionHandler('play', () => {
+          play();
+          // Update position state immediately when play is triggered
+          const audioElement = getCurrentAudioElement();
+          if (audioElement) {
+            const duration = audioElement.duration || durationToSeconds(currentSong.duration);
+            const position = audioElement.currentTime || 0;
+            const rate = audioElement.playbackRate || 1;
+            updatePositionState(duration, position, rate);
+            console.log("📊 MediaSession: play action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
+          }
+        });
+        
+        navigator.mediaSession.setActionHandler('pause', () => {
+          pause();
+          // Update position state immediately when pause is triggered
+          const audioElement = getCurrentAudioElement();
+          if (audioElement) {
+            const duration = audioElement.duration || durationToSeconds(currentSong.duration);
+            const position = audioElement.currentTime || 0;
+            const rate = audioElement.playbackRate || 1;
+            updatePositionState(duration, position, rate);
+            console.log("📊 MediaSession: pause action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
+          }
+        });
+        
         navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
         navigator.mediaSession.setActionHandler('previoustrack', () => previousSong());
       }
     }
-  }, [currentSong, play, pause, nextSong, previousSong, isPlaying]);
+  }, [currentSong, play, pause, nextSong, previousSong, isPlaying, getCurrentAudioElement]);
 
   // Update MediaSession playback state when isPlaying changes
   useEffect(() => {
@@ -117,30 +141,32 @@ const Index = () => {
 
   // Update MediaSession position state regularly during playback
   useEffect(() => {
-    if (!isPlaying || !currentSong?.duration) return;
+    if (!isPlaying || !currentSong) return;
 
-    const durationInSeconds = durationToSeconds(currentSong.duration);
-    
     // Call updatePositionState immediately when playback starts
     const audioElement = getCurrentAudioElement();
-    if (audioElement && !isNaN(audioElement.currentTime)) {
-      const currentPosition = audioElement.currentTime;
-      updatePositionState(durationInSeconds, currentPosition, 1);
-      console.log("📊 MediaSession position INIT:", currentPosition.toFixed(1), "/", durationInSeconds.toFixed(1));
+    if (audioElement) {
+      const duration = audioElement.duration || durationToSeconds(currentSong.duration);
+      const position = audioElement.currentTime || 0;
+      const rate = audioElement.playbackRate || 1;
+      updatePositionState(duration, position, rate);
+      console.log("📊 MediaSession position INIT:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
     }
     
     // Then update position from audio element every second
     const interval = setInterval(() => {
       const audioElement = getCurrentAudioElement();
-      if (audioElement && !isNaN(audioElement.currentTime)) {
-        const currentPosition = audioElement.currentTime;
-        updatePositionState(durationInSeconds, currentPosition, 1);
-        console.log("📊 MediaSession position update:", currentPosition.toFixed(1), "/", durationInSeconds.toFixed(1));
+      if (audioElement) {
+        const duration = audioElement.duration || durationToSeconds(currentSong.duration);
+        const position = audioElement.currentTime || 0;
+        const rate = audioElement.playbackRate || 1;
+        updatePositionState(duration, position, rate);
+        console.log("📊 MediaSession position update:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentSong?.duration, getCurrentAudioElement]);
+  }, [isPlaying, currentSong, getCurrentAudioElement]);
   useEffect(() => {
     if (currentSong) {
       setForceUpdate(prev => prev + 1);
