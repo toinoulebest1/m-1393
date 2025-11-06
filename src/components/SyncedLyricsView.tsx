@@ -587,7 +587,7 @@ export const SyncedLyricsView: React.FC = () => {
         <div className="flex flex-col flex-grow overflow-hidden md:w-2/3 md:pl-8 md:border-l md:border-white/10">
           
           {/* Lyrics content */}
-          <div className="flex-grow w-full overflow-hidden flex flex-col">
+          <div className="flex-grow w-full overflow-hidden flex flex-col order-last md:order-first">
             {isLoadingLyrics ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
@@ -672,7 +672,7 @@ export const SyncedLyricsView: React.FC = () => {
           </div>
 
           {/* Player Controls Area */}
-          <div className="w-full pt-4 flex-shrink-0">
+          <div className="w-full pt-4 flex-shrink-0 order-first md:order-last">
             {/* Mobile-only Song Info */}
             <div className="flex items-center justify-between px-2 md:hidden">
               <div>
