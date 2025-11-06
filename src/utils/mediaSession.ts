@@ -1,7 +1,7 @@
 /**
  * Utility functions for MediaSession API
  */
-import logoUrl from '@/assets/logo.png';
+// REMOVED: import logoUrl from '@/assets/logo.png';
 
 // Update media session metadata
 export const updateMediaSessionMetadata = (song: {
@@ -14,13 +14,15 @@ export const updateMediaSessionMetadata = (song: {
   if ('mediaSession' in navigator) {
     console.log('Updating MediaSession metadata for:', song.title);
     
+    const absoluteLogoUrl = `${window.location.origin}/logo.png`;
+
     navigator.mediaSession.metadata = new MediaMetadata({
       title: song.title,
       artist: song.artist,
       album: song.genre || 'Unknown Album',
       artwork: [
         {
-          src: song.imageUrl || logoUrl,
+          src: song.imageUrl || absoluteLogoUrl,
           sizes: '512x512',
           type: 'image/png'
         }
