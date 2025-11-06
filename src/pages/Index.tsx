@@ -145,8 +145,10 @@ const Index = () => {
 
     // Call updatePositionState immediately when playback starts
     const audioElement = getCurrentAudioElement();
-    if (audioElement && audioElement.duration && !isNaN(audioElement.duration)) {
-      const duration = audioElement.duration;
+    if (audioElement) {
+      const duration = (audioElement.duration && !isNaN(audioElement.duration)) 
+        ? audioElement.duration 
+        : durationToSeconds(currentSong.duration);
       const position = audioElement.currentTime || 0;
       const rate = audioElement.playbackRate || 1;
       updatePositionState(duration, position, rate);
@@ -156,8 +158,10 @@ const Index = () => {
     // Then update position from audio element every second
     const interval = setInterval(() => {
       const audioElement = getCurrentAudioElement();
-      if (audioElement && audioElement.duration && !isNaN(audioElement.duration)) {
-        const duration = audioElement.duration;
+      if (audioElement) {
+        const duration = (audioElement.duration && !isNaN(audioElement.duration)) 
+          ? audioElement.duration 
+          : durationToSeconds(currentSong.duration);
         const position = audioElement.currentTime || 0;
         const rate = audioElement.playbackRate || 1;
         updatePositionState(duration, position, rate);
