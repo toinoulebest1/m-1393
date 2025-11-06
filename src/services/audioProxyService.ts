@@ -107,7 +107,7 @@ class AudioProxyService {
   }
 
   /**
-   * Obtenir l'URL audio via le proxy
+   * Obtenir l'URL audio via le proxy en testant toutes les instances
    */
   async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<string | null> {
     if (!this.initialized) {
@@ -122,32 +122,41 @@ class AudioProxyService {
       return cached.url;
     }
 
-    // Essayer avec retry et fallback
-    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+    // Essayer TOUTES les instances disponibles (pas juste retry sur la même)
+    const availableInstances = this.instances.filter(i => 
+      !i.lastError || Date.now() - i.lastError > this.ERROR_COOLDOWN
+    );
+
+    if (availableInstances.length === 0) {
+      console.error("❌ Aucune instance disponible");
+      return null;
+    }
+
+    // Essayer chaque instance jusqu'à trouver une qui fonctionne
+    for (const instance of availableInstances) {
       try {
+        console.log(`🌐 Tentative avec ${instance.url}...`);
+        this.currentInstance = instance;
+        
         const url = await this.fetchAudioUrl(trackId, quality);
         if (url) {
-          // Mettre en cache
+          // Succès ! Mettre en cache et retourner
           this.cacheUrl(cacheKey, url, quality);
+          console.log(`✅ Succès avec ${instance.url}`);
           return url;
         }
       } catch (error: any) {
-        console.warn(`⚠️ Tentative ${attempt + 1}/${this.MAX_RETRIES + 1} échouée:`, error.message);
+        console.warn(`⚠️ ${instance.url} échec:`, error.message, `(status: ${error.status})`);
         
-        // Si 429, 401 ou 5xx, changer d'instance
-        if (error.status === 429 || error.status === 401 || error.status >= 500) {
-          this.markInstanceError();
-          this.switchToNextInstance();
-        }
+        // Marquer l'erreur pour cette instance
+        this.markInstanceError();
         
-        // Attendre avant retry
-        if (attempt < this.MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (attempt + 1)));
-        }
+        // Continuer avec l'instance suivante
+        continue;
       }
     }
 
-    console.error("❌ Échec récupération URL après tous les retries:", trackId);
+    console.error("❌ Toutes les instances ont échoué pour:", trackId);
     return null;
   }
 
@@ -160,11 +169,10 @@ class AudioProxyService {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 8000); // Réduit à 8s pour plus de réactivité
 
     try {
       const url = `${this.currentInstance.url}/track/?id=${trackId}&quality=${quality}`;
-      console.log("🌐 Requête proxy:", url);
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -176,8 +184,20 @@ class AudioProxyService {
       clearTimeout(timeout);
 
       if (!response.ok) {
+        // Créer une erreur avec le status code pour la gestion d'erreur
         const error: any = new Error(`HTTP ${response.status}`);
         error.status = response.status;
+        
+        // Tenter de lire le message d'erreur
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            error.message = `${response.status}: ${errorData.error}`;
+          }
+        } catch (e) {
+          // Ignore si impossible de parser le JSON
+        }
+        
         throw error;
       }
 
@@ -204,8 +224,12 @@ class AudioProxyService {
         return data;
       }
 
-      console.warn("⚠️ Format de réponse inconnu:", data);
-      return null;
+      console.warn("⚠️ Format de réponse inconnu ou vide:", data);
+      
+      // Si format inconnu, considérer comme erreur
+      const error: any = new Error('Format de réponse invalide');
+      error.status = 500;
+      throw error;
     } catch (error) {
       clearTimeout(timeout);
       throw error;
