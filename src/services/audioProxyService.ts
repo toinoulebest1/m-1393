@@ -94,32 +94,23 @@ class AudioProxyService {
    */
   private async testLatency(instanceUrl: string): Promise<number> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s pour tenir compte du réseau
     
     try {
-      console.log(`🔍 Test latence: ${instanceUrl}/ping`);
+      console.log(`🔍 Test latence: ${instanceUrl}/track/?id=157172496&quality=LOSSLESS`);
       const start = performance.now();
       
-      let response;
-      try {
-        response = await fetch(`${instanceUrl}/ping`, {
-          signal: controller.signal,
-          method: 'HEAD'
-        });
-        console.log(`📡 Réponse /ping: ${response.status} ${response.statusText}`);
-      } catch (pingError: any) {
-        console.log(`⚠️ /ping échoué (${pingError.name}: ${pingError.message}), tentative fallback sur ${instanceUrl}`);
-        // Fallback: tester avec un endpoint alternatif
-        response = await fetch(instanceUrl, {
-          signal: controller.signal,
-          method: 'HEAD'
-        });
-        console.log(`📡 Réponse fallback: ${response.status} ${response.statusText}`);
-      }
+      // Tester avec une vraie requête track (HEAD pour économiser bande passante)
+      const response = await fetch(`${instanceUrl}/track/?id=157172496&quality=LOSSLESS`, {
+        signal: controller.signal,
+        method: 'HEAD' // HEAD pour ne pas télécharger tout l'audio
+      });
       
       clearTimeout(timeout);
       
-      if (response.ok) {
+      console.log(`📡 Réponse ${instanceUrl}: ${response.status} ${response.statusText}`);
+      
+      if (response.ok || response.status === 200) {
         const latency = performance.now() - start;
         console.log(`✅ ${instanceUrl}: ${latency.toFixed(0)}ms`);
         return latency;
