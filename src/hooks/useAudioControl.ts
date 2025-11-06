@@ -257,6 +257,18 @@ export const useAudioControl = ({
         // Activer le renouvellement automatique
         setupLinkRenewal();
         
+        // Listener pour mettre à jour MediaSession dès que la durée est connue
+        const onLoadedMetadata = () => {
+          if ('mediaSession' in navigator && audio.duration && !isNaN(audio.duration)) {
+            // Importer la fonction updatePositionState
+            import('@/utils/mediaSession').then(({ updatePositionState }) => {
+              updatePositionState(audio.duration, audio.currentTime || 0, audio.playbackRate || 1);
+              console.log("📊 MediaSession: metadata loaded, duration:", audio.duration.toFixed(1));
+            });
+          }
+        };
+        audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+        
         // Démarrage INSTANTANÉ sans attendre - streaming progressif
         // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
         try {
