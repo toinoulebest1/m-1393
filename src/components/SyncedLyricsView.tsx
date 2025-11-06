@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ChevronDown, MoreVertical } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -511,73 +511,50 @@ export const SyncedLyricsView: React.FC = () => {
         />
       </div>
 
+      {/* Header for Mobile */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:hidden">
+        <Button onClick={handleClose} variant="ghost" size="icon" className="rounded-full bg-black/20 text-white/80 hover:bg-black/40">
+          <ChevronDown className="h-6 w-6" />
+        </Button>
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase tracking-wider text-white/80">En lecture</p>
+          <p className="truncate text-sm font-semibold text-white max-w-[200px]">{currentSong.album_name || currentSong.artist}</p>
+        </div>
+        <Button variant="ghost" size="icon" className="rounded-full bg-black/20 text-white/80 hover:bg-black/40">
+          <MoreVertical className="h-5 w-5" />
+        </Button>
+      </div>
+
       {/* Main content */}
-      <div className="flex flex-col md:flex-row h-screen w-full p-4 md:p-6 overflow-hidden relative z-10">
-        {/* Left side - Song information */}
-        <div className="flex flex-col items-center md:items-start justify-center md:w-1/3 h-[30%] md:h-full md:pr-8">
-          {/* Song image */}
-          {currentSong.imageUrl && (
-            <div className="relative mb-4 md:mb-6">
-              <img
-                src={currentSong.imageUrl}
-                alt={`${currentSong.title} - Album art`}
-                className="rounded-lg shadow-lg md:w-64 md:h-64 w-44 h-44 object-cover"
-                loading="eager"
-                style={{
-                  boxShadow: accentColor ? `0 0 20px 2px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.4)` : undefined,
-                }}
-              />
-            </div>
-          )}
+      <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-hidden p-4 pt-20 md:flex-row md:items-stretch md:p-6 md:pt-4">
+        
+        {/* Left side (Desktop) / Top + Bottom (Mobile) */}
+        <div className="flex flex-col justify-between md:w-1/3 md:justify-center md:pr-8">
+          {/* Album Art */}
+          <div className="w-full flex-shrink-0 px-8 md:px-0 md:mb-6">
+            <img
+              src={currentSong.imageUrl}
+              alt={`${currentSong.title} - Album art`}
+              className="aspect-square w-full max-w-xs mx-auto rounded-lg shadow-lg md:w-64 md:h-64 object-cover"
+              loading="eager"
+              style={{
+                boxShadow: accentColor ? `0 0 20px 2px rgba(${accentColor[0]}, ${accentColor[1]}, ${accentColor[2]}, 0.4)` : undefined,
+              }}
+            />
+          </div>
           
-          {/* Player Controls */}
-          <div className="w-full mb-4">
-            {/* Progress display */}
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-spotify-neutral">
-                {formatTime(currentTime)}
-              </span>
-              <span className="text-spotify-neutral">
-                {formatDuration(currentSong?.duration)}
-              </span>
-            </div>
-            
-            {/* Progress bar */}
-            <div className="flex items-center mb-4">
-              <Slider
-                value={[progress]}
-                max={100}
-                step={0.1}
-                className="flex-grow"
-                onValueChange={handleProgressChange}
-              />
-            </div>
-            
-            {/* Volume control with favorite button */}
-            <div className="flex items-center space-x-2 mb-3 px-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setVolume(volume === 0 ? 50 : 0)}
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0"
-              >
-                {volume === 0 ? (
-                  <VolumeX className="h-3.5 w-3.5" />
-                ) : (
-                  <Volume2 className="h-3.5 w-3.5" />
-                )}
-              </Button>
-              <Slider
-                value={[volume]}
-                max={100}
-                step={1}
-                className="flex-grow max-w-[100px]"
-                onValueChange={(value) => setVolume(value[0])}
-              />
-              <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">
-                {volume}%
-              </span>
-              <div className="flex-grow" />
+          {/* Player Controls Area */}
+          <div className="w-full pt-4">
+            {/* Song Info */}
+            <div className="flex items-center justify-between px-2 md:px-0 md:text-left md:block">
+              <div className="md:mb-2">
+                <h1 className="text-xl md:text-3xl font-bold text-white break-words">
+                  {currentSong.title}
+                </h1>
+                <p className="text-lg md:text-xl text-spotify-neutral break-words">
+                  {currentSong.artist}
+                </p>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -585,98 +562,80 @@ export const SyncedLyricsView: React.FC = () => {
                   try {
                     const wasFavorite = favorites.some(f => f.id === currentSong.id);
                     await toggleFavorite(currentSong);
-                    if (wasFavorite) {
-                      toast.success("Retiré des favoris");
-                    } else {
-                      toast.success("Ajouté aux favoris ❤️");
-                    }
+                    toast.success(wasFavorite ? "Retiré des favoris" : "Ajouté aux favoris ❤️");
                   } catch (error: any) {
                     toast.error(error.message || "Erreur lors de l'ajout aux favoris");
                   }
                 }}
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0 transition-all hover:scale-110"
+                className="text-white/80 hover:text-white transition-all hover:scale-110"
               >
                 <Heart 
-                  className="h-3.5 w-3.5" 
+                  className="h-6 w-6" 
                   fill={favorites.some(f => f.id === currentSong.id) ? "currentColor" : "none"}
                 />
               </Button>
             </div>
+
+            {/* Progress Bar */}
+            <div className="w-full my-2">
+              <Slider
+                value={[progress]}
+                max={100}
+                step={0.1}
+                className="flex-grow"
+                onValueChange={handleProgressChange}
+              />
+              <div className="flex items-center justify-between text-xs mt-1 px-1">
+                <span className="text-spotify-neutral">{formatTime(currentTime)}</span>
+                <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
+              </div>
+            </div>
             
             {/* Playback controls */}
             <div className="flex items-center justify-center space-x-4">
-              <Button 
-                variant="ghost"
-                size="icon"
-                onClick={previousSong}
-                className="text-white hover:bg-white/10 rounded-full h-10 w-10"
-              >
-                <SkipBack className="h-5 w-5" />
+              <Button variant="ghost" size="icon" onClick={previousSong} className="text-white hover:bg-white/10 rounded-full h-12 w-12">
+                <SkipBack className="h-6 w-6" />
               </Button>
-              
-              <Button
-                variant="default"
-                size="icon"
-                onClick={handlePlayPause}
-                className="bg-white text-black hover:bg-white/90 rounded-full h-12 w-12 flex items-center justify-center"
-              >
-                {isPlaying ? (
-                  <Pause className="h-6 w-6" />
-                ) : (
-                  <Play className="h-6 w-6" />
-                )}
+              <Button variant="default" size="icon" onClick={handlePlayPause} className="bg-white text-black hover:bg-white/90 rounded-full h-16 w-16">
+                {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
               </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={nextSong}
-                className="text-white hover:bg-white/10 rounded-full h-10 w-10"
-              >
-                <SkipForward className="h-5 w-5" />
+              <Button variant="ghost" size="icon" onClick={nextSong} className="text-white hover:bg-white/10 rounded-full h-12 w-12">
+                <SkipForward className="h-6 w-6" />
               </Button>
+            </div>
+
+            {/* Volume Control (Mobile) */}
+            <div className="flex items-center space-x-3 mt-4 md:hidden">
+              <VolumeX className="h-5 w-5 text-spotify-neutral/70" />
+              <Slider
+                value={[volume]}
+                max={100}
+                step={1}
+                className="flex-grow"
+                onValueChange={(value) => setVolume(value[0])}
+              />
+              <Volume2 className="h-5 w-5 text-spotify-neutral/70" />
+            </div>
+
+            {/* Desktop-only controls */}
+            <div className="hidden md:flex items-center space-x-2 mt-4 px-1">
+              <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 50 : 0)} className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0">
+                {volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              </Button>
+              <Slider value={[volume]} max={100} step={1} className="flex-grow max-w-[100px]" onValueChange={(value) => setVolume(value[0])} />
+              <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">{volume}%</span>
             </div>
           </div>
 
-          <div className="text-center md:text-left w-full px-4 md:px-0">
-            <h1 className="text-xl md:text-3xl font-bold text-white mb-2 break-words">
-              {currentSong.title}
-            </h1>
-            <p className="text-lg md:text-xl text-spotify-neutral break-words">
-              {currentSong.artist}
-            </p>
-          </div>
-          
-          {/* Generate lyrics button */}
-          {!lyricsText && !isGenerating && (
-            <Button
-              onClick={generateLyrics}
-              disabled={isGenerating || !currentSong.artist}
-              className="mt-4 md:mt-6 animate-fade-in"
-              variant="outline"
-            >
-              {isGenerating ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Music className="h-4 w-4 mr-2" />
-              )}
-              Récupérer les paroles
-            </Button>
-          )}
-
-          {/* Back button */}
-          <Button 
-            onClick={handleClose} 
-            variant="ghost" 
-            className="mt-4 text-white/70 hover:text-white"
-          >
+          {/* Desktop Back Button */}
+          <Button onClick={handleClose} variant="ghost" className="mt-4 text-white/70 hover:text-white hidden md:inline-flex">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour
           </Button>
         </div>
 
         {/* Right side - Lyrics content */}
-        <div className="flex-grow h-[70%] md:h-full md:max-h-full overflow-hidden md:w-2/3 md:pl-8 md:border-l border-white/10">
+        <div className="hidden md:flex flex-grow h-[70%] md:h-full md:max-h-full overflow-hidden md:w-2/3 md:pl-8 md:border-l border-white/10">
           <div className="h-full w-full flex flex-col">
             {isLoadingLyrics ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
