@@ -496,6 +496,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if ('mediaSession' in navigator && audioRef.current) {
         navigator.mediaSession.playbackState = 'playing';
         try {
+          // S'assurer que la durée de l'API est définie
+          if (!apiDurationRef.current && currentSong?.duration) {
+            apiDurationRef.current = durationToSeconds(currentSong.duration);
+          }
           const duration = apiDurationRef.current || audioRef.current.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
             updatePositionState(duration, audioRef.current.currentTime, audioRef.current.playbackRate);
