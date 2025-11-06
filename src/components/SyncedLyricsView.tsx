@@ -531,7 +531,7 @@ export const SyncedLyricsView: React.FC = () => {
         {/* Left side (Desktop) / Top part (Mobile) */}
         <div className="flex flex-col md:w-1/3 md:justify-center md:pr-8">
           {/* Album Art */}
-          <div className="w-full flex-shrink-0 px-8 md:px-0 md:mb-6">
+          <div className="w-full flex-shrink-0 px-12 md:px-0 md:mb-6">
             <img
               src={currentSong.imageUrl}
               alt={`${currentSong.title} - Album art`}
@@ -607,7 +607,7 @@ export const SyncedLyricsView: React.FC = () => {
                     <LrcPlayer 
                       parsedLyrics={parsedLyrics} 
                       currentTime={currentTime}
-                      className="h-full text-lg"
+                      className="h-full text-base md:text-lg"
                       accentColor={accentColor}
                     />
                   ) : (
