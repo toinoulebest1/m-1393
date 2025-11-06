@@ -128,7 +128,8 @@ class AudioProxyService {
   }
 
   /**
-   * Obtenir l'URL audio via le proxy en testant toutes les instances
+   * Obtenir l'URL audio via le proxy en interrogeant toutes les instances en parallèle
+   * La première réponse valide gagne
    */
   async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<{ url: string; duration?: number } | null> {
     if (!this.initialized) {
@@ -143,47 +144,67 @@ class AudioProxyService {
       return { url: cached.url, duration: cached.duration };
     }
 
-    // Essayer TOUTES les instances disponibles (pas juste retry sur la même)
+    // Filtrer les instances disponibles
     const availableInstances = this.instances.filter(i => 
       !i.lastError || Date.now() - i.lastError > this.ERROR_COOLDOWN
     );
 
     if (availableInstances.length === 0) {
       console.error("❌ Aucune instance disponible");
-      console.error("🔍 État des instances:", this.instances.map(i => ({
-        url: i.url,
-        latency: i.latency,
-        lastError: i.lastError ? new Date(i.lastError).toISOString() : 'none',
-        consecutiveErrors: i.consecutiveErrors,
-        cooldownRemaining: i.lastError ? Math.max(0, this.ERROR_COOLDOWN - (Date.now() - i.lastError)) : 0
-      })));
       return null;
     }
     
-    console.log(`🎯 ${availableInstances.length} instances disponibles pour essai`);
-    console.log("📋 Instances:", availableInstances.map(i => `${i.url} (${i.latency}ms)`).join(', '));
+    console.log(`🏁 Course entre ${availableInstances.length} instances pour ${trackId}...`);
+    console.log("📋 Instances participantes:", availableInstances.map(i => i.url).join(', '));
 
-    // Essayer chaque instance jusqu'à trouver une qui fonctionne
-    for (const instance of availableInstances) {
-      try {
-        console.log(`🌐 Tentative avec ${instance.url}...`);
-        this.currentInstance = instance;
-        
-        const result = await this.fetchAudioUrl(trackId, quality);
-        if (result) {
-          // Succès ! Mettre en cache et retourner
-          this.cacheUrl(cacheKey, result.url, quality, result.duration);
-          console.log(`✅ Succès avec ${instance.url}`);
-          return result;
-        }
-      } catch (error: any) {
-        console.warn(`⚠️ ${instance.url} échec:`, error.message, `(status: ${error.status})`);
-        
+    // Lancer des appels parallèles à TOUTES les instances
+    const racePromises = availableInstances.map(instance => 
+      this.fetchFromInstance(instance, trackId, quality)
+    );
+
+    try {
+      // Attendre la première réponse valide
+      const result = await Promise.race(
+        racePromises.map(async (promise, index) => {
+          try {
+            const res = await promise;
+            if (res) {
+              console.log(`🏆 GAGNANT: ${availableInstances[index].url}`);
+              this.currentInstance = availableInstances[index];
+              return res;
+            }
+            throw new Error('Réponse invalide');
+          } catch (error) {
+            // Cette instance a échoué, on attend les autres
+            throw error;
+          }
+        })
+      );
+
+      // Mettre en cache et retourner
+      if (result) {
+        this.cacheUrl(cacheKey, result.url, quality, result.duration);
+        return result;
+      }
+    } catch (error) {
+      console.warn("⚠️ Première instance a échoué, attente des autres...");
+    }
+
+    // Si la première a échoué, attendre toutes les autres avec Promise.allSettled
+    const allResults = await Promise.allSettled(racePromises);
+    
+    // Chercher la première réponse valide
+    for (let i = 0; i < allResults.length; i++) {
+      const result = allResults[i];
+      if (result.status === 'fulfilled' && result.value) {
+        console.log(`✅ Succès avec ${availableInstances[i].url}`);
+        this.currentInstance = availableInstances[i];
+        this.cacheUrl(cacheKey, result.value.url, quality, result.value.duration);
+        return result.value;
+      } else if (result.status === 'rejected') {
         // Marquer l'erreur pour cette instance
-        this.markInstanceError();
-        
-        // Continuer avec l'instance suivante
-        continue;
+        availableInstances[i].consecutiveErrors++;
+        availableInstances[i].lastError = Date.now();
       }
     }
 
@@ -192,18 +213,14 @@ class AudioProxyService {
   }
 
   /**
-   * Récupérer l'URL audio depuis l'instance courante
+   * Récupérer depuis une instance spécifique (pour la course parallèle)
    */
-  private async fetchAudioUrl(trackId: string, quality: string): Promise<{ url: string; duration?: number } | null> {
-    if (!this.currentInstance) {
-      throw new Error("Aucune instance disponible");
-    }
-
+  private async fetchFromInstance(instance: ProxyInstance, trackId: string, quality: string): Promise<{ url: string; duration?: number } | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // Réduit à 8s pour plus de réactivité
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
-      const url = `${this.currentInstance.url}/track/?id=${trackId}&quality=${quality}`;
+      const url = `${instance.url}/track/?id=${trackId}&quality=${quality}`;
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -215,21 +232,7 @@ class AudioProxyService {
       clearTimeout(timeout);
 
       if (!response.ok) {
-        // Créer une erreur avec le status code pour la gestion d'erreur
-        const error: any = new Error(`HTTP ${response.status}`);
-        error.status = response.status;
-        
-        // Tenter de lire le message d'erreur
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            error.message = `${response.status}: ${errorData.error}`;
-          }
-        } catch (e) {
-          // Ignore si impossible de parser le JSON
-        }
-        
-        throw error;
+        throw new Error(`HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -239,12 +242,7 @@ class AudioProxyService {
         const metadata = data[0];
         const trackUrl = data[2]?.OriginalTrackUrl;
         if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
-          // Extraire la durée depuis metadata.duration
           const duration = metadata?.duration ? Number(metadata.duration) : undefined;
-          console.log("✅ URL extraite depuis tableau Tidal (OriginalTrackUrl)");
-          if (duration) {
-            console.log("✅ Durée extraite depuis data[0].duration:", duration, "secondes");
-          }
           return { url: trackUrl, duration };
         }
       }
@@ -253,34 +251,27 @@ class AudioProxyService {
       if (typeof data === 'string' && data.startsWith('ey')) {
         const manifest: ManifestResponse = JSON.parse(atob(data));
         if (manifest.urls && manifest.urls.length > 0) {
-          console.log("✅ URL décodée depuis manifeste Base64");
           return { url: manifest.urls[0] };
         }
       }
       
       // Cas 3: JSON direct avec urls[]
       if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
-        console.log("✅ URL extraite depuis JSON");
         return { url: data.urls[0] };
       }
       
       // Cas 4: URL directe dans la réponse
       if (typeof data === 'string' && data.startsWith('http')) {
-        console.log("✅ URL directe reçue");
         return { url: data };
       }
 
-      console.warn("⚠️ Format de réponse inconnu ou vide:", data);
-      
-      // Si format inconnu, considérer comme erreur
-      const error: any = new Error('Format de réponse invalide');
-      error.status = 500;
-      throw error;
+      throw new Error('Format de réponse invalide');
     } catch (error) {
       clearTimeout(timeout);
       throw error;
     }
   }
+
 
   /**
    * Mettre en cache une URL
@@ -303,54 +294,6 @@ class AudioProxyService {
     console.log("💾 URL mise en cache:", key, `(${this.urlCache.size}/${this.MAX_CACHE_SIZE})`);
   }
 
-  /**
-   * Marquer une erreur pour l'instance courante
-   */
-  private markInstanceError(): void {
-    if (this.currentInstance) {
-      this.currentInstance.consecutiveErrors++;
-      this.currentInstance.lastError = Date.now();
-      console.warn(`⚠️ Erreur instance ${this.currentInstance.url} (${this.currentInstance.consecutiveErrors} consécutives)`);
-    }
-  }
-
-  /**
-   * Basculer vers la prochaine instance disponible
-   */
-  private switchToNextInstance(): void {
-    if (!this.currentInstance || this.instances.length <= 1) return;
-
-    // Filtrer les instances sans erreur récente
-    const availableInstances = this.instances.filter(i => 
-      !i.lastError || Date.now() - i.lastError > this.ERROR_COOLDOWN
-    );
-
-    if (availableInstances.length === 0) {
-      console.warn("⚠️ Toutes les instances en cooldown, réinitialisation");
-      this.instances.forEach(i => {
-        i.lastError = undefined;
-        i.consecutiveErrors = 0;
-      });
-      return;
-    }
-
-    // Trouver la prochaine instance
-    const currentIndex = this.instances.indexOf(this.currentInstance);
-    let nextIndex = (currentIndex + 1) % this.instances.length;
-    
-    // Chercher une instance sans erreur récente
-    let attempts = 0;
-    while (attempts < this.instances.length) {
-      const candidate = this.instances[nextIndex];
-      if (!candidate.lastError || Date.now() - candidate.lastError > this.ERROR_COOLDOWN) {
-        this.currentInstance = candidate;
-        console.log("🔄 Basculement vers:", this.currentInstance.url);
-        return;
-      }
-      nextIndex = (nextIndex + 1) % this.instances.length;
-      attempts++;
-    }
-  }
 
   /**
    * Précharger l'URL d'une piste
