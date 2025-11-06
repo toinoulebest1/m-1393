@@ -20,6 +20,7 @@ interface CachedUrl {
   url: string;
   timestamp: number;
   quality: string;
+  duration?: number;
 }
 
 class AudioProxyService {
@@ -129,7 +130,7 @@ class AudioProxyService {
   /**
    * Obtenir l'URL audio via le proxy en testant toutes les instances
    */
-  async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<string | null> {
+  async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<{ url: string; duration?: number } | null> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -139,7 +140,7 @@ class AudioProxyService {
     const cached = this.urlCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.URL_CACHE_TTL) {
       console.log("🎯 Cache hit:", trackId);
-      return cached.url;
+      return { url: cached.url, duration: cached.duration };
     }
 
     // Essayer TOUTES les instances disponibles (pas juste retry sur la même)
@@ -168,12 +169,12 @@ class AudioProxyService {
         console.log(`🌐 Tentative avec ${instance.url}...`);
         this.currentInstance = instance;
         
-        const url = await this.fetchAudioUrl(trackId, quality);
-        if (url) {
+        const result = await this.fetchAudioUrl(trackId, quality);
+        if (result) {
           // Succès ! Mettre en cache et retourner
-          this.cacheUrl(cacheKey, url, quality);
+          this.cacheUrl(cacheKey, result.url, quality, result.duration);
           console.log(`✅ Succès avec ${instance.url}`);
-          return url;
+          return result;
         }
       } catch (error: any) {
         console.warn(`⚠️ ${instance.url} échec:`, error.message, `(status: ${error.status})`);
@@ -193,7 +194,7 @@ class AudioProxyService {
   /**
    * Récupérer l'URL audio depuis l'instance courante
    */
-  private async fetchAudioUrl(trackId: string, quality: string): Promise<string | null> {
+  private async fetchAudioUrl(trackId: string, quality: string): Promise<{ url: string; duration?: number } | null> {
     if (!this.currentInstance) {
       throw new Error("Aucune instance disponible");
     }
@@ -235,10 +236,15 @@ class AudioProxyService {
       
       // Cas 1: Tableau Tidal [metadata, manifest, {OriginalTrackUrl}]
       if (Array.isArray(data) && data.length >= 3) {
+        const metadata = data[0];
         const trackUrl = data[2]?.OriginalTrackUrl;
         if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
+          const duration = metadata?.duration;
           console.log("✅ URL extraite depuis tableau Tidal (OriginalTrackUrl)");
-          return trackUrl;
+          if (duration) {
+            console.log("✅ Durée extraite depuis métadonnées Tidal:", duration, "secondes");
+          }
+          return { url: trackUrl, duration };
         }
       }
       
@@ -247,20 +253,20 @@ class AudioProxyService {
         const manifest: ManifestResponse = JSON.parse(atob(data));
         if (manifest.urls && manifest.urls.length > 0) {
           console.log("✅ URL décodée depuis manifeste Base64");
-          return manifest.urls[0];
+          return { url: manifest.urls[0] };
         }
       }
       
       // Cas 3: JSON direct avec urls[]
       if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
         console.log("✅ URL extraite depuis JSON");
-        return data.urls[0];
+        return { url: data.urls[0] };
       }
       
       // Cas 4: URL directe dans la réponse
       if (typeof data === 'string' && data.startsWith('http')) {
         console.log("✅ URL directe reçue");
-        return data;
+        return { url: data };
       }
 
       console.warn("⚠️ Format de réponse inconnu ou vide:", data);
@@ -278,7 +284,7 @@ class AudioProxyService {
   /**
    * Mettre en cache une URL
    */
-  private cacheUrl(key: string, url: string, quality: string): void {
+  private cacheUrl(key: string, url: string, quality: string, duration?: number): void {
     // Limiter la taille du cache
     if (this.urlCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = Array.from(this.urlCache.entries())
@@ -289,7 +295,8 @@ class AudioProxyService {
     this.urlCache.set(key, {
       url,
       quality,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      duration
     });
     
     console.log("💾 URL mise en cache:", key, `(${this.urlCache.size}/${this.MAX_CACHE_SIZE})`);

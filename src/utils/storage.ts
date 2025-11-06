@@ -173,32 +173,23 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     // Utiliser le multi-proxy seulement si on a un tidal_id
     if (tidalId) {
       try {
-        const proxyUrl = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+        const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
         
-            if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
-              console.log('✅ URL audio récupérée via Tidal:', proxyUrl.substring(0, 50));
-              
-              // Récupérer la durée depuis l'API Deezer
-              let duration: number | undefined;
-              try {
-                const { data: deezerData } = await supabase.functions.invoke('deezer-proxy', {
-                  body: { endpoint: `/track/${deezerId}` }
-                });
-                if (deezerData?.duration) {
-                  duration = deezerData.duration;
-                  console.log('✅ Durée récupérée depuis API Deezer:', duration, 'secondes');
-                }
-              } catch (e) {
-                console.warn('⚠️ Impossible de récupérer la durée depuis Deezer');
-              }
-              
-              // Mettre à jour le deezer_id dans la DB
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-              }
-              
-              return { url: proxyUrl, duration };
-            }
+        if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
+          console.log('✅ URL audio récupérée via Tidal:', proxyResult.url.substring(0, 50));
+          
+          const duration = proxyResult.duration;
+          if (duration) {
+            console.log('✅ Durée récupérée depuis les métadonnées Tidal:', duration, 'secondes');
+          }
+          
+          // Mettre à jour le deezer_id dans la DB
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+          }
+          
+          return { url: proxyResult.url, duration };
+        }
         
         console.warn('⚠️ Multi-proxy: pas d\'URL valide');
       } catch (error) {
@@ -227,23 +218,14 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           console.log('🚀 Récupération audio (recherche) via multi-proxy, Tidal ID:', tidalId);
           
           try {
-            const proxyUrl = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+            const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
             
-            if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
-              console.log('✅ URL audio récupérée (recherche):', proxyUrl.substring(0, 50));
+            if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
+              console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));
               
-              // Récupérer la durée depuis l'API Deezer
-              let duration: number | undefined;
-              try {
-                const { data: deezerData } = await supabase.functions.invoke('deezer-proxy', {
-                  body: { endpoint: `/track/${foundDeezerId}` }
-                });
-                if (deezerData?.duration) {
-                  duration = deezerData.duration;
-                  console.log('✅ Durée récupérée depuis API Deezer (recherche):', duration, 'secondes');
-                }
-              } catch (e) {
-                console.warn('⚠️ Impossible de récupérer la durée depuis Deezer');
+              const duration = proxyResult.duration;
+              if (duration) {
+                console.log('✅ Durée récupérée depuis les métadonnées Tidal (recherche):', duration, 'secondes');
               }
               
               // Mettre à jour le deezer_id et tidal_id dans la DB
@@ -256,7 +238,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
                   .eq('id', songId);
               }
               
-              return { url: proxyUrl, duration };
+              return { url: proxyResult.url, duration };
             }
             
             console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
