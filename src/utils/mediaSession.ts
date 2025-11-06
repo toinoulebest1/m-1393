@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for MediaSession API
  */
@@ -20,9 +19,9 @@ export const updateMediaSessionMetadata = (song: {
       album: song.genre || 'Unknown Album',
       artwork: [
         {
-          src: song.imageUrl || "https://picsum.photos/256/256",
-          sizes: '256x256',
-          type: 'image/jpeg'
+          src: song.imageUrl || "/logo.png",
+          sizes: '512x512',
+          type: 'image/png'
         }
       ]
     });
@@ -66,4 +65,3 @@ export const durationToSeconds = (duration: string | undefined): number => {
     return 0;
   }
 };
-

@@ -105,7 +105,7 @@ export const Sidebar = () => {
   return <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
-          <Music2 className="w-8 h-8 text-spotify-accent" />
+          <img src="/logo.png" alt="Logo" className="w-8 h-8" />
           <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
         </div>
       </div>
