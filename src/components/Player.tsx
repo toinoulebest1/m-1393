@@ -310,7 +310,11 @@ export const Player = () => {
         className="fixed bottom-0 left-0 right-0 h-[88px] bg-spotify-dark/90 backdrop-blur-lg border-t border-spotify-border z-50"
         onClick={handleNavigateToFullScreen}
       >
-        <Progress value={progress} className="absolute top-0 h-1 w-full rounded-none border-none bg-spotify-neutral/30" />
+        <Progress 
+          value={progress} 
+          className="absolute top-0 h-[2px] w-full rounded-none border-none bg-spotify-neutral/30" 
+          indicatorClassName="bg-spotify-accent"
+        />
 
         <div className="p-2 h-full">
           <div className="flex items-center justify-between h-full gap-4">
