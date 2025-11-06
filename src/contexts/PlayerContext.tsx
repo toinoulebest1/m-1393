@@ -543,40 +543,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+          const audio = audioRef.current;
+          if (!audio) return;
           const skipTime = details.seekOffset || 10;
           const newTime = Math.max(audio.currentTime - skipTime, 0);
           audio.currentTime = newTime;
-          updateProgress(newTime);
-          const duration = apiDurationRef.current || audio.duration;
-          if (duration && !isNaN(duration) && duration !== Infinity) {
-            updatePositionState(duration, newTime, audio.playbackRate);
-          }
+          updatePositionState(audio.duration, newTime, audio.playbackRate);
         });
       } catch (e) { console.warn("Could not set seekbackward handler"); }
 
       try {
         navigator.mediaSession.setActionHandler('seekforward', (details) => {
+          const audio = audioRef.current;
+          if (!audio) return;
           const skipTime = details.seekOffset || 10;
           const newTime = Math.min(audio.currentTime + skipTime, audio.duration);
           audio.currentTime = newTime;
-          updateProgress(newTime);
-          const duration = apiDurationRef.current || audio.duration;
-          if (duration && !isNaN(duration) && duration !== Infinity) {
-            updatePositionState(duration, newTime, audio.playbackRate);
-          }
+          updatePositionState(audio.duration, newTime, audio.playbackRate);
         });
       } catch (e) { console.warn("Could not set seekforward handler"); }
 
       try {
         navigator.mediaSession.setActionHandler('seekto', (details) => {
+          const audio = audioRef.current;
+          if (!audio) return;
           if (details.seekTime != null && audio.duration) {
             const newTime = Math.max(0, Math.min(details.seekTime, audio.duration));
             audio.currentTime = newTime;
-            updateProgress(newTime);
-            const duration = apiDurationRef.current || audio.duration;
-            if (duration && !isNaN(duration) && duration !== Infinity) {
-              updatePositionState(duration, newTime, audio.playbackRate);
-            }
+            updatePositionState(audio.duration, newTime, audio.playbackRate);
           }
         });
       } catch (e) { console.warn("Could not set seekto handler"); }
@@ -605,7 +599,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.mediaSession.setActionHandler('stop', null);
       }
     };
-  }, [currentSong, setProgress, isChangingSong]);
+  }, [currentSong, setProgress, isChangingSong, stopCurrentSong]);
 
   // Persistance des données
   useEffect(() => {
