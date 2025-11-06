@@ -310,10 +310,21 @@ export const Player = () => {
         className="fixed bottom-0 left-0 right-0 h-[88px] bg-spotify-dark/90 backdrop-blur-lg border-t border-spotify-border z-50"
         onClick={handleNavigateToFullScreen}
       >
-        <Progress 
-          value={progress} 
-          className="absolute top-0 h-[2px] w-full rounded-none border-none bg-spotify-neutral/30" 
-          indicatorClassName="bg-spotify-accent"
+        <Slider
+          value={[progress]}
+          max={100}
+          step={0.1}
+          onValueChange={handleProgressChange}
+          disabled={!currentSong}
+          className={cn(
+            "absolute top-0 w-full h-4", // Augmente la zone tactile
+            // Style de la barre
+            "[&>span:first-of-type]:h-[3px]",
+            // Style de la progression (remplissage)
+            "[&>span:first-of-type_>span]:bg-spotify-accent",
+            // Style de la poignée
+            "[&_[role=slider]]:h-3 [&_[role=slider]]:w-3 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:opacity-100"
+          )}
         />
 
         <div className="p-2 h-full">
