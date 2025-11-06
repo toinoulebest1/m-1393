@@ -135,12 +135,6 @@ class TidalSearchService {
       }
     }
     
-    // Si aucun match, retourner le premier résultat par défaut
-    if (data.items.length > 0 && data.items[0].id) {
-      console.warn("⚠️ Aucun match exact, utilisation du premier résultat");
-      return String(data.items[0].id);
-    }
-    
     return null;
   }
 
