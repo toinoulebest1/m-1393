@@ -26,12 +26,6 @@ export const updateMediaSessionMetadata = (song: {
         }
       ]
     });
-    
-    // Update position state immediately after setting metadata
-    if (song.duration) {
-      const durationInSeconds = durationToSeconds(song.duration);
-      updatePositionState(durationInSeconds, 0, 1);
-    }
   }
 };
 

@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { updateMediaSessionMetadata } from "@/utils/mediaSession";
+import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from "@/utils/mediaSession";
 import { AudioCacheManager } from "@/components/AudioCacheManager";
 import { UnavailableSongCard } from "@/components/UnavailableSongCard";
 import { Song } from "@/types/player";
@@ -29,7 +29,8 @@ const Index = () => {
     isPlaying,
     stopCurrentSong,
     removeSong,
-    isChangingSong
+    isChangingSong,
+    progress
   } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
@@ -112,6 +113,23 @@ const Index = () => {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
+
+  // Update MediaSession position state regularly during playback
+  useEffect(() => {
+    if (!isPlaying || !currentSong?.duration) return;
+
+    const durationInSeconds = durationToSeconds(currentSong.duration);
+    
+    // Update position immediately
+    updatePositionState(durationInSeconds, progress, 1);
+
+    // Then update every second during playback
+    const interval = setInterval(() => {
+      updatePositionState(durationInSeconds, progress, 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, progress, currentSong?.duration]);
   useEffect(() => {
     if (currentSong) {
       setForceUpdate(prev => prev + 1);
