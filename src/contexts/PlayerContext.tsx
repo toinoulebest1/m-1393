@@ -349,7 +349,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // CACHE DÉSACTIVÉ - toujours récupérer depuis le réseau
           console.log("📡 Récupération DIRECTE depuis le réseau (cache désactivé)...");
-          const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+          const result = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url,
             song.deezer_id,
             song.tidal_id,
@@ -357,13 +357,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             song.artist
           );
           
-          if (!audioUrl || typeof audioUrl !== 'string') {
+          if (!result || !result.url || typeof result.url !== 'string') {
             console.log("❌ Pas d'URL audio disponible");
             return;
           }
 
           // Configuration audio avec gestion d'état
-          audioRef.current.src = audioUrl;
+          audioRef.current.src = result.url;
           audioRef.current.preload = "auto";
           
           // Gestionnaires d'événements pour le chargement

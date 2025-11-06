@@ -40,13 +40,13 @@ export const CastButton = () => {
       setDlnaLoading(true);
       setDlnaUrl(null);
       console.log('🧩 Resolving DLNA link for:', currentSong.title);
-      const url = await UltraFastStreaming.getAudioUrlUltraFast(
+      const result = await UltraFastStreaming.getAudioUrlUltraFast(
         currentSong.url,
         currentSong.deezer_id,
         currentSong.title,
         currentSong.artist
       );
-      setDlnaUrl(url);
+      setDlnaUrl(result.url);
       toast.success('Lien DLNA prêt', { description: 'Vous pouvez l\'utiliser dans votre app DLNA' });
     } catch (e) {
       console.error('DLNA link error:', e);

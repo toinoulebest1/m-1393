@@ -123,6 +123,7 @@ export const useAudioControl = ({
         // ✅ SIMPLIFIÉ: Vérifier directement le cache avec l'URL de la chanson demandée
         // Ne plus se fier à cachedCurrentSong qui peut être désynchronisé
         let audioUrl: string;
+        let apiDuration: number | undefined;
         
         console.log("🔍 Vérification cache IndexedDB pour:", song.title);
         const cachedUrl = await getFromCache(song.url);
@@ -134,15 +135,33 @@ export const useAudioControl = ({
           console.log("✅ Chanson depuis cache:", song.title, "ID:", song.id);
         } else {
           console.log("⚠️ Pas en cache, récupération réseau pour:", song.title);
-          audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+          const result = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url, 
             song.deezer_id,
             song.title,
             song.artist,
             song.id
           );
+          audioUrl = result.url;
+          apiDuration = result.duration;
           const elapsed = performance.now() - startTime;
           console.log("✅ URL réseau récupérée en:", elapsed.toFixed(1), "ms pour:", song.title);
+          if (apiDuration) {
+            console.log("✅ Durée API récupérée:", apiDuration, "secondes");
+            // Mettre à jour immédiatement MediaSession avec la durée API
+            if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+              try {
+                navigator.mediaSession.setPositionState({
+                  duration: apiDuration,
+                  position: 0,
+                  playbackRate: 1
+                });
+                console.log("📊 MediaSession durée définie AVANT lecture:", apiDuration);
+              } catch (e) {
+                console.warn("⚠️ Erreur setPositionState:", e);
+              }
+            }
+          }
         }
         
         // Gestion des erreurs si pas d'URL

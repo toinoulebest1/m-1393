@@ -248,16 +248,18 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('📍 Original URL:', currentSong.url);
         
         // Obtenir l'URL réelle via UltraFastStreaming
-        const audioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
+        const result = await UltraFastStreaming.getAudioUrlUltraFast(
           currentSong.url,
           currentSong.deezer_id,
           currentSong.title,
           currentSong.artist
         );
         
-        if (!audioUrl || typeof audioUrl !== 'string') {
+        if (!result || !result.url || typeof result.url !== 'string') {
           throw new Error('URL audio invalide');
         }
+        
+        const audioUrl = result.url;
 
         console.log('✅ Resolved URL for cast:', audioUrl);
 

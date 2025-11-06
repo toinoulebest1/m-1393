@@ -8,14 +8,14 @@ import { UltraFastCache } from './ultraFastCache';
 import { supabase } from '@/integrations/supabase/client';
 
 export class UltraFastStreaming {
-  private static promisePool = new Map<string, Promise<string>>();
+  private static promisePool = new Map<string, Promise<{ url: string; duration?: number }>>();
   private static requestCount = 0;
 
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
    * CACHE DÉSACTIVÉ pour debug
    */
-  static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
+  static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> {
     const startTime = performance.now();
     this.requestCount++;
     
@@ -34,7 +34,10 @@ export class UltraFastStreaming {
 
     try {
       const result = await promise;
-      console.log("✅ URL récupérée depuis le réseau:", result.substring(0, 100) + "...");
+      console.log("✅ URL récupérée depuis le réseau:", result.url.substring(0, 100) + "...");
+      if (result.duration) {
+        console.log("✅ Durée récupérée:", result.duration, "secondes");
+      }
       return result;
     } finally {
       this.promisePool.delete(songUrl);
@@ -44,7 +47,7 @@ export class UltraFastStreaming {
   /**
    * Streaming direct optimisé
    */
-  private static async streamingDirect(songUrl: string, startTime: number, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
+  private static async streamingDirect(songUrl: string, startTime: number, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> {
     console.log("🚀 Streaming direct");
 
     try {
@@ -65,18 +68,18 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide
    */
-private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string | null> {
+private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
     try {
-      const url = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, songId);
-      if (typeof url === 'string') {
+      const result = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, songId);
+      if (result && typeof result.url === 'string') {
         // Validation rapide de l'URL pour éviter les liens cassés (500) ou expirés
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 1500);
         try {
-          const head = await fetch(url, { method: 'HEAD', signal: controller.signal });
+          const head = await fetch(result.url, { method: 'HEAD', signal: controller.signal });
           clearTimeout(timeout);
           if (head.ok || head.status === 405) { // Certains endpoints ne supportent pas HEAD
-            return url;
+            return result;
           }
           console.warn("⚠️ Validation URL échouée:", head.status, songTitle || songUrl);
           return null;

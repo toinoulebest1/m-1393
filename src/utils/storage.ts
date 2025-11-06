@@ -127,7 +127,7 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
 };
 
 
-export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> => {
+export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
   console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
 
   // ========== PRIORITÉ ABSOLUE: DEEZER/DEEZMATE ==========
@@ -175,16 +175,30 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       try {
         const proxyUrl = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
         
-        if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
-          console.log('✅ URL audio récupérée via Tidal:', proxyUrl.substring(0, 50));
-          
-          // Mettre à jour le deezer_id dans la DB
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-          }
-          
-          return proxyUrl;
-        }
+            if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
+              console.log('✅ URL audio récupérée via Tidal:', proxyUrl.substring(0, 50));
+              
+              // Récupérer la durée depuis l'API Deezer
+              let duration: number | undefined;
+              try {
+                const { data: deezerData } = await supabase.functions.invoke('deezer-proxy', {
+                  body: { endpoint: `/track/${deezerId}` }
+                });
+                if (deezerData?.duration) {
+                  duration = deezerData.duration;
+                  console.log('✅ Durée récupérée depuis API Deezer:', duration, 'secondes');
+                }
+              } catch (e) {
+                console.warn('⚠️ Impossible de récupérer la durée depuis Deezer');
+              }
+              
+              // Mettre à jour le deezer_id dans la DB
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+              }
+              
+              return { url: proxyUrl, duration };
+            }
         
         console.warn('⚠️ Multi-proxy: pas d\'URL valide');
       } catch (error) {
@@ -218,6 +232,20 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
             if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
               console.log('✅ URL audio récupérée (recherche):', proxyUrl.substring(0, 50));
               
+              // Récupérer la durée depuis l'API Deezer
+              let duration: number | undefined;
+              try {
+                const { data: deezerData } = await supabase.functions.invoke('deezer-proxy', {
+                  body: { endpoint: `/track/${foundDeezerId}` }
+                });
+                if (deezerData?.duration) {
+                  duration = deezerData.duration;
+                  console.log('✅ Durée récupérée depuis API Deezer (recherche):', duration, 'secondes');
+                }
+              } catch (e) {
+                console.warn('⚠️ Impossible de récupérer la durée depuis Deezer');
+              }
+              
               // Mettre à jour le deezer_id et tidal_id dans la DB
               if (songId) {
                 void supabase.from('songs')
@@ -228,7 +256,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
                   .eq('id', songId);
               }
               
-              return proxyUrl;
+              return { url: proxyUrl, duration };
             }
             
             console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
@@ -260,7 +288,11 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       
       if (!error && data?.preview) {
         console.log('✅ Lien preview Deezer récupéré');
-        return data.preview;
+        const duration = data.duration || undefined;
+        if (duration) {
+          console.log('✅ Durée récupérée depuis API Deezer (preview):', duration, 'secondes');
+        }
+        return { url: data.preview, duration };
       }
     } catch (error) {
       console.warn('⚠️ Erreur récupération preview Deezer:', error);
@@ -291,7 +323,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
 
     console.log('✅ URL Supabase récupérée (fichier local)');
-    return data.signedUrl;
+    return { url: data.signedUrl };
   } catch (error) {
     console.error('❌ Musique introuvable:', error);
     throw new Error(`Cette musique n'est pas disponible. Utilisez la recherche Deezer pour la trouver.`);

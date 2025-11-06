@@ -83,7 +83,8 @@ export function RewindQuizGame() {
 
       // Get the actual audio URL (for local files) or use directly (for Deezer previews)
       console.log('🔍 Récupération URL pour:', url);
-      const fullUrl = url.startsWith('http') ? url : await getAudioFileUrl(url);
+      const result = url.startsWith('http') ? { url } : await getAudioFileUrl(url);
+      const fullUrl = result.url;
       console.log('✅ URL obtenue:', fullUrl);
 
       // Create or reuse audio context

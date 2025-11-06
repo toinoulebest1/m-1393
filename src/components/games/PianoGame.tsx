@@ -100,14 +100,14 @@ const tileIdCounterRef = useRef(0);
 
     try {
       if (!isPlaying) {
-        const audioUrl = await getAudioFileUrl(currentSong.url);
+        const result = await getAudioFileUrl(currentSong.url);
         
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current = null;
         }
 
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(result.url);
         audio.crossOrigin = "anonymous";
         audio.volume = 0.5;
         audioRef.current = audio;
