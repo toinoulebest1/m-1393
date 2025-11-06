@@ -43,12 +43,23 @@ class AudioProxyService {
       console.log("🔌 Initialisation du proxy audio...");
       
       // Charger les instances
+      console.log("📂 Chargement de /instances.json...");
       const response = await fetch('/instances.json');
+      
+      if (!response.ok) {
+        throw new Error(`Impossible de charger instances.json: ${response.status} ${response.statusText}`);
+      }
+      
       const instanceUrls: string[] = await response.json();
+      console.log(`📋 ${instanceUrls.length} instances trouvées:`, instanceUrls);
       
       // Tester la latence de chaque instance en parallèle
+      console.log("⏱️ Test de latence en cours...");
       const latencyTests = instanceUrls.map(url => this.testLatency(url));
       const results = await Promise.allSettled(latencyTests);
+      
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value < Infinity).length;
+      console.log(`📊 Tests terminés: ${successCount}/${instanceUrls.length} instances répondent`);
       
       this.instances = results
         .map((result, index) => ({
@@ -59,10 +70,17 @@ class AudioProxyService {
         .sort((a, b) => a.latency - b.latency);
       
       // Sélectionner la meilleure instance
-      this.currentInstance = this.instances.find(i => i.latency < Infinity) || this.instances[0];
+      this.currentInstance = this.instances.find(i => i.latency < Infinity) || null;
       
-      console.log("✅ Proxy initialisé. Instance la plus rapide:", this.currentInstance.url, `(${this.currentInstance.latency}ms)`);
-      console.log("📊 Instances disponibles:", this.instances.map(i => `${i.url} (${i.latency}ms)`).join(', '));
+      if (!this.currentInstance) {
+        console.error("❌ AUCUNE instance disponible ! Toutes ont échoué au test.");
+        console.error("🔍 Détails des instances:", this.instances.map(i => 
+          `${i.url}: latency=${i.latency}ms, errors=${i.consecutiveErrors}`
+        ));
+      } else {
+        console.log("✅ Proxy initialisé. Instance la plus rapide:", this.currentInstance.url, `(${this.currentInstance.latency}ms)`);
+        console.log("📊 Instances disponibles:", this.instances.filter(i => i.latency < Infinity).map(i => `${i.url} (${i.latency}ms)`).join(', '));
+      }
       
       this.initialized = true;
     } catch (error) {
@@ -79,29 +97,40 @@ class AudioProxyService {
     const timeout = setTimeout(() => controller.abort(), 5000);
     
     try {
+      console.log(`🔍 Test latence: ${instanceUrl}/ping`);
       const start = performance.now();
-      const response = await fetch(`${instanceUrl}/ping`, {
-        signal: controller.signal,
-        method: 'HEAD'
-      }).catch(() => 
-        // Fallback: tester avec un endpoint alternatif
-        fetch(instanceUrl, {
+      
+      let response;
+      try {
+        response = await fetch(`${instanceUrl}/ping`, {
           signal: controller.signal,
           method: 'HEAD'
-        })
-      );
+        });
+        console.log(`📡 Réponse /ping: ${response.status} ${response.statusText}`);
+      } catch (pingError: any) {
+        console.log(`⚠️ /ping échoué (${pingError.name}: ${pingError.message}), tentative fallback sur ${instanceUrl}`);
+        // Fallback: tester avec un endpoint alternatif
+        response = await fetch(instanceUrl, {
+          signal: controller.signal,
+          method: 'HEAD'
+        });
+        console.log(`📡 Réponse fallback: ${response.status} ${response.statusText}`);
+      }
       
       clearTimeout(timeout);
       
       if (response.ok) {
         const latency = performance.now() - start;
-        console.log(`⚡ ${instanceUrl}: ${latency.toFixed(0)}ms`);
+        console.log(`✅ ${instanceUrl}: ${latency.toFixed(0)}ms`);
         return latency;
       }
+      
+      console.warn(`❌ ${instanceUrl}: HTTP ${response.status} - non OK`);
       return Infinity;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeout);
-      console.warn(`⚠️ ${instanceUrl}: timeout/erreur`);
+      const errorType = error.name === 'AbortError' ? 'TIMEOUT' : error.name;
+      console.error(`❌ ${instanceUrl}: ${errorType} - ${error.message}`);
       return Infinity;
     }
   }
@@ -129,8 +158,18 @@ class AudioProxyService {
 
     if (availableInstances.length === 0) {
       console.error("❌ Aucune instance disponible");
+      console.error("🔍 État des instances:", this.instances.map(i => ({
+        url: i.url,
+        latency: i.latency,
+        lastError: i.lastError ? new Date(i.lastError).toISOString() : 'none',
+        consecutiveErrors: i.consecutiveErrors,
+        cooldownRemaining: i.lastError ? Math.max(0, this.ERROR_COOLDOWN - (Date.now() - i.lastError)) : 0
+      })));
       return null;
     }
+    
+    console.log(`🎯 ${availableInstances.length} instances disponibles pour essai`);
+    console.log("📋 Instances:", availableInstances.map(i => `${i.url} (${i.latency}ms)`).join(', '));
 
     // Essayer chaque instance jusqu'à trouver une qui fonctionne
     for (const instance of availableInstances) {
