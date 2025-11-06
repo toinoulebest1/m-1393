@@ -13,47 +13,28 @@ export class UltraFastStreaming {
 
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
+   * CACHE DÉSACTIVÉ pour debug
    */
   static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<string> {
     const startTime = performance.now();
     this.requestCount++;
     
-    console.log("🚀 Ultra-fast streaming:", songUrl);
+    console.log("🚀 Ultra-fast streaming (SANS CACHE):", songUrl);
 
-    // 1. L0 Cache instantané (< 0.1ms)
-    if (UltraFastCache.hasL0(songUrl)) {
-      const l0Result = UltraFastCache.getL0(songUrl);
-      if (l0Result) {
-        const elapsed = performance.now() - startTime;
-        console.log("⚡ L0 CACHE:", elapsed.toFixed(2), "ms");
-        return l0Result;
-      }
-    }
-
-    // 2. Warm cache (< 0.5ms)
-    const warmResult = UltraFastCache.getWarm(songUrl);
-    if (warmResult) {
-      const elapsed = performance.now() - startTime;
-      console.log("🔥 WARM CACHE:", elapsed.toFixed(2), "ms");
-      return warmResult;
-    }
-
-    // 3. Vérifier si déjà en cours de récupération
+    // CACHE DÉSACTIVÉ - toujours récupérer depuis le réseau
+    // 1. Vérifier si déjà en cours de récupération
     if (this.promisePool.has(songUrl)) {
       console.log("⏳ Réutilisation promesse existante");
       return await this.promisePool.get(songUrl)!;
     }
 
-    // 4. Streaming ultra-agressif
+    // 2. Streaming direct
     const promise = this.streamingDirect(songUrl, startTime, deezerId, songTitle, songArtist, songId);
     this.promisePool.set(songUrl, promise);
 
     try {
       const result = await promise;
-      
-      // Promouvoir vers tous les caches
-      this.promoteToAllCaches(songUrl, result);
-      
+      console.log("✅ URL récupérée depuis le réseau:", result.substring(0, 100) + "...");
       return result;
     } finally {
       this.promisePool.delete(songUrl);
