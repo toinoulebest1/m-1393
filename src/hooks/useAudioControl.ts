@@ -5,7 +5,7 @@ import { updateMediaSessionMetadata } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
-import { cacheCurrentSong, getFromCache } from '@/utils/audioCache';
+import { cacheCurrentSong, getFromCache, saveToCache } from '@/utils/audioCache';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -144,6 +144,14 @@ export const useAudioControl = ({
             song.artist,
             song.id
           );
+
+          if (!result || !result.url) {
+            console.error("❌ Impossible de récupérer l'URL audio pour", song.title);
+            toast.error(`Impossible de lire "${song.title}". Aucune source audio trouvée.`);
+            setIsLoading(false);
+            return;
+          }
+
           audioUrl = result.url;
           apiDuration = result.duration;
           const elapsed = performance.now() - startTime;
