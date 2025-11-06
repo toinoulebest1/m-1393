@@ -10,7 +10,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { AdBanner } from "./AdBanner";
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import logo from "@/assets/logo.png";
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -20,6 +19,7 @@ export const Sidebar = () => {
     i18n
   } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
+  const logoUrl = "https://pwknncursthenghqgevl.supabase.co/storage/v1/object/public/logo/logo.png";
   useEffect(() => {
     const checkAdminStatus = async () => {
       const {
@@ -107,7 +107,7 @@ export const Sidebar = () => {
   return <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
-          <img src={logo} alt="Logo" className="w-8 h-8" />
+          <img src={logoUrl} alt="Logo" className="w-8 h-8" />
           <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
         </div>
       </div>
