@@ -237,35 +237,53 @@ class AudioProxyService {
 
       const data = await response.json();
       
-      // Cas 1: Tableau Tidal [metadata, manifest, {OriginalTrackUrl}]
-      if (Array.isArray(data) && data.length >= 3) {
-        const metadata = data[0];
-        const trackUrl = data[2]?.OriginalTrackUrl;
-        if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
-          const duration = metadata?.duration ? Number(metadata.duration) : undefined;
-          return { url: trackUrl, duration };
-        }
+      let trackUrl: string | undefined;
+      let duration: number | undefined;
+
+      // --- Extraction de l'URL ---
+      // Cas 1: Tableau Tidal
+      if (Array.isArray(data) && data.length >= 3 && data[2]?.OriginalTrackUrl) {
+        trackUrl = data[2].OriginalTrackUrl;
       }
-      
       // Cas 2: Manifeste Base64
-      if (typeof data === 'string' && data.startsWith('ey')) {
-        const manifest: ManifestResponse = JSON.parse(atob(data));
+      else if (typeof data === 'string' && data.startsWith('ey')) {
+        const manifest = JSON.parse(atob(data));
         if (manifest.urls && manifest.urls.length > 0) {
-          return { url: manifest.urls[0] };
+          trackUrl = manifest.urls[0];
+          // Vérifier la durée à l'intérieur du manifeste
+          if ((manifest as any).duration) {
+            duration = Number((manifest as any).duration);
+          }
         }
       }
-      
       // Cas 3: JSON direct avec urls[]
-      if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
-        return { url: data.urls[0] };
+      else if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
+        trackUrl = data.urls[0];
       }
-      
-      // Cas 4: URL directe dans la réponse
-      if (typeof data === 'string' && data.startsWith('http')) {
-        return { url: data };
+      // Cas 4: URL directe
+      else if (typeof data === 'string' && data.startsWith('http')) {
+        trackUrl = data;
       }
 
-      throw new Error('Format de réponse invalide');
+      // --- Extraction de la durée ---
+      // Si la durée n'a pas encore été trouvée, vérifier les emplacements courants
+      if (duration === undefined) {
+        // Depuis l'objet racine
+        if (data?.duration && !isNaN(Number(data.duration))) {
+          duration = Number(data.duration);
+        }
+        // Depuis les métadonnées Tidal
+        else if (Array.isArray(data) && data[0]?.duration && !isNaN(Number(data[0].duration))) {
+          duration = Number(data[0].duration);
+        }
+      }
+
+      if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
+        if (duration) console.log(`✅ Durée de ${duration}s trouvée pour ${trackId}`);
+        return { url: trackUrl, duration };
+      }
+
+      throw new Error('Format de réponse invalide ou URL non trouvée');
     } catch (error) {
       clearTimeout(timeout);
       throw error;
