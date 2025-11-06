@@ -104,26 +104,22 @@ const Index = () => {
           play();
           // Update position state immediately when play is triggered
           const audioElement = getCurrentAudioElement();
-          if (audioElement) {
-            const duration = audioElement.duration || durationToSeconds(currentSong.duration);
-            const position = audioElement.currentTime || 0;
-            const rate = audioElement.playbackRate || 1;
-            updatePositionState(duration, position, rate);
-            console.log("📊 MediaSession: play action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
-          }
+          const duration = durationToSeconds(currentSong.duration);
+          const position = audioElement?.currentTime || 0;
+          const rate = audioElement?.playbackRate || 1;
+          updatePositionState(duration, position, rate);
+          console.log("📊 MediaSession: play action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
         });
         
         navigator.mediaSession.setActionHandler('pause', () => {
           pause();
           // Update position state immediately when pause is triggered
           const audioElement = getCurrentAudioElement();
-          if (audioElement) {
-            const duration = audioElement.duration || durationToSeconds(currentSong.duration);
-            const position = audioElement.currentTime || 0;
-            const rate = audioElement.playbackRate || 1;
-            updatePositionState(duration, position, rate);
-            console.log("📊 MediaSession: pause action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
-          }
+          const duration = durationToSeconds(currentSong.duration);
+          const position = audioElement?.currentTime || 0;
+          const rate = audioElement?.playbackRate || 1;
+          updatePositionState(duration, position, rate);
+          console.log("📊 MediaSession: pause action, position:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
         });
         
         navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
@@ -145,28 +141,20 @@ const Index = () => {
 
     // Call updatePositionState immediately when playback starts
     const audioElement = getCurrentAudioElement();
-    if (audioElement) {
-      const duration = (audioElement.duration && !isNaN(audioElement.duration)) 
-        ? audioElement.duration 
-        : durationToSeconds(currentSong.duration);
-      const position = audioElement.currentTime || 0;
-      const rate = audioElement.playbackRate || 1;
-      updatePositionState(duration, position, rate);
-      console.log("📊 MediaSession position INIT:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
-    }
+    const duration = durationToSeconds(currentSong.duration);
+    const position = audioElement?.currentTime || 0;
+    const rate = audioElement?.playbackRate || 1;
+    updatePositionState(duration, position, rate);
+    console.log("📊 MediaSession position INIT:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
     
     // Then update position from audio element every second
     const interval = setInterval(() => {
       const audioElement = getCurrentAudioElement();
-      if (audioElement) {
-        const duration = (audioElement.duration && !isNaN(audioElement.duration)) 
-          ? audioElement.duration 
-          : durationToSeconds(currentSong.duration);
-        const position = audioElement.currentTime || 0;
-        const rate = audioElement.playbackRate || 1;
-        updatePositionState(duration, position, rate);
-        console.log("📊 MediaSession position update:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
-      }
+      const duration = durationToSeconds(currentSong.duration);
+      const position = audioElement?.currentTime || 0;
+      const rate = audioElement?.playbackRate || 1;
+      updatePositionState(duration, position, rate);
+      console.log("📊 MediaSession position update:", position.toFixed(1), "/", duration.toFixed(1), "rate:", rate);
     }, 1000);
 
     return () => clearInterval(interval);
