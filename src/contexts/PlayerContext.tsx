@@ -449,10 +449,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handleTimeUpdate = () => {
       const currentTime = audio.currentTime;
-      updateProgress(currentTime);
-
-      // Priorité à la durée de l'API, sinon celle de l'élément audio
       const duration = apiDurationRef.current || audio.duration;
+
+      // Mettre à jour l'état de la progression pour l'UI
+      if (duration && !isNaN(duration) && duration > 0) {
+        const progressPercent = (currentTime / duration) * 100;
+        setProgress(progressPercent);
+      }
+      
+      // Sauvegarder la position toutes les 2 secondes pour optimiser
+      if (Math.floor(currentTime) % 2 === 0) {
+        localStorage.setItem('audioProgress', currentTime.toString());
+      }
 
       // Mettre à jour la Media Session uniquement avec des données valides
       updatePositionState(duration, currentTime, audio.playbackRate);
@@ -461,29 +469,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleLoadedMetadata = () => {
       if (audio && currentSong && !isNaN(audio.currentTime)) {
         const currentTime = audio.currentTime;
-        
-        // Sauvegarder seulement toutes les 2 secondes pour optimiser
-        if (Math.floor(currentTime) % 2 === 0) {
-          localStorage.setItem('audioProgress', currentTime.toString());
-        }
+        const duration = apiDurationRef.current || audio.duration;
         
         // Mettre à jour le progress dans l'état
-        if (audio.duration && !isNaN(audio.duration)) {
-          const progressPercent = (currentTime / audio.duration) * 100;
+        if (duration && !isNaN(duration) && duration > 0) {
+          const progressPercent = (currentTime / duration) * 100;
           setProgress(progressPercent);
         }
         
-        // Mettre à jour MediaSession avec la durée de l'API
-        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
-          try {
-            const duration = apiDurationRef.current || audio.duration;
-            if (duration && !isNaN(duration) && duration !== Infinity) {
-              updatePositionState(duration, currentTime, audio.playbackRate);
-            }
-          } catch (e) {
-            // Ignorer les erreurs silencieusement
-          }
-        }
+        // Mettre à jour MediaSession avec la durée
+        updatePositionState(duration, currentTime, audio.playbackRate);
       }
     };
 
@@ -610,7 +605,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.mediaSession.setActionHandler('stop', null);
       }
     };
-  }, [currentSong, setProgress, isChangingSong, updateProgress]);
+  }, [currentSong, setProgress, isChangingSong]);
 
   // Persistance des données
   useEffect(() => {
