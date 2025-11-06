@@ -20,6 +20,7 @@ interface UseAudioControlProps {
   setNextSongPreloaded: (value: boolean) => void;
   preloadNextTracks: () => Promise<void>;
   setDisplayedSong: (song: Song | null) => void;
+  apiDurationRef?: React.MutableRefObject<number | undefined>;
 }
 
 // Compteur d'appels pour debugging
@@ -37,7 +38,8 @@ export const useAudioControl = ({
   changeTimeoutRef,
   setNextSongPreloaded,
   preloadNextTracks,
-  setDisplayedSong
+  setDisplayedSong,
+  apiDurationRef
 }: UseAudioControlProps) => {
 
   // Handlers et intervalle persistants
@@ -148,6 +150,12 @@ export const useAudioControl = ({
           console.log("✅ URL réseau récupérée en:", elapsed.toFixed(1), "ms pour:", song.title);
           if (apiDuration) {
             console.log("✅ Durée API récupérée:", apiDuration, "secondes");
+            
+            // Stocker la durée dans le ref pour PlayerContext
+            if (apiDurationRef) {
+              apiDurationRef.current = apiDuration;
+            }
+            
             // Mettre à jour immédiatement MediaSession avec la durée API
             if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
               try {

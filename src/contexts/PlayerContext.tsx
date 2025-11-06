@@ -66,6 +66,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [displayedSong, setDisplayedSong] = useState<Song | null>(null);
+  
+  // Stocker la durée de l'API pour MediaSession
+  const apiDurationRef = useRef<number | undefined>(undefined);
 
   // États de répétition (sans queue)
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
@@ -231,7 +234,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     changeTimeoutRef,
     setNextSongPreloaded,
     preloadNextTracks,
-    setDisplayedSong
+    setDisplayedSong,
+    apiDurationRef
   });
 
   // Wrapper function for setVolume that updates both state and audio element
@@ -441,6 +445,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const progressPercent = (currentTime / audioRef.current.duration) * 100;
           setProgress(progressPercent);
         }
+        
+        // Mettre à jour MediaSession avec la durée de l'API
+        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+          try {
+            const duration = apiDurationRef.current || audioRef.current.duration;
+            if (duration && !isNaN(duration) && duration !== Infinity) {
+              navigator.mediaSession.setPositionState({
+                duration: duration,
+                position: currentTime,
+                playbackRate: audioRef.current.playbackRate || 1
+              });
+            }
+          } catch (e) {
+            // Ignorer les erreurs silencieusement
+          }
+        }
       }
     };
 
@@ -460,12 +480,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handlePlaying = () => {
       // S'assurer que isAudioReady est true quand la lecture démarre
       setIsAudioReady(true);
+      
+      // Mettre à jour MediaSession quand la lecture démarre
+      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && audioRef.current) {
+        try {
+          const duration = apiDurationRef.current || audioRef.current.duration;
+          if (duration && !isNaN(duration) && duration !== Infinity) {
+            navigator.mediaSession.setPositionState({
+              duration: duration,
+              position: audioRef.current.currentTime,
+              playbackRate: audioRef.current.playbackRate || 1
+            });
+          }
+        } catch (e) {
+          // Ignorer les erreurs
+        }
+      }
+    };
+    
+    const handlePause = () => {
+      // Mettre à jour MediaSession quand la lecture est en pause
+      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && audioRef.current) {
+        try {
+          const duration = apiDurationRef.current || audioRef.current.duration;
+          if (duration && !isNaN(duration) && duration !== Infinity) {
+            navigator.mediaSession.setPositionState({
+              duration: duration,
+              position: audioRef.current.currentTime,
+              playbackRate: audioRef.current.playbackRate || 1
+            });
+          }
+        } catch (e) {
+          // Ignorer les erreurs
+        }
+      }
     };
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('loadstart', handleLoadStart);
     audioRef.current.addEventListener('canplay', handleCanPlay);
     audioRef.current.addEventListener('playing', handlePlaying);
+    audioRef.current.addEventListener('pause', handlePause);
 
     return () => {
       if (audioRef.current) {
@@ -473,6 +528,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audioRef.current.removeEventListener('loadstart', handleLoadStart);
         audioRef.current.removeEventListener('canplay', handleCanPlay);
         audioRef.current.removeEventListener('playing', handlePlaying);
+        audioRef.current.removeEventListener('pause', handlePause);
       }
     };
   }, [currentSong, setProgress]);
