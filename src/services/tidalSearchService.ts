@@ -16,6 +16,7 @@ class TidalSearchService {
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly searchInstances = [
     'https://chaos.squid.wtf',
+    'https://aether.squid.wtf'
   ];
 
   /**
