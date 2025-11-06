@@ -1,0 +1,338 @@
+/**
+ * Service de proxy audio multi-instances avec sélection automatique
+ * Supporte le décodage de manifestes Base64 et tolérance aux erreurs
+ */
+
+interface ProxyInstance {
+  url: string;
+  latency: number;
+  lastError?: number;
+  consecutiveErrors: number;
+}
+
+interface ManifestResponse {
+  urls: string[];
+  quality?: string;
+  id?: string;
+}
+
+interface CachedUrl {
+  url: string;
+  timestamp: number;
+  quality: string;
+}
+
+class AudioProxyService {
+  private instances: ProxyInstance[] = [];
+  private currentInstance: ProxyInstance | null = null;
+  private urlCache = new Map<string, CachedUrl>();
+  private readonly URL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_CACHE_SIZE = 50;
+  private readonly RETRY_DELAY = 1000;
+  private readonly MAX_RETRIES = 2;
+  private readonly ERROR_COOLDOWN = 30000; // 30 secondes
+  private initialized = false;
+
+  /**
+   * Initialiser le service avec test de latence des instances
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    try {
+      console.log("🔌 Initialisation du proxy audio...");
+      
+      // Charger les instances
+      const response = await fetch('/instances.json');
+      const instanceUrls: string[] = await response.json();
+      
+      // Tester la latence de chaque instance en parallèle
+      const latencyTests = instanceUrls.map(url => this.testLatency(url));
+      const results = await Promise.allSettled(latencyTests);
+      
+      this.instances = results
+        .map((result, index) => ({
+          url: instanceUrls[index],
+          latency: result.status === 'fulfilled' ? result.value : Infinity,
+          consecutiveErrors: result.status === 'fulfilled' ? 0 : 1
+        }))
+        .sort((a, b) => a.latency - b.latency);
+      
+      // Sélectionner la meilleure instance
+      this.currentInstance = this.instances.find(i => i.latency < Infinity) || this.instances[0];
+      
+      console.log("✅ Proxy initialisé. Instance la plus rapide:", this.currentInstance.url, `(${this.currentInstance.latency}ms)`);
+      console.log("📊 Instances disponibles:", this.instances.map(i => `${i.url} (${i.latency}ms)`).join(', '));
+      
+      this.initialized = true;
+    } catch (error) {
+      console.error("❌ Erreur initialisation proxy:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Tester la latence d'une instance
+   */
+  private async testLatency(instanceUrl: string): Promise<number> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    
+    try {
+      const start = performance.now();
+      const response = await fetch(`${instanceUrl}/ping`, {
+        signal: controller.signal,
+        method: 'HEAD'
+      }).catch(() => 
+        // Fallback: tester avec un endpoint alternatif
+        fetch(instanceUrl, {
+          signal: controller.signal,
+          method: 'HEAD'
+        })
+      );
+      
+      clearTimeout(timeout);
+      
+      if (response.ok) {
+        const latency = performance.now() - start;
+        console.log(`⚡ ${instanceUrl}: ${latency.toFixed(0)}ms`);
+        return latency;
+      }
+      return Infinity;
+    } catch (error) {
+      clearTimeout(timeout);
+      console.warn(`⚠️ ${instanceUrl}: timeout/erreur`);
+      return Infinity;
+    }
+  }
+
+  /**
+   * Obtenir l'URL audio via le proxy
+   */
+  async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<string | null> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    // Vérifier le cache
+    const cacheKey = `${trackId}_${quality}`;
+    const cached = this.urlCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.URL_CACHE_TTL) {
+      console.log("🎯 Cache hit:", trackId);
+      return cached.url;
+    }
+
+    // Essayer avec retry et fallback
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        const url = await this.fetchAudioUrl(trackId, quality);
+        if (url) {
+          // Mettre en cache
+          this.cacheUrl(cacheKey, url, quality);
+          return url;
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ Tentative ${attempt + 1}/${this.MAX_RETRIES + 1} échouée:`, error.message);
+        
+        // Si 429, 401 ou 5xx, changer d'instance
+        if (error.status === 429 || error.status === 401 || error.status >= 500) {
+          this.markInstanceError();
+          this.switchToNextInstance();
+        }
+        
+        // Attendre avant retry
+        if (attempt < this.MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (attempt + 1)));
+        }
+      }
+    }
+
+    console.error("❌ Échec récupération URL après tous les retries:", trackId);
+    return null;
+  }
+
+  /**
+   * Récupérer l'URL audio depuis l'instance courante
+   */
+  private async fetchAudioUrl(trackId: string, quality: string): Promise<string | null> {
+    if (!this.currentInstance) {
+      throw new Error("Aucune instance disponible");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const url = `${this.currentInstance.url}/track/?id=${trackId}&quality=${quality}`;
+      console.log("🌐 Requête proxy:", url);
+      
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const error: any = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+
+      const data = await response.json();
+      
+      // Cas 1: Manifeste Base64
+      if (typeof data === 'string' && data.startsWith('ey')) {
+        const manifest: ManifestResponse = JSON.parse(atob(data));
+        if (manifest.urls && manifest.urls.length > 0) {
+          console.log("✅ URL décodée depuis manifeste Base64");
+          return manifest.urls[0];
+        }
+      }
+      
+      // Cas 2: JSON direct avec urls[]
+      if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
+        console.log("✅ URL extraite depuis JSON");
+        return data.urls[0];
+      }
+      
+      // Cas 3: URL directe dans la réponse
+      if (typeof data === 'string' && data.startsWith('http')) {
+        console.log("✅ URL directe reçue");
+        return data;
+      }
+
+      console.warn("⚠️ Format de réponse inconnu:", data);
+      return null;
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error;
+    }
+  }
+
+  /**
+   * Mettre en cache une URL
+   */
+  private cacheUrl(key: string, url: string, quality: string): void {
+    // Limiter la taille du cache
+    if (this.urlCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = Array.from(this.urlCache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+      this.urlCache.delete(oldestKey);
+    }
+
+    this.urlCache.set(key, {
+      url,
+      quality,
+      timestamp: Date.now()
+    });
+    
+    console.log("💾 URL mise en cache:", key, `(${this.urlCache.size}/${this.MAX_CACHE_SIZE})`);
+  }
+
+  /**
+   * Marquer une erreur pour l'instance courante
+   */
+  private markInstanceError(): void {
+    if (this.currentInstance) {
+      this.currentInstance.consecutiveErrors++;
+      this.currentInstance.lastError = Date.now();
+      console.warn(`⚠️ Erreur instance ${this.currentInstance.url} (${this.currentInstance.consecutiveErrors} consécutives)`);
+    }
+  }
+
+  /**
+   * Basculer vers la prochaine instance disponible
+   */
+  private switchToNextInstance(): void {
+    if (!this.currentInstance || this.instances.length <= 1) return;
+
+    // Filtrer les instances sans erreur récente
+    const availableInstances = this.instances.filter(i => 
+      !i.lastError || Date.now() - i.lastError > this.ERROR_COOLDOWN
+    );
+
+    if (availableInstances.length === 0) {
+      console.warn("⚠️ Toutes les instances en cooldown, réinitialisation");
+      this.instances.forEach(i => {
+        i.lastError = undefined;
+        i.consecutiveErrors = 0;
+      });
+      return;
+    }
+
+    // Trouver la prochaine instance
+    const currentIndex = this.instances.indexOf(this.currentInstance);
+    let nextIndex = (currentIndex + 1) % this.instances.length;
+    
+    // Chercher une instance sans erreur récente
+    let attempts = 0;
+    while (attempts < this.instances.length) {
+      const candidate = this.instances[nextIndex];
+      if (!candidate.lastError || Date.now() - candidate.lastError > this.ERROR_COOLDOWN) {
+        this.currentInstance = candidate;
+        console.log("🔄 Basculement vers:", this.currentInstance.url);
+        return;
+      }
+      nextIndex = (nextIndex + 1) % this.instances.length;
+      attempts++;
+    }
+  }
+
+  /**
+   * Précharger l'URL d'une piste
+   */
+  async preloadTrack(trackId: string, quality: string = 'MP3_320'): Promise<void> {
+    console.log("🔮 Préchargement:", trackId);
+    try {
+      await this.getAudioUrl(trackId, quality);
+    } catch (error) {
+      console.warn("⚠️ Échec préchargement:", trackId, error);
+    }
+  }
+
+  /**
+   * Nettoyer le cache périodiquement
+   */
+  cleanupCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [key, cached] of this.urlCache.entries()) {
+      if (now - cached.timestamp > this.URL_CACHE_TTL) {
+        this.urlCache.delete(key);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log("🧹 Cache nettoyé:", cleaned, "entrées expirées");
+    }
+  }
+
+  /**
+   * Obtenir les statistiques du service
+   */
+  getStats() {
+    return {
+      currentInstance: this.currentInstance?.url,
+      instancesCount: this.instances.length,
+      cacheSize: this.urlCache.size,
+      instances: this.instances.map(i => ({
+        url: i.url,
+        latency: i.latency,
+        errors: i.consecutiveErrors
+      }))
+    };
+  }
+}
+
+// Instance singleton
+export const audioProxyService = new AudioProxyService();
+
+// Nettoyage périodique du cache (toutes les 5 minutes)
+setInterval(() => {
+  audioProxyService.cleanupCache();
+}, 5 * 60 * 1000);

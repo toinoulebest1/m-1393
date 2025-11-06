@@ -4,6 +4,7 @@ import { getPreGeneratedDropboxLink, generateAndSaveDropboxLinkAdvanced } from '
 import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
 import { circuitBreaker } from './circuitBreaker';
+import { audioProxyService } from '@/services/audioProxyService';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
@@ -150,9 +151,35 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
 
   // ÉTAPE 1: Race Condition - Appels parallèles avec Circuit Breaker
   if (deezerId) {
-    console.log('🏁 Race Condition: Deezmate vs flacdownloader');
+    console.log('🏁 Race Condition: Multi-proxy vs Deezmate vs flacdownloader');
     
     const promises: Promise<string | null>[] = [];
+    
+    // PRIORITÉ 1: Multi-instance proxy (instances.json)
+    promises.push(
+      (async () => {
+        try {
+          console.log('🚀 Appel multi-proxy avec ID:', deezerId);
+          const proxyUrl = await audioProxyService.getAudioUrl(deezerId, 'MP3_320');
+          
+          if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
+            console.log('✅ Multi-proxy gagne la race! URL:', proxyUrl.substring(0, 50));
+            
+            if (songId) {
+              void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+            }
+            
+            return proxyUrl;
+          }
+          
+          console.warn('⚠️ Multi-proxy: pas d\'URL valide');
+          return null;
+        } catch (error) {
+          console.warn('⚠️ Multi-proxy échec:', error);
+          return null;
+        }
+      })()
+    );
     
     // Deezmate (si circuit fermé)
     if (!circuitBreaker.isOpen('deezmate')) {
@@ -273,6 +300,32 @@ try {
         console.log('🏁 Race Condition avec ID trouvé:', foundDeezerId);
         
         const promises: Promise<string | null>[] = [];
+        
+        // PRIORITÉ 1: Multi-instance proxy
+        promises.push(
+          (async () => {
+            try {
+              console.log('🚀 Appel multi-proxy (recherche) avec ID:', foundDeezerId);
+              const proxyUrl = await audioProxyService.getAudioUrl(foundDeezerId, 'MP3_320');
+              
+              if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
+                console.log('✅ Multi-proxy race win! URL:', proxyUrl.substring(0, 50));
+                
+                if (songId) {
+                  void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+                }
+                
+                return proxyUrl;
+              }
+              
+              console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
+              return null;
+            } catch (error) {
+              console.warn('⚠️ Multi-proxy échec (recherche):', error);
+              return null;
+            }
+          })()
+        );
         
         // Deezmate (si circuit fermé)
         if (!circuitBreaker.isOpen('deezmate')) {

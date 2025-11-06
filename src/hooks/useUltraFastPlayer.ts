@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Song } from '@/types/player';
 import { useIntelligentPreloader } from './useIntelligentPreloader';
+import { audioProxyService } from '@/services/audioProxyService';
 // import { memoryCache } from '@/utils/memoryCache'; // DÉSACTIVÉ
 
 interface UseUltraFastPlayerProps {
@@ -53,6 +54,14 @@ export const useUltraFastPlayer = ({
       const nextSong = getNextSong();
       if (nextSong) {
         console.log("🚀 Préchargement RETARDÉ de la prochaine chanson:", nextSong.title);
+        
+        // Préchargement via multi-proxy si deezer_id disponible
+        if (nextSong.deezer_id) {
+          console.log("🌐 Préchargement multi-proxy:", nextSong.deezer_id);
+          await audioProxyService.preloadTrack(nextSong.deezer_id, 'MP3_320');
+        }
+        
+        // Préchargement intelligent classique
         await preloadPredictedSongs([nextSong]);
       }
     }, 5000); // Attendre 5 secondes au lieu de 100ms
