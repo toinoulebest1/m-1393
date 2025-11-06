@@ -482,7 +482,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsAudioReady(true);
       
       // Mettre à jour MediaSession quand la lecture démarre
-      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && audioRef.current) {
+      if ('mediaSession' in navigator && audioRef.current) {
+        navigator.mediaSession.playbackState = 'playing';
         try {
           const duration = apiDurationRef.current || audioRef.current.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
@@ -500,7 +501,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     const handlePause = () => {
       // Mettre à jour MediaSession quand la lecture est en pause
-      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && audioRef.current) {
+      if ('mediaSession' in navigator && audioRef.current) {
+        navigator.mediaSession.playbackState = 'paused';
         try {
           const duration = apiDurationRef.current || audioRef.current.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
@@ -516,22 +518,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('loadstart', handleLoadStart);
-    audioRef.current.addEventListener('canplay', handleCanPlay);
-    audioRef.current.addEventListener('playing', handlePlaying);
-    audioRef.current.addEventListener('pause', handlePause);
+    const audio = audioRef.current;
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('playing', handlePlaying);
+    audio.addEventListener('pause', handlePause);
+
+    // Action handlers for seeking
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
+          updateProgress(audio.currentTime);
+        });
+      } catch (e) { console.warn("Could not set seekbackward handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+          const skipTime = details.seekOffset || 10;
+          audio.currentTime = Math.min(audio.currentTime + skipTime, audio.duration);
+          updateProgress(audio.currentTime);
+        });
+      } catch (e) { console.warn("Could not set seekforward handler"); }
+    }
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('loadstart', handleLoadStart);
-        audioRef.current.removeEventListener('canplay', handleCanPlay);
-        audioRef.current.removeEventListener('playing', handlePlaying);
-        audioRef.current.removeEventListener('pause', handlePause);
+      if (audio) {
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        audio.removeEventListener('loadstart', handleLoadStart);
+        audio.removeEventListener('canplay', handleCanPlay);
+        audio.removeEventListener('playing', handlePlaying);
+        audio.removeEventListener('pause', handlePause);
+      }
+      // Clear handlers
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
       }
     };
-  }, [currentSong, setProgress]);
+  }, [currentSong, setProgress, isChangingSong, updateProgress]);
 
   // Persistance des données
   useEffect(() => {
