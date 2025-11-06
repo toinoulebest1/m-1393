@@ -233,7 +233,16 @@ class AudioProxyService {
 
       const data = await response.json();
       
-      // Cas 1: Manifeste Base64
+      // Cas 1: Tableau Tidal [metadata, manifest, {OriginalTrackUrl}]
+      if (Array.isArray(data) && data.length >= 3) {
+        const trackUrl = data[2]?.OriginalTrackUrl;
+        if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
+          console.log("✅ URL extraite depuis tableau Tidal (OriginalTrackUrl)");
+          return trackUrl;
+        }
+      }
+      
+      // Cas 2: Manifeste Base64
       if (typeof data === 'string' && data.startsWith('ey')) {
         const manifest: ManifestResponse = JSON.parse(atob(data));
         if (manifest.urls && manifest.urls.length > 0) {
@@ -242,13 +251,13 @@ class AudioProxyService {
         }
       }
       
-      // Cas 2: JSON direct avec urls[]
+      // Cas 3: JSON direct avec urls[]
       if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
         console.log("✅ URL extraite depuis JSON");
         return data.urls[0];
       }
       
-      // Cas 3: URL directe dans la réponse
+      // Cas 4: URL directe dans la réponse
       if (typeof data === 'string' && data.startsWith('http')) {
         console.log("✅ URL directe reçue");
         return data;
