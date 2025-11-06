@@ -90,7 +90,7 @@ class TidalSearchService {
    * Trouver le meilleur match dans les résultats de recherche
    */
   private findBestMatch(data: any, searchTitle: string, searchArtist: string): string | null {
-    if (!data || !data.tracks || !Array.isArray(data.tracks)) {
+    if (!data || !data.items || !Array.isArray(data.items)) {
       return null;
     }
     
@@ -104,7 +104,7 @@ class TidalSearchService {
     const normalizedSearchArtist = normalizeString(searchArtist);
     
     // Essayer de trouver un match exact
-    for (const track of data.tracks) {
+    for (const track of data.items) {
       if (!track.id) continue;
       
       const trackTitle = normalizeString(track.title || '');
@@ -120,7 +120,7 @@ class TidalSearchService {
     }
     
     // Essayer un match partiel sur le titre principal
-    for (const track of data.tracks) {
+    for (const track of data.items) {
       if (!track.id) continue;
       
       const trackTitle = normalizeString(track.title || '');
@@ -137,9 +137,9 @@ class TidalSearchService {
     }
     
     // Si aucun match, retourner le premier résultat par défaut
-    if (data.tracks.length > 0 && data.tracks[0].id) {
+    if (data.items.length > 0 && data.items[0].id) {
       console.warn("⚠️ Aucun match exact, utilisation du premier résultat");
-      return String(data.tracks[0].id);
+      return String(data.items[0].id);
     }
     
     return null;
