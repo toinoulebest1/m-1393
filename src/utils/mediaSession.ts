@@ -15,12 +15,12 @@ export const updateMediaSessionMetadata = (song: {
   if ('mediaSession' in navigator) {
     console.log('Updating MediaSession metadata for:', song.title);
     
-    const { data: logoData } = supabase.storage.from('logo').getPublicUrl('logo.png');
-    const supabaseLogoUrl = logoData.publicUrl;
+    // URL pointant vers le service de rendu d'images de Supabase pour permettre le redimensionnement
+    const supabaseLogoRenderUrl = 'https://pwknncursthenghqgevl.supabase.co/storage/v1/render/image/public/logo/logo.png';
     const sizes = [96, 128, 192, 256, 384, 512];
 
     const artwork = sizes.map(size => ({
-      src: song.imageUrl || `${supabaseLogoUrl}?width=${size}&height=${size}`,
+      src: song.imageUrl || `${supabaseLogoRenderUrl}?width=${size}&height=${size}`,
       sizes: `${size}x${size}`,
       type: 'image/png',
     }));
