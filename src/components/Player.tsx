@@ -304,6 +304,11 @@ export const Player = () => {
     handleFavoriteToggle();
   };
 
+  const handleMobileLyricsNavigation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleLyricsNavigation();
+  };
+
   if (isMobile) {
     return (
       <div 
@@ -349,16 +354,11 @@ export const Player = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleMobileFavoriteToggle}
+                onClick={handleMobileLyricsNavigation}
                 disabled={!currentSong}
                 className="p-0 h-8 w-8"
               >
-                <Heart className={cn(
-                  "w-6 h-6", 
-                  favorites.some(fav => fav.id === currentSong?.id) 
-                    ? "text-red-500 fill-red-500" 
-                    : "text-spotify-neutral"
-                )} />
+                <Mic className="w-6 h-6 text-spotify-neutral" />
               </Button>
               <Button
                 variant="ghost"
