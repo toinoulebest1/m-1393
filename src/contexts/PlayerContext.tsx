@@ -295,9 +295,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (nextPredicted && nextPredicted.id !== currentSong?.id) {
       console.log("✅ Lecture de la chanson prédite:", nextPredicted.title, "ID:", nextPredicted.id);
-      // Vider la prédiction actuelle pour éviter la condition de course lors d'un double-clic
-      predictedNextRef.current = null;
       await play(nextPredicted);
+    } else if (currentSong && nextPredicted?.id === currentSong?.id) {
+      console.warn("⚠️ Prédiction obsolète (même chanson), nouvelle prédiction...");
+      toast.info("Recherche d'une chanson suivante...");
+      
+      const newPreds = await predictNextSongs(currentSong, history);
+      const newNextSong = newPreds[0];
+
+      if (newNextSong && newNextSong.id !== currentSong.id) {
+        console.log("✅ Nouvelle prédiction trouvée, lecture:", newNextSong.title);
+        predictedNextRef.current = newNextSong;
+        await play(newNextSong);
+      } else {
+        console.error("❌ Impossible de trouver une chanson suivante différente.");
+        toast.error("Erreur: chanson suivante non trouvée.");
+      }
     } else if (nextPredicted?.id === currentSong?.id) {
       console.error("❌ BUG: La prédiction pointe vers la même chanson!");
       toast.error("Erreur: même chanson détectée");
