@@ -11,7 +11,7 @@ import { RewindQuizGame } from "@/components/games/RewindQuizGame";
 type GameType = "blind-test" | "guess-lyrics" | "rewind-quiz" | null;
 
 const BlindTest = () => {
-  const [selectedGame, setSelectedGame] = useState<GameType>(null);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
 
   const renderGameSelection = () => (
     <div className="container mx-auto px-4 py-8">

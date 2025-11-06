@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
 import { supabase } from "@/integrations/supabase/client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";

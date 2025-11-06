@@ -16,6 +16,7 @@ import {
   Radio, Link, Globe, Info, Pause
 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from "@/components/Layout";
-import { Player } from "@/components/Player";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useLocation } from "react-router-dom";
 import { Music, Trash2 } from "lucide-react";

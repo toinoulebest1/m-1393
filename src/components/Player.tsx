@@ -9,11 +9,14 @@ import { extractDominantColor } from "@/utils/colorExtractor";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CastButton } from "@/components/CastButton";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Progress } from "@/components/ui/progress";
 
 export const Player = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   const {
     currentSong,
@@ -282,8 +285,88 @@ export const Player = () => {
     }
   };
 
+  const handleNavigateToFullScreen = (e: React.MouseEvent) => {
+    // Prevent navigation when clicking on buttons
+    if (e.target instanceof HTMLElement && e.target.closest('button')) {
+      e.stopPropagation();
+      return;
+    }
+    navigate("/synced-lyrics");
+  };
+
+  const handleMobilePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handlePlayPause();
+  };
+
+  const handleMobileFavoriteToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleFavoriteToggle();
+  };
+
+  if (isMobile) {
+    return (
+      <div 
+        className="fixed bottom-0 left-0 right-0 h-[88px] bg-spotify-dark/90 backdrop-blur-lg border-t border-spotify-border z-50"
+        onClick={handleNavigateToFullScreen}
+      >
+        <Progress value={progress} className="absolute top-0 h-1 w-full rounded-none border-none bg-spotify-neutral/30" />
+
+        <div className="p-2 h-full">
+          <div className="flex items-center justify-between h-full gap-4">
+            <div className="flex items-center gap-3 overflow-hidden flex-1">
+              {displayedSong?.imageUrl && (
+                <img
+                  src={displayedSong.imageUrl}
+                  alt="Current Song"
+                  className="w-14 h-14 rounded-md object-cover flex-shrink-0"
+                />
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-base font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
+                <span className="text-sm text-spotify-neutral truncate">{displayedSong?.artist || "..."}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 pr-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleMobileFavoriteToggle}
+                disabled={!currentSong}
+                className="p-0 h-8 w-8"
+              >
+                <Heart className={cn(
+                  "w-6 h-6", 
+                  favorites.some(fav => fav.id === currentSong?.id) 
+                    ? "text-red-500 fill-red-500" 
+                    : "text-spotify-neutral"
+                )} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 p-0"
+                onClick={handleMobilePlayPause}
+                disabled={!currentSong || (!isAudioReady && !isChangingSong)}
+              >
+                {!isAudioReady && currentSong ? (
+                  <Loader2 className="h-6 w-6 text-white animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="h-6 w-6 text-white" />
+                ) : (
+                  <Play className="h-6 w-6 text-white" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-spotify-dark border-t border-spotify-border z-50 hidden md:block">
       {/* Overlay de chargement seulement pendant le changement de musique */}
       {isChangingSong && (
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-10">

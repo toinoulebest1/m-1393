@@ -15,6 +15,7 @@ import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { useDebounce } from "use-debounce";
 import { searchArtist } from "@/services/deezerApi";
 import { formatRelativeTime } from "@/utils/dateUtils";
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
-import { usePlayerContext } from "@/contexts/PlayerContext";
+import { usePlayer } from "@/contexts/PlayerContext";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from "@/utils/mediaSession";
@@ -20,22 +20,12 @@ const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const {
-    refreshCurrentSong,
-    currentSong,
-    play,
-    pause,
-    nextSong,
-    previousSong,
-    isPlaying,
-    stopCurrentSong,
-    removeSong,
-    isChangingSong,
-    progress,
-    getCurrentAudioElement
-  } = usePlayerContext();
+    currentSong
+  } = usePlayer();
+  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
+  const [showUploader, setShowUploader] = useState(false);
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
-  const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
   const [metadataOpacity, setMetadataOpacity] = useState(1);

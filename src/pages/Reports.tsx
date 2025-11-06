@@ -20,6 +20,7 @@ import { fr } from "date-fns/locale";
 import { CheckCircle, XCircle, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Layout } from "@/components/Layout";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const Reports = () => {
   const [reports, setReports] = useState<any[]>([]);

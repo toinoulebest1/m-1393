@@ -23,7 +23,7 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
         </main>
       </div>
       {!hideNavbar && isMobile && <BottomNavBar />}
-      <Player />
+      {!hideNavbar && <Player />}
     </div>
   );
 };

@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { SongPicker } from "@/components/SongPicker";
 import { generateImageFromSongs } from "@/utils/storage";
 import { SongCard } from "@/components/SongCard";
-import { Player } from "@/components/Player";
 import { cn } from "@/lib/utils";
 import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
 import { Layout } from "@/components/Layout";

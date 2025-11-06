@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
-import { Player } from "@/components/Player";
 import { Layout } from "@/components/Layout";
 import { formatRelativeTime } from "@/utils/dateUtils";
 interface Playlist {

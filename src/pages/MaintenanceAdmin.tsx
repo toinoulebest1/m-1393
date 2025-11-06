@@ -4,7 +4,6 @@ import { AnnouncementManagement } from "@/components/AnnouncementManagement";
 import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Ban, Megaphone } from "lucide-react";
-import { Player } from "@/components/Player";
 
 const MaintenanceAdmin = () => {
   return (
