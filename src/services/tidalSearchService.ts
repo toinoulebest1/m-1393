@@ -37,8 +37,8 @@ class TidalSearchService {
       try {
         console.log(`🔍 Recherche Tidal via ${instance}:`, title, artist);
         
-        const searchQuery = encodeURIComponent(`${title} ${artist}`);
-        const url = `${instance}/search?q=${searchQuery}&limit=5`;
+        // Utiliser les paramètres s (song) et a (artist) au lieu de q
+        const url = `${instance}/search?s=${encodeURIComponent(title)}&a=${encodeURIComponent(artist)}&limit=5`;
         
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
