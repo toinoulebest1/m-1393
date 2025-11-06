@@ -21,11 +21,12 @@ export const updateMediaSessionMetadata = (song: {
       artist: song.artist,
       album: song.genre || 'Unknown Album',
       artwork: [
-        {
-          src: song.imageUrl || absoluteLogoUrl,
-          sizes: '512x512',
-          type: 'image/png'
-        }
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '96x96', type: 'image/png' },
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '128x128', type: 'image/png' },
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '192x192', type: 'image/png' },
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '256x256', type: 'image/png' },
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '384x384', type: 'image/png' },
+        { src: song.imageUrl || absoluteLogoUrl, sizes: '512x512', type: 'image/png' },
       ]
     });
   }

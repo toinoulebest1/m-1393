@@ -559,6 +559,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         });
       } catch (e) { console.warn("Could not set seekforward handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime != null && audio.duration) {
+            const newTime = Math.max(0, Math.min(details.seekTime, audio.duration));
+            audio.currentTime = newTime;
+            updateProgress(newTime);
+            const duration = apiDurationRef.current || audio.duration;
+            if (duration && !isNaN(duration) && duration !== Infinity) {
+              updatePositionState(duration, newTime, audio.playbackRate);
+            }
+          }
+        });
+      } catch (e) { console.warn("Could not set seekto handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('stop', () => {
+          stopCurrentSong();
+        });
+      } catch (e) { console.warn("Could not set stop handler"); }
     }
 
     return () => {
@@ -573,6 +593,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('seekbackward', null);
         navigator.mediaSession.setActionHandler('seekforward', null);
+        navigator.mediaSession.setActionHandler('seekto', null);
+        navigator.mediaSession.setActionHandler('stop', null);
       }
     };
   }, [currentSong, setProgress, isChangingSong, updateProgress]);
