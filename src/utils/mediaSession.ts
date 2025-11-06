@@ -1,6 +1,7 @@
 /**
  * Utility functions for MediaSession API
  */
+import logoUrl from '@/assets/logo.png';
 
 // Update media session metadata
 export const updateMediaSessionMetadata = (song: {
@@ -19,7 +20,7 @@ export const updateMediaSessionMetadata = (song: {
       album: song.genre || 'Unknown Album',
       artwork: [
         {
-          src: song.imageUrl || "/logo.png",
+          src: song.imageUrl || logoUrl,
           sizes: '512x512',
           type: 'image/png'
         }

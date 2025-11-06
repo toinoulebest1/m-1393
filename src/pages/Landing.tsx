@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Music, Mic2, Trophy, ListMusic, Heart, History, Search, Gamepad2, Sparkles, Play, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/logo.png";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ const Landing = () => {
               <div className="relative group">
                 <div className="absolute inset-0 bg-spotify-accent/20 rounded-full blur-2xl group-hover:bg-spotify-accent/30 transition-all duration-500 animate-pulse" />
                 <div className="relative p-8 bg-gradient-to-br from-spotify-accent/20 to-purple-500/20 rounded-full backdrop-blur-xl border border-spotify-accent/30 shadow-2xl group-hover:scale-110 transition-transform duration-500">
-                  <img src="/logo.png" alt="Logo" className="w-24 h-24" />
+                  <img src={logo} alt="Logo" className="w-24 h-24" />
                 </div>
               </div>
             </div>
@@ -241,7 +242,7 @@ const Landing = () => {
         <footer className="border-t border-white/10 mt-32 py-12 backdrop-blur-sm">
           <div className="container mx-auto px-4 text-center">
             <div className="flex justify-center mb-6">
-              <img src="/logo.png" alt="Logo" className="w-8 h-8" />
+              <img src={logo} alt="Logo" className="w-8 h-8" />
             </div>
             <p className="text-spotify-neutral">© 2025 Music Platform. Tous droits réservés.</p>
           </div>
