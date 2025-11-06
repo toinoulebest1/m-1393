@@ -22,6 +22,9 @@ interface UseAudioControlProps {
   setDisplayedSong: (song: Song | null) => void;
 }
 
+// Compteur d'appels pour debugging
+let playCallCounter = 0;
+
 export const useAudioControl = ({
   audioRef,
   nextAudioRef,
@@ -38,7 +41,20 @@ export const useAudioControl = ({
 }: UseAudioControlProps) => {
 
   const play = useCallback(async (song?: Song) => {
+    playCallCounter++;
+    const callId = playCallCounter;
+    const timestamp = new Date().toISOString();
+    
+    console.log(`\n🎬 === APPEL PLAY #${callId} à ${timestamp} ===`);
+    console.log(`📝 Song demandée:`, song ? `"${song.title}" (ID: ${song.id})` : "AUCUNE");
+    console.log(`📝 Current song:`, currentSong ? `"${currentSong.title}" (ID: ${currentSong.id})` : "AUCUNE");
+    console.log(`⏱️ isChangingSong:`, isChangingSong);
+    
     if (song && (!currentSong || song.id !== currentSong.id)) {
+      console.log(`✅ APPEL #${callId}: Changement de chanson confirmé`);
+      console.log(`   De: ${currentSong?.title || "RIEN"} (${currentSong?.id || "N/A"})`);
+      console.log(`   Vers: ${song.title} (${song.id})`);
+      
       // ✅ TOUJOURS arrêter tous les audios avant de commencer
       console.log("🛑 Arrêt complet de tous les audios avant nouvelle lecture");
       console.log("Nouvelle chanson:", song.title);
@@ -576,11 +592,13 @@ export const useAudioControl = ({
           
           // Changement terminé
           changeTimeoutRef.current = window.setTimeout(() => {
+            console.log(`🏁 FIN APPEL PLAY #${callId}: ${song.title} terminé avec SUCCÈS`);
             setIsChangingSong(false);
             changeTimeoutRef.current = null;
           }, 50);
         } else {
           console.log("⚠️ Lecture en attente d'activation utilisateur");
+          console.log(`🏁 FIN APPEL PLAY #${callId}: ${song.title} en attente`);
           setIsChangingSong(false);
           
           toast.info("Cliquez pour activer la lecture audio", {
@@ -594,6 +612,7 @@ export const useAudioControl = ({
           // Cas fréquent sur Chrome: play() interrompu par un nouveau chargement
           if (errMsg.includes('interrupted by a new load request')) {
             console.warn('⚠️ play() interrompu par un nouveau chargement - pas de rollback');
+            console.log(`🏁 FIN APPEL PLAY #${callId}: INTERROMPU (nouveau chargement)`);
             setIsChangingSong(false);
             setIsPlaying(!audioRef.current?.paused);
             return;
@@ -608,6 +627,7 @@ export const useAudioControl = ({
           audioRef.current.src = '';
           
           // Débloquer l'interface
+          console.log(`🏁 FIN APPEL PLAY #${callId}: ERREUR - ${errMsg}`);
           setIsChangingSong(false);
           setIsPlaying(false);
           
