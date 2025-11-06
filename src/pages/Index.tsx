@@ -20,7 +20,14 @@ const Index = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const {
-    currentSong
+    currentSong,
+    isChangingSong,
+    isPlaying,
+    play,
+    pause,
+    nextSong,
+    previousSong,
+    refreshCurrentSong
   } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [showUploader, setShowUploader] = useState(false);
