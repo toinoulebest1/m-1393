@@ -286,12 +286,22 @@ export const useAudioControl = ({
         
         // Listener pour mettre à jour MediaSession dès que la durée est connue
         const onLoadedMetadata = () => {
-          if ('mediaSession' in navigator && audio.duration && !isNaN(audio.duration)) {
-            // Importer la fonction updatePositionState
-            import('@/utils/mediaSession').then(({ updatePositionState }) => {
-              updatePositionState(audio.duration, audio.currentTime || 0, audio.playbackRate || 1);
-              console.log("📊 MediaSession: metadata loaded, duration:", audio.duration.toFixed(1));
-            });
+          if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+            const audioDuration = audio.duration;
+            const knownDuration = apiDurationRef?.current;
+
+            // Priorité à la durée de l'API si elle existe.
+            // Sinon, utiliser la durée de l'élément audio si elle est valide (finie).
+            const durationToSet = knownDuration ?? (audioDuration && isFinite(audioDuration) ? audioDuration : undefined);
+
+            if (durationToSet) {
+              import('@/utils/mediaSession').then(({ updatePositionState }) => {
+                updatePositionState(durationToSet, audio.currentTime || 0, audio.playbackRate || 1);
+                console.log("📊 MediaSession: metadata loaded, duration set to:", durationToSet.toFixed(1));
+              });
+            } else {
+              console.log("📊 MediaSession: metadata loaded, mais pas de durée valide à définir.", { knownDuration, audioDuration });
+            }
           }
         };
         audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
