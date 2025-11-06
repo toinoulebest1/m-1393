@@ -239,10 +239,11 @@ class AudioProxyService {
         const metadata = data[0];
         const trackUrl = data[2]?.OriginalTrackUrl;
         if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
-          const duration = metadata?.duration;
+          // Extraire la durée depuis metadata.duration
+          const duration = metadata?.duration ? Number(metadata.duration) : undefined;
           console.log("✅ URL extraite depuis tableau Tidal (OriginalTrackUrl)");
           if (duration) {
-            console.log("✅ Durée extraite depuis métadonnées Tidal:", duration, "secondes");
+            console.log("✅ Durée extraite depuis data[0].duration:", duration, "secondes");
           }
           return { url: trackUrl, duration };
         }
