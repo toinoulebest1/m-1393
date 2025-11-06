@@ -27,7 +27,7 @@ export class AudioElementPool {
     for (let i = 0; i < this.POOL_SIZE; i++) {
       const audio = new Audio();
       audio.crossOrigin = "anonymous";
-      audio.preload = "auto";
+      audio.preload = "metadata";
       audio.volume = 0.7;
       
       // Optimisations navigateur

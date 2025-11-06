@@ -121,7 +121,15 @@ const Index = () => {
 
     const durationInSeconds = durationToSeconds(currentSong.duration);
     
-    // Update position from audio element every second
+    // Call updatePositionState immediately when playback starts
+    const audioElement = getCurrentAudioElement();
+    if (audioElement && !isNaN(audioElement.currentTime)) {
+      const currentPosition = audioElement.currentTime;
+      updatePositionState(durationInSeconds, currentPosition, 1);
+      console.log("📊 MediaSession position INIT:", currentPosition.toFixed(1), "/", durationInSeconds.toFixed(1));
+    }
+    
+    // Then update position from audio element every second
     const interval = setInterval(() => {
       const audioElement = getCurrentAudioElement();
       if (audioElement && !isNaN(audioElement.currentTime)) {
