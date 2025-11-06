@@ -5,6 +5,7 @@ import { memoryCache } from './memoryCache';
 import { getDropboxConfig } from './dropboxStorage';
 import { circuitBreaker } from './circuitBreaker';
 import { audioProxyService } from '@/services/audioProxyService';
+import { tidalSearchService } from '@/services/tidalSearchService';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité stricte à Dropbox d'abord
@@ -151,25 +152,46 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
 
   // ÉTAPE 1: Multi-proxy pour récupérer l'URL audio
   if (deezerId) {
-    console.log('🚀 Récupération audio via multi-proxy, ID:', deezerId);
+    console.log('🚀 Récupération audio via multi-proxy');
     
-    try {
-      const proxyUrl = await audioProxyService.getAudioUrl(deezerId, 'MP3_320');
+    // Chercher l'ID Tidal correspondant si on a titre + artiste
+    let tidalId: string | null = null;
+    
+    if (songTitle && songArtist) {
+      console.log("🔍 Recherche Tidal ID pour:", songTitle, songArtist);
+      tidalId = await tidalSearchService.searchTidalId(songTitle, songArtist);
       
-      if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
-        console.log('✅ URL audio récupérée:', proxyUrl.substring(0, 50));
+      // Sauvegarder le tidal_id dans la DB si on en a un
+      if (tidalId && songId) {
+        console.log("💾 Sauvegarde tidal_id dans la DB:", tidalId);
+        void supabase.from('songs')
+          .update({ tidal_id: tidalId })
+          .eq('id', songId);
+      }
+    }
+    
+    // Utiliser le multi-proxy seulement si on a un tidal_id
+    if (tidalId) {
+      try {
+        const proxyUrl = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
         
-        // Mettre à jour le deezer_id dans la DB si on a un songId
-        if (songId) {
-          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+        if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
+          console.log('✅ URL audio récupérée via Tidal:', proxyUrl.substring(0, 50));
+          
+          // Mettre à jour le deezer_id dans la DB
+          if (songId) {
+            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+          }
+          
+          return proxyUrl;
         }
         
-        return proxyUrl;
+        console.warn('⚠️ Multi-proxy: pas d\'URL valide');
+      } catch (error) {
+        console.warn('⚠️ Multi-proxy échec:', error);
       }
-      
-      console.warn('⚠️ Multi-proxy: pas d\'URL valide');
-    } catch (error) {
-      console.warn('⚠️ Multi-proxy échec:', error);
+    } else {
+      console.warn("⚠️ Impossible de trouver l'ID Tidal, passage à preview Deezer");
     }
   }
 
@@ -181,27 +203,40 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       // Recherche directe Deezer ID
       const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
       
-      // Si on a trouvé un ID Deezer, utiliser le multi-proxy
+      // Si on a trouvé un ID Deezer, chercher l'ID Tidal et utiliser le multi-proxy
       if (foundDeezerId) {
-        console.log('🚀 Récupération audio (recherche) via multi-proxy, ID:', foundDeezerId);
+        console.log('🔍 Recherche Tidal ID pour:', songTitle, songArtist);
         
-        try {
-          const proxyUrl = await audioProxyService.getAudioUrl(foundDeezerId, 'MP3_320');
+        const tidalId = await tidalSearchService.searchTidalId(songTitle, songArtist);
+        
+        if (tidalId) {
+          console.log('🚀 Récupération audio (recherche) via multi-proxy, Tidal ID:', tidalId);
           
-          if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
-            console.log('✅ URL audio récupérée (recherche):', proxyUrl.substring(0, 50));
+          try {
+            const proxyUrl = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
             
-            // Mettre à jour le deezer_id dans la DB si on a un songId
-            if (songId) {
-              void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
+            if (proxyUrl && typeof proxyUrl === 'string' && proxyUrl.startsWith('http')) {
+              console.log('✅ URL audio récupérée (recherche):', proxyUrl.substring(0, 50));
+              
+              // Mettre à jour le deezer_id et tidal_id dans la DB
+              if (songId) {
+                void supabase.from('songs')
+                  .update({ 
+                    deezer_id: foundDeezerId,
+                    tidal_id: tidalId 
+                  })
+                  .eq('id', songId);
+              }
+              
+              return proxyUrl;
             }
             
-            return proxyUrl;
+            console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
+          } catch (error) {
+            console.warn('⚠️ Multi-proxy échec (recherche):', error);
           }
-          
-          console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
-        } catch (error) {
-          console.warn('⚠️ Multi-proxy échec (recherche):', error);
+        } else {
+          console.warn("⚠️ Impossible de trouver l'ID Tidal pour la recherche");
         }
       }
     } catch (error) {
