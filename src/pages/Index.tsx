@@ -120,12 +120,16 @@ const Index = () => {
 
     const durationInSeconds = durationToSeconds(currentSong.duration);
     
+    // Convertir le pourcentage de progression en secondes
+    const positionInSeconds = (progress / 100) * durationInSeconds;
+    
     // Update position immediately
-    updatePositionState(durationInSeconds, progress, 1);
+    updatePositionState(durationInSeconds, positionInSeconds, 1);
 
     // Then update every second during playback
     const interval = setInterval(() => {
-      updatePositionState(durationInSeconds, progress, 1);
+      const currentPositionInSeconds = (progress / 100) * durationInSeconds;
+      updatePositionState(durationInSeconds, currentPositionInSeconds, 1);
     }, 1000);
 
     return () => clearInterval(interval);
