@@ -194,7 +194,7 @@ export const useAudioControl = ({
         });
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
-        let isHandlingError = false; // Flag pour éviter les boucles
+        let isHandlingError = false;
         const handleAudioError = async (e: Event) => {
           const audioError = (e.target as HTMLAudioElement).error;
           
@@ -216,233 +216,35 @@ export const useAudioControl = ({
             return;
           }
           
-          // Si c'est une erreur audio (n'importe quel code sauf aborted) ou erreur de demuxer Chrome
-          if (audioError?.code || audioError?.message?.includes('DEMUXER_ERROR')) {
-            isHandlingError = true;
-            
-            console.log("🔄 Lien expiré/invalide détecté, rechargement automatique...");
-            console.log("🎯 PRIORITÉ: Tentative Deezmate en premier...");
-            
-            // PRIORITÉ: Essayer Deezmate en premier si on a un deezer_id
-            try {
-              if (song.deezer_id) {
-                console.log("🎯 Tentative Deezmate avec ID:", song.deezer_id);
-                
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 2000); // 2s timeout
-                
-                try {
-                  const url = `https://api.deezmate.com/dl/${song.deezer_id}`;
-                  const res = await fetch(url, { signal: controller.signal });
-                  clearTimeout(timeout);
-                  
-                  if (res.ok) {
-                    const data = await res.json();
-                    const flacUrl = data?.links?.flac || data?.links?.FLAC;
-                    
-                    if (flacUrl && typeof flacUrl === 'string' && flacUrl.startsWith('http')) {
-                      console.log("✅ Deezmate fallback réussi!");
-                      
-                      const currentTime = audio.currentTime;
-                      const wasPlaying = !audio.paused;
-                      
-                      audio.removeEventListener('error', errorHandlerRef.current as any);
-                      audio.crossOrigin = '';
-                      audio.src = flacUrl;
-                      audio.load();
-                      
-                      if (wasPlaying) {
-                        await waitForCanPlay(3000).catch(() => {});
-                        audio.currentTime = currentTime;
-                        await audio.play().catch(err => console.warn('play() failed after Deezmate', err));
-                        console.log("✅ Lecture reprise avec Deezmate");
-                        toast.success("Source audio basculée");
-                      } else {
-                        await waitForCanPlay(3000).catch(() => {});
-                        audio.currentTime = currentTime;
-                      }
-                      
-                      errorHandlerRef.current = handleAudioError;
-                      audio.addEventListener('error', errorHandlerRef.current as any);
-                      isHandlingError = false; // Reset flag
-                      return; // Success, sortir
-                    }
-                  }
-                } catch (deezErr) {
-                  clearTimeout(timeout);
-                  console.warn("⚠️ Deezmate timeout/échec:", deezErr);
-                }
-              }
-              
-              // Si Deezmate échoue, essayer le lien preview Deezer
-              console.log("🔄 Deezmate échoué, essai preview Deezer...");
-              
-              if (song.deezer_id) {
-                const { supabase } = await import('@/integrations/supabase/client');
-                const { data, error } = await supabase.functions.invoke('deezer-proxy', {
-                  body: { 
-                    endpoint: `/track/${song.deezer_id}`
-                  }
-                });
-                
-                if (!error && data?.preview) {
-                  console.log("✅ Lien preview Deezer obtenu");
-                  
-                  const currentTime = audio.currentTime;
-                  const wasPlaying = !audio.paused;
-                  
-                 audio.removeEventListener('error', errorHandlerRef.current as any);
-                  audio.src = data.preview;
-                  audio.load();
-                  
-                  if (wasPlaying) {
-                    await waitForCanPlay(3000).catch(() => {});
-                    audio.currentTime = currentTime;
-                    await audio.play().catch(err => console.warn('play() failed after preview', err));
-                    console.log("✅ Lecture reprise avec preview Deezer");
-                    toast.info("Qualité audio réduite", {
-                      description: "Basculé vers l'aperçu Deezer"
-                    });
-                  } else {
-                    await waitForCanPlay(3000).catch(() => {});
-                    audio.currentTime = currentTime;
-                  }
-                  
-                  audio.addEventListener('error', handleAudioError);
-                  isHandlingError = false; // Reset flag
-                  return;
-                }
-              }
-              
-              // Dernier recours: système classique
-              console.log("🔄 Fallback vers système classique...");
-              const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                song.url, 
-                song.deezer_id,
-                song.title,
-                song.artist,
-                song.id
-              );
-              
-              if (newAudioUrl && newAudioUrl !== audio.src) {
-                console.log("✅ Nouveau lien obtenu via système classique");
-                const currentTime = audio.currentTime;
-                const wasPlaying = !audio.paused;
-                
-                audio.removeEventListener('error', handleAudioError);
-                audio.src = newAudioUrl;
-                audio.load();
-                
-                if (wasPlaying) {
-                  await waitForCanPlay(3000).catch(() => {});
-                  audio.currentTime = currentTime;
-                  await audio.play().catch(err => console.warn('play() failed after classic fallback', err));
-                  console.log("✅ Lecture reprise");
-                } else {
-                  await waitForCanPlay(3000).catch(() => {});
-                  audio.currentTime = currentTime;
-                }
-                
-                audio.addEventListener('error', handleAudioError);
-                isHandlingError = false; // Reset flag
-              } else {
-                console.warn("⚠️ Aucune alternative disponible");
-                toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
-                isHandlingError = false; // Reset flag
-              }
-            } catch (reloadError) {
-              console.error("❌ Impossible de recharger le lien:", reloadError);
-              toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
-              isHandlingError = false; // Reset flag
-            }
-          }
+          // Laisser l'utilisateur recliquer sur play au lieu de relancer automatiquement
+          isHandlingError = true;
+          console.log("⚠️ Erreur audio - utilisateur doit recliquer sur play");
+          toast.error("Erreur de lecture, cliquez sur play pour réessayer");
+          isHandlingError = false;
         };
         
-        // Gestionnaire de stalled (buffering bloqué) - Chrome specific
+        // Gestionnaire de stalled (buffering bloqué) - DÉSACTIVÉ
         const handleStalled = async () => {
-          console.warn("⚠️ Buffering bloqué (stalled), tentative de rechargement...");
-          
-          try {
-            const newAudioUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-              song.url, 
-              song.deezer_id,
-              song.title,
-              song.artist,
-              song.id
-            );
-            
-            if (newAudioUrl && newAudioUrl !== audio.src) {
-              const currentTime = audio.currentTime;
-              const wasPlaying = !audio.paused;
-              
-              audio.removeEventListener('stalled', handleStalled);
-              audio.src = newAudioUrl;
-              audio.load();
-              audio.currentTime = currentTime;
-              
-              if (wasPlaying) {
-                await audio.play();
-                console.log("✅ Lecture reprise après stalled");
-              }
-              
-              audio.addEventListener('stalled', handleStalled);
-            }
-          } catch (error) {
-            console.error("❌ Erreur rechargement après stalled:", error);
-          }
+          console.warn("⚠️ Buffering bloqué (stalled) - ignoré");
+          // Ne rien faire, laisser le navigateur gérer
         };
         
-        // Renouvellement préventif des liens Deezer toutes les 20 secondes (avant expiration)
+        // Renouvellement préventif DÉSACTIVÉ (causait des arrêts intempestifs)
+        // Le lien sera renouvelé uniquement en cas d'erreur via handleAudioError
         const setupLinkRenewal = () => {
-          if (renewalIntervalRef.current) clearInterval(renewalIntervalRef.current);
-          
-          // Pour les liens Deezer (preview temporaires), renouveler toutes les 20s
-          if (song.isDeezer || audioUrl.includes('dzcdn.net')) {
-            console.log("🔄 Activation renouvellement automatique des liens Deezer");
-            
-            renewalIntervalRef.current = window.setInterval(async () => {
-              if (!audio.paused && !audio.ended) {
-                console.log("🔄 Renouvellement préventif du lien (éviter expiration)...");
-                
-                try {
-                  const newUrl = await UltraFastStreaming.getAudioUrlUltraFast(
-                    song.url,
-                    song.deezer_id,
-                    song.title,
-                    song.artist,
-                    song.id
-                  );
-                  
-                  if (newUrl && newUrl !== audio.src) {
-                    const currentTime = audio.currentTime;
-                    audio.src = newUrl;
-                    audio.currentTime = currentTime;
-                    console.log("✅ Lien renouvelé avec succès");
-                  }
-                } catch (error) {
-                  console.error("❌ Erreur renouvellement préventif:", error);
-                }
-              }
-            }, 20000); // Renouveler toutes les 20 secondes
-          }
+          // Fonction vide pour éviter les interruptions
+          console.log("ℹ️ Renouvellement automatique désactivé (éviter les interruptions)");
         };
         
-        // Nettoyage du renouvellement quand la chanson change/se termine
+        // Nettoyage du renouvellement (au cas où)
         const cleanupRenewal = () => {
           if (renewalIntervalRef.current) {
             clearInterval(renewalIntervalRef.current);
             renewalIntervalRef.current = null;
-            console.log("🧹 Renouvellement automatique arrêté");
           }
         };
         
         audio.addEventListener('ended', cleanupRenewal);
-        audio.addEventListener('pause', () => {
-          // Arrêter le renouvellement si en pause trop longtemps
-          setTimeout(() => {
-            if (audio.paused) cleanupRenewal();
-          }, 30000);
-        });
         
         // Ajouter les listeners (avec refs stables)
         if (errorHandlerRef.current) audio.removeEventListener('error', errorHandlerRef.current);
