@@ -1,6 +1,7 @@
 /**
  * Utility functions for MediaSession API
  */
+import { supabase } from '@/integrations/supabase/client';
 // REMOVED: import logoUrl from '@/assets/logo.png';
 
 // Update media session metadata
@@ -14,20 +15,21 @@ export const updateMediaSessionMetadata = (song: {
   if ('mediaSession' in navigator) {
     console.log('Updating MediaSession metadata for:', song.title);
     
-    const absoluteLogoUrl = `${window.location.origin}/logo.png`;
+    const { data: logoData } = supabase.storage.from('logo').getPublicUrl('logo.png');
+    const supabaseLogoUrl = logoData.publicUrl;
+    const sizes = [96, 128, 192, 256, 384, 512];
+
+    const artwork = sizes.map(size => ({
+      src: song.imageUrl || `${supabaseLogoUrl}?width=${size}&height=${size}`,
+      sizes: `${size}x${size}`,
+      type: 'image/png',
+    }));
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: song.title,
       artist: song.artist,
       album: song.genre || 'Unknown Album',
-      artwork: [
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '96x96', type: 'image/png' },
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '128x128', type: 'image/png' },
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '192x192', type: 'image/png' },
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '256x256', type: 'image/png' },
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '384x384', type: 'image/png' },
-        { src: song.imageUrl || absoluteLogoUrl, sizes: '512x512', type: 'image/png' },
-      ]
+      artwork: artwork,
     });
   }
 };
