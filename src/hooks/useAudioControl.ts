@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata } from '@/utils/mediaSession';
@@ -39,6 +39,11 @@ export const useAudioControl = ({
   preloadNextTracks,
   setDisplayedSong
 }: UseAudioControlProps) => {
+
+  // Handlers et intervalle persistants
+  const errorHandlerRef = useRef<((e: Event) => void) | null>(null);
+  const stalledHandlerRef = useRef<((e: Event) => void) | null>(null);
+  const renewalIntervalRef = useRef<number | null>(null);
 
   const play = useCallback(async (song?: Song) => {
     playCallCounter++;
@@ -97,6 +102,20 @@ export const useAudioControl = ({
         audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
         audio.preload = "auto"; // Force preload auto pour la chanson courante
+        
+        // Nettoyage des anciens listeners et intervalles
+        if (errorHandlerRef.current) {
+          audio.removeEventListener('error', errorHandlerRef.current);
+          errorHandlerRef.current = null;
+        }
+        if (stalledHandlerRef.current) {
+          audio.removeEventListener('stalled', stalledHandlerRef.current as any);
+          stalledHandlerRef.current = null;
+        }
+        if (renewalIntervalRef.current) {
+          clearInterval(renewalIntervalRef.current);
+          renewalIntervalRef.current = null;
+        }
         
         console.log("🚀 Récupération URL ultra-rapide pour:", song.title, "ID:", song.id);
         const startTime = performance.now();
@@ -227,7 +246,7 @@ export const useAudioControl = ({
                       const currentTime = audio.currentTime;
                       const wasPlaying = !audio.paused;
                       
-                      audio.removeEventListener('error', handleAudioError);
+                      audio.removeEventListener('error', errorHandlerRef.current as any);
                       audio.crossOrigin = '';
                       audio.src = flacUrl;
                       audio.load();
@@ -243,7 +262,8 @@ export const useAudioControl = ({
                         audio.currentTime = currentTime;
                       }
                       
-                      audio.addEventListener('error', handleAudioError);
+                      errorHandlerRef.current = handleAudioError;
+                      audio.addEventListener('error', errorHandlerRef.current as any);
                       isHandlingError = false; // Reset flag
                       return; // Success, sortir
                     }
@@ -271,7 +291,7 @@ export const useAudioControl = ({
                   const currentTime = audio.currentTime;
                   const wasPlaying = !audio.paused;
                   
-                  audio.removeEventListener('error', handleAudioError);
+                 audio.removeEventListener('error', errorHandlerRef.current as any);
                   audio.src = data.preview;
                   audio.load();
                   
@@ -373,15 +393,14 @@ export const useAudioControl = ({
         };
         
         // Renouvellement préventif des liens Deezer toutes les 20 secondes (avant expiration)
-        let renewalInterval: number | null = null;
         const setupLinkRenewal = () => {
-          if (renewalInterval) clearInterval(renewalInterval);
+          if (renewalIntervalRef.current) clearInterval(renewalIntervalRef.current);
           
           // Pour les liens Deezer (preview temporaires), renouveler toutes les 20s
           if (song.isDeezer || audioUrl.includes('dzcdn.net')) {
             console.log("🔄 Activation renouvellement automatique des liens Deezer");
             
-            renewalInterval = window.setInterval(async () => {
+            renewalIntervalRef.current = window.setInterval(async () => {
               if (!audio.paused && !audio.ended) {
                 console.log("🔄 Renouvellement préventif du lien (éviter expiration)...");
                 
@@ -410,9 +429,9 @@ export const useAudioControl = ({
         
         // Nettoyage du renouvellement quand la chanson change/se termine
         const cleanupRenewal = () => {
-          if (renewalInterval) {
-            clearInterval(renewalInterval);
-            renewalInterval = null;
+          if (renewalIntervalRef.current) {
+            clearInterval(renewalIntervalRef.current);
+            renewalIntervalRef.current = null;
             console.log("🧹 Renouvellement automatique arrêté");
           }
         };
@@ -425,11 +444,13 @@ export const useAudioControl = ({
           }, 30000);
         });
         
-        // Ajouter les listeners
-        audio.removeEventListener('error', handleAudioError);
-        audio.removeEventListener('stalled', handleStalled);
-        audio.addEventListener('error', handleAudioError);
-        audio.addEventListener('stalled', handleStalled);
+        // Ajouter les listeners (avec refs stables)
+        if (errorHandlerRef.current) audio.removeEventListener('error', errorHandlerRef.current);
+        if (stalledHandlerRef.current) audio.removeEventListener('stalled', stalledHandlerRef.current as any);
+        errorHandlerRef.current = handleAudioError;
+        stalledHandlerRef.current = handleStalled;
+        audio.addEventListener('error', errorHandlerRef.current);
+        audio.addEventListener('stalled', stalledHandlerRef.current as any);
         
         // Activer le renouvellement automatique
         setupLinkRenewal();
