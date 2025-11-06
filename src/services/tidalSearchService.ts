@@ -15,9 +15,7 @@ class TidalSearchService {
   private cache = new Map<string, string>(); // Clé: "titre|artiste" → Tidal ID
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly searchInstances = [
-    'https://aether.squid.wtf',
-    'https://zeus.squid.wtf',
-    'https://kraken.squid.wtf',
+    'https://chaos.squid.wtf',
   ];
 
   /**
