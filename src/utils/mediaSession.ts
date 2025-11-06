@@ -38,10 +38,15 @@ export const updatePositionState = (
   position: number,
   playbackRate: number
 ) => {
+  // GARDE DE SÉCURITÉ : Ne jamais mettre à jour l'OS avec une durée invalide.
+  if (!duration || isNaN(duration) || duration === Infinity || duration <= 0) {
+    return; // Bloque la mise à jour si la durée n'est pas fiable.
+  }
+
   if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
     try {
       navigator.mediaSession.setPositionState({
-        duration: isNaN(duration) ? 0 : duration,
+        duration: duration,
         position: isNaN(position) ? 0 : position,
         playbackRate: playbackRate || 1
       });
