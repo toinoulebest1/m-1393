@@ -246,7 +246,6 @@ const Top100 = () => {
         <div className="flex items-center justify-center h-screen">
           <Music className="w-12 h-12 text-spotify-accent animate-pulse" />
         </div>
-        <Player />
       </Layout>
     );
   }
@@ -259,7 +258,6 @@ const Top100 = () => {
           <h2 className="text-2xl font-bold text-white">Aucune chanson dans le Top 100</h2>
           <p className="text-spotify-neutral">Commencez à aimer des chansons pour les voir ici</p>
         </div>
-        <Player />
       </Layout>
     );
   }
@@ -357,7 +355,6 @@ const Top100 = () => {
           </div>
         </div>
 
-        <Player />
       </div>
 
       {/* Dialog de confirmation suppression */}

@@ -327,7 +327,6 @@ const Index = () => {
             <AudioCacheManager />
           </div>}
         
-        <Player />
         <Toaster />
       </div>
     </Layout>;

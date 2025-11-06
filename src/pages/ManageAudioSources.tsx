@@ -256,7 +256,6 @@ const ManageAudioSources = () => {
           </Card>
         </div>
       </div>
-      <Player />
     </Layout>
   );
 };

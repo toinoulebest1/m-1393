@@ -511,7 +511,6 @@ const PlaylistsPage = () => {
               </div>}
           </div>
         </div>
-        <Player />
       </div>
     </Layout>;
 };

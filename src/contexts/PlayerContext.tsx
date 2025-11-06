@@ -5,6 +5,9 @@ import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { useAudioControl } from '@/hooks/useAudioControl';
 import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
+import { useToast } from "@/hooks/use-toast";
+import { AutoplayManager } from "@/utils/autoplayManager";
+import { CastProvider, useCast } from "./CastContext";
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
@@ -824,7 +827,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentSong, setCurrentSong, stopCurrentSong, setHistory, favorites, removeFavorite]);
 
   // L'objet context complet sans queue
-  const playerContext: PlayerContextType = {
+  const value = {
     currentSong,
     displayedSong,
     isPlaying,
@@ -862,8 +865,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <PlayerContext.Provider value={playerContext}>
-      {children}
+    <PlayerContext.Provider value={value}>
+      <CastProvider>
+        {children}
+      </CastProvider>
     </PlayerContext.Provider>
   );
 };

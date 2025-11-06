@@ -168,7 +168,6 @@ const AdminHistory = () => {
             <p className="text-muted-foreground">Vérification des permissions...</p>
           </div>
         </div>
-        <Player />
       </Layout>
     );
   }
@@ -324,7 +323,6 @@ const AdminHistory = () => {
           </CardContent>
         </Card>
       </div>
-      <Player />
     </Layout>
   );
 };

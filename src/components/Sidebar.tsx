@@ -104,7 +104,7 @@ export const Sidebar = () => {
       toast.error(t('common.logoutError'));
     }
   };
-  return <div className="fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex flex-col h-[calc(100vh-80px)] z-50">
+  return <div className="hidden md:flex fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex-col h-full z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
           <img src={logoUrl} alt="Logo" className="w-8 h-8" />

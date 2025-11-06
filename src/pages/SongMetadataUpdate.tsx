@@ -230,8 +230,6 @@ const SongMetadataUpdate = () => {
           onOpenChange={setDropboxChangesOpen}
         />
       </div>
-      
-      <Player />
     </Layout>
   );
 };

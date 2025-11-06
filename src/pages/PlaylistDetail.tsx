@@ -817,7 +817,6 @@ const PlaylistDetail = () => {
             ))}
           </div>
         </div>
-        <Player />
       </Layout>
     );
   }
@@ -831,7 +830,6 @@ const PlaylistDetail = () => {
             <p className="text-spotify-neutral text-lg">{t('playlists.notFound')}</p>
           </div>
         </div>
-        <Player />
       </Layout>
     );
   }
@@ -1030,7 +1028,6 @@ const PlaylistDetail = () => {
             </div>
           )}
         </div>
-      <Player />
     </Layout>
   );
 };

@@ -147,7 +147,6 @@ const BlindTest = () => {
   return (
     <Layout>
       {selectedGame === null ? renderGameSelection() : renderSelectedGame()}
-      <Player />
     </Layout>
   );
 };

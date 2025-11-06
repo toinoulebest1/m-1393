@@ -1,4 +1,3 @@
-
 import { MaintenanceSettings } from "@/components/MaintenanceSettings";
 import { UserBanManagement } from "@/components/UserBanManagement";
 import { AnnouncementManagement } from "@/components/AnnouncementManagement";
@@ -49,7 +48,6 @@ const MaintenanceAdmin = () => {
           </TabsContent>
         </Tabs>
       </div>
-      <Player />
     </Layout>
   );
 };

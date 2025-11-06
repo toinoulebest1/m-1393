@@ -114,7 +114,6 @@ const Favorites = () => {
               <p className="text-spotify-neutral text-lg">{t('common.noFavorites')}</p>
             </div>
           </div>
-          <Player />
         </div>
       </Layout>
     );
@@ -185,7 +184,6 @@ const Favorites = () => {
             </div>
           </div>
         </div>
-        <Player />
       </div>
     </Layout>
   );

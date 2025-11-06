@@ -1,5 +1,6 @@
-
 import { Sidebar } from "./Sidebar";
+import { Player } from "./Player";
+import { BottomNavBar } from "./BottomNavBar";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LayoutProps {
@@ -12,15 +13,17 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-spotify-dark text-white">
-      {!hideNavbar && <Sidebar />}
+      {!hideNavbar && !isMobile && <Sidebar />}
       <div className={cn(
         "relative z-10 flex-1 flex flex-col overflow-hidden",
-        hideNavbar ? "w-full" : "md:ml-60 w-full"
+        (hideNavbar || isMobile) ? "w-full" : "md:ml-64"
       )}>
-        <main className="flex-1 overflow-y-auto pb-24">
+        <main className="flex-1 overflow-y-auto pb-[152px] md:pb-[88px]">
           {children}
         </main>
       </div>
+      {!hideNavbar && isMobile && <BottomNavBar />}
+      <Player />
     </div>
   );
 };

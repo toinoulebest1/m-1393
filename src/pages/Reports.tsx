@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Player } from "@/components/Player";
@@ -20,6 +19,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { CheckCircle, XCircle, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Layout } from "@/components/Layout";
 
 const Reports = () => {
   const [reports, setReports] = useState<any[]>([]);
@@ -217,9 +217,8 @@ const Reports = () => {
   const rejectedCount = reports.filter(report => report.status === 'rejected').length;
 
   return (
-    <div className="flex min-h-screen bg-spotify-dark">
-      <Sidebar />
-      <div className="flex-1 ml-64 p-8 pb-32 bg-spotify-dark">
+    <Layout>
+      <div className="flex-1 p-8 pb-32">
         <div className="rounded-lg border border-border bg-spotify-dark/50 text-card-foreground shadow-lg">
           <div className="flex flex-col space-y-1.5 p-6">
             <div className="flex justify-between items-center">
@@ -374,10 +373,8 @@ const Reports = () => {
           </div>
         </div>
       </div>
-      <Player />
-    </div>
+    </Layout>
   );
 };
 
 export default Reports;
-
