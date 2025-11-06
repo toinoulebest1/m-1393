@@ -30,7 +30,8 @@ const Index = () => {
     stopCurrentSong,
     removeSong,
     isChangingSong,
-    progress
+    progress,
+    getCurrentAudioElement
   } = usePlayerContext();
   const isMobile = useIsMobile();
   const [showCacheManager, setShowCacheManager] = useState(false);
@@ -120,20 +121,18 @@ const Index = () => {
 
     const durationInSeconds = durationToSeconds(currentSong.duration);
     
-    // Convertir le pourcentage de progression en secondes
-    const positionInSeconds = (progress / 100) * durationInSeconds;
-    
-    // Update position immediately
-    updatePositionState(durationInSeconds, positionInSeconds, 1);
-
-    // Then update every second during playback
+    // Update position from audio element every second
     const interval = setInterval(() => {
-      const currentPositionInSeconds = (progress / 100) * durationInSeconds;
-      updatePositionState(durationInSeconds, currentPositionInSeconds, 1);
+      const audioElement = getCurrentAudioElement();
+      if (audioElement && !isNaN(audioElement.currentTime)) {
+        const currentPosition = audioElement.currentTime;
+        updatePositionState(durationInSeconds, currentPosition, 1);
+        console.log("📊 MediaSession position update:", currentPosition.toFixed(1), "/", durationInSeconds.toFixed(1));
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, progress, currentSong?.duration]);
+  }, [isPlaying, currentSong?.duration, getCurrentAudioElement]);
   useEffect(() => {
     if (currentSong) {
       setForceUpdate(prev => prev + 1);
