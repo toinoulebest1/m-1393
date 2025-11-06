@@ -193,11 +193,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     (async () => {
       try {
+        console.log("🔄 Début prédiction pour:", currentSong.title, "ID:", currentSong.id);
         const preds = await predictNextSongs(currentSong, history);
         predictedNextRef.current = preds[0] || null;
         
         if (predictedNextRef.current) {
-          console.log("🔮 Prochaine chanson prédite:", predictedNextRef.current.title);
+          console.log("✅ Prédiction FIXÉE:", predictedNextRef.current.title, "ID:", predictedNextRef.current.id);
+          console.log("📦 Référence stockée dans predictedNextRef.current");
           // Précharger immédiatement
           await preloadPredictedSongs(preds);
         }
@@ -276,6 +278,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    console.log("=== BOUTON SUIVANT CLIQUÉ ===");
+    
     // Annuler les préchargements intelligents (recommandations Deezer)
     // Le préchargement de la chanson suivante se relancera automatiquement
     cancelAllPreloads();
@@ -283,17 +287,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const nextPredicted = predictedNextRef.current;
     console.log("🔍 DEBUG NEXT SONG:");
     console.log("- Chanson actuelle:", currentSong?.title, "ID:", currentSong?.id);
-    console.log("- Chanson prédite:", nextPredicted?.title, "ID:", nextPredicted?.id);
+    console.log("- Chanson stockée dans predictedNextRef:", nextPredicted?.title, "ID:", nextPredicted?.id);
+    console.log("- Objet complet:", JSON.stringify(nextPredicted, null, 2));
     
     if (nextPredicted && nextPredicted.id !== currentSong?.id) {
-      console.log("▶️ Lecture de la chanson prédite:", nextPredicted.title);
+      console.log("✅ Lecture de la chanson prédite:", nextPredicted.title, "ID:", nextPredicted.id);
       await play(nextPredicted);
     } else if (nextPredicted?.id === currentSong?.id) {
       console.error("❌ BUG: La prédiction pointe vers la même chanson!");
       toast.error("Erreur: même chanson détectée");
     } else {
+      console.warn("⚠️ Aucune chanson prédite disponible");
       toast.info("Pas de chanson suivante disponible");
     }
+    console.log("=================================");
   }, [isChangingSong, play, cancelAllPreloads, currentSong]);
 
   const previousSong = useCallback(async () => {
