@@ -66,13 +66,15 @@ export const useIntelligentPreloader = () => {
   }, [savePatterns]);
 
   // Prédire les prochaines chansons probables (basé sur Deezer et genre)
+  // AVEC exclusion des 15 dernières chansons de l'historique
   const predictNextSongs = useCallback(async (currentSong: Song, recentHistory: Song[]): Promise<Song[]> => {
     if (!currentSong) return [];
     
     const predictions: Song[] = [];
     
-    // Créer un Set d'IDs récents pour exclusion rapide (20 dernières chansons)
-    const recentIds = new Set(recentHistory.slice(-20).map(s => s.id));
+    // Créer un Set d'IDs récents pour exclusion rapide (15 dernières chansons)
+    const recentIds = new Set(recentHistory.slice(-15).map(s => s.id));
+    console.log("🚫 Exclusion des 15 dernières chansons:", Array.from(recentIds));
     
     // Créer un Set des artistes récents (10 derniers artistes)
     const recentArtists = new Set(
@@ -85,12 +87,12 @@ export const useIntelligentPreloader = () => {
       
       const deezerRecommendations = await getDeezerRecommendationsByGenre(
         currentSong, 
-        10, // Demander plus pour compenser les exclusions
+        20, // Demander plus pour compenser les exclusions
         recentHistory
       );
       
       for (const song of deezerRecommendations) {
-        // Ne pas ajouter les chansons déjà dans l'historique récent
+        // Ne pas ajouter les chansons déjà dans l'historique récent (15 dernières)
         // NI les chansons du même artiste récent
         const artistMatch = recentArtists.has(song.artist.toLowerCase().trim());
         if (!recentIds.has(song.id) && !artistMatch && !predictions.some(p => p.id === song.id)) {
@@ -107,6 +109,7 @@ export const useIntelligentPreloader = () => {
       const selectedSong = predictions[randomIndex];
       console.log(`🎲 Chanson sélectionnée aléatoirement [${randomIndex + 1}/${predictions.length}]:`, 
                  `${selectedSong.title} - ${selectedSong.artist}`);
+      console.log("✅ Confirmation: cette chanson N'EST PAS dans les 15 dernières");
       return [selectedSong];
     }
     
