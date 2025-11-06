@@ -295,6 +295,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     if (nextPredicted && nextPredicted.id !== currentSong?.id) {
       console.log("✅ Lecture de la chanson prédite:", nextPredicted.title, "ID:", nextPredicted.id);
+      // Vider la prédiction actuelle pour éviter la condition de course lors d'un double-clic
+      predictedNextRef.current = null;
       await play(nextPredicted);
     } else if (nextPredicted?.id === currentSong?.id) {
       console.error("❌ BUG: La prédiction pointe vers la même chanson!");
