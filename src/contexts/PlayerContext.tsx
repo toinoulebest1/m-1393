@@ -24,10 +24,9 @@ const createNextAudio = () => {
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Nettoyage du localStorage au démarrage (suppression de l'ancienne queue)
+  // Nettoyage léger du localStorage (ne pas toucher à la queue)
   useEffect(() => {
-    console.log("🧹 Nettoyage du système de queue...");
-    localStorage.removeItem('queue');
+    console.log("🧹 Nettoyage léger (sans effacer la queue)...");
     localStorage.removeItem('lastSearchResults');
     localStorage.removeItem('shuffleMode');
     localStorage.removeItem('repeatMode');
@@ -284,6 +283,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Le préchargement de la chanson suivante se relancera automatiquement
     cancelAllPreloads();
 
+    // 1) Tenter d'utiliser la queue locale si disponible
+    try {
+      const savedQueue = localStorage.getItem('queue');
+      if (savedQueue && currentSong) {
+        const arr: Song[] = JSON.parse(savedQueue);
+        const idx = arr.findIndex(s => s.id === currentSong.id);
+        console.log("📜 Queue détectée (", arr.length, ") index courant:", idx);
+        if (idx !== -1 && idx + 1 < arr.length) {
+          const target = arr[idx + 1];
+          console.log("▶️ Lecture via queue (suivant):", target.title, target.id);
+          await play(target);
+          console.log("=================================");
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Lecture queue échouée:", e);
+    }
+
+    // 2) Fallback: prédiction intelligente
     const nextPredicted = predictedNextRef.current;
     console.log("🔍 DEBUG NEXT SONG:");
     console.log("- Chanson actuelle:", currentSong?.title, "ID:", currentSong?.id);
@@ -309,18 +328,45 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    console.log("=== BOUTON PRÉCÉDENT CLIQUÉ ===");
+
     // Annuler les préchargements intelligents (recommandations Deezer)
     cancelAllPreloads();
 
+    // 1) Tenter d'utiliser la queue locale si disponible
+    try {
+      const savedQueue = localStorage.getItem('queue');
+      if (savedQueue && currentSong) {
+        const arr: Song[] = JSON.parse(savedQueue);
+        const idx = arr.findIndex(s => s.id === currentSong.id);
+        console.log("📜 Queue détectée (", arr.length, ") index courant:", idx);
+        if (idx > 0) {
+          const target = arr[idx - 1];
+          console.log("◀️ Lecture via queue (précédent):", target.title, target.id);
+          await play(target);
+          console.log("=================================");
+          return;
+        } else if (idx === 0 && repeatMode === 'all' && arr.length > 0) {
+          const target = arr[arr.length - 1];
+          console.log("🔁 Repeat all: aller à la fin:", target.title, target.id);
+          await play(target);
+          console.log("=================================");
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Lecture queue échouée:", e);
+    }
+
+    // 2) Fallback: historique local
     if (history.length > 1) {
-      // Revenir à la chanson précédente dans l'historique
       const prevSong = history[history.length - 2];
-      console.log("◀️ Lecture de la chanson précédente:", prevSong.title);
+      console.log("◀️ Lecture via historique:", prevSong.title);
       await play(prevSong);
     } else {
       toast.info("Pas de chanson précédente");
     }
-  }, [isChangingSong, history, play, cancelAllPreloads]);
+  }, [isChangingSong, history, play, cancelAllPreloads, currentSong, repeatMode]);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {
