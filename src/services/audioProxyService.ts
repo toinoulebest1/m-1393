@@ -24,17 +24,17 @@ class AudioProxyService {
       if (!response.ok) throw new Error('Failed to load instances');
       const data = await response.json();
       
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.every(i => typeof i === 'string')) {
         this.instances = data;
         console.log(`✅ ${this.instances.length} instances de proxy audio chargées`);
       } else {
-        throw new Error('Invalid instances format');
+        throw new Error('Invalid instances format: expected array of strings');
       }
       
       this.initialized = true;
     } catch (error) {
       console.error('❌ Erreur chargement instances:', error);
-      this.instances = [];
+      this.instances = []; // Assurez-vous que la liste est vide en cas d'erreur
     }
   }
 
@@ -99,18 +99,18 @@ class AudioProxyService {
   private async raceForTidalId(title: string, artist: string): Promise<string | null> {
     const controllers = this.instances.map(() => new AbortController());
     
-    const searchPromises = this.instances.map((instance, index) => 
-      this.searchTidalId(instance, title, artist, controllers[index].signal)
+    const searchPromises = this.instances.map((instanceUrl, index) => 
+      this.searchTidalId(instanceUrl, title, artist, controllers[index].signal)
         .then(tidalId => {
           if (tidalId) {
             // Annuler toutes les autres recherches d'ID
             controllers.forEach((controller, i) => {
               if (i !== index) controller.abort();
             });
-            console.log(`🏆 ID trouvé par ${instance}: ${tidalId}`);
+            console.log(`🏆 ID trouvé par ${instanceUrl}: ${tidalId}`);
             return tidalId;
           }
-          throw new Error(`Aucun ID trouvé sur ${instance}`);
+          throw new Error(`Aucun ID trouvé sur ${instanceUrl}`);
         })
     );
 
@@ -128,18 +128,18 @@ class AudioProxyService {
   private async raceForAudioUrl(tidalId: string, quality: string): Promise<{ url: string; duration?: string } | null> {
     const controllers = this.instances.map(() => new AbortController());
     
-    const urlPromises = this.instances.map((instance, index) => 
-      this.fetchAudioUrl(instance, tidalId, quality, controllers[index].signal)
+    const urlPromises = this.instances.map((instanceUrl, index) => 
+      this.fetchAudioUrl(instanceUrl, tidalId, quality, controllers[index].signal)
         .then(result => {
           if (result) {
             // Annuler toutes les autres requêtes d'URL
             controllers.forEach((controller, i) => {
               if (i !== index) controller.abort();
             });
-            console.log(`🏆 URL trouvée par ${instance}`);
+            console.log(`🏆 URL trouvée par ${instanceUrl}`);
             return result;
           }
-          throw new Error(`Aucune URL trouvée sur ${instance}`);
+          throw new Error(`Aucune URL trouvée sur ${instanceUrl}`);
         })
     );
 
@@ -154,10 +154,10 @@ class AudioProxyService {
   /**
    * Rechercher l'ID Tidal sur une instance spécifique
    */
-  private async searchTidalId(instance: string, title: string, artist: string, signal: AbortSignal): Promise<string | null> {
+  private async searchTidalId(instanceUrl: string, title: string, artist: string, signal: AbortSignal): Promise<string | null> {
     try {
       const searchQuery = `${title} ${artist}`;
-      const url = `${instance}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
+      const url = `${instanceUrl}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
       
       const response = await fetch(url, {
         signal,
@@ -181,11 +181,11 @@ class AudioProxyService {
       return bestMatch;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`⏹️ Recherche annulée sur ${instance}`);
+        console.log(`⏹️ Recherche annulée sur ${instanceUrl}`);
       } else if (error instanceof Error && error.message.includes('CORS')) {
-        console.warn(`⚠️ Erreur CORS sur ${instance}:`, error.message);
+        console.warn(`⚠️ Erreur CORS sur ${instanceUrl}:`, error.message);
       } else {
-        console.warn(`⚠️ Erreur recherche ID sur ${instance}:`, error);
+        console.warn(`⚠️ Erreur recherche ID sur ${instanceUrl}:`, error);
       }
       return null;
     }
@@ -194,9 +194,9 @@ class AudioProxyService {
   /**
    * Récupérer l'URL audio sur une instance spécifique
    */
-  private async fetchAudioUrl(instance: string, tidalId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: string } | null> {
+  private async fetchAudioUrl(instanceUrl: string, tidalId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: string } | null> {
     try {
-      const url = `${instance}/track/?id=${tidalId}&quality=${quality}`;
+      const url = `${instanceUrl}/track/?id=${tidalId}&quality=${quality}`;
       
       const response = await fetch(url, {
         signal,
@@ -227,11 +227,11 @@ class AudioProxyService {
       return null;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`⏹️ Requête URL annulée sur ${instance}`);
+        console.log(`⏹️ Requête URL annulée sur ${instanceUrl}`);
       } else if (error instanceof Error && error.message.includes('CORS')) {
-        console.warn(`⚠️ Erreur CORS sur ${instance}:`, error.message);
+        console.warn(`⚠️ Erreur CORS sur ${instanceUrl}:`, error.message);
       } else {
-        console.warn(`⚠️ Erreur récupération URL sur ${instance}:`, error);
+        console.warn(`⚠️ Erreur récupération URL sur ${instanceUrl}:`, error);
       }
       return null;
     }
