@@ -35,7 +35,6 @@ class AudioProxyService {
   private readonly MAX_RETRIES = 2;
   private readonly ERROR_COOLDOWN = 30000; // 30 secondes
   private initialized = false;
-  private readonly TOP_N_INSTANCES = 3; // Nombre d'instances à tester en parallèle
 
   /**
    * Initialiser le service avec test de latence des instances
@@ -122,19 +121,19 @@ class AudioProxyService {
 
     // Trier les instances par score de santé
     const sortedInstances = this.sortInstances();
-    const topInstances = sortedInstances.slice(0, this.TOP_N_INSTANCES);
+    const instancesToRace = sortedInstances; // Utiliser toutes les instances
 
-    if (topInstances.length === 0) {
+    if (instancesToRace.length === 0) {
       console.error("❌ Aucune instance disponible");
       return null;
     }
     
-    console.log(`🏁 Course entre les ${topInstances.length} meilleures instances pour ${trackId}...`);
-    console.log("📋 Instances participantes:", topInstances.map(i => `${i.url} (score: ${i.score.toFixed(0)})`).join(', '));
+    console.log(`🏁 Course entre les ${instancesToRace.length} instances pour ${trackId}...`);
+    console.log("📋 Instances participantes:", instancesToRace.map(i => `${i.url} (score: ${i.score.toFixed(0)})`).join(', '));
 
-    const controllers = topInstances.map(() => new AbortController());
+    const controllers = instancesToRace.map(() => new AbortController());
     
-    const racePromises = topInstances.map((instance, index) => 
+    const racePromises = instancesToRace.map((instance, index) => 
       this.fetchFromInstance(instance, trackId, quality, controllers[index].signal)
         .then(result => {
           // Annuler les autres requêtes dès qu'on a un gagnant
@@ -161,7 +160,7 @@ class AudioProxyService {
     for (let i = 0; i < allResults.length; i++) {
       const result = allResults[i];
       if (result.status === 'fulfilled' && result.value) {
-        const winnerInstance = topInstances[i];
+        const winnerInstance = instancesToRace[i];
         console.log(`✅ Succès (fallback) avec ${winnerInstance.url}`);
         this.currentInstance = winnerInstance;
         this.cacheUrl(cacheKey, result.value.url, quality, result.value.duration);
