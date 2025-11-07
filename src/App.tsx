@@ -22,47 +22,40 @@ import ManageAudioSources from "./pages/ManageAudioSources";
 import SongMetadataUpdate from "./pages/SongMetadataUpdate";
 import AdminHistory from "./pages/AdminHistory";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
-import { useMaintenanceMode } from "./hooks/useMaintenanceMode";
-import MaintenancePage from "./pages/MaintenanceAdmin";
-import { PlayerProvider } from "./contexts/PlayerContext";
-import { Toaster } from "./components/ui/sonner";
-import { AdBanner } from "./components/AdBanner";
-import { useBanStatus } from './hooks/useBanStatus';
 
 const queryClient = new QueryClient();
 
 function App() {
-  const { isMaintenanceMode, loading } = useMaintenanceMode();
-  const { isBanned, loading: banLoading } = useBanStatus();
-
-  if (isMaintenanceMode) {
-    return <MaintenancePage />;
-  }
-
-  if (isBanned) {
-    return <BannedUserPage />;
-  }
-
   return (
-    <div className="h-screen w-screen bg-background text-foreground">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/landing" element={<Landing />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/playlists" element={<Playlists />} />
-          <Route path="/playlist/:id" element={<PlaylistDetail />} />
-          <Route path="/blind-test" element={<BlindTest />} />
-          <Route path="/top100" element={<Top100 />} />
-          <Route path="/artist/:id" element={<ArtistProfile />} />
-          <Route path="/admin/reports" element={<Reports />} />
-        </Routes>
-        <AdBanner />
-      </BrowserRouter>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <PlayerProvider>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/home" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/playlists" element={<Playlists />} />
+              <Route path="/playlist/:id" element={<PlaylistDetail />} />
+              <Route path="/blind-test" element={<BlindTest />} />
+              <Route path="/top100" element={<Top100 />} />
+              <Route path="/artist/:id" element={<ArtistProfile />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
+              <Route path="/add-songs" element={<ManageAudioSources />} />
+              <Route path="/metadata-update" element={<SongMetadataUpdate />} />
+              <Route path="/admin/history" element={<AdminHistory />} />
+              <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
+            </Routes>
+          </PlayerProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
