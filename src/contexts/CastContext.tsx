@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { usePlayerContext } from './PlayerContext';
@@ -63,12 +62,12 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('🎬 Initializing Cast Framework...');
 
-    if (window.top !== window.self) {
+    /* if (window.top !== window.self) {
       console.warn('⚠️ Cast in iframe preview may be limited. Open the app in a new tab.');
       toast.info('Cast indisponible en mode aperçu', {
         description: 'Ouvrez l’application dans un nouvel onglet pour détecter vos appareils Cast.'
       });
-    }
+    } */
 
     const onCastReady = () => {
       const castAny: any = (window as any).cast;
@@ -121,7 +120,19 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const discoverDevices = useCallback(async () => {
+    if (window.top !== window.self) {
+      toast.error('Fonctionnalité Cast non disponible en aperçu', {
+        description: 'Pour utiliser cette fonctionnalité, veuillez ouvrir l\'application dans un nouvel onglet.',
+        action: {
+          label: 'Ouvrir',
+          onClick: () => window.open(window.location.href, '_blank'),
+        },
+      });
+      return;
+    }
+
     if (!isApiReady) {
+      toast.warning("L'API Cast n'est pas encore prête. Veuillez réessayer dans quelques instants.");
       return;
     }
 
