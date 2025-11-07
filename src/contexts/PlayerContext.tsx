@@ -8,7 +8,7 @@ import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
 import { useToast } from "@/hooks/use-toast";
 import { AutoplayManager } from "@/utils/autoplayManager";
 
-import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { getFromCache } from '@/utils/audioCache';
@@ -249,14 +249,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Prépare l'élément audio suivant avec l'URL et attend le canplay
   const prepareNextAudio = async (song: Song) => {
     try {
-      const url = await UltraFastStreaming.getAudioUrlUltraFast(
+      const result = await getAudioFileUrl(
         song.url,
         song.deezer_id,
         song.title,
         song.artist
       );
-      if (!url || typeof url !== 'string') throw new Error('URL invalide pour la prochaine piste');
-      nextAudioRef.current.src = url;
+      if (!result || !result.url || typeof result.url !== 'string') throw new Error('URL invalide pour la prochaine piste');
+      nextAudioRef.current.src = result.url;
       nextAudioRef.current.preload = 'auto';
       await new Promise<void>((resolve, reject) => {
         const onCanPlay = () => { cleanup(); resolve(); };
@@ -370,7 +370,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // CACHE DÉSACTIVÉ - toujours récupérer depuis le réseau
           console.log("📡 Récupération DIRECTE depuis le réseau (cache désactivé)...");
-          const result = await UltraFastStreaming.getAudioUrlUltraFast(
+          const result = await getAudioFileUrl(
             song.url,
             song.deezer_id,
             song.title,

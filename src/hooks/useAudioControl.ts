@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
@@ -138,7 +138,7 @@ export const useAudioControl = ({
           console.log("✅ Chanson depuis cache:", song.title, "ID:", song.id);
         } else {
           console.log("⚠️ Pas en cache, récupération réseau pour:", song.title);
-          const result = await UltraFastStreaming.getAudioUrlUltraFast(
+          const result = await getAudioFileUrl(
             song.url, 
             song.deezer_id,
             song.title,
