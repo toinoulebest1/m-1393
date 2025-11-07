@@ -154,6 +154,22 @@ export const MusicUploader = () => {
   const fetchLyrics = async (title: string, artist: string, songId: string, duration?: number, albumName?: string) => {
     try {
       console.log(`Récupération des paroles pour: ${title} de ${artist}`);
+
+      // Vérifier d'abord si les paroles existent déjà
+      const { data: existingLyrics, error: checkError } = await supabase
+        .from('lyrics')
+        .select('id')
+        .eq('song_id', songId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error("Erreur lors de la vérification des paroles existantes:", checkError);
+      }
+
+      if (existingLyrics) {
+        console.log("Paroles déjà en cache pour:", title);
+        return "cached"; // Retourner une valeur pour indiquer que c'est déjà en cache
+      }
       
       const { data, error } = await supabase.functions.invoke('generate-lyrics', {
         body: { 
@@ -424,7 +440,7 @@ export const MusicUploader = () => {
         // Récupération des paroles en arrière-plan (passer la durée en secondes)
         fetchLyrics(title, artist, fileId, duration, undefined).then(lyrics => {
           if (lyrics) {
-            toast.dismiss(lyricsToastId);
+            toast.success(`Paroles trouvées pour "${title}"`, { id: lyricsToastId });
           } else {
             toast.error(`Impossible de trouver les paroles pour "${title}"`, {
               id: lyricsToastId

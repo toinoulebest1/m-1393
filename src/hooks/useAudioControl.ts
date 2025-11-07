@@ -448,17 +448,14 @@ export const useAudioControl = ({
             }
           })();
           
-          // Récupération des paroles en arrière-plan pour les musiques Deezer
-          if (song.isDeezer) {
-            fetchLyricsInBackground(
-              song.id,
-              song.title,
-              song.artist,
-              song.duration,
-              song.album_name,
-              song.isDeezer
-            );
-          }
+          // Récupération des paroles en arrière-plan
+          fetchLyricsInBackground(
+            song.id,
+            song.title,
+            song.artist,
+            song.duration,
+            song.album_name
+          );
           
           // Préchargement de la chanson suivante en arrière-plan
           setTimeout(() => preloadNextTracks(), 1000);
