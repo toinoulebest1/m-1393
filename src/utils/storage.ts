@@ -150,77 +150,31 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 1: Multi-proxy pour récupérer l'URL audio
+  // ÉTAPE 1: Utiliser le nouveau service audio avec Deezmate/Flacdownloader
   if (deezerId) {
-    console.log('🚀 Récupération audio via multi-proxy');
+    console.log('🚀 Récupération audio via Deezmate/Flacdownloader');
     
-    // Chercher l'ID Tidal correspondant si on a titre + artiste
-    let tidalId: string | null = null;
-    
-    if (songTitle && songArtist) {
-      console.log("🔍 Recherche Tidal ID pour:", songTitle, songArtist);
-      tidalId = await tidalSearchService.searchTidalId(songTitle, songArtist);
+    try {
+      const result = await audioProxyService.getAudioUrl(deezerId, 'LOSSLESS');
       
-      // Sauvegarder le tidal_id dans la DB si on en a un
-      if (tidalId && songId) {
-        console.log("💾 Sauvegarde tidal_id dans la DB:", tidalId);
-        void supabase.from('songs')
-          .update({ tidal_id: tidalId })
-          .eq('id', songId);
-      }
-    }
-    
-    // Utiliser le multi-proxy seulement si on a un tidal_id
-    if (tidalId) {
-      try {
-        const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+      if (result && result.url && result.url.startsWith('http')) {
+        console.log('✅ URL audio récupérée:', result.url.substring(0, 50) + '...');
         
-        if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
-          console.log('✅ URL audio récupérée via Tidal:', proxyResult.url.substring(0, 50));
-          
-          const duration = proxyResult.duration;
-          if (duration) {
-            console.log('✅ Durée récupérée depuis les métadonnées Tidal:', duration, 'secondes');
-          }
-          
-          // Mettre à jour le deezer_id dans la DB
-          if (songId) {
-            void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-          }
-          
-          return { url: proxyResult.url, duration };
+        if (result.duration) {
+          console.log('✅ Durée récupérée:', result.duration, 'secondes');
         }
         
-        console.warn('⚠️ Multi-proxy: pas d\'URL valide');
-      } catch (error) {
-        console.warn('⚠️ Multi-proxy échec:', error);
+        // Mettre à jour le deezer_id dans la DB
+        if (songId) {
+          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
+        }
+        
+        return { url: result.url, duration: result.duration };
       }
-    } else {
-      console.warn("⚠️ Impossible de trouver l'ID Tidal, passage à flacdownloader");
-    }
-
-    // NOUVEAU: Fallback vers flacdownloader-proxy si le multi-proxy a échoué ou n'a pas été tenté
-    console.log('🔄 Tentative de fallback via flacdownloader-proxy...');
-    try {
-      const flacProxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${deezerId}`;
-      console.log('🔗 URL du proxy flacdownloader:', flacProxyUrl);
-
-      // On doit valider que l'URL fonctionne, car la fonction proxy renvoie un stream.
-      // Un simple fetch HEAD peut suffire.
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-      const response = await fetch(flacProxyUrl, { method: 'HEAD', signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (response.ok || response.status === 405) { // 405 Method Not Allowed is ok, means endpoint exists but doesn't support HEAD
-        console.log('✅ flacdownloader-proxy a répondu, utilisation de l\'URL.');
-        return { url: flacProxyUrl }; // Pas de durée ici, on la découvrira à la lecture
-      } else {
-        const errorText = response.statusText;
-        console.warn(`⚠️ flacdownloader-proxy a échoué avec le statut: ${response.status} ${errorText}`);
-      }
+      
+      console.warn('⚠️ Service audio: pas d\'URL valide');
     } catch (error) {
-      console.warn('⚠️ Erreur lors de l\'appel à flacdownloader-proxy:', error);
+      console.warn('⚠️ Service audio échoué:', error);
     }
   }
 
