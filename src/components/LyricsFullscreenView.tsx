@@ -276,7 +276,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   };
 
   // Query to fetch lyrics - optimized with better parsing
-  const { data: lyrics, isLoading, refetch } = useQuery({
+  const { data: lyricsData, isLoading, refetch } = useQuery({
     queryKey: ["lyrics", song?.id],
     queryFn: async () => {
       if (!song?.id) return null;
@@ -284,12 +284,12 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
       try {
         const { data, error } = await supabase
           .from("lyrics")
-          .select("content")
+          .select("content, source")
           .eq("song_id", song.id)
           .maybeSingle();
   
         if (error) throw error;
-        return data?.content || null;
+        return data ? { content: data.content, source: data.source } : null;
       } catch (err) {
         console.error("Erreur lors de la récupération des paroles:", err);
         return null;
@@ -301,13 +301,13 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
     meta: {
       onSuccess: (data) => {
         // Vérifier si les paroles sont au format LRC
-        if (data) {
-          const lrcFormatDetected = detectLrcFormat(data);
+        if (data?.content) {
+          const lrcFormatDetected = detectLrcFormat(data.content);
           setIsLrcFormat(lrcFormatDetected);
           
           if (lrcFormatDetected) {
             try {
-              const parsed = parseLrc(data);
+              const parsed = parseLrc(data.content);
               setParsedLyrics(parsed);
             } catch (error) {
               console.error("Erreur lors du parsing des paroles LRC:", error);
@@ -385,11 +385,15 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
         throw new Error(response.data.error);
       }
 
+      const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
+      const lyricsSource = lyricsContent ? 'LRCLIB' : null;
+
       const { error: insertError } = await supabase
         .from("lyrics")
         .upsert({
           song_id: song.id,
-          content: response.data.lyrics,
+          content: lyricsContent,
+          source: lyricsSource,
         });
 
       if (insertError) {
@@ -555,6 +559,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
   const songTitle = song?.title || "Titre inconnu";
   const songArtist = song?.artist || "Artiste inconnu";
   const songImage = song?.imageUrl || "/placeholder.svg";
+  const lyrics = lyricsData?.content;
 
   // Use useMemo for styles to calculate only once
   const bgStyle = useMemo(() => {
@@ -808,7 +813,7 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                 <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
               </div>
             ) : lyrics ? (
-              <div className="w-full h-full flex items-start justify-center overflow-hidden">
+              <div className="w-full h-full flex flex-col items-start justify-center overflow-hidden">
                 <div className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm bg-black/20">
                   {isLrcFormat && parsedLyrics ? (
                     <>
@@ -840,6 +845,11 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                     </div>
                   )}
                 </div>
+                {lyricsData.source && (
+                  <div className="w-full max-w-3xl text-right text-xs text-spotify-neutral/60 mt-2 pr-6">
+                    Source: {lyricsData.source}
+                  </div>
+                )}
               </div>
             ) : error ? (
               <div className="flex-grow max-w-3xl mx-auto w-full p-6">

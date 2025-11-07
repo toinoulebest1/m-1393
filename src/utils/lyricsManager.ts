@@ -40,7 +40,7 @@ const fetchLyricsFromInstances = async (tidalId: string): Promise<string | null>
 
 
 /**
- * Récupère automatiquement les paroles d'une chanson depuis LRCLIB
+ * Récupère automatiquement les paroles d'une chanson
  */
 export const fetchAndSaveLyrics = async (
   songId: string,
@@ -49,17 +49,14 @@ export const fetchAndSaveLyrics = async (
   duration?: string,
   albumName?: string,
   isDeezer?: boolean
-): Promise<{ syncedLyrics: string | null; plainLyrics: string | null }> => {
+): Promise<{ syncedLyrics: string | null; plainLyrics: string | null; source: string | null }> => {
   try {
     console.log('🎵 Recherche de paroles pour:', songTitle, 'par', artist);
 
-    // Pour les musiques Deezer/Tidal, ne pas essayer de vérifier/sauvegarder dans la DB
-    // car elles n'ont pas d'UUID valide
     if (!isDeezer && !songId.startsWith('deezer-')) {
-      // Vérifier si les paroles existent déjà pour les musiques locales
       const { data: existingLyrics } = await supabase
         .from('lyrics')
-        .select('content')
+        .select('content, source')
         .eq('song_id', songId)
         .maybeSingle();
 
@@ -67,14 +64,15 @@ export const fetchAndSaveLyrics = async (
         console.log('✅ Paroles déjà en cache');
         return {
           syncedLyrics: existingLyrics.content.includes('[') ? existingLyrics.content : null,
-          plainLyrics: existingLyrics.content
+          plainLyrics: existingLyrics.content,
+          source: existingLyrics.source || null
         };
       }
     }
 
     let lyricsContent: string | null = null;
+    let lyricsSource: string | null = null;
 
-    // NOUVEAU: Tenter de récupérer les paroles depuis les instances proxy
     if (!isDeezer && !songId.startsWith('deezer-')) {
       const { data: songData } = await supabase
         .from('songs')
@@ -84,13 +82,14 @@ export const fetchAndSaveLyrics = async (
       
       if (songData?.tidal_id) {
         lyricsContent = await fetchLyricsFromInstances(songData.tidal_id);
+        if (lyricsContent) {
+          lyricsSource = 'MUSIXMATCH';
+        }
       }
     }
 
-    // Si les instances n'ont rien donné, utiliser LRCLIB
     if (!lyricsContent) {
       console.log('🎵 Paroles non trouvées sur les instances, appel de LRCLIB.');
-      // Convertir la durée de MM:SS en secondes
       let durationInSeconds: number | undefined;
       if (duration) {
         const parts = duration.split(':');
@@ -99,14 +98,8 @@ export const fetchAndSaveLyrics = async (
         }
       }
 
-      // Appeler l'edge function pour récupérer les paroles
       const response = await supabase.functions.invoke('generate-lyrics', {
-        body: {
-          songTitle,
-          artist,
-          duration: durationInSeconds,
-          albumName
-        }
+        body: { songTitle, artist, duration: durationInSeconds, albumName }
       });
 
       if (response.error) throw new Error(response.error.message);
@@ -114,25 +107,27 @@ export const fetchAndSaveLyrics = async (
         console.warn('⚠️ Paroles non trouvées sur LRCLIB:', response.data.error);
       } else {
         lyricsContent = response.data.syncedLyrics || response.data.lyrics;
+        if (lyricsContent) {
+          lyricsSource = 'LRCLIB';
+        }
       }
     }
 
-    // Sauvegarder dans la base de données uniquement pour les musiques locales (avec UUID valide)
     if (lyricsContent && !isDeezer && !songId.startsWith('deezer-')) {
       const { error: insertError } = await supabase
         .from('lyrics')
         .upsert({
           song_id: songId,
-          content: lyricsContent
+          content: lyricsContent,
+          source: lyricsSource
         });
 
       if (insertError) {
         console.error('❌ Erreur sauvegarde paroles:', insertError);
       } else {
-        console.log('✅ Paroles sauvegardées dans la DB');
+        console.log(`✅ Paroles sauvegardées dans la DB (Source: ${lyricsSource})`);
       }
 
-      // Sauvegarder dans Dropbox si activé
       if (isDropboxEnabled()) {
         try {
           await uploadLyricsToDropbox(songId, lyricsContent);
@@ -147,11 +142,12 @@ export const fetchAndSaveLyrics = async (
 
     return {
       syncedLyrics: lyricsContent && lyricsContent.includes('[') ? lyricsContent : null,
-      plainLyrics: lyricsContent
+      plainLyrics: lyricsContent,
+      source: lyricsSource
     };
   } catch (error) {
     console.error('❌ Erreur récupération paroles:', error);
-    return { syncedLyrics: null, plainLyrics: null };
+    return { syncedLyrics: null, plainLyrics: null, source: null };
   }
 };
 
@@ -166,11 +162,10 @@ export const fetchLyricsInBackground = (
   albumName?: string,
   isDeezer?: boolean
 ): void => {
-  // Lancer la récupération en arrière-plan sans attendre
   setTimeout(() => {
     fetchAndSaveLyrics(songId, songTitle, artist, duration, albumName, isDeezer)
       .catch(error => {
         console.warn('⚠️ Échec récupération paroles en arrière-plan:', error);
       });
-  }, 2000); // Attendre 2 secondes après le début de la lecture
+  }, 2000);
 };
