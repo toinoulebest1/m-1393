@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
-import { updateMediaSessionMetadata } from '@/utils/mediaSession';
+import { updateMediaSessionMetadata, durationToSeconds } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';

@@ -59,14 +59,23 @@ export const updatePositionState = (
 };
 
 // Format duration string to seconds
-export const durationToSeconds = (duration: string | undefined): number => {
-  if (!duration) return 0;
-  
+export const durationToSeconds = (duration: any): number => {
+  if (duration === null || duration === undefined) return 0;
+  if (typeof duration === 'number') return isNaN(duration) ? 0 : duration;
+  if (typeof duration !== 'string') return 0;
+
   try {
     if (duration.includes(':')) {
-      const [minutes, seconds] = duration.split(':').map(Number);
-      if (isNaN(minutes) || isNaN(seconds)) return 0;
-      return (minutes * 60) + seconds;
+      const parts = duration.split(':').map(Number);
+      if (parts.some(isNaN)) return 0;
+      
+      let seconds = 0;
+      if (parts.length === 2) { // MM:SS
+        seconds = parts[0] * 60 + parts[1];
+      } else if (parts.length === 3) { // HH:MM:SS
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+      return seconds;
     }
     
     const durationInSeconds = parseFloat(duration);

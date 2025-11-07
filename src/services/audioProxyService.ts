@@ -35,30 +35,6 @@ class AudioProxyService {
   private initialized = false;
 
   /**
-   * Helper to convert duration string/number to seconds
-   */
-  private durationToSeconds(duration: any): number | undefined {
-    if (duration === null || duration === undefined) return undefined;
-    if (typeof duration === 'number') return isNaN(duration) ? undefined : duration;
-    if (typeof duration !== 'string') return undefined;
-
-    if (duration.includes(':')) {
-      const parts = duration.split(':').map(Number);
-      if (parts.some(isNaN)) return undefined;
-      let seconds = 0;
-      if (parts.length === 2) { // MM:SS
-        seconds = parts[0] * 60 + parts[1];
-      } else if (parts.length === 3) { // HH:MM:SS
-        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      }
-      return seconds > 0 ? seconds : undefined;
-    }
-    
-    const num = parseFloat(duration);
-    return isNaN(num) || num <= 0 ? undefined : num;
-  }
-
-  /**
    * Initialiser le service avec test de latence des instances
    */
   async initialize(): Promise<void> {
@@ -276,7 +252,8 @@ class AudioProxyService {
           trackUrl = manifest.urls[0];
           // Vérifier la durée à l'intérieur du manifeste
           if ((manifest as any).duration) {
-            duration = Number((manifest as any).duration);
+            const parsedDuration = durationToSeconds((manifest as any).duration);
+            if (parsedDuration > 0) duration = parsedDuration;
           }
         }
       }
@@ -294,11 +271,13 @@ class AudioProxyService {
       if (duration === undefined) {
         // Depuis l'objet racine
         if (data?.duration) {
-          duration = this.durationToSeconds(data.duration);
+          const parsedDuration = durationToSeconds(data.duration);
+          if (parsedDuration > 0) duration = parsedDuration;
         }
         // Depuis les métadonnées Tidal
         else if (Array.isArray(data) && data[0]?.duration) {
-          duration = this.durationToSeconds(data[0].duration);
+          const parsedDuration = durationToSeconds(data[0].duration);
+          if (parsedDuration > 0) duration = parsedDuration;
         }
       }
 
