@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PlayerPreferences } from '@/types/player';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
@@ -65,14 +64,8 @@ export const usePlayerPreferences = () => {
       
       if (nextTrack) {
         console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
-        await UltraFastStreaming.getAudioUrlUltraFast(
-          nextTrack.url,
-          nextTrack.deezer_id,
-          
-          nextTrack.title,
-          nextTrack.artist,
-          nextTrack.id
-        );
+        const { audioProxyService } = await import('@/services/audioProxyService');
+        await audioProxyService.preloadTrack(nextTrack.deezer_id || nextTrack.id);
         console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }
     } catch (error) {

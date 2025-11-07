@@ -1,151 +1,102 @@
 /**
  * Service de proxy audio pour Deezer avec Deezmate et Flacdownloader
  */
-import { durationToSeconds } from '@/utils/mediaSession';
+import { supabase } from '@/integrations/supabase/client';
+
+const PROXY_TIMEOUT = 1500; // 1.5 secondes
 
 class AudioProxyService {
-  private initialized = false;
-
-  async initialize(): Promise<void> {
-    if (this.initialized) return;
-    console.log("🔌 Initialisation du service audio Deezer...");
-    this.initialized = true;
-  }
-
   /**
-   * Obtenir l'URL audio via les nouvelles instances Deezer
+   * Obtenir l'URL audio en interrogeant les services en parallèle avec timeouts.
    */
   async getAudioUrl(trackId: string, quality: string = 'FLAC'): Promise<{ url: string; duration?: number } | null> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
+    console.log(`🚀 Récupération URL pour ${trackId} via services parallèles...`);
 
-    console.log(`🚀 Récupération URL pour ${trackId}...`);
-
-    // Essayer Deezmate en premier
     try {
-      const deezmateResult = await this.tryDeezmate(trackId);
-      if (deezmateResult) {
-        console.log("✅ URL Deezmate trouvée:", deezmateResult.url.substring(0, 70) + "...");
-        return deezmateResult;
+      const result = await Promise.any([
+        this.tryDeezmateProxy(trackId),
+        this.tryFlacdownloaderProxy(trackId),
+      ]);
+
+      if (result) {
+        console.log(`✅ URL trouvée pour ${trackId}:`, result.url.substring(0, 70) + "...");
+        return result;
       }
     } catch (error) {
-      console.warn("⚠️ Deezmate échoué:", error);
+      console.error(`❌ Toutes les sources ont échoué pour ${trackId}:`, error);
     }
 
-    // Fallback vers Flacdownloader
-    try {
-      const flacdownloaderResult = await this.tryFlacdownloader(trackId);
-      if (flacdownloaderResult) {
-        console.log("✅ URL Flacdownloader trouvée:", flacdownloaderResult.url.substring(0, 70) + "...");
-        return flacdownloaderResult;
-      }
-    } catch (error) {
-      console.warn("⚠️ Flacdownloader échoué:", error);
-    }
-
-    console.error("❌ Toutes les sources ont échoué pour:", trackId);
     return null;
   }
 
   /**
-   * Essayer Deezmate
+   * Helper pour créer une promesse avec timeout.
    */
-  private async tryDeezmate(trackId: string): Promise<{ url: string; duration?: number } | null> {
-    console.log("🎵 Tentative Deezmate...");
-    
-    const response = await fetch(`https://api.deezmate.com/dl/${trackId}`);
-    
-    if (!response.ok) {
-      throw new Error(`Deezmate HTTP ${response.status}`);
-    }
+  private withTimeout<T>(promise: Promise<T>, ms: number, serviceName: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timeout de ${ms}ms dépassé pour le service ${serviceName}`));
+      }, ms);
 
-    const data = await response.json();
-    console.log("📋 Réponse Deezmate:", data);
-    
-    if (data.success && data.links && data.links.flac) {
-      console.log("✅ Deezmate succès, URL FLAC:", data.links.flac);
-      return { url: data.links.flac };
-    }
-
-    throw new Error('Réponse Deezmate invalide');
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
   }
 
   /**
-   * Essayer Flacdownloader
+   * Essayer le proxy Deezmate.
    */
-  private async tryFlacdownloader(trackId: string): Promise<{ url: string; duration?: number } | null> {
-    console.log("🎵 Tentative Flacdownloader...");
-    
-    const shareLink = await this.getDeezerShareLink(trackId);
-    if (!shareLink) {
-      throw new Error('Impossible d\'obtenir le lien de partage Deezer');
-    }
+  private async tryDeezmateProxy(trackId: string): Promise<{ url: string; duration?: number }> {
+    console.log("🎵 Tentative Deezmate Proxy...");
+    const promise = supabase.functions.invoke('deezmate-proxy', {
+      body: { trackId },
+    });
 
-    const flacdownloaderUrl = `https://flacdownloader.com/flac/download?t=${shareLink}&f=FLAC`;
-    console.log("🔗 URL Flacdownloader:", flacdownloaderUrl);
-    
-    const response = await fetch(flacdownloaderUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Flacdownloader HTTP ${response.status}`);
-    }
+    const { data, error } = await this.withTimeout(promise, PROXY_TIMEOUT, 'Deezmate');
 
-    const data = await response.json();
-    console.log("📋 Réponse Flacdownloader:", data);
+    if (error) throw new Error(`Deezmate Proxy a échoué: ${error.message}`);
+    if (!data.success || !data.links?.flac) throw new Error('Réponse Deezmate invalide');
     
-    if (data.url && data.url.startsWith('http')) {
-      console.log("✅ Flacdownloader succès, URL:", data.url);
-      return { url: data.url, duration: data.duration };
-    }
-
-    throw new Error('URL Flacdownloader invalide');
+    return { url: data.links.flac };
   }
 
   /**
-   * Obtenir le lien de partage Deezer
+   * Essayer le proxy Flacdownloader.
    */
-  private async getDeezerShareLink(trackId: string): Promise<string | null> {
-    try {
-      const response = await fetch(`https://api.deezer.com/track/${trackId}`);
-      
-      if (!response.ok) {
-        throw new Error(`Deezer API HTTP ${response.status}`);
-      }
+  private async tryFlacdownloaderProxy(trackId: string): Promise<{ url: string; duration?: number }> {
+    console.log("🎵 Tentative Flacdownloader Proxy...");
+    const promise = supabase.functions.invoke('flacdownloader-proxy', {
+      body: { deezerId: trackId },
+    });
+    
+    const { data, error } = await this.withTimeout(promise, PROXY_TIMEOUT, 'Flacdownloader');
 
-      const trackData = await response.json();
-      
-      if (trackData.link) {
-        return trackData.link;
-      }
+    if (error) throw new Error(`Flacdownloader Proxy a échoué: ${error.message}`);
+    // Le proxy flacdownloader retourne directement une URL, pas un JSON
+    if (typeof data?.url !== 'string') throw new Error('Réponse Flacdownloader invalide');
 
-      return `https://link.deezer.com/s/${trackId}`;
-    } catch (error) {
-      console.warn("⚠️ Erreur obtention lien partage Deezer:", error);
-      return `https://link.deezer.com/s/${trackId}`;
-    }
+    return { url: data.url, duration: data.duration };
   }
 
   /**
-   * Précharger l'audio d'une piste
+   * Précharger l'audio d'une piste (résolution d'URL uniquement).
    */
   async preloadTrack(trackId: string, quality: string = 'FLAC'): Promise<void> {
     console.log("🔮 Préchargement (URL seulement):", trackId);
     try {
-      await this.getAudioUrl(trackId, quality);
+      // Ne pas attendre le résultat, juste lancer la requête
+      this.getAudioUrl(trackId, quality);
     } catch (error) {
-      console.warn("⚠️ Échec préchargement (URL):", trackId, error);
+      // L'échec du préchargement est silencieux
     }
-  }
-
-  /**
-   * Obtenir les statistiques du service
-   */
-  getStats() {
-    return {
-      cacheSize: 0, // Cache interne désactivé
-      sources: ['Deezmate', 'Flacdownloader']
-    };
   }
 }
 

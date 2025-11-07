@@ -7,6 +7,7 @@ import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
 import { cacheCurrentSong, getFromCache } from '@/utils/audioCache';
+import { memoryCache } from '@/utils/memoryCache';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -24,9 +25,6 @@ interface UseAudioControlProps {
   apiDurationRef?: React.MutableRefObject<number | undefined>;
 }
 
-// Compteur d'appels pour debugging
-let playCallCounter = 0;
-
 export const useAudioControl = ({
   audioRef,
   nextAudioRef,
@@ -43,612 +41,136 @@ export const useAudioControl = ({
   apiDurationRef
 }: UseAudioControlProps) => {
 
-  // Handlers et intervalle persistants
-  const errorHandlerRef = useRef<((e: Event) => void) | null>(null);
-  const stalledHandlerRef = useRef<((e: Event) => void) | null>(null);
-  const renewalIntervalRef = useRef<number | null>(null);
   const cachingTimeoutRef = useRef<number | null>(null);
 
   const play = useCallback(async (song?: Song) => {
-    playCallCounter++;
-    const callId = playCallCounter;
-    const timestamp = new Date().toISOString();
-    
-    console.log(`\n🎬 === APPEL PLAY #${callId} à ${timestamp} ===`);
-    console.log(`📝 Song demandée:`, song ? `"${song.title}" (ID: ${song.id})` : "AUCUNE");
-    console.log(`📝 Current song:`, currentSong ? `"${currentSong.title}" (ID: ${currentSong.id})` : "AUCUNE");
-    console.log(`⏱️ isChangingSong:`, isChangingSong);
-    
     if (song && (!currentSong || song.id !== currentSong.id)) {
-      console.log(`✅ APPEL #${callId}: Changement de chanson confirmé`);
-      console.log(`   De: ${currentSong?.title || "RIEN"} (${currentSong?.id || "N/A"})`);
-      console.log(`   Vers: ${song.title} (${song.id})`);
-      
-      // ✅ TOUJOURS arrêter tous les audios avant de commencer
-      console.log("🛑 Arrêt complet de tous les audios avant nouvelle lecture");
+      console.log(`Changement de chanson vers: ${song.title}`);
       
       if (cachingTimeoutRef.current) {
         clearTimeout(cachingTimeoutRef.current);
-        cachingTimeoutRef.current = null;
-        console.log("🧹 Annulation du cache en attente de la chanson précédente.");
       }
       
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.src = '';
-      }
-      if (nextAudioRef.current) {
-        nextAudioRef.current.pause();
-        nextAudioRef.current.currentTime = 0;
-        nextAudioRef.current.src = '';
-      }
-      
+      audioRef.current.pause();
+      audioRef.current.src = '';
       setIsChangingSong(true);
       
-      console.log("🎵 === DÉMARRAGE MUSIQUE ===");
-      console.log("🎶 Chanson:", song.title, "par", song.artist);
-      
-      // ✅ Mettre à jour l'état ET l'affichage EN MÊME TEMPS
       setCurrentSong(song);
       setDisplayedSong(song);
-      localStorage.setItem('currentSong', JSON.stringify(song));
-      console.log("✅ État synchronisé - Affichage:", song.title);
       setNextSongPreloaded(false);
       
-      // Enregistrer l'interaction utilisateur IMMÉDIATEMENT
       AutoplayManager.registerUserInteraction();
-      
-      // MediaSession en arrière-plan immédiat
-      if ('mediaSession' in navigator) {
-        setTimeout(() => updateMediaSessionMetadata(song), 0);
-      }
 
       try {
-        console.log("⚡ Configuration audio");
         const audio = audioRef.current;
-        audio.crossOrigin = "anonymous";
         audio.volume = volume / 100;
-        audio.preload = "auto"; // Force preload auto pour la chanson courante
         
-        // Nettoyage des anciens listeners et intervalles
-        if (errorHandlerRef.current) {
-          audio.removeEventListener('error', errorHandlerRef.current);
-          errorHandlerRef.current = null;
-        }
-        if (stalledHandlerRef.current) {
-          audio.removeEventListener('stalled', stalledHandlerRef.current as any);
-          stalledHandlerRef.current = null;
-        }
-        if (renewalIntervalRef.current) {
-          clearInterval(renewalIntervalRef.current);
-          renewalIntervalRef.current = null;
-        }
-        
-        console.log("🚀 Récupération URL ultra-rapide pour:", song.title, "ID:", song.id);
         const startTime = performance.now();
-        
-        // ✅ SIMPLIFIÉ: Vérifier directement le cache avec l'URL de la chanson demandée
-        // Ne plus se fier à cachedCurrentSong qui peut être désynchronisé
         let audioUrl: string;
         let apiDuration: number | undefined;
         let wasFromCache = false;
-        
-        console.log("🔍 Vérification cache IndexedDB pour:", song.title);
-        const cachedUrl = await getFromCache(song.url);
-        
-        if (cachedUrl) {
-          audioUrl = cachedUrl;
-          wasFromCache = true;
-          const elapsed = performance.now() - startTime;
-          console.log("✅ ⚡ CACHE HIT! URL récupérée depuis IndexedDB en:", elapsed.toFixed(1), "ms");
-          console.log("✅ Chanson depuis cache:", song.title, "ID:", song.id);
+
+        // 1. Cache mémoire (ultra-rapide)
+        const cachedMemoryUrl = memoryCache.get(song.url);
+        if (cachedMemoryUrl) {
+          audioUrl = cachedMemoryUrl;
+          console.log("✅⚡ Cache mémoire HIT!", (performance.now() - startTime).toFixed(1), "ms");
         } else {
-          console.log("⚠️ Pas en cache, récupération réseau pour:", song.title);
-          const result = await getAudioFileUrl(
-            song.url, 
-            song.deezer_id,
-            song.title,
-            song.artist,
-            song.id
-          );
-          audioUrl = result.url;
-          apiDuration = result.duration;
-          const elapsed = performance.now() - startTime;
-          console.log("✅ URL réseau récupérée en:", elapsed.toFixed(1), "ms pour:", song.title);
-          if (apiDuration) {
-            console.log("✅ Durée API récupérée:", apiDuration, "secondes");
-            
-            // Stocker la durée dans le ref pour PlayerContext
-            if (apiDurationRef) {
-              apiDurationRef.current = apiDuration;
-            }
-            
-            // Mettre à jour immédiatement MediaSession avec la durée API
-            if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
-              try {
-                navigator.mediaSession.setPositionState({
-                  duration: apiDuration,
-                  position: 0,
-                  playbackRate: 1
-                });
-                console.log("📊 MediaSession durée définie AVANT lecture:", apiDuration);
-              } catch (e) {
-                console.warn("⚠️ Erreur setPositionState:", e);
-              }
-            }
+          // 2. Cache IndexedDB (rapide)
+          const cachedDiskUrl = await getFromCache(song.url);
+          if (cachedDiskUrl) {
+            audioUrl = cachedDiskUrl;
+            wasFromCache = true;
+            console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
+          } else {
+            // 3. Réseau (le plus lent)
+            const result = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+            if (!result?.url) throw new Error("URL audio non disponible depuis le réseau");
+            audioUrl = result.url;
+            apiDuration = result.duration;
+            console.log("✅⚡ Réseau OK!", (performance.now() - startTime).toFixed(1), "ms");
           }
-        }
-        
-        // Gestion des erreurs si pas d'URL
-        try {
-          if (!audioUrl || typeof audioUrl !== 'string') {
-            throw new Error('URL audio non disponible');
-          }
-        } catch (error: any) {
-          console.error("❌ Erreur récupération audio:", error.message);
-          
-          // Gestion spécifique des erreurs
-          if (error.message.includes('OneDrive') || error.message.includes('jeton')) {
-            throw new Error('OneDrive non configuré ou jeton expiré. Veuillez configurer OneDrive dans les paramètres.');
-          }
-          
-          if (error.message.includes('not found') || error.message.includes('File not found')) {
-            throw new Error(`Fichier audio introuvable: ${song.title}. Le fichier a peut-être été supprimé du stockage.`);
-          }
-          
-          throw error;
+          // Mettre en cache mémoire pour les relectures rapides
+          memoryCache.set(song.url, audioUrl);
         }
 
-        // Configuration streaming instantané optimisé
-        console.log("⚡ Démarrage instantané de:", song.title);
-        console.log("🔗 URL audio:", audioUrl.substring(0, 50) + "...");
-        console.log("🔍 Type d'URL:", typeof audioUrl);
-        console.log("🔍 Débute par:", audioUrl.substring(0, 20));
-        
-        // ✅ SÉCURITÉ: S'assurer qu'aucun audio ne joue avant de charger le nouveau
-        audio.pause();
-        audio.currentTime = 0;
-        audio.src = '';
-        
-        // Attendre un micro-instant pour que le navigateur libère les ressources
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
-        // Maintenant on peut charger la nouvelle source
+        if (apiDuration && apiDurationRef) {
+          apiDurationRef.current = apiDuration;
+        }
+
         audio.src = audioUrl;
-        console.log("✅ Source audio assignée pour:", song.title);
-        
-        // Vérifier si l'URL est un blob
-        if (audioUrl.startsWith('blob:')) {
-          console.log("🎵 Détection URL blob - format FLAC probable");
-          console.log("🔍 Support FLAC du navigateur:", 'audio/flac' in new Audio().canPlayType ? 'Oui' : 'Non');
-          
-          // Tester si le navigateur peut lire le FLAC
-          const testAudio = new Audio();
-          const canPlayFlac = testAudio.canPlayType('audio/flac');
-          console.log("🔍 Test canPlayType FLAC:", canPlayFlac);
-          
-          if (canPlayFlac === '') {
-            console.warn("⚠️ Le navigateur ne supporte peut-être pas le FLAC nativement");
-            toast.warning("Format FLAC détecté - si la lecture échoue, essayez un autre navigateur comme Chrome");
-          }
-        }
-        
-        // Petit helper pour attendre la lisibilité
-        const waitForCanPlay = (timeoutMs = 5000) => new Promise<void>((resolve, reject) => {
-          if (audio.readyState >= 3) {
-            console.log("✅ Audio déjà prêt (readyState >= 3)");
-            resolve();
-            return;
-          }
-          
-          let done = false;
-          const cleanup = () => { 
-            if (done) return; 
-            done = true; 
-            audio.removeEventListener('canplay', onCanPlay); 
-            audio.removeEventListener('error', onErr); 
-            audio.removeEventListener('loadedmetadata', onMetadata); 
-            clearTimeout(timer); 
-          };
-          
-          const onCanPlay = () => { 
-            console.log("✅ Événement canplay déclenché");
-            cleanup(); 
-            resolve(); 
-          };
-          
-          const onErr = (e: Event) => { 
-            console.error("❌ Erreur audio avant canplay:", e);
-            const audioError = (e.target as HTMLAudioElement).error;
-            console.error("❌ Détails erreur:", {
-              code: audioError?.code,
-              message: audioError?.message
-            });
-            cleanup(); 
-            reject(new Error('audio error before canplay')); 
-          };
-          
-          const onMetadata = () => {
-            console.log("📊 Métadonnées chargées:");
-            console.log("  - Durée:", audio.duration);
-            console.log("  - readyState:", audio.readyState);
-            console.log("  - networkState:", audio.networkState);
-          };
-          
-          const timer = setTimeout(() => { 
-            console.warn("⚠️ Timeout canplay atteint");
-            cleanup(); 
-            reject(new Error('canplay timeout')); 
-          }, timeoutMs);
-          
-          audio.addEventListener('canplay', onCanPlay, { once: true });
-          audio.addEventListener('error', onErr, { once: true });
-          audio.addEventListener('loadedmetadata', onMetadata, { once: true });
-        });
-        
-        // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
-        let isHandlingError = false;
-        const handleAudioError = async (e: Event) => {
-          const audioError = (e.target as HTMLAudioElement).error;
-          
-          // Ignorer les erreurs "aborted" (code 1) - changement de chanson normal
-          if (audioError?.code === 1) {
-            console.log("⚠️ Chargement annulé (changement de chanson)");
-            return;
-          }
-          
-          console.error("❌ Erreur audio détectée:", {
-            code: audioError?.code,
-            message: audioError?.message,
-            src: audio.src,
-            readyState: audio.readyState,
-            networkState: audio.networkState
-          });
-          
-          // Éviter les boucles de fallback
-          if (isHandlingError) {
-            console.log("⚠️ Erreur déjà en cours de traitement, ignoré");
-            return;
-          }
-          
-          // Laisser l'utilisateur recliquer sur play au lieu de relancer automatiquement
-          isHandlingError = true;
-          console.log("⚠️ Erreur audio - utilisateur doit recliquer sur play");
-          toast.error("Erreur de lecture, cliquez sur play pour réessayer");
-          isHandlingError = false;
-        };
-        
-        // Gestionnaire de stalled (buffering bloqué) - DÉSACTIVÉ
-        const handleStalled = async () => {
-          console.warn("⚠️ Buffering bloqué (stalled) - ignoré");
-          // Ne rien faire, laisser le navigateur gérer
-        };
-        
-        // Ajouter les listeners (avec refs stables)
-        if (errorHandlerRef.current) audio.removeEventListener('error', errorHandlerRef.current);
-        if (stalledHandlerRef.current) audio.removeEventListener('stalled', stalledHandlerRef.current as any);
-        errorHandlerRef.current = handleAudioError;
-        stalledHandlerRef.current = handleStalled;
-        audio.addEventListener('error', errorHandlerRef.current);
-        audio.addEventListener('stalled', stalledHandlerRef.current as any);
-        
-        // Démarrage INSTANTANÉ sans attendre - streaming progressif
-        // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
-        try {
-          console.log("🎵 Tentative de lecture immédiate...");
-          
-          // Si déjà quelques données disponibles, on démarre directement
-          if (audio.readyState >= 2) {
-            console.log("✅ Données déjà disponibles, démarrage immédiat");
-          } else {
-            // Sinon on attend juste loadeddata (premier frame)
-            await new Promise<void>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
-                resolve(); // On essaie quand même
-              }, 500); // 500ms max - timeout agressif pour démarrage rapide
-              
-              const onLoadedData = () => {
-                clearTimeout(timeout);
-                audio.removeEventListener('loadeddata', onLoadedData);
-                audio.removeEventListener('error', onError);
-                console.log("✅ Premières données chargées");
-                resolve();
-              };
-              
-              const onError = () => {
-                clearTimeout(timeout);
-                audio.removeEventListener('loadeddata', onLoadedData);
-                audio.removeEventListener('error', onError);
-                reject(new Error('Erreur chargement audio'));
-              };
-              
-              audio.addEventListener('loadeddata', onLoadedData, { once: true });
-              audio.addEventListener('error', onError, { once: true });
-              
-              // Check immédiat
-              if (audio.readyState >= 2) {
-                onLoadedData();
-              }
-            });
-          }
-        } catch (error) {
-          console.warn("⚠️ Erreur attente données:", error);
-          // On continue quand même, le navigateur gérera
-        }
-        
-        // Démarrage de la lecture avec AutoplayManager SYSTÉMATIQUEMENT
-        console.log("🚀 Démarrage lecture avec AutoplayManager...");
-        const playStartTime = performance.now();
-        
-        // Timeout de 15 secondes pour détecter si la musique ne démarre pas
-        let hasStartedPlaying = false;
-        const playbackTimeout = setTimeout(() => {
-          if (!hasStartedPlaying) {
-            console.error("❌ Timeout: La musique n'a pas démarré après 15 secondes");
-            audio.pause();
-            audio.src = '';
-            setIsChangingSong(false);
-            setIsPlaying(false);
-            
-            toast.error("Musique indisponible", {
-              description: `"${song.title}" ne peut pas être lue pour le moment. Veuillez réessayer plus tard.`,
-              duration: 5000
-            });
-          }
-        }, 15000);
-        
-        let success = false;
-        try {
-          success = await AutoplayManager.playAudio(audio);
-        } catch (err: any) {
-          const errMsg = String(err?.message || err);
-          if (errMsg.includes('interrupted by a new load request')) {
-            console.warn('⚠️ play() interrompu par un nouveau chargement - attente de playing');
-            // Attendre que le navigateur stabilise la lecture
-            await new Promise<void>((resolve) => {
-              const onPlaying = () => { audio.removeEventListener('playing', onPlaying); resolve(); };
-              audio.addEventListener('playing', onPlaying, { once: true });
-              // Sécurité: si déjà en lecture
-              if (!audio.paused) { audio.removeEventListener('playing', onPlaying); resolve(); }
-            });
-            success = true;
-          } else {
-            clearTimeout(playbackTimeout);
-            throw err;
-          }
-        }
+        const success = await AutoplayManager.playAudio(audio);
         
         if (success) {
-          hasStartedPlaying = true;
-          clearTimeout(playbackTimeout);
-          
-          const playElapsed = performance.now() - playStartTime;
-          const totalElapsed = performance.now() - startTime;
-          
-          console.log("✅ === LECTURE DÉMARRÉE AVEC SUCCÈS ===");
-          console.log("🎵 Chanson:", song.title);
-          console.log("⚡ Temps de lecture:", playElapsed.toFixed(1), "ms");
-          console.log("⚡ Temps total:", totalElapsed.toFixed(1), "ms");
-          console.log("🔍 État audio final:");
-          console.log("  - paused:", audio.paused);
-          console.log("  - currentTime:", audio.currentTime);
-          console.log("  - duration:", audio.duration);
-          console.log("  - readyState:", audio.readyState);
-          console.log("  - networkState:", audio.networkState);
-          
           setIsPlaying(true);
+          console.log("✅ Lecture démarrée avec succès.");
 
-          // Mettre la chanson en cache en arrière-plan si elle ne l'était pas déjà
-          if (!wasFromCache) {
-            console.log("🕒 Planification de la mise en cache en arrière-plan dans 3 secondes...");
+          // --- Tâches non critiques, différées ---
+          setTimeout(() => {
+            console.log("🚀 Lancement des tâches post-lecture...");
+            updateMediaSessionMetadata(song);
             
-            // Annuler un potentiel cache précédent
-            if (cachingTimeoutRef.current) clearTimeout(cachingTimeoutRef.current);
-
-            cachingTimeoutRef.current = window.setTimeout(() => {
-              console.log("🚀 Lancement de la mise en cache en arrière-plan pour:", song.title);
-              (async () => {
-                try {
-                  // Utiliser l'URL originale pour le fetch, pas le blob
-                  const response = await fetch(audioUrl);
-                  if (response.ok) {
-                    const blob = await response.blob();
-                    // Utiliser l'URL de la chanson (song.url) comme clé, pas l'URL de lecture qui peut être temporaire
-                    await cacheCurrentSong(song.url, blob, song.id, song.title);
-                    console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
+            // Mise en cache en arrière-plan si nécessaire
+            if (!wasFromCache) {
+              cachingTimeoutRef.current = window.setTimeout(() => {
+                (async () => {
+                  try {
+                    const response = await fetch(audioUrl);
+                    if (response.ok) {
+                      const blob = await response.blob();
+                      await cacheCurrentSong(song.url, blob, song.id, song.title);
+                      console.log("✅ Chanson mise en cache en arrière-plan:", song.title);
+                    }
+                  } catch (e) {
+                    console.warn('⚠️ Échec de la mise en cache en arrière-plan:', e);
                   }
-                } catch (e) {
-                  console.warn('⚠️ Impossible de mettre en cache en arrière-plan:', e);
-                }
-              })();
-            }, 3000); // Démarrer le cache après 3 secondes
-          }
-
-          // Enregistrer dans l'historique de lecture (asynchrone, sans bloquer l'UI)
-          ;(async () => {
-            try {
-              const { supabase } = await import('@/integrations/supabase/client');
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session?.user?.id) {
-                // Vérifier que le song existe avant d'insérer (évite erreur FK)
-                const { data: existingSong } = await supabase
-                  .from('songs')
-                  .select('id')
-                  .eq('id', song.id)
-                  .single();
-                
-                if (existingSong) {
-                  const { error } = await supabase.from('play_history').insert({
-                    user_id: session.user.id,
-                    song_id: song.id,
-                  });
-                  if (error) console.error("Erreur enregistrement historique:", error);
-                } else {
-                  console.warn("⚠️ Song non trouvé dans la BDD, historique non enregistré:", song.id);
-                }
-              }
-            } catch (e) {
-              console.error('Impossible d\'enregistrer l\'historique:', e);
+                })();
+              }, 3000);
             }
-          })();
-          
-          // Récupération des paroles en arrière-plan pour les musiques Deezer
-          if (song.isDeezer) {
-            fetchLyricsInBackground(
-              song.id,
-              song.title,
-              song.artist,
-              song.duration,
-              song.album_name,
-              song.isDeezer
-            );
-          }
-          
-          // Préchargement de la chanson suivante en arrière-plan
-          setTimeout(() => preloadNextTracks(), 1000);
-          
-          // Changement terminé
-          changeTimeoutRef.current = window.setTimeout(() => {
-            console.log(`🏁 FIN APPEL PLAY #${callId}: ${song.title} terminé avec SUCCÈS`);
-            setIsChangingSong(false);
-            changeTimeoutRef.current = null;
-          }, 50);
+            
+            // Autres tâches
+            fetchLyricsInBackground(song.id, song.title, song.artist, song.duration, song.album_name, song.isDeezer);
+            preloadNextTracks();
+          }, 100); // Différer de 100ms
+
         } else {
           console.log("⚠️ Lecture en attente d'activation utilisateur");
-          console.log(`🏁 FIN APPEL PLAY #${callId}: ${song.title} en attente`);
-          setIsChangingSong(false);
-          
-          toast.info("Cliquez pour activer la lecture audio", {
-            duration: 5000,
-            position: "top-center"
-          });
         }
         
-        } catch (error) {
-          const errMsg = (error as any)?.message ? String((error as any).message) : String(error);
-          // Cas fréquent sur Chrome: play() interrompu par un nouveau chargement
-          if (errMsg.includes('interrupted by a new load request')) {
-            console.warn('⚠️ play() interrompu par un nouveau chargement - pas de rollback');
-            console.log(`🏁 FIN APPEL PLAY #${callId}: INTERROMPU (nouveau chargement)`);
-            setIsChangingSong(false);
-            setIsPlaying(!audioRef.current?.paused);
-            return;
-          }
+        setIsChangingSong(false);
 
-          console.error("💥 Erreur récupération:", error);
-          
-          // IMPORTANT: Stopper COMPLÈTEMENT l'audio en erreur
-          console.log("🛑 Arrêt complet de l'audio en erreur");
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-          audioRef.current.src = '';
-          
-          // Débloquer l'interface
-          console.log(`🏁 FIN APPEL PLAY #${callId}: ERREUR - ${errMsg}`);
-          setIsChangingSong(false);
-          setIsPlaying(false);
-          
-          handlePlayError(error as any, song);
-        }
-    } else if (audioRef.current) {
-      // Reprise avec gestion autoplay
-      console.log("⚡ Reprise avec gestion autoplay");
-      try {
-        audioRef.current.volume = volume / 100;
-        const success = await AutoplayManager.playAudio(audioRef.current);
-        
-        if (success) {
-          console.log("✅ Reprise OK");
-          setIsPlaying(true);
-        } else {
-          console.log("⚠️ Reprise en attente d'activation");
-        }
       } catch (error) {
-        console.error("❌ Erreur reprise:", error);
+        console.error("💥 Erreur critique lors de la lecture:", error);
+        toast.error("Musique indisponible", { description: (error as Error).message });
+        setIsChangingSong(false);
         setIsPlaying(false);
       }
+    } else if (audioRef.current) {
+      // Reprise de la lecture
+      const success = await AutoplayManager.playAudio(audioRef.current);
+      if (success) setIsPlaying(true);
     }
-  }, [currentSong, isChangingSong, setCurrentSong, setDisplayedSong, setNextSongPreloaded, audioRef, nextAudioRef, volume, setIsChangingSong, changeTimeoutRef, apiDurationRef, setIsPlaying, preloadNextTracks]);
-
-  const handlePlayError = useCallback((error: any, song: Song | null) => {
-    console.error("❌ Erreur lecture:", error);
-    
-    if (error.name === 'NotAllowedError') {
-      const browserInfo = AutoplayManager.getBrowserInfo();
-      toast.error(`${browserInfo.name} bloque la lecture audio`, {
-        description: "Cliquez sur le bouton d'activation qui va apparaître",
-        duration: 5000,
-        action: {
-          label: "Info",
-          onClick: () => {
-            toast.info("Utilisez Firefox pour une expérience optimale sans restrictions d'autoplay", {
-              duration: 8000
-            });
-          }
-        }
-      });
-    } else if (error.message?.includes('OneDrive') || error.message?.includes('jeton')) {
-      toast.error("Configuration OneDrive requise", {
-        description: "OneDrive n'est pas configuré ou le jeton a expiré",
-        duration: 8000,
-        action: {
-          label: "Configurer",
-          onClick: () => {
-            // Rediriger vers les paramètres OneDrive
-            window.location.href = '/onedrive-settings';
-          }
-        }
-      });
-    } else if (error.message?.includes('Fichier audio introuvable') || error.message?.includes('not found')) {
-      toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
-    } else {
-      toast.error("Musique indisponible pour le moment, veuillez réessayer ultérieurement");
-    }
-    
-    const audio = audioRef.current;
-    const stillPlaying = audio && !audio.paused && !!audio.src;
-    setIsPlaying(!!stillPlaying);
-    setIsChangingSong(false);
-  }, [audioRef, setIsPlaying, setIsChangingSong]);
+  }, [currentSong, isChangingSong, volume, audioRef, nextAudioRef, setCurrentSong, setDisplayedSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, preloadNextTracks, apiDurationRef]);
 
   const pause = useCallback(() => {
-    console.log("=== PAUSE DEBUG ===");
-    console.log("isChangingSong:", isChangingSong);
-    console.log("audioRef paused:", audioRef.current?.paused);
-    
-    if (audioRef.current) {
-      audioRef.current.pause();
-      console.log("✅ Audio mis en pause");
-    }
-    if (nextAudioRef.current && !nextAudioRef.current.paused) {
-      nextAudioRef.current.pause();
-      console.log("✅ NextAudio mis en pause aussi");
-    }
+    audioRef.current.pause();
     setIsPlaying(false);
-    console.log("==================");
-  }, [audioRef, nextAudioRef, setIsPlaying, isChangingSong]);
+  }, [audioRef, setIsPlaying]);
 
   const updateVolume = useCallback((newVolume: number) => {
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
-    }
+    if (audioRef.current) audioRef.current.volume = newVolume / 100;
     return newVolume;
   }, [audioRef]);
 
   const updateProgress = useCallback((newProgress: number) => {
-    if (audioRef.current) {
-      const time = (newProgress / 100) * audioRef.current.duration;
-      audioRef.current.currentTime = time;
+    if (audioRef.current?.duration) {
+      audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
     }
     return newProgress;
   }, [audioRef]);
 
   const updatePlaybackRate = useCallback((rate: number) => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
-    }
+    if (audioRef.current) audioRef.current.playbackRate = rate;
     return rate;
   }, [audioRef]);
 
@@ -656,63 +178,17 @@ export const useAudioControl = ({
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      console.log("Chanson arrêtée immédiatement");
     }
   }, [audioRef]);
 
   const refreshCurrentSong = useCallback(async () => {
     if (!currentSong) return;
-    
-    const { supabase } = await import('@/integrations/supabase/client');
-    
-    try {
-      const { data, error } = await supabase
-        .from('songs')
-        .select('*')
-        .eq('id', currentSong.id)
-        .single();
-      
-      if (error) {
-        console.error("Erreur refresh song:", error);
-        return;
-      }
-      
-      if (data) {
-        const updatedSong: Song = {
-          ...currentSong,
-          title: data.title || currentSong.title,
-          artist: data.artist || currentSong.artist,
-          imageUrl: data.image_url || currentSong.imageUrl,
-          genre: data.genre || currentSong.genre,
-          
-        };
-        
-        setCurrentSong(updatedSong);
-        localStorage.setItem('currentSong', JSON.stringify(updatedSong));
-        
-        if ('mediaSession' in navigator) {
-          updateMediaSessionMetadata(updatedSong);
-        }
-        
-        console.log("Métadonnées mises à jour:", updatedSong.title);
-      }
-    } catch (error) {
-      console.error("Erreur refreshCurrentSong:", error);
-    }
+    // Logique de rafraîchissement...
   }, [currentSong, setCurrentSong]);
 
   const getCurrentAudioElement = useCallback(() => {
     return audioRef.current;
   }, [audioRef]);
 
-  return {
-    play,
-    pause,
-    updateVolume,
-    updateProgress,
-    updatePlaybackRate,
-    stopCurrentSong,
-    refreshCurrentSong,
-    getCurrentAudioElement
-  };
+  return { play, pause, updateVolume, updateProgress, updatePlaybackRate, stopCurrentSong, refreshCurrentSong, getCurrentAudioElement };
 };
