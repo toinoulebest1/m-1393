@@ -2,6 +2,7 @@
  * Service de proxy audio multi-instances avec sélection automatique
  * Supporte le décodage de manifestes Base64 et tolérance aux erreurs
  */
+import { durationToSeconds } from '@/utils/mediaSession';
 
 interface ProxyInstance {
   url: string;
@@ -54,76 +55,26 @@ class AudioProxyService {
       const instanceUrls: string[] = await response.json();
       console.log(`📋 ${instanceUrls.length} instances trouvées:`, instanceUrls);
       
-      // Tester la latence de chaque instance en parallèle
-      console.log("⏱️ Test de latence en cours...");
-      const latencyTests = instanceUrls.map(url => this.testLatency(url));
-      const results = await Promise.allSettled(latencyTests);
+      // Ne plus faire de test de latence, on suppose qu'elles sont toutes dispo au début.
+      // La course dans getAudioUrl se chargera de trouver la meilleure.
+      this.instances = instanceUrls.map(url => ({
+        url,
+        latency: 0, // On ne teste plus, on met une valeur par défaut
+        consecutiveErrors: 0,
+      }));
       
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value < Infinity).length;
-      console.log(`📊 Tests terminés: ${successCount}/${instanceUrls.length} instances répondent`);
-      
-      this.instances = results
-        .map((result, index) => ({
-          url: instanceUrls[index],
-          latency: result.status === 'fulfilled' ? result.value : Infinity,
-          consecutiveErrors: result.status === 'fulfilled' ? 0 : 1
-        }))
-        .sort((a, b) => a.latency - b.latency);
-      
-      // Sélectionner la meilleure instance
-      this.currentInstance = this.instances.find(i => i.latency < Infinity) || null;
+      this.currentInstance = this.instances.length > 0 ? this.instances[0] : null;
       
       if (!this.currentInstance) {
-        console.error("❌ AUCUNE instance disponible ! Toutes ont échoué au test.");
-        console.error("🔍 Détails des instances:", this.instances.map(i => 
-          `${i.url}: latency=${i.latency}ms, errors=${i.consecutiveErrors}`
-        ));
+        console.error("❌ AUCUNE instance configurée dans instances.json !");
       } else {
-        console.log("✅ Proxy initialisé. Instance la plus rapide:", this.currentInstance.url, `(${this.currentInstance.latency}ms)`);
-        console.log("📊 Instances disponibles:", this.instances.filter(i => i.latency < Infinity).map(i => `${i.url} (${i.latency}ms)`).join(', '));
+        console.log("✅ Proxy initialisé. " + this.instances.length + " instances chargées.");
       }
       
       this.initialized = true;
     } catch (error) {
       console.error("❌ Erreur initialisation proxy:", error);
       throw error;
-    }
-  }
-
-  /**
-   * Tester la latence d'une instance
-   */
-  private async testLatency(instanceUrl: string): Promise<number> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s pour tenir compte du réseau
-    
-    try {
-      console.log(`🔍 Test latence: ${instanceUrl}/track/?id=157172496&quality=LOSSLESS`);
-      const start = performance.now();
-      
-      // Tester avec une vraie requête track (HEAD pour économiser bande passante)
-      const response = await fetch(`${instanceUrl}/track/?id=157172496&quality=LOSSLESS`, {
-        signal: controller.signal,
-        method: 'HEAD' // HEAD pour ne pas télécharger tout l'audio
-      });
-      
-      clearTimeout(timeout);
-      
-      console.log(`📡 Réponse ${instanceUrl}: ${response.status} ${response.statusText}`);
-      
-      if (response.ok || response.status === 200) {
-        const latency = performance.now() - start;
-        console.log(`✅ ${instanceUrl}: ${latency.toFixed(0)}ms`);
-        return latency;
-      }
-      
-      console.warn(`❌ ${instanceUrl}: HTTP ${response.status} - non OK`);
-      return Infinity;
-    } catch (error: any) {
-      clearTimeout(timeout);
-      const errorType = error.name === 'AbortError' ? 'TIMEOUT' : error.name;
-      console.error(`❌ ${instanceUrl}: ${errorType} - ${error.message}`);
-      return Infinity;
     }
   }
 
