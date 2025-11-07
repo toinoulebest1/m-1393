@@ -1,18 +1,18 @@
 /**
- * Service de proxy audio simplifié pour Deezer avec Deezmate et Flacdownloader
+ * Service de proxy audio pour Deezer avec Deezmate et Flacdownloader
  */
 import { durationToSeconds } from '@/utils/mediaSession';
 
-interface CachedUrl {
-  url: string;
+interface CachedAudio {
+  blob: Blob;
   timestamp: number;
   duration?: number;
 }
 
 class AudioProxyService {
-  private urlCache = new Map<string, CachedUrl>();
-  private readonly URL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly MAX_CACHE_SIZE = 100;
+  private audioCache = new Map<string, CachedAudio>();
+  private readonly AUDIO_CACHE_TTL = 10 * 60 * 1000; // 10 minutes pour le blob audio
+  private readonly MAX_CACHE_SIZE = 50; // Réduit car on stocke des blobs
   private initialized = false;
 
   async initialize(): Promise<void> {
@@ -24,17 +24,18 @@ class AudioProxyService {
   /**
    * Obtenir l'URL audio via les nouvelles instances Deezer
    */
-  async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<{ url: string; duration?: number } | null> {
+  async getAudioUrl(trackId: string, quality: string = 'FLAC'): Promise<{ url: string; duration?: number } | null> {
     if (!this.initialized) {
       await this.initialize();
     }
 
-    // Vérifier le cache
+    // Vérifier le cache de blobs audio
     const cacheKey = `${trackId}_${quality}`;
-    const cached = this.urlCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.URL_CACHE_TTL) {
-      console.log("🎯 Cache hit:", trackId);
-      return { url: cached.url, duration: cached.duration };
+    const cached = this.audioCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.AUDIO_CACHE_TTL) {
+      console.log("🎯 Cache audio hit:", trackId);
+      const audioUrl = URL.createObjectURL(cached.blob);
+      return { url: audioUrl, duration: cached.duration };
     }
 
     console.log(`🚀 Récupération audio pour ${trackId}...`);
@@ -43,8 +44,9 @@ class AudioProxyService {
     try {
       const deezmateResult = await this.tryDeezmate(trackId);
       if (deezmateResult) {
-        this.cacheUrl(cacheKey, deezmateResult.url, deezmateResult.duration);
-        return deezmateResult;
+        this.cacheAudio(cacheKey, deezmateResult.blob, deezmateResult.duration);
+        const audioUrl = URL.createObjectURL(deezmateResult.blob);
+        return { url: audioUrl, duration: deezmateResult.duration };
       }
     } catch (error) {
       console.warn("⚠️ Deezmate échoué:", error);
@@ -54,8 +56,9 @@ class AudioProxyService {
     try {
       const flacdownloaderResult = await this.tryFlacdownloader(trackId);
       if (flacdownloaderResult) {
-        this.cacheUrl(cacheKey, flacdownloaderResult.url, flacdownloaderResult.duration);
-        return flacdownloaderResult;
+        this.cacheAudio(cacheKey, flacdownloaderResult.blob, flacdownloaderResult.duration);
+        const audioUrl = URL.createObjectURL(flacdownloaderResult.blob);
+        return { url: audioUrl, duration: flacdownloaderResult.duration };
       }
     } catch (error) {
       console.warn("⚠️ Flacdownloader échoué:", error);
@@ -68,7 +71,7 @@ class AudioProxyService {
   /**
    * Essayer Deezmate
    */
-  private async tryDeezmate(trackId: string): Promise<{ url: string; duration?: number } | null> {
+  private async tryDeezmate(trackId: string): Promise<{ blob: Blob; duration?: number } | null> {
     console.log("🎵 Tentative Deezmate...");
     
     const response = await fetch(`https://api.deezmate.com/dl/${trackId}`);
@@ -77,20 +80,30 @@ class AudioProxyService {
       throw new Error(`Deezmate HTTP ${response.status}`);
     }
 
-    const audioUrl = await response.text();
+    const data = await response.json();
     
-    if (audioUrl && audioUrl.startsWith('http')) {
-      console.log("✅ Deezmate succès:", audioUrl.substring(0, 50) + "...");
-      return { url: audioUrl };
+    if (data.success && data.links && data.links.flac) {
+      console.log("✅ Deezmate succès, téléchargement du FLAC...");
+      
+      // Télécharger le fichier FLAC immédiatement
+      const audioResponse = await fetch(data.links.flac);
+      if (!audioResponse.ok) {
+        throw new Error(`Téléchargement Deezmate HTTP ${audioResponse.status}`);
+      }
+      
+      const blob = await audioResponse.blob();
+      console.log("✅ FLAC téléchargé:", blob.size, "bytes");
+      
+      return { blob };
     }
 
-    throw new Error('URL Deezmate invalide');
+    throw new Error('Réponse Deezmate invalide');
   }
 
   /**
    * Essayer Flacdownloader
    */
-  private async tryFlacdownloader(trackId: string): Promise<{ url: string; duration?: number } | null> {
+  private async tryFlacdownloader(trackId: string): Promise<{ blob: Blob; duration?: number } | null> {
     console.log("🎵 Tentative Flacdownloader...");
     
     // D'abord, obtenir le lien de partage Deezer
@@ -111,8 +124,18 @@ class AudioProxyService {
     const data = await response.json();
     
     if (data.url && data.url.startsWith('http')) {
-      console.log("✅ Flacdownloader succès:", data.url.substring(0, 50) + "...");
-      return { url: data.url, duration: data.duration };
+      console.log("✅ Flacdownloader succès, téléchargement...");
+      
+      // Télécharger le fichier immédiatement
+      const audioResponse = await fetch(data.url);
+      if (!audioResponse.ok) {
+        throw new Error(`Téléchargement Flacdownloader HTTP ${audioResponse.status}`);
+      }
+      
+      const blob = await audioResponse.blob();
+      console.log("✅ FLAC téléchargé:", blob.size, "bytes");
+      
+      return { blob, duration: data.duration };
     }
 
     throw new Error('URL Flacdownloader invalide');
@@ -145,29 +168,36 @@ class AudioProxyService {
   }
 
   /**
-   * Mettre en cache une URL
+   * Mettre en cache un blob audio
    */
-  private cacheUrl(key: string, url: string, duration?: number): void {
+  private cacheAudio(key: string, blob: Blob, duration?: number): void {
     // Limiter la taille du cache
-    if (this.urlCache.size >= this.MAX_CACHE_SIZE) {
-      const oldestKey = Array.from(this.urlCache.entries())
+    if (this.audioCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = Array.from(this.audioCache.entries())
         .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-      this.urlCache.delete(oldestKey);
+      
+      // Libérer l'URL de l'ancien blob
+      const oldBlob = this.audioCache.get(oldestKey)?.blob;
+      if (oldBlob) {
+        URL.revokeObjectURL(URL.createObjectURL(oldBlob));
+      }
+      
+      this.audioCache.delete(oldestKey);
     }
 
-    this.urlCache.set(key, {
-      url,
+    this.audioCache.set(key, {
+      blob,
       timestamp: Date.now(),
       duration
     });
     
-    console.log("💾 URL mise en cache:", key, `(${this.urlCache.size}/${this.MAX_CACHE_SIZE})`);
+    console.log("💾 Audio mis en cache:", key, `(${this.audioCache.size}/${this.MAX_CACHE_SIZE})`, `${blob.size} bytes`);
   }
 
   /**
-   * Précharger l'URL d'une piste
+   * Précharger l'audio d'une piste
    */
-  async preloadTrack(trackId: string, quality: string = 'MP3_320'): Promise<void> {
+  async preloadTrack(trackId: string, quality: string = 'FLAC'): Promise<void> {
     console.log("🔮 Préchargement:", trackId);
     try {
       await this.getAudioUrl(trackId, quality);
@@ -183,15 +213,17 @@ class AudioProxyService {
     const now = Date.now();
     let cleaned = 0;
     
-    for (const [key, cached] of this.urlCache.entries()) {
-      if (now - cached.timestamp > this.URL_CACHE_TTL) {
-        this.urlCache.delete(key);
+    for (const [key, cached] of this.audioCache.entries()) {
+      if (now - cached.timestamp > this.AUDIO_CACHE_TTL) {
+        // Libérer l'URL du blob
+        URL.revokeObjectURL(URL.createObjectURL(cached.blob));
+        this.audioCache.delete(key);
         cleaned++;
       }
     }
     
     if (cleaned > 0) {
-      console.log("🧹 Cache nettoyé:", cleaned, "entrées expirées");
+      console.log("🧹 Cache audio nettoyé:", cleaned, "entrées expirées");
     }
   }
 
@@ -200,7 +232,7 @@ class AudioProxyService {
    */
   getStats() {
     return {
-      cacheSize: this.urlCache.size,
+      cacheSize: this.audioCache.size,
       sources: ['Deezmate', 'Flacdownloader']
     };
   }
