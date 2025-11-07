@@ -9,6 +9,7 @@ interface ProxyInstance {
   latency: number;
   lastError?: number;
   consecutiveErrors: number;
+  score: number; // Ajout du score de santé
 }
 
 interface ManifestResponse {
@@ -29,11 +30,12 @@ class AudioProxyService {
   private currentInstance: ProxyInstance | null = null;
   private urlCache = new Map<string, CachedUrl>();
   private readonly URL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly MAX_CACHE_SIZE = 50;
+  private readonly MAX_CACHE_SIZE = 100; // Augmentation du cache
   private readonly RETRY_DELAY = 1000;
   private readonly MAX_RETRIES = 2;
   private readonly ERROR_COOLDOWN = 30000; // 30 secondes
   private initialized = false;
+  private readonly TOP_N_INSTANCES = 3; // Nombre d'instances à tester en parallèle
 
   /**
    * Initialiser le service avec test de latence des instances
@@ -59,8 +61,9 @@ class AudioProxyService {
       // La course dans getAudioUrl se chargera de trouver la meilleure.
       this.instances = instanceUrls.map(url => ({
         url,
-        latency: 0, // On ne teste plus, on met une valeur par défaut
+        latency: 300, // Latence moyenne de départ
         consecutiveErrors: 0,
+        score: 1000, // Score de départ
       }));
       
       this.currentInstance = this.instances.length > 0 ? this.instances[0] : null;
@@ -79,8 +82,30 @@ class AudioProxyService {
   }
 
   /**
-   * Obtenir l'URL audio via le proxy en interrogeant toutes les instances en parallèle
-   * La première réponse valide gagne
+   * Classe les instances en fonction de leur score de santé.
+   * Le score pénalise la latence élevée et les erreurs récentes.
+   */
+  private sortInstances(): ProxyInstance[] {
+    const now = Date.now();
+    this.instances.forEach(instance => {
+      let score = 1000;
+      // Pénalité pour la latence (moyenne pondérée simple)
+      score -= instance.latency * 0.5;
+      // Pénalité lourde pour les erreurs consécutives
+      score -= instance.consecutiveErrors * 250;
+      // Pénalité si l'erreur est très récente
+      if (instance.lastError && now - instance.lastError < this.ERROR_COOLDOWN / 2) {
+        score -= 500;
+      }
+      instance.score = Math.max(0, score); // Le score ne peut pas être négatif
+    });
+
+    return [...this.instances].sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Obtenir l'URL audio via le proxy en interrogeant les meilleures instances en parallèle.
+   * La première réponse valide gagne et annule les autres.
    */
   async getAudioUrl(trackId: string, quality: string = 'MP3_320'): Promise<{ url: string; duration?: number } | null> {
     if (!this.initialized) {
@@ -95,67 +120,52 @@ class AudioProxyService {
       return { url: cached.url, duration: cached.duration };
     }
 
-    // Filtrer les instances disponibles
-    const availableInstances = this.instances.filter(i => 
-      !i.lastError || Date.now() - i.lastError > this.ERROR_COOLDOWN
-    );
+    // Trier les instances par score de santé
+    const sortedInstances = this.sortInstances();
+    const topInstances = sortedInstances.slice(0, this.TOP_N_INSTANCES);
 
-    if (availableInstances.length === 0) {
+    if (topInstances.length === 0) {
       console.error("❌ Aucune instance disponible");
       return null;
     }
     
-    console.log(`🏁 Course entre ${availableInstances.length} instances pour ${trackId}...`);
-    console.log("📋 Instances participantes:", availableInstances.map(i => i.url).join(', '));
+    console.log(`🏁 Course entre les ${topInstances.length} meilleures instances pour ${trackId}...`);
+    console.log("📋 Instances participantes:", topInstances.map(i => `${i.url} (score: ${i.score.toFixed(0)})`).join(', '));
 
-    // Lancer des appels parallèles à TOUTES les instances
-    const racePromises = availableInstances.map(instance => 
-      this.fetchFromInstance(instance, trackId, quality)
+    const controllers = topInstances.map(() => new AbortController());
+    
+    const racePromises = topInstances.map((instance, index) => 
+      this.fetchFromInstance(instance, trackId, quality, controllers[index].signal)
+        .then(result => {
+          // Annuler les autres requêtes dès qu'on a un gagnant
+          controllers.forEach((c, i) => {
+            if (i !== index) c.abort();
+          });
+          return result;
+        })
     );
 
     try {
-      // Attendre la première réponse valide
-      const result = await Promise.race(
-        racePromises.map(async (promise, index) => {
-          try {
-            const res = await promise;
-            if (res) {
-              console.log(`🏆 GAGNANT: ${availableInstances[index].url}`);
-              this.currentInstance = availableInstances[index];
-              return res;
-            }
-            throw new Error('Réponse invalide');
-          } catch (error) {
-            // Cette instance a échoué, on attend les autres
-            throw error;
-          }
-        })
-      );
-
-      // Mettre en cache et retourner
+      const result = await Promise.race(racePromises);
       if (result) {
         this.cacheUrl(cacheKey, result.url, quality, result.duration);
-        return result;
+        return { url: result.url, duration: result.duration };
       }
     } catch (error) {
-      console.warn("⚠️ Première instance a échoué, attente des autres...");
+      // Promise.race rejette dès qu'une promesse rejette.
+      // On continue pour voir si une autre réussit.
     }
 
-    // Si la première a échoué, attendre toutes les autres avec Promise.allSettled
+    // Si la course a échoué, on attend toutes les réponses pour trouver un succès
     const allResults = await Promise.allSettled(racePromises);
-    
-    // Chercher la première réponse valide
     for (let i = 0; i < allResults.length; i++) {
       const result = allResults[i];
       if (result.status === 'fulfilled' && result.value) {
-        console.log(`✅ Succès avec ${availableInstances[i].url}`);
-        this.currentInstance = availableInstances[i];
+        const winnerInstance = topInstances[i];
+        console.log(`✅ Succès (fallback) avec ${winnerInstance.url}`);
+        this.currentInstance = winnerInstance;
         this.cacheUrl(cacheKey, result.value.url, quality, result.value.duration);
-        return result.value;
-      } else if (result.status === 'rejected') {
-        // Marquer l'erreur pour cette instance
-        availableInstances[i].consecutiveErrors++;
-        availableInstances[i].lastError = Date.now();
+        return { url: result.value.url, duration: result.value.duration };
       }
     }
 
@@ -166,21 +176,20 @@ class AudioProxyService {
   /**
    * Récupérer depuis une instance spécifique (pour la course parallèle)
    */
-  private async fetchFromInstance(instance: ProxyInstance, trackId: string, quality: string): Promise<{ url: string; duration?: number } | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
+  private async fetchFromInstance(instance: ProxyInstance, trackId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: number; latency: number } | null> {
+    const startTime = performance.now();
+    
     try {
       const url = `${instance.url}/track/?id=${trackId}&quality=${quality}`;
       
       const response = await fetch(url, {
-        signal: controller.signal,
+        signal,
         headers: {
           'Accept': 'application/json'
         }
       });
 
-      clearTimeout(timeout);
+      const latency = performance.now() - startTime;
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -191,56 +200,54 @@ class AudioProxyService {
       let trackUrl: string | undefined;
       let duration: number | undefined;
 
-      // --- Extraction de l'URL ---
-      // Cas 1: Tableau Tidal
-      if (Array.isArray(data) && data.length >= 3 && data[2]?.OriginalTrackUrl) {
-        trackUrl = data[2].OriginalTrackUrl;
-      }
-      // Cas 2: Manifeste Base64
-      else if (typeof data === 'string' && data.startsWith('ey')) {
-        const manifest = JSON.parse(atob(data));
-        if (manifest.urls && manifest.urls.length > 0) {
-          trackUrl = manifest.urls[0];
-          // Vérifier la durée à l'intérieur du manifeste
-          if ((manifest as any).duration) {
-            const parsedDuration = durationToSeconds((manifest as any).duration);
-            if (parsedDuration > 0) duration = parsedDuration;
-          }
+      // --- Décodage robuste du manifeste ---
+      try {
+        let manifest: any = {};
+        if (typeof data === 'string' && data.startsWith('ey')) {
+          manifest = JSON.parse(atob(data));
+        } else if (typeof data === 'object' && data !== null) {
+          manifest = data;
         }
-      }
-      // Cas 3: JSON direct avec urls[]
-      else if (data.urls && Array.isArray(data.urls) && data.urls.length > 0) {
-        trackUrl = data.urls[0];
-      }
-      // Cas 4: URL directe
-      else if (typeof data === 'string' && data.startsWith('http')) {
-        trackUrl = data;
+
+        if (Array.isArray(manifest) && manifest.length >= 3 && manifest[2]?.OriginalTrackUrl) {
+          trackUrl = manifest[2].OriginalTrackUrl;
+        } else if (manifest.urls && Array.isArray(manifest.urls) && manifest.urls.length > 0) {
+          trackUrl = manifest.urls[0];
+        } else if (typeof manifest === 'string' && manifest.startsWith('http')) {
+          trackUrl = manifest;
+        }
+
+        if (manifest.duration) {
+          const parsedDuration = durationToSeconds(manifest.duration);
+          if (parsedDuration > 0) duration = parsedDuration;
+        } else if (Array.isArray(manifest) && manifest[0]?.duration) {
+          const parsedDuration = durationToSeconds(manifest[0].duration);
+          if (parsedDuration > 0) duration = parsedDuration;
+        }
+      } catch (e) {
+        throw new Error('Format de manifeste invalide');
       }
 
-      // --- Extraction de la durée ---
-      // Si la durée n'a pas encore été trouvée, vérifier les emplacements courants
-      if (duration === undefined) {
-        // Depuis l'objet racine
-        if (data?.duration) {
-          const parsedDuration = durationToSeconds(data.duration);
-          if (parsedDuration > 0) duration = parsedDuration;
-        }
-        // Depuis les métadonnées Tidal
-        else if (Array.isArray(data) && data[0]?.duration) {
-          const parsedDuration = durationToSeconds(data[0].duration);
-          if (parsedDuration > 0) duration = parsedDuration;
-        }
-      }
 
       if (trackUrl && typeof trackUrl === 'string' && trackUrl.startsWith('http')) {
+        // Succès : mise à jour de la santé de l'instance
+        instance.latency = (instance.latency * 0.7) + (latency * 0.3); // Moyenne pondérée
+        instance.consecutiveErrors = 0;
         if (duration) console.log(`✅ Durée de ${duration}s trouvée pour ${trackId}`);
-        return { url: trackUrl, duration };
+        return { url: trackUrl, duration, latency };
       }
 
-      throw new Error('Format de réponse invalide ou URL non trouvée');
-    } catch (error) {
-      clearTimeout(timeout);
-      throw error;
+      throw new Error('URL non trouvée dans le manifeste');
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log(`⏹️ Requête annulée pour ${instance.url}`);
+      } else {
+        // Échec : mise à jour de la santé de l'instance
+        instance.consecutiveErrors++;
+        instance.lastError = Date.now();
+        console.warn(`⚠️ Échec pour ${instance.url}:`, error.message);
+      }
+      throw error; // Renvoyer l'erreur pour que Promise.race/allSettled puisse la gérer
     }
   }
 
@@ -306,9 +313,10 @@ class AudioProxyService {
       currentInstance: this.currentInstance?.url,
       instancesCount: this.instances.length,
       cacheSize: this.urlCache.size,
-      instances: this.instances.map(i => ({
+      instances: this.sortInstances().map(i => ({ // Afficher les instances triées
         url: i.url,
-        latency: i.latency,
+        score: i.score.toFixed(0),
+        latency: i.latency.toFixed(0),
         errors: i.consecutiveErrors
       }))
     };
