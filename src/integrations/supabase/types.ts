@@ -297,21 +297,18 @@ export type Database = {
           created_at: string
           id: string
           song_id: string
-          source: string | null
         }
         Insert: {
           content: string
           created_at?: string
           id?: string
           song_id: string
-          source?: string | null
         }
         Update: {
           content?: string
           created_at?: string
           id?: string
           song_id?: string
-          source?: string | null
         }
         Relationships: [
           {

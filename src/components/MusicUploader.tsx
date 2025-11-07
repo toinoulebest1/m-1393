@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload, FolderOpen, Music } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -111,7 +112,7 @@ export const MusicUploader = () => {
   };
 
   // Fonction modifiée pour traiter un fichier LRC et l'associer correctement à un fichier audio
-  const processLrcFile = async (lrcFile: File, title: string, artist: string): Promise<boolean> => {
+  const processLrcFile = async (lrcFile: File, songId: string, title: string, artist: string): Promise<boolean> => {
     try {
       console.log(`Traitement du fichier LRC pour la chanson ${title}:`, lrcFile.name);
       
@@ -134,9 +135,8 @@ export const MusicUploader = () => {
       const { error } = await supabase
         .from('lyrics')
         .insert({
-          song_id: title,
-          content: lyricsText,
-          source: 'Fichier local'
+          song_id: songId,
+          content: lyricsText
         });
       
       if (error) {
@@ -144,7 +144,7 @@ export const MusicUploader = () => {
         return false;
       }
       
-      console.log("Paroles du fichier LRC enregistrées avec succès pour:", title);
+      console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
       return true;
     } catch (error) {
       console.error("Erreur lors du traitement du fichier LRC:", error);
@@ -175,15 +175,13 @@ export const MusicUploader = () => {
         
         // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
         const lyricsContent = data.syncedLyrics || data.lyrics;
-        const source = data.source || 'Inconnue';
         
         // Enregistrer les paroles dans la base de données
         const { error: saveLyricsError } = await supabase
           .from('lyrics')
           .insert({
             song_id: songId,
-            content: lyricsContent,
-            source: source
+            content: lyricsContent
           });
         
         if (saveLyricsError) {
@@ -192,7 +190,7 @@ export const MusicUploader = () => {
           console.log("Paroles enregistrées avec succès pour:", songId);
         }
         
-        return { lyrics: data.lyrics, source };
+        return data.lyrics;
       }
       
       return null;
@@ -410,10 +408,10 @@ export const MusicUploader = () => {
       
       // Si on a trouvé un fichier LRC, le traiter
       if (lrcFile) {
-        lyricsFound = await processLrcFile(lrcFile, title, artist);
+        lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
         
         if (lyricsFound) {
-          toast.success(`Paroles synchronisées importées depuis un fichier LRC local`);
+          toast.success(`Paroles synchronisées importées depuis le fichier LRC`);
         }
       } else {
         console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
@@ -426,14 +424,15 @@ export const MusicUploader = () => {
         const lyricsToastId = toast.loading(`Récupération des paroles pour "${title}"...`);
         
         // Récupération des paroles en arrière-plan (passer la durée en secondes)
-        fetchLyrics(title, artist, fileId, duration, undefined).then(result => {
-          if (result && result.lyrics) {
-            toast.dismiss(lyricsToastId);
-            toast.success(`Paroles récupérées pour "${title}" via ${result.source}`);
-            console.log(`Paroles récupérées pour "${title}"`);
+        fetchLyrics(title, artist, fileId, duration, undefined).then(lyrics => {
+          if (lyrics) {
+            toast.success(`Paroles récupérées pour "${title}"`, {
+              id: lyricsToastId
+            });
           } else {
-            toast.dismiss(lyricsToastId);
-            toast.error(`Impossible de trouver les paroles pour "${title}"`);
+            toast.error(`Impossible de trouver les paroles pour "${title}"`, {
+              id: lyricsToastId
+            });
           }
         });
       }

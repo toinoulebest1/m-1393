@@ -303,11 +303,10 @@ export const SyncedLyricsView: React.FC = () => {
       // Parse LRC format lyrics
       try {
         const parsed = parseLrc(lyrics);
-        setParsedLyrics({ ...parsed, source: data.source });
+        setParsedLyrics(parsed);
       } catch (parseError) {
         console.error('SyncedLyricsView: Error parsing lyrics', parseError);
         // Still show raw lyrics text even if parsing fails
-        setParsedLyrics({ source: data.source });
       }
     } catch (error) {
       console.error('SyncedLyricsView: Error fetching lyrics', error);
@@ -369,7 +368,6 @@ export const SyncedLyricsView: React.FC = () => {
 
       // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
       const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
-      const lyricsSource = lyricsContent ? 'LRCLIB' : null;
       
       // Save lyrics to database only for local songs with valid UUID
       if (currentSong.id && !currentSong.id.startsWith('deezer-')) {
@@ -378,7 +376,6 @@ export const SyncedLyricsView: React.FC = () => {
           .upsert({
             song_id: currentSong.id,
             content: lyricsContent,
-            source: lyricsSource,
           });
         if (insertError) {
           throw insertError;
@@ -396,6 +393,7 @@ export const SyncedLyricsView: React.FC = () => {
         // Lyrics are not in LRC format
       }
       
+      toast.success("Les paroles ont été récupérées avec succès");
     } catch (error: any) {
       console.error('Error generating lyrics:', error);
       setError(error.message || "Impossible de récupérer les paroles");
@@ -642,7 +640,7 @@ export const SyncedLyricsView: React.FC = () => {
             ) : lyricsText ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
                 <div 
-                  className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm flex flex-col" 
+                  className="w-full h-full max-w-3xl overflow-y-auto rounded-md p-4 md:p-6 backdrop-blur-sm" 
                   style={{
                     backgroundColor: accentColor 
                       ? `rgba(${accentColor[0] * 0.15}, ${accentColor[1] * 0.15}, ${accentColor[2] * 0.15}, 0.3)`
@@ -653,22 +651,17 @@ export const SyncedLyricsView: React.FC = () => {
                     <LrcPlayer 
                       parsedLyrics={parsedLyrics} 
                       currentTime={currentTime}
-                      className="h-full text-base md:text-lg flex-grow"
+                      className="h-full text-base md:text-lg"
                       accentColor={accentColor}
                     />
                   ) : (
                     <div 
-                      className="whitespace-pre-line text-base md:text-lg leading-relaxed flex-grow"
+                      className="whitespace-pre-line text-base md:text-lg leading-relaxed"
                       style={{
                         color: getTextColor()
                       }}
                     >
                       {lyricsText}
-                    </div>
-                  )}
-                  {parsedLyrics?.source && (
-                    <div className="mt-4 text-right text-xs text-spotify-neutral/60">
-                      Source: {parsedLyrics.source}
                     </div>
                   )}
                 </div>

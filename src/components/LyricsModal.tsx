@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -44,7 +45,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
     setUseDropbox(isDropboxEnabled());
   }, []);
 
-  const { data: lyricsData, isLoading, refetch } = useQuery({
+  const { data: lyrics, isLoading, refetch } = useQuery({
     queryKey: ['lyrics', songId, useDropbox],
     queryFn: async () => {
       console.log('Fetching lyrics for song:', songId);
@@ -57,7 +58,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
           
           if (dropboxLyrics) {
             console.log('Lyrics fetched from Dropbox successfully');
-            return { content: dropboxLyrics, source: 'Dropbox' };
+            return dropboxLyrics;
           }
           
           console.log('No lyrics found in Dropbox, falling back to database');
@@ -70,7 +71,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       // Si Dropbox n'est pas activé ou si la récupération a échoué, utiliser la base de données
       const { data, error } = await supabase
         .from('lyrics')
-        .select('content, source')
+        .select('content')
         .eq('song_id', songId)
         .maybeSingle();
 
@@ -79,7 +80,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         throw error;
       }
 
-      return data ? { content: data.content, source: data.source } : null;
+      return data?.content || null;
     },
     enabled: isOpen && !!songId,
   });
@@ -137,7 +138,6 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
 
       // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
       const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
-      const lyricsSource = lyricsContent ? 'LRCLIB' : null;
       
       // Enregistrer les paroles dans la base de données
       const { error: insertError } = await supabase
@@ -145,7 +145,6 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
         .upsert({
           song_id: songId,
           content: lyricsContent,
-          source: lyricsSource,
         });
 
       if (insertError) {
@@ -164,6 +163,10 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       }
 
       await refetch();
+      toast({
+        title: "Succès",
+        description: "Les paroles ont été récupérées avec succès",
+      });
     } catch (error) {
       console.error('Error generating lyrics:', error);
       setError(error.message || "Impossible de récupérer les paroles");
@@ -184,7 +187,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
           <DialogTitle className="text-xl font-bold flex items-center justify-between">
             <span className="break-words">{songTitle || "Titre inconnu"}</span>
             <div className="flex space-x-2">
-              {lyricsData && onEditRequest && (
+              {lyrics && onEditRequest && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -196,7 +199,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
                 </Button>
               )}
               
-              {!lyricsData && !isLoading && (
+              {!lyrics && !isLoading && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -224,17 +227,10 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
               <Loader2 className="h-8 w-8 animate-spin text-spotify-accent" />
               <span className="ml-2">{t("common.loadingLyrics")}</span>
             </div>
-          ) : lyricsData?.content ? (
-            <>
-              <div className="whitespace-pre-line text-spotify-neutral">
-                {lyricsData.content}
-              </div>
-              {lyricsData.source && (
-                <div className="mt-4 text-right text-xs text-spotify-neutral/60">
-                  Source: {lyricsData.source}
-                </div>
-              )}
-            </>
+          ) : lyrics ? (
+            <div className="whitespace-pre-line text-spotify-neutral">
+              {lyrics}
+            </div>
           ) : error ? (
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>{t("common.error")}</AlertTitle>

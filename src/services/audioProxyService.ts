@@ -326,16 +326,6 @@ class AudioProxyService {
 // Instance singleton
 export const audioProxyService = new AudioProxyService();
 
-/**
- * Exporte une fonction pour obtenir les URL des instances.
- * Utile pour d'autres services comme la recherche de paroles.
- */
-export const getInstances = async (): Promise<string[]> => {
-  await audioProxyService.initialize(); // S'assurer que le service est initialisé
-  // Retourne les instances triées par score pour que la recherche de paroles les essaie dans le bon ordre
-  return audioProxyService.getStats().instances.map(i => i.url);
-};
-
 // Nettoyage périodique du cache (toutes les 5 minutes)
 setInterval(() => {
   audioProxyService.cleanupCache();

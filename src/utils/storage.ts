@@ -202,7 +202,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     // NOUVEAU: Fallback vers flacdownloader-proxy si le multi-proxy a échoué ou n'a pas été tenté
     console.log('🔄 Tentative de fallback via flacdownloader-proxy...');
     try {
-      const flacProxyUrl = `${supabase.functions.url}/flacdownloader-proxy?deezerId=${deezerId}`;
+      const flacProxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${deezerId}`;
       console.log('🔗 URL du proxy flacdownloader:', flacProxyUrl);
 
       // On doit valider que l'URL fonctionne, car la fonction proxy renvoie un stream.
@@ -274,30 +274,28 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
 
           // NOUVEAU: Fallback vers flacdownloader-proxy si le multi-proxy a échoué
           console.log('🔄 Tentative de fallback (recherche) via flacdownloader-proxy...');
-          if (foundDeezerId) {
-            try {
-              const flacProxyUrl = `${supabase.functions.url}/flacdownloader-proxy?deezerId=${foundDeezerId}`;
-              console.log('🔗 URL du proxy flacdownloader (recherche):', flacProxyUrl);
+          try {
+            const flacProxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${foundDeezerId}`;
+            console.log('🔗 URL du proxy flacdownloader (recherche):', flacProxyUrl);
 
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-              const response = await fetch(flacProxyUrl, { method: 'HEAD', signal: controller.signal });
-              clearTimeout(timeoutId);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const response = await fetch(flacProxyUrl, { method: 'HEAD', signal: controller.signal });
+            clearTimeout(timeoutId);
 
-              if (response.ok || response.status === 405) {
-                console.log('✅ flacdownloader-proxy a répondu (recherche), utilisation de l\'URL.');
-                // Mettre à jour le deezer_id dans la DB
-                if (songId) {
-                  void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-                }
-                return { url: flacProxyUrl };
-              } else {
-                const errorText = response.statusText;
-                console.warn(`⚠️ flacdownloader-proxy a échoué (recherche) avec le statut: ${response.status} ${errorText}`);
+            if (response.ok || response.status === 405) {
+              console.log('✅ flacdownloader-proxy a répondu (recherche), utilisation de l\'URL.');
+              // Mettre à jour le deezer_id dans la DB
+              if (songId) {
+                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
               }
-            } catch (error) {
-              console.warn('⚠️ Erreur lors de l\'appel à flacdownloader-proxy (recherche):', error);
+              return { url: flacProxyUrl };
+            } else {
+              const errorText = response.statusText;
+              console.warn(`⚠️ flacdownloader-proxy a échoué (recherche) avec le statut: ${response.status} ${errorText}`);
             }
+          } catch (error) {
+            console.warn('⚠️ Erreur lors de l\'appel à flacdownloader-proxy (recherche):', error);
           }
         }
       }
