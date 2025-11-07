@@ -33,25 +33,27 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <PlayerProvider>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/home" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/playlists" element={<Playlists />} />
-              <Route path="/playlist/:id" element={<PlaylistDetail />} />
-              <Route path="/blind-test" element={<BlindTest />} />
-              <Route path="/top100" element={<Top100 />} />
-              <Route path="/artist/:id" element={<ArtistProfile />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
-              <Route path="/add-songs" element={<ManageAudioSources />} />
-              <Route path="/metadata-update" element={<SongMetadataUpdate />} />
-              <Route path="/admin/history" element={<AdminHistory />} />
-              <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
-            </Routes>
+            <CastProvider>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/playlists" element={<Playlists />} />
+                <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                <Route path="/blind-test" element={<BlindTest />} />
+                <Route path="/top100" element={<Top100 />} />
+                <Route path="/artist/:id" element={<ArtistProfile />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
+                <Route path="/add-songs" element={<ManageAudioSources />} />
+                <Route path="/metadata-update" element={<SongMetadataUpdate />} />
+                <Route path="/admin/history" element={<AdminHistory />} />
+                <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
+              </Routes>
+            </CastProvider>
           </PlayerProvider>
         </BrowserRouter>
       </TooltipProvider>

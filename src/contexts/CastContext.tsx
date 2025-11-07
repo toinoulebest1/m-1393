@@ -33,15 +33,7 @@ declare global {
 }
 
 export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Utiliser usePlayerContext avec un try-catch pour éviter les erreurs de hot reload
-  let playerContext;
-  try {
-    playerContext = usePlayerContext();
-  } catch (error) {
-    // Si le PlayerContext n'est pas encore disponible, continuer sans
-    console.warn('⚠️ PlayerContext not ready yet');
-    playerContext = null;
-  }
+  const playerContext = usePlayerContext();
   
   const currentSong = playerContext?.currentSong;
   const isPlaying = playerContext?.isPlaying;
@@ -65,7 +57,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
     /* if (window.top !== window.self) {
       console.warn('⚠️ Cast in iframe preview may be limited. Open the app in a new tab.');
       toast.info('Cast indisponible en mode aperçu', {
-        description: 'Ouvrez l’application dans un nouvel onglet pour détecter vos appareils Cast.'
+        description: 'Ouvrez l\'application dans un nouvel onglet pour détecter vos appareils Cast.'
       });
     } */
 

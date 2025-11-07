@@ -7,7 +7,6 @@ import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
 import { useToast } from "@/hooks/use-toast";
 import { AutoplayManager } from "@/utils/autoplayManager";
-import { CastProvider, useCast } from "./CastContext";
 
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
@@ -866,9 +865,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   return (
     <PlayerContext.Provider value={value}>
-      <CastProvider>
-        {children}
-      </CastProvider>
+      {children}
     </PlayerContext.Provider>
   );
 };
