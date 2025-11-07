@@ -1,0 +1,1 @@
+alter table "public"."lyrics" add column "source" text;
