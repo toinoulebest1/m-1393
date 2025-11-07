@@ -128,109 +128,74 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
 
 
 export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
+  const FORCE_DEEZMATE_FLAC = true;
   console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
 
-  // ========== PRIORITÉ ABSOLUE: DEEZER/DEEZMATE ==========
-  
-  // ÉTAPE 0: Si on a un songId mais pas de deezerId, chercher dans la DB
-  if (songId && !deezerId) {
-    try {
-      const { data: songData } = await supabase
-        .from('songs')
-        .select('deezer_id')
-        .eq('id', songId)
-        .single();
-      
-      if (songData?.deezer_id) {
-        console.log('🔥 ID Deezer trouvé dans la DB:', songData.deezer_id);
-        deezerId = songData.deezer_id;
-      }
-    } catch (error) {
-      console.warn('⚠️ Erreur recherche deezer_id:', error);
-    }
-  }
+  // ========== STRATÉGIE FORCÉE: DEEZMATE/FLAC UNIQUEMENT ==========
+  if (FORCE_DEEZMATE_FLAC) {
+    console.log("🎯 Source forcée: Deezmate (FLAC). La preview (filePath) sera ignorée si un ID Deezer est trouvé.");
 
-  // ÉTAPE 1: Utiliser le nouveau service audio avec Deezmate/Flacdownloader
-  if (deezerId) {
-    console.log('🚀 Récupération audio via Deezmate/Flacdownloader');
-    
-    try {
-      const result = await audioProxyService.getAudioUrl(deezerId, 'FLAC');
-      
-      if (result && result.url && (result.url.startsWith('http') || result.url.startsWith('blob:'))) {
-        console.log('✅ URL audio récupérée:', result.url.substring(0, 50) + '...');
-        
-        if (result.duration) {
-          console.log('✅ Durée récupérée:', result.duration, 'secondes');
-        }
-        
-        // Mettre à jour le deezer_id dans la DB
-        if (songId) {
-          void supabase.from('songs').update({ deezer_id: deezerId }).eq('id', songId);
-        }
-        
-        return { url: result.url, duration: result.duration };
-      }
-      
-      console.warn('⚠️ Service audio: pas d\'URL valide');
-    } catch (error) {
-      console.warn('⚠️ Service audio échoué:', error);
-    }
-  }
+    let finalDeezerId = deezerId;
 
-  // ÉTAPE 2: Si pas de deezer_id mais on a titre+artiste, recherche parallélisée
-  if (!deezerId && songTitle && songArtist) {
-    console.log('🔎 Recherche parallèle Deezer ID...');
+    // ÉTAPE 1: Assurer d'avoir un ID Deezer
+    if (!finalDeezerId && songId && !songId.startsWith('deezer-')) {
+      try {
+        const { data: songData } = await supabase.from('songs').select('deezer_id').eq('id', songId).single();
+        if (songData?.deezer_id) {
+          console.log('🔥 ID Deezer trouvé dans la DB:', songData.deezer_id);
+          finalDeezerId = songData.deezer_id;
+        }
+      } catch (error) {
+        console.warn('⚠️ Erreur recherche deezer_id dans DB:', error);
+      }
+    }
+
+    if (!finalDeezerId && songTitle && songArtist) {
+      try {
+        const foundId = await searchDeezerIdByTitleArtist(songTitle, songArtist);
+        if (foundId) {
+          console.log('🔥 ID Deezer trouvé par recherche:', foundId);
+          finalDeezerId = foundId;
+        }
+      } catch (error) {
+        console.warn('⚠️ Erreur recherche deezer_id par titre/artiste:', error);
+      }
+    }
     
-    try {
-      // Recherche directe Deezer ID
-      const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
-      
-      // Si on a trouvé un ID Deezer, utiliser le service audio
-      if (foundDeezerId) {
-        console.log('🚀 Récupération audio (recherche) via Deezmate/Flacdownloader, ID:', foundDeezerId);
-        
-        try {
-          const proxyResult = await audioProxyService.getAudioUrl(foundDeezerId, 'FLAC');
+    if (!finalDeezerId && songId && songId.startsWith('deezer-')) {
+        finalDeezerId = songId.replace('deezer-', '');
+        console.log('🔥 ID Deezer extrait du songId:', finalDeezerId);
+    }
+
+    // ÉTAPE 2: Utiliser l'ID Deezer si disponible
+    if (finalDeezerId) {
+      console.log(`🚀 Tentative Deezmate avec ID: ${finalDeezerId}`);
+      try {
+        const result = await audioProxyService.getAudioUrl(finalDeezerId, 'FLAC');
+        if (result && result.url && (result.url.startsWith('http') || result.url.startsWith('blob:'))) {
+          console.log('✅ [FORCED] URL audio Deezmate récupérée:', result.url.substring(0, 50) + '...');
           
-          if (proxyResult && proxyResult.url && (proxyResult.url.startsWith('http') || proxyResult.url.startsWith('blob:'))) {
-            console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));
-            
-            const duration = proxyResult.duration;
-            if (duration) {
-              console.log('✅ Durée récupérée depuis les métadonnées (recherche):', duration, 'secondes');
-            }
-            
-            // Mettre à jour le deezer_id dans la DB
-            if (songId) {
-              void supabase.from('songs')
-                .update({ deezer_id: foundDeezerId })
-                .eq('id', songId);
-            }
-            
-            return { url: proxyResult.url, duration };
+          if (songId && !deezerId) {
+            void supabase.from('songs').update({ deezer_id: finalDeezerId }).eq('id', songId);
           }
           
-          console.warn('⚠️ Service audio: pas d\'URL valide (recherche)');
-        } catch (error) {
-          console.warn('⚠️ Service audio échec (recherche):', error);
+          return result;
         }
-      } else {
-        console.warn("⚠️ Impossible de trouver l'ID Deezer pour la recherche");
+        throw new Error("Le service audio n'a pas retourné d'URL valide.");
+      } catch (error) {
+        console.error("❌ [FORCED] Erreur service audio:", error);
+        throw new Error("La source Deezmate (forcée) a échoué. Impossible de lire la musique.");
       }
-    } catch (error) {
-      console.warn('⚠️ Erreur recherche Deezer:', error);
     }
   }
 
-  // ========== FALLBACK: STORAGE LOCAL ==========
+  // ========== FALLBACK: STORAGE LOCAL (HORS DEEZER) ==========
+  console.log('⚠️ Fallback vers le stockage local (Supabase/Dropbox).');
   
-  console.log('⚠️ Aucun lien haute qualité disponible, fallback vers storage local...');
-  
-  // Fallback vers storage local
-  console.log('📦 Tentative récupération depuis Supabase Storage. Fichier:', filePath);
-  
-  // Fallback final: Supabase Storage pour fichiers uploadés
+  if (filePath && (filePath.includes('dzcdn.net') || filePath.startsWith('deezer:'))) {
+      throw new Error("La source Deezmate a échoué et les previews sont désactivées. Impossible de lire la musique.");
+  }
+
   try {
     const { data, error } = await supabase.storage
       .from('audio')
