@@ -157,7 +157,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     try {
       const result = await audioProxyService.getAudioUrl(deezerId, 'FLAC');
       
-      if (result && result.url && result.url.startsWith('http')) {
+      if (result && result.url && (result.url.startsWith('http') || result.url.startsWith('blob:'))) {
         console.log('✅ URL audio récupérée:', result.url.substring(0, 50) + '...');
         
         if (result.duration) {
@@ -193,7 +193,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
         try {
           const proxyResult = await audioProxyService.getAudioUrl(foundDeezerId, 'FLAC');
           
-          if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
+          if (proxyResult && proxyResult.url && (proxyResult.url.startsWith('http') || proxyResult.url.startsWith('blob:'))) {
             console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));
             
             const duration = proxyResult.duration;
@@ -228,7 +228,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
   console.log('⚠️ Aucun lien haute qualité disponible, fallback vers storage local...');
   
   // Fallback vers storage local
-  console.log('📦 Tentative récupération depuis Supabase Storage. localId:', localId);
+  console.log('📦 Tentative récupération depuis Supabase Storage. Fichier:', filePath);
   
   // Fallback final: Supabase Storage pour fichiers uploadés
   try {
