@@ -543,7 +543,7 @@ export const SyncedLyricsView: React.FC = () => {
               <MoreVertical className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-spotify-dark border-white/10 text-white">
+          <DropdownMenuContent className="bg-spotify-dark border-white/10 text-white z-[150]">
             <DropdownMenuItem onClick={discoverDevices}>
               <Cast className="mr-2 h-4 w-4" />
               <span>Diffuser</span>
