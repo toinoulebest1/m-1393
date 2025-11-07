@@ -18,8 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCast } from "@/contexts/CastContext";
-import ReportSongDialog from "@/components/ReportSongDialog";
-import DeezerSearchDialog from "@/components/DeezerSearchDialog";
+import { ReportSongDialog } from "@/components/ReportSongDialog";
 
 export const SyncedLyricsView: React.FC = () => {
   const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites, refreshCurrentSong } = usePlayer();
