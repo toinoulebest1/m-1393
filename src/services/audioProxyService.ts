@@ -35,6 +35,30 @@ class AudioProxyService {
   private initialized = false;
 
   /**
+   * Helper to convert duration string/number to seconds
+   */
+  private durationToSeconds(duration: any): number | undefined {
+    if (duration === null || duration === undefined) return undefined;
+    if (typeof duration === 'number') return isNaN(duration) ? undefined : duration;
+    if (typeof duration !== 'string') return undefined;
+
+    if (duration.includes(':')) {
+      const parts = duration.split(':').map(Number);
+      if (parts.some(isNaN)) return undefined;
+      let seconds = 0;
+      if (parts.length === 2) { // MM:SS
+        seconds = parts[0] * 60 + parts[1];
+      } else if (parts.length === 3) { // HH:MM:SS
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+      return seconds > 0 ? seconds : undefined;
+    }
+    
+    const num = parseFloat(duration);
+    return isNaN(num) || num <= 0 ? undefined : num;
+  }
+
+  /**
    * Initialiser le service avec test de latence des instances
    */
   async initialize(): Promise<void> {
@@ -269,12 +293,12 @@ class AudioProxyService {
       // Si la durée n'a pas encore été trouvée, vérifier les emplacements courants
       if (duration === undefined) {
         // Depuis l'objet racine
-        if (data?.duration && !isNaN(Number(data.duration))) {
-          duration = Number(data.duration);
+        if (data?.duration) {
+          duration = this.durationToSeconds(data.duration);
         }
         // Depuis les métadonnées Tidal
-        else if (Array.isArray(data) && data[0]?.duration && !isNaN(Number(data[0].duration))) {
-          duration = Number(data[0].duration);
+        else if (Array.isArray(data) && data[0]?.duration) {
+          duration = this.durationToSeconds(data[0].duration);
         }
       }
 
