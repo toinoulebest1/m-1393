@@ -196,6 +196,8 @@ export const useAudioControl = ({
         // Configuration streaming instantané optimisé
         console.log("⚡ Démarrage instantané de:", song.title);
         console.log("🔗 URL audio:", audioUrl.substring(0, 50) + "...");
+        console.log("🔍 Type d'URL:", typeof audioUrl);
+        console.log("🔍 Débute par:", audioUrl.substring(0, 20));
         
         // ✅ SÉCURITÉ: S'assurer qu'aucun audio ne joue avant de charger le nouveau
         audio.pause();
@@ -209,16 +211,73 @@ export const useAudioControl = ({
         audio.src = audioUrl;
         console.log("✅ Source audio assignée pour:", song.title);
         
+        // Vérifier si l'URL est un blob
+        if (audioUrl.startsWith('blob:')) {
+          console.log("🎵 Détection URL blob - format FLAC probable");
+          console.log("🔍 Support FLAC du navigateur:", 'audio/flac' in new Audio().canPlayType ? 'Oui' : 'Non');
+          
+          // Tester si le navigateur peut lire le FLAC
+          const testAudio = new Audio();
+          const canPlayFlac = testAudio.canPlayType('audio/flac');
+          console.log("🔍 Test canPlayType FLAC:", canPlayFlac);
+          
+          if (canPlayFlac === '') {
+            console.warn("⚠️ Le navigateur ne supporte peut-être pas le FLAC nativement");
+            toast.warning("Format FLAC détecté - si la lecture échoue, essayez un autre navigateur comme Chrome");
+          }
+        }
+        
         // Petit helper pour attendre la lisibilité
-        const waitForCanPlay = (timeoutMs = 2000) => new Promise<void>((resolve, reject) => {
-          if (audio.readyState >= 3) return resolve();
+        const waitForCanPlay = (timeoutMs = 5000) => new Promise<void>((resolve, reject) => {
+          if (audio.readyState >= 3) {
+            console.log("✅ Audio déjà prêt (readyState >= 3)");
+            resolve();
+            return;
+          }
+          
           let done = false;
-          const cleanup = () => { if (done) return; done = true; audio.removeEventListener('canplay', onCanPlay); audio.removeEventListener('error', onErr); clearTimeout(timer); };
-          const onCanPlay = () => { cleanup(); resolve(); };
-          const onErr = () => { cleanup(); reject(new Error('audio error before canplay')); };
-          const timer = setTimeout(() => { cleanup(); reject(new Error('canplay timeout')); }, timeoutMs);
+          const cleanup = () => { 
+            if (done) return; 
+            done = true; 
+            audio.removeEventListener('canplay', onCanPlay); 
+            audio.removeEventListener('error', onErr); 
+            audio.removeEventListener('loadedmetadata', onMetadata); 
+            clearTimeout(timer); 
+          };
+          
+          const onCanPlay = () => { 
+            console.log("✅ Événement canplay déclenché");
+            cleanup(); 
+            resolve(); 
+          };
+          
+          const onErr = (e: Event) => { 
+            console.error("❌ Erreur audio avant canplay:", e);
+            const audioError = (e.target as HTMLAudioElement).error;
+            console.error("❌ Détails erreur:", {
+              code: audioError?.code,
+              message: audioError?.message
+            });
+            cleanup(); 
+            reject(new Error('audio error before canplay')); 
+          };
+          
+          const onMetadata = () => {
+            console.log("📊 Métadonnées chargées:");
+            console.log("  - Durée:", audio.duration);
+            console.log("  - readyState:", audio.readyState);
+            console.log("  - networkState:", audio.networkState);
+          };
+          
+          const timer = setTimeout(() => { 
+            console.warn("⚠️ Timeout canplay atteint");
+            cleanup(); 
+            reject(new Error('canplay timeout')); 
+          }, timeoutMs);
+          
           audio.addEventListener('canplay', onCanPlay, { once: true });
           audio.addEventListener('error', onErr, { once: true });
+          audio.addEventListener('loadedmetadata', onMetadata, { once: true });
         });
         
         // Gestionnaire d'erreur permanent pour détecter les liens expirés/invalides
@@ -235,7 +294,9 @@ export const useAudioControl = ({
           console.error("❌ Erreur audio détectée:", {
             code: audioError?.code,
             message: audioError?.message,
-            src: audio.src
+            src: audio.src,
+            readyState: audio.readyState,
+            networkState: audio.networkState
           });
           
           // Éviter les boucles de fallback
@@ -257,23 +318,6 @@ export const useAudioControl = ({
           // Ne rien faire, laisser le navigateur gérer
         };
         
-        // Renouvellement préventif DÉSACTIVÉ (causait des arrêts intempestifs)
-        // Le lien sera renouvelé uniquement en cas d'erreur via handleAudioError
-        const setupLinkRenewal = () => {
-          // Fonction vide pour éviter les interruptions
-          console.log("ℹ️ Renouvellement automatique désactivé (éviter les interruptions)");
-        };
-        
-        // Nettoyage du renouvellement (au cas où)
-        const cleanupRenewal = () => {
-          if (renewalIntervalRef.current) {
-            clearInterval(renewalIntervalRef.current);
-            renewalIntervalRef.current = null;
-          }
-        };
-        
-        audio.addEventListener('ended', cleanupRenewal);
-        
         // Ajouter les listeners (avec refs stables)
         if (errorHandlerRef.current) audio.removeEventListener('error', errorHandlerRef.current);
         if (stalledHandlerRef.current) audio.removeEventListener('stalled', stalledHandlerRef.current as any);
@@ -282,34 +326,11 @@ export const useAudioControl = ({
         audio.addEventListener('error', errorHandlerRef.current);
         audio.addEventListener('stalled', stalledHandlerRef.current as any);
         
-        // Activer le renouvellement automatique
-        setupLinkRenewal();
-        
-        // Listener pour mettre à jour MediaSession dès que la durée est connue
-        const onLoadedMetadata = () => {
-          if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
-            const audioDuration = audio.duration;
-            const knownDuration = apiDurationRef?.current;
-
-            // Priorité à la durée de l'API si elle existe.
-            // Sinon, utiliser la durée de l'élément audio si elle est valide (finie).
-            const durationToSet = knownDuration ?? (audioDuration && isFinite(audioDuration) ? audioDuration : undefined);
-
-            if (durationToSet) {
-              import('@/utils/mediaSession').then(({ updatePositionState }) => {
-                updatePositionState(durationToSet, audio.currentTime || 0, audio.playbackRate || 1);
-                console.log("📊 MediaSession: metadata loaded, duration set to:", durationToSet.toFixed(1));
-              });
-            } else {
-              console.log("📊 MediaSession: metadata loaded, mais pas de durée valide à définir.", { knownDuration, audioDuration });
-            }
-          }
-        };
-        audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
-        
         // Démarrage INSTANTANÉ sans attendre - streaming progressif
         // On essaie de jouer immédiatement, le navigateur buffera en arrière-plan
         try {
+          console.log("🎵 Tentative de lecture immédiate...");
+          
           // Si déjà quelques données disponibles, on démarre directement
           if (audio.readyState >= 2) {
             console.log("✅ Données déjà disponibles, démarrage immédiat");
@@ -319,7 +340,7 @@ export const useAudioControl = ({
               const timeout = setTimeout(() => {
                 console.warn("⚠️ Timeout atteint, tentative de lecture quand même");
                 resolve(); // On essaie quand même
-              }, 300); // 300ms max - timeout agressif pour démarrage rapide
+              }, 500); // 500ms max - timeout agressif pour démarrage rapide
               
               const onLoadedData = () => {
                 clearTimeout(timeout);
@@ -403,6 +424,12 @@ export const useAudioControl = ({
           console.log("🎵 Chanson:", song.title);
           console.log("⚡ Temps de lecture:", playElapsed.toFixed(1), "ms");
           console.log("⚡ Temps total:", totalElapsed.toFixed(1), "ms");
+          console.log("🔍 État audio final:");
+          console.log("  - paused:", audio.paused);
+          console.log("  - currentTime:", audio.currentTime);
+          console.log("  - duration:", audio.duration);
+          console.log("  - readyState:", audio.readyState);
+          console.log("  - networkState:", audio.networkState);
           
           setIsPlaying(true);
 

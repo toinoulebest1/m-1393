@@ -7,12 +7,13 @@ interface CachedAudio {
   blob: Blob;
   timestamp: number;
   duration?: number;
+  objectUrl?: string; // Garder une référence à l'URL
 }
 
 class AudioProxyService {
   private audioCache = new Map<string, CachedAudio>();
   private readonly AUDIO_CACHE_TTL = 10 * 60 * 1000; // 10 minutes pour le blob audio
-  private readonly MAX_CACHE_SIZE = 50; // Réduit car on stocke des blobs
+  private readonly MAX_CACHE_SIZE = 50;
   private initialized = false;
 
   async initialize(): Promise<void> {
@@ -34,8 +35,14 @@ class AudioProxyService {
     const cached = this.audioCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.AUDIO_CACHE_TTL) {
       console.log("🎯 Cache audio hit:", trackId);
-      const audioUrl = URL.createObjectURL(cached.blob);
-      return { url: audioUrl, duration: cached.duration };
+      
+      // Recréer l'URL si nécessaire
+      if (!cached.objectUrl) {
+        cached.objectUrl = URL.createObjectURL(cached.blob);
+        console.log("🔗 URL blob recréée:", cached.objectUrl.substring(0, 50) + "...");
+      }
+      
+      return { url: cached.objectUrl, duration: cached.duration };
     }
 
     console.log(`🚀 Récupération audio pour ${trackId}...`);
@@ -44,9 +51,10 @@ class AudioProxyService {
     try {
       const deezmateResult = await this.tryDeezmate(trackId);
       if (deezmateResult) {
-        this.cacheAudio(cacheKey, deezmateResult.blob, deezmateResult.duration);
-        const audioUrl = URL.createObjectURL(deezmateResult.blob);
-        return { url: audioUrl, duration: deezmateResult.duration };
+        const objectUrl = URL.createObjectURL(deezmateResult.blob);
+        this.cacheAudio(cacheKey, deezmateResult.blob, deezmateResult.duration, objectUrl);
+        console.log("✅ FLAC Deezmate prêt:", objectUrl.substring(0, 50) + "...");
+        return { url: objectUrl, duration: deezmateResult.duration };
       }
     } catch (error) {
       console.warn("⚠️ Deezmate échoué:", error);
@@ -56,9 +64,10 @@ class AudioProxyService {
     try {
       const flacdownloaderResult = await this.tryFlacdownloader(trackId);
       if (flacdownloaderResult) {
-        this.cacheAudio(cacheKey, flacdownloaderResult.blob, flacdownloaderResult.duration);
-        const audioUrl = URL.createObjectURL(flacdownloaderResult.blob);
-        return { url: audioUrl, duration: flacdownloaderResult.duration };
+        const objectUrl = URL.createObjectURL(flacdownloaderResult.blob);
+        this.cacheAudio(cacheKey, flacdownloaderResult.blob, flacdownloaderResult.duration, objectUrl);
+        console.log("✅ FLAC Flacdownloader prêt:", objectUrl.substring(0, 50) + "...");
+        return { url: objectUrl, duration: flacdownloaderResult.duration };
       }
     } catch (error) {
       console.warn("⚠️ Flacdownloader échoué:", error);
@@ -81,9 +90,11 @@ class AudioProxyService {
     }
 
     const data = await response.json();
+    console.log("📋 Réponse Deezmate:", data);
     
     if (data.success && data.links && data.links.flac) {
       console.log("✅ Deezmate succès, téléchargement du FLAC...");
+      console.log("🔗 URL FLAC:", data.links.flac);
       
       // Télécharger le fichier FLAC immédiatement
       const audioResponse = await fetch(data.links.flac);
@@ -93,6 +104,18 @@ class AudioProxyService {
       
       const blob = await audioResponse.blob();
       console.log("✅ FLAC téléchargé:", blob.size, "bytes");
+      console.log("📝 Type MIME:", blob.type);
+      console.log("📝 Détails blob:", {
+        size: blob.size,
+        type: blob.type,
+        isAudio: blob.type.startsWith('audio/'),
+        lastModified: blob.lastModified
+      });
+      
+      // Vérifier si le blob est valide
+      if (blob.size === 0) {
+        throw new Error('Blob vide - téléchargement échoué');
+      }
       
       return { blob };
     }
@@ -113,6 +136,7 @@ class AudioProxyService {
     }
 
     const flacdownloaderUrl = `https://flacdownloader.com/flac/download?t=${shareLink}&f=FLAC`;
+    console.log("🔗 URL Flacdownloader:", flacdownloaderUrl);
     
     const response = await fetch(flacdownloaderUrl);
     
@@ -122,6 +146,7 @@ class AudioProxyService {
 
     // Flacdownloader retourne généralement un JSON avec l'URL
     const data = await response.json();
+    console.log("📋 Réponse Flacdownloader:", data);
     
     if (data.url && data.url.startsWith('http')) {
       console.log("✅ Flacdownloader succès, téléchargement...");
@@ -134,6 +159,7 @@ class AudioProxyService {
       
       const blob = await audioResponse.blob();
       console.log("✅ FLAC téléchargé:", blob.size, "bytes");
+      console.log("📝 Type MIME:", blob.type);
       
       return { blob, duration: data.duration };
     }
@@ -170,16 +196,16 @@ class AudioProxyService {
   /**
    * Mettre en cache un blob audio
    */
-  private cacheAudio(key: string, blob: Blob, duration?: number): void {
+  private cacheAudio(key: string, blob: Blob, duration?: number, objectUrl?: string): void {
     // Limiter la taille du cache
     if (this.audioCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = Array.from(this.audioCache.entries())
         .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
       
       // Libérer l'URL de l'ancien blob
-      const oldBlob = this.audioCache.get(oldestKey)?.blob;
-      if (oldBlob) {
-        URL.revokeObjectURL(URL.createObjectURL(oldBlob));
+      const oldEntry = this.audioCache.get(oldestKey);
+      if (oldEntry?.objectUrl) {
+        URL.revokeObjectURL(oldEntry.objectUrl);
       }
       
       this.audioCache.delete(oldestKey);
@@ -188,7 +214,8 @@ class AudioProxyService {
     this.audioCache.set(key, {
       blob,
       timestamp: Date.now(),
-      duration
+      duration,
+      objectUrl
     });
     
     console.log("💾 Audio mis en cache:", key, `(${this.audioCache.size}/${this.MAX_CACHE_SIZE})`, `${blob.size} bytes`);
@@ -216,7 +243,9 @@ class AudioProxyService {
     for (const [key, cached] of this.audioCache.entries()) {
       if (now - cached.timestamp > this.AUDIO_CACHE_TTL) {
         // Libérer l'URL du blob
-        URL.revokeObjectURL(URL.createObjectURL(cached.blob));
+        if (cached.objectUrl) {
+          URL.revokeObjectURL(cached.objectUrl);
+        }
         this.audioCache.delete(key);
         cleaned++;
       }
