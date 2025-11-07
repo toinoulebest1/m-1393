@@ -575,8 +575,52 @@ export const SyncedLyricsView: React.FC = () => {
                 />
               </Button>
             </div>
-            {/* Desktop Back Button */}
-            <Button onClick={handleClose} variant="ghost" className="mt-4 text-white/70 hover:text-white hidden md:inline-flex">
+            {/* Desktop Back Button is moved after player controls */}
+          </div>
+
+          {/* Player Controls Area for Desktop */}
+          <div className="hidden md:block w-full pt-4 flex-shrink-0">
+            {/* Progress Bar */}
+            <div className="w-full my-2">
+              <Slider
+                value={[progress]}
+                max={100}
+                step={0.1}
+                className="flex-grow"
+                onValueChange={handleProgressChange}
+              />
+              <div className="flex items-center justify-between text-xs mt-1 px-1">
+                <span className="text-spotify-neutral">{formatTime(currentTime)}</span>
+                <span className="text-spotify-neutral">{formatDuration(currentSong?.duration)}</span>
+              </div>
+            </div>
+            
+            {/* Playback controls */}
+            <div className="flex items-center justify-center space-x-4">
+              <Button variant="ghost" size="icon" onClick={previousSong} className="text-white hover:bg-white/10 rounded-full h-12 w-12">
+                <SkipBack className="h-6 w-6" />
+              </Button>
+              <Button variant="default" size="icon" onClick={handlePlayPause} className="bg-white text-black hover:bg-white/90 rounded-full h-16 w-16">
+                {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={nextSong} className="text-white hover:bg-white/10 rounded-full h-12 w-12">
+                <SkipForward className="h-6 w-6" />
+              </Button>
+            </div>
+
+            {/* Desktop-only volume controls */}
+            <div className="flex items-center space-x-2 mt-4 px-1">
+              <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 50 : 0)} className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0">
+                {volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              </Button>
+              <Slider value={[volume]} max={100} step={1} className="flex-grow max-w-[100px]" onValueChange={(value) => setVolume(value[0])} />
+              <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">{volume}%</span>
+            </div>
+          </div>
+
+          {/* Desktop Back Button */}
+          <div className="hidden md:block w-full pt-4">
+            <Button onClick={handleClose} variant="ghost" className="mt-4 text-white/70 hover:text-white">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Retour
             </Button>
@@ -671,10 +715,10 @@ export const SyncedLyricsView: React.FC = () => {
             )}
           </div>
 
-          {/* Player Controls Area */}
-          <div className="w-full pt-4 flex-shrink-0 order-first md:order-last">
+          {/* Player Controls Area - NOW MOBILE ONLY */}
+          <div className="w-full pt-4 flex-shrink-0 md:hidden">
             {/* Mobile-only Song Info */}
-            <div className="flex items-center justify-between px-2 md:hidden">
+            <div className="flex items-center justify-between px-2">
               <div>
                 <h1 className="text-xl font-bold text-white break-words">
                   {currentSong.title}
@@ -733,7 +777,7 @@ export const SyncedLyricsView: React.FC = () => {
             </div>
 
             {/* Volume Control (Mobile) */}
-            <div className="flex items-center space-x-3 mt-4 md:hidden">
+            <div className="flex items-center space-x-3 mt-4">
               <VolumeX className="h-5 w-5 text-spotify-neutral/70" />
               <Slider
                 value={[volume]}
@@ -743,15 +787,6 @@ export const SyncedLyricsView: React.FC = () => {
                 onValueChange={(value) => setVolume(value[0])}
               />
               <Volume2 className="h-5 w-5 text-spotify-neutral/70" />
-            </div>
-
-            {/* Desktop-only controls */}
-            <div className="hidden md:flex items-center space-x-2 mt-4 px-1">
-              <Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 50 : 0)} className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-7 w-7 flex-shrink-0">
-                {volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-              </Button>
-              <Slider value={[volume]} max={100} step={1} className="flex-grow max-w-[100px]" onValueChange={(value) => setVolume(value[0])} />
-              <span className="text-[10px] text-spotify-neutral/70 w-7 text-right flex-shrink-0">{volume}%</span>
             </div>
           </div>
         </div>
