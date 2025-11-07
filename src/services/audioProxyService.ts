@@ -217,7 +217,8 @@ class AudioProxyService {
    */
   private async fetchAudioUrl(instance: ProxyInstance, tidalId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: string } | null> {
     try {
-      const url = `${instance.url}/download?id=${tidalId}&quality=${quality}`;
+      // Correction de l'URL pour utiliser le bon endpoint /track/
+      const url = `${instance.url}/track/?id=${tidalId}&quality=${quality}`;
       
       const response = await fetch(url, {
         signal,
@@ -237,9 +238,10 @@ class AudioProxyService {
       
       const data = await response.json();
       
-      if (data.url) {
+      // Extraire le bon champ OriginalTrackUrl de la réponse
+      if (data.OriginalTrackUrl) {
         return {
-          url: data.url,
+          url: data.OriginalTrackUrl,
           duration: data.duration
         };
       }
