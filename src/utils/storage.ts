@@ -173,7 +173,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     // Utiliser le multi-proxy seulement si on a un tidal_id
     if (tidalId) {
       try {
-        const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+        const proxyResult = await audioProxyService.getAudioUrl(
+          tidalId, 
+          songTitle || '', 
+          songArtist || '', 
+          'LOSSLESS'
+        );
         
         if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
           console.log('✅ URL audio récupérée via Tidal:', proxyResult.url.substring(0, 50));
@@ -243,7 +248,12 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           console.log('🚀 Récupération audio (recherche) via multi-proxy, Tidal ID:', tidalId);
           
           try {
-            const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+            const proxyResult = await audioProxyService.getAudioUrl(
+              tidalId, 
+              songTitle || '', 
+              songArtist || '', 
+              'LOSSLESS'
+            );
             
             if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
               console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));

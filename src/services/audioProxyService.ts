@@ -182,8 +182,15 @@ class AudioProxyService {
       
       const response = await fetch(url, {
         signal,
-        headers: { 'Accept': 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        }
       });
+      
+      if (!response) {
+        throw new Error('Pas de réponse du serveur');
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -196,6 +203,8 @@ class AudioProxyService {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log(`⏹️ Recherche annulée sur ${instance.name}`);
+      } else if (error instanceof Error && error.message.includes('CORS')) {
+        console.warn(`⚠️ Erreur CORS sur ${instance.name}:`, error.message);
       } else {
         console.warn(`⚠️ Erreur recherche ID sur ${instance.name}:`, error);
       }
@@ -212,8 +221,15 @@ class AudioProxyService {
       
       const response = await fetch(url, {
         signal,
-        headers: { 'Accept': 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        }
       });
+      
+      if (!response) {
+        throw new Error('Pas de réponse du serveur');
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -232,6 +248,8 @@ class AudioProxyService {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log(`⏹️ Requête URL annulée sur ${instance.name}`);
+      } else if (error instanceof Error && error.message.includes('CORS')) {
+        console.warn(`⚠️ Erreur CORS sur ${instance.name}:`, error.message);
       } else {
         console.warn(`⚠️ Erreur récupération URL sur ${instance.name}:`, error);
       }
