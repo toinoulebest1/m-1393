@@ -1,6 +1,6 @@
 /**
  * Service de recherche Tidal pour convertir titre + artiste → Tidal ID
- * Utilise l'API aether.squid.wtf/search
+ * Utilise une liste dynamique d'instances pour des recherches simultanées.
  */
 
 interface TidalSearchResult {
@@ -14,82 +14,118 @@ interface TidalSearchResult {
 class TidalSearchService {
   private cache = new Map<string, string>(); // Clé: "titre|artiste" → Tidal ID
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-  private readonly searchInstances = [
-    'https://aether.squid.wtf',
-    'https://zeus.squid.wtf',
-    'https://kraken.squid.wtf',
-    'https://wolf.qqdl.site',
-    'https://maus.qqdl.site',
-    'https://vogel.qqdl.site',
-    'https://katze.qqdl.site',
-    'https://hund.qqdl.site',
-    'https://phoenix.squid.wtf',
-    'https://shiva.squid.wtf',
-    'https://chaos.squid.wtf',
-    'https://tidal.kinoplus.online'
-  ];
+  private searchInstances: string[] = [];
+  private instancesPromise: Promise<void> | null = null;
+
+  private loadInstances(): Promise<void> {
+    if (this.instancesPromise) {
+      return this.instancesPromise;
+    }
+
+    this.instancesPromise = (async () => {
+      try {
+        const response = await fetch('/instances.json');
+        if (!response.ok) {
+          throw new Error(`Failed to load instances.json: ${response.statusText}`);
+        }
+        const instances = await response.json();
+        if (Array.isArray(instances) && instances.every(i => typeof i === 'string')) {
+          this.searchInstances = instances;
+          console.log(`✅ ${this.searchInstances.length} instances de recherche Tidal chargées.`);
+        } else {
+          throw new Error('Invalid format for instances.json');
+        }
+      } catch (error) {
+        console.error("⚠️ Erreur chargement instances.json, utilisation de la liste par défaut:", error);
+        // Fallback list in case the JSON file is unavailable
+        this.searchInstances = [
+          'https://aether.squid.wtf',
+          'https://zeus.squid.wtf',
+          'https://kraken.squid.wtf',
+          'https://wolf.qqdl.site',
+          'https://maus.qqdl.site',
+          'https://vogel.qqdl.site',
+          'https://katze.qqdl.site',
+          'https://hund.qqdl.site',
+          'https://phoenix.squid.wtf',
+          'https://shiva.squid.wtf',
+          'https://chaos.squid.wtf',
+          'https://tidal.kinoplus.online'
+        ];
+      }
+    })();
+    
+    return this.instancesPromise;
+  }
 
   /**
-   * Chercher l'ID Tidal d'un track via titre + artiste
+   * Chercher l'ID Tidal d'un track via titre + artiste en parallèle sur toutes les instances.
    */
   async searchTidalId(title: string, artist: string): Promise<string | null> {
+    await this.loadInstances();
+
     const cacheKey = `${title.toLowerCase()}|${artist.toLowerCase()}`;
     
-    // Vérifier le cache
     if (this.cache.has(cacheKey)) {
       console.log("🎯 Tidal ID en cache:", title, artist);
       return this.cache.get(cacheKey)!;
     }
 
-    // Essayer chaque instance jusqu'à trouver un résultat
-    for (const instance of this.searchInstances) {
-      try {
-        console.log(`🔍 Recherche Tidal via ${instance}:`, title, artist);
-        
-        // Combiner titre et artiste dans un seul paramètre de recherche 's' pour de meilleurs résultats
-        const searchQuery = `${title} ${artist}`;
-        const url = `${instance}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
-        
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        
-        const response = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json'
+    if (this.searchInstances.length === 0) {
+      console.error("❌ Aucune instance de recherche Tidal disponible.");
+      return null;
+    }
+
+    console.log(`🚀 Recherche simultanée sur ${this.searchInstances.length} instances pour:`, title, artist);
+
+    const promises = this.searchInstances.map(instance => 
+      (async () => {
+        try {
+          const searchQuery = `${title} ${artist}`;
+          const url = `${instance}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
+          
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 8000);
+          
+          const response = await fetch(url, {
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+          });
+          
+          clearTimeout(timeout);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
           }
-        });
-        
-        clearTimeout(timeout);
-        
-        if (!response.ok) {
-          console.warn(`⚠️ ${instance} search HTTP ${response.status}`);
-          continue;
+          
+          const data = await response.json();
+          const bestMatch = this.findBestMatch(data, title, artist);
+          
+          if (bestMatch) {
+            console.log(`✅ Tidal ID trouvé: ${bestMatch} (${instance})`);
+            return bestMatch;
+          }
+          
+          throw new Error(`Aucun résultat pour "${title}" - "${artist}"`);
+        } catch (error) {
+          // This error is expected when an instance fails, so we don't log it to avoid noise.
+          // Promise.any will handle it.
+          throw new Error(`Échec sur ${instance}`);
         }
-        
-        const data = await response.json();
-        
-        // Chercher le meilleur match
-        const bestMatch = this.findBestMatch(data, title, artist);
-        
-        if (bestMatch) {
-          console.log(`✅ Tidal ID trouvé: ${bestMatch} (${instance})`);
-          
-          // Mettre en cache
-          this.cache.set(cacheKey, bestMatch);
-          
-          // Nettoyer le cache après TTL
-          setTimeout(() => this.cache.delete(cacheKey), this.CACHE_TTL);
-          
-          return bestMatch;
-        }
-        
-        console.warn(`⚠️ ${instance}: Aucun résultat pour "${title}" - "${artist}"`);
-        
-      } catch (error) {
-        console.warn(`⚠️ ${instance} search échec:`, error);
-        continue;
+      })()
+    );
+
+    try {
+      const firstResult = await Promise.any(promises);
+      
+      if (firstResult) {
+        this.cache.set(cacheKey, firstResult);
+        setTimeout(() => this.cache.delete(cacheKey), this.CACHE_TTL);
+        return firstResult;
       }
+    } catch (error) {
+      // This error is thrown by Promise.any when all promises reject.
+      // It's an AggregateError, but we don't need to log the details.
     }
     
     console.error("❌ Aucune instance n'a trouvé l'ID Tidal pour:", title, artist);
@@ -113,7 +149,6 @@ class TidalSearchService {
     const normalizedSearchTitle = normalizeString(searchTitle);
     const normalizedSearchArtist = normalizeString(searchArtist);
     
-    // Essayer de trouver un match exact
     for (const track of data.items) {
       if (!track.id) continue;
       
@@ -122,14 +157,12 @@ class TidalSearchService {
         .map((a: any) => normalizeString(typeof a === 'string' ? a : a.name || ''))
         .join(' ');
       
-      // Match exact titre + artiste
       if (trackTitle === normalizedSearchTitle && 
           trackArtists.includes(normalizedSearchArtist)) {
         return String(track.id);
       }
     }
     
-    // Essayer un match partiel sur le titre principal
     for (const track of data.items) {
       if (!track.id) continue;
       
@@ -138,7 +171,6 @@ class TidalSearchService {
         .map((a: any) => normalizeString(typeof a === 'string' ? a : a.name || ''))
         .join(' ');
       
-      // Match partiel (titre contient recherche OU recherche contient titre)
       if ((trackTitle.includes(normalizedSearchTitle) || 
            normalizedSearchTitle.includes(trackTitle)) &&
           trackArtists.includes(normalizedSearchArtist)) {
