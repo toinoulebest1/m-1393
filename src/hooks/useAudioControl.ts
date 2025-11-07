@@ -1,7 +1,8 @@
 import { useCallback, useRef } from 'react';
+import { usePlayer } from '@/contexts/PlayerContext';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { toast } from 'sonner';
-import { updateMediaSessionMetadata, durationToSeconds } from '@/utils/mediaSession';
+import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
@@ -46,6 +47,21 @@ export const useAudioControl = ({
   const errorHandlerRef = useRef<((e: Event) => void) | null>(null);
   const stalledHandlerRef = useRef<((e: Event) => void) | null>(null);
   const renewalIntervalRef = useRef<number | null>(null);
+
+  const {
+    audio,
+    isPlaying,
+    setIsPlaying,
+    currentSong: playerCurrentSong,
+    setCurrentSong,
+    setCurrentTime,
+    setDuration,
+    duration, // <-- On récupère la durée depuis le contexte
+    setQueue,
+    setOriginalQueue,
+    setQueueSource,
+    setPlaybackSpeed,
+  } = usePlayer();
 
   const play = useCallback(async (song?: Song) => {
     playCallCounter++;
@@ -657,6 +673,43 @@ export const useAudioControl = ({
   const getCurrentAudioElement = useCallback(() => {
     return audioRef.current;
   }, [audioRef]);
+
+  // Met à jour le temps de lecture actuel et la barre de progression
+  const handleTimeUpdate = useCallback(() => {
+    if (audio.current) {
+      const currentTime = audio.current.currentTime;
+      setCurrentTime(currentTime);
+
+      // Utilise la durée fiable du contexte au lieu de audio.current.duration
+      if (duration > 0) {
+        updatePositionState(
+          duration,
+          currentTime,
+          audio.current.playbackRate
+        );
+      }
+    }
+  }, [audio, setCurrentTime, duration]);
+
+  // Gère le chargement des métadonnées audio
+  const handleLoadedMetadata = useCallback(() => {
+    const audioUrlData = audio.current;
+    const songDuration = durationToSeconds(audioUrlData.duration || song.duration);
+    
+    // Stocke la durée fiable dans le contexte dès que possible
+    if (songDuration > 0) {
+      setDuration(songDuration);
+    }
+
+    // Mise à jour des métadonnées pour le centre de notification
+    updateMediaSessionMetadata({
+      title: song.title,
+      artist: song.artist,
+      album: song.album_name,
+      artwork: song.imageUrl,
+      duration: songDuration,
+    });
+  }, [audio, song, setDuration, updateMediaSessionMetadata]);
 
   return {
     play,
