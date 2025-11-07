@@ -42,6 +42,7 @@ export const updatePositionState = (
 ) => {
   // GARDE DE SÉCURITÉ : Ne jamais mettre à jour l'OS avec une durée invalide.
   if (!duration || isNaN(duration) || duration === Infinity || duration <= 0) {
+    console.warn(`MediaSession update bloquée: durée invalide (${duration})`);
     return; // Bloque la mise à jour si la durée n'est pas fiable.
   }
 
