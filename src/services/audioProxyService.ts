@@ -1,38 +1,20 @@
 import { supabase } from '@/integrations/supabase/client';
 
-interface ProxyInstance {
-  url: string;
-  name: string;
-  score: number;
-  lastUsed: number;
-  errorCount: number;
-  lastError: number;
-}
-
 interface CachedUrl {
   url: string;
   duration?: string;
   timestamp: number;
 }
 
-interface TidalSearchResult {
-  id: string;
-  title: string;
-  artists: string[];
-  album?: string;
-  duration?: number;
-}
-
 class AudioProxyService {
-  private instances: ProxyInstance[] = [];
+  private instances: string[] = [];
   private urlCache = new Map<string, CachedUrl>();
   private readonly URL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 100;
-  private readonly ERROR_COOLDOWN = 30000; // 30 secondes
   private initialized = false;
 
   /**
-   * Initialiser le service avec test de latence des instances
+   * Initialiser le service
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -42,16 +24,13 @@ class AudioProxyService {
       if (!response.ok) throw new Error('Failed to load instances');
       const data = await response.json();
       
-      this.instances = data.map((url: string) => ({
-        url,
-        name: new URL(url).hostname,
-        score: 100,
-        lastUsed: 0,
-        errorCount: 0,
-        lastError: 0
-      }));
+      if (Array.isArray(data)) {
+        this.instances = data;
+        console.log(`✅ ${this.instances.length} instances de proxy audio chargées`);
+      } else {
+        throw new Error('Invalid instances format');
+      }
       
-      console.log(`✅ ${this.instances.length} instances de proxy audio chargées`);
       this.initialized = true;
     } catch (error) {
       console.error('❌ Erreur chargement instances:', error);
@@ -128,10 +107,10 @@ class AudioProxyService {
             controllers.forEach((controller, i) => {
               if (i !== index) controller.abort();
             });
-            console.log(`🏆 ID trouvé par ${instance.name}: ${tidalId}`);
+            console.log(`🏆 ID trouvé par ${instance}: ${tidalId}`);
             return tidalId;
           }
-          throw new Error(`Aucun ID trouvé sur ${instance.name}`);
+          throw new Error(`Aucun ID trouvé sur ${instance}`);
         })
     );
 
@@ -157,10 +136,10 @@ class AudioProxyService {
             controllers.forEach((controller, i) => {
               if (i !== index) controller.abort();
             });
-            console.log(`🏆 URL trouvée par ${instance.name}`);
+            console.log(`🏆 URL trouvée par ${instance}`);
             return result;
           }
-          throw new Error(`Aucune URL trouvée sur ${instance.name}`);
+          throw new Error(`Aucune URL trouvée sur ${instance}`);
         })
     );
 
@@ -175,10 +154,10 @@ class AudioProxyService {
   /**
    * Rechercher l'ID Tidal sur une instance spécifique
    */
-  private async searchTidalId(instance: ProxyInstance, title: string, artist: string, signal: AbortSignal): Promise<string | null> {
+  private async searchTidalId(instance: string, title: string, artist: string, signal: AbortSignal): Promise<string | null> {
     try {
       const searchQuery = `${title} ${artist}`;
-      const url = `${instance.url}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
+      const url = `${instance}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
       
       const response = await fetch(url, {
         signal,
@@ -202,11 +181,11 @@ class AudioProxyService {
       return bestMatch;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`⏹️ Recherche annulée sur ${instance.name}`);
+        console.log(`⏹️ Recherche annulée sur ${instance}`);
       } else if (error instanceof Error && error.message.includes('CORS')) {
-        console.warn(`⚠️ Erreur CORS sur ${instance.name}:`, error.message);
+        console.warn(`⚠️ Erreur CORS sur ${instance}:`, error.message);
       } else {
-        console.warn(`⚠️ Erreur recherche ID sur ${instance.name}:`, error);
+        console.warn(`⚠️ Erreur recherche ID sur ${instance}:`, error);
       }
       return null;
     }
@@ -215,10 +194,9 @@ class AudioProxyService {
   /**
    * Récupérer l'URL audio sur une instance spécifique
    */
-  private async fetchAudioUrl(instance: ProxyInstance, tidalId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: string } | null> {
+  private async fetchAudioUrl(instance: string, tidalId: string, quality: string, signal: AbortSignal): Promise<{ url: string; duration?: string } | null> {
     try {
-      // Correction de l'URL pour utiliser le bon endpoint /track/
-      const url = `${instance.url}/track/?id=${tidalId}&quality=${quality}`;
+      const url = `${instance}/track/?id=${tidalId}&quality=${quality}`;
       
       const response = await fetch(url, {
         signal,
@@ -249,11 +227,11 @@ class AudioProxyService {
       return null;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`⏹️ Requête URL annulée sur ${instance.name}`);
+        console.log(`⏹️ Requête URL annulée sur ${instance}`);
       } else if (error instanceof Error && error.message.includes('CORS')) {
-        console.warn(`⚠️ Erreur CORS sur ${instance.name}:`, error.message);
+        console.warn(`⚠️ Erreur CORS sur ${instance}:`, error.message);
       } else {
-        console.warn(`⚠️ Erreur récupération URL sur ${instance.name}:`, error);
+        console.warn(`⚠️ Erreur récupération URL sur ${instance}:`, error);
       }
       return null;
     }
@@ -267,21 +245,29 @@ class AudioProxyService {
       return null;
     }
     
-    const normalizeString = (str: string) => 
-      str.toLowerCase()
+    const normalizeString = (str: string | undefined | null) => {
+      if (!str) return '';
+      return str.toLowerCase()
         .trim()
         .replace(/[^\w\s]/g, '')
         .replace(/\s+/g, ' ');
+    };
     
     const normalizedSearchTitle = normalizeString(searchTitle);
     const normalizedSearchArtist = normalizeString(searchArtist);
     
+    if (!normalizedSearchTitle || !normalizedSearchArtist) {
+      console.warn('⚠️ Titre ou artiste invalide pour la recherche');
+      return null;
+    }
+    
     for (const track of data.items) {
       if (!track.id) continue;
       
-      const trackTitle = normalizeString(track.title || '');
+      const trackTitle = normalizeString(track.title);
       const trackArtists = (track.artists || [])
-        .map((a: any) => normalizeString(typeof a === 'string' ? a : a.name || ''))
+        .map((a: any) => normalizeString(typeof a === 'string' ? a : a?.name))
+        .filter(Boolean)
         .join(' ');
       
       if (trackTitle === normalizedSearchTitle && 
@@ -293,9 +279,10 @@ class AudioProxyService {
     for (const track of data.items) {
       if (!track.id) continue;
       
-      const trackTitle = normalizeString(track.title || '');
+      const trackTitle = normalizeString(track.title);
       const trackArtists = (track.artists || [])
-        .map((a: any) => normalizeString(typeof a === 'string' ? a : a.name || ''))
+        .map((a: any) => normalizeString(typeof a === 'string' ? a : a?.name))
+        .filter(Boolean)
         .join(' ');
       
       if ((trackTitle.includes(normalizedSearchTitle) || 
@@ -344,6 +331,20 @@ class AudioProxyService {
         timestamp: new Date(value.timestamp).toISOString()
       }))
     };
+  }
+
+  /**
+   * Précharger une piste
+   */
+  async preloadTrack(tidalId: string, quality: string = 'HIGH'): Promise<void> {
+    const cacheKey = `${tidalId}_${quality}`;
+    if (this.urlCache.has(cacheKey)) {
+      console.log("✅ Déjà en cache:", tidalId);
+      return;
+    }
+
+    console.log("🔮 Préchargement:", tidalId);
+    await this.raceForAudioUrl(tidalId, quality);
   }
 }
 
