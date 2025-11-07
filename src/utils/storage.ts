@@ -202,7 +202,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     // NOUVEAU: Fallback vers deezmate-proxy si le multi-proxy a échoué ou n'a pas été tenté
     console.log('🔄 Tentative de fallback via deezmate-proxy...');
     try {
-      const proxyUrl = `${supabase.functions.getURL('deezmate-proxy')}?deezerId=${deezerId}`;
+      const supabaseUrl = supabase.functions.supabaseUrl;
+      const proxyUrl = `${supabaseUrl}/functions/v1/deezmate-proxy?deezerId=${deezerId}`;
       console.log('🔗 URL du proxy deezmate:', proxyUrl);
 
       // On doit valider que l'URL fonctionne, car la fonction proxy renvoie un stream.
@@ -275,7 +276,8 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
           // NOUVEAU: Fallback vers deezmate-proxy si le multi-proxy a échoué
           console.log('🔄 Tentative de fallback (recherche) via deezmate-proxy...');
           try {
-            const proxyUrl = `${supabase.functions.getURL('deezmate-proxy')}?deezerId=${foundDeezerId}`;
+            const supabaseUrl = supabase.functions.supabaseUrl;
+            const proxyUrl = `${supabaseUrl}/functions/v1/deezmate-proxy?deezerId=${foundDeezerId}`;
             console.log('🔗 URL du proxy deezmate (recherche):', proxyUrl);
 
             const controller = new AbortController();
