@@ -47,6 +47,7 @@ export const useAudioControl = ({
   const errorHandlerRef = useRef<((e: Event) => void) | null>(null);
   const stalledHandlerRef = useRef<((e: Event) => void) | null>(null);
   const renewalIntervalRef = useRef<number | null>(null);
+  const cachingTimeoutRef = useRef<number | null>(null);
 
   const play = useCallback(async (song?: Song) => {
     playCallCounter++;
@@ -65,8 +66,12 @@ export const useAudioControl = ({
       
       // ✅ TOUJOURS arrêter tous les audios avant de commencer
       console.log("🛑 Arrêt complet de tous les audios avant nouvelle lecture");
-      console.log("Nouvelle chanson:", song.title);
-      console.log("Chanson actuelle:", currentSong?.title);
+      
+      if (cachingTimeoutRef.current) {
+        clearTimeout(cachingTimeoutRef.current);
+        cachingTimeoutRef.current = null;
+        console.log("🧹 Annulation du cache en attente de la chanson précédente.");
+      }
       
       if (audioRef.current) {
         audioRef.current.pause();
@@ -127,12 +132,14 @@ export const useAudioControl = ({
         // Ne plus se fier à cachedCurrentSong qui peut être désynchronisé
         let audioUrl: string;
         let apiDuration: number | undefined;
+        let wasFromCache = false;
         
         console.log("🔍 Vérification cache IndexedDB pour:", song.title);
         const cachedUrl = await getFromCache(song.url);
         
         if (cachedUrl) {
           audioUrl = cachedUrl;
+          wasFromCache = true;
           const elapsed = performance.now() - startTime;
           console.log("✅ ⚡ CACHE HIT! URL récupérée depuis IndexedDB en:", elapsed.toFixed(1), "ms");
           console.log("✅ Chanson depuis cache:", song.title, "ID:", song.id);
@@ -433,19 +440,31 @@ export const useAudioControl = ({
           
           setIsPlaying(true);
 
-          // Mettre la chanson en cache (en arrière-plan, sans bloquer)
-          ;(async () => {
-            try {
-              const response = await fetch(audioUrl);
-              if (response.ok) {
-                const blob = await response.blob();
-                await cacheCurrentSong(audioUrl, blob, song.id, song.title);
-                console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
-              }
-            } catch (e) {
-              console.warn('Impossible de mettre en cache:', e);
-            }
-          })();
+          // Mettre la chanson en cache en arrière-plan si elle ne l'était pas déjà
+          if (!wasFromCache) {
+            console.log("🕒 Planification de la mise en cache en arrière-plan dans 3 secondes...");
+            
+            // Annuler un potentiel cache précédent
+            if (cachingTimeoutRef.current) clearTimeout(cachingTimeoutRef.current);
+
+            cachingTimeoutRef.current = window.setTimeout(() => {
+              console.log("🚀 Lancement de la mise en cache en arrière-plan pour:", song.title);
+              (async () => {
+                try {
+                  // Utiliser l'URL originale pour le fetch, pas le blob
+                  const response = await fetch(audioUrl);
+                  if (response.ok) {
+                    const blob = await response.blob();
+                    // Utiliser l'URL de la chanson (song.url) comme clé, pas l'URL de lecture qui peut être temporaire
+                    await cacheCurrentSong(song.url, blob, song.id, song.title);
+                    console.log("✅ Chanson actuelle mise en cache avec succès:", song.title);
+                  }
+                } catch (e) {
+                  console.warn('⚠️ Impossible de mettre en cache en arrière-plan:', e);
+                }
+              })();
+            }, 3000); // Démarrer le cache après 3 secondes
+          }
 
           // Enregistrer dans l'historique de lecture (asynchrone, sans bloquer l'UI)
           ;(async () => {
