@@ -167,6 +167,7 @@ serve(async (req) => {
             .insert({
               song_id: newSong.id,
               content: lyrics,
+              source: 'LrcLib'
             });
 
           if (lyricsError) {
