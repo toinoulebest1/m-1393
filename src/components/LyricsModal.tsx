@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -163,10 +162,6 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
       }
 
       await refetch();
-      toast({
-        title: "Succès",
-        description: "Les paroles ont été récupérées avec succès",
-      });
     } catch (error) {
       console.error('Error generating lyrics:', error);
       setError(error.message || "Impossible de récupérer les paroles");

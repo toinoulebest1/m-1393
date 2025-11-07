@@ -393,7 +393,6 @@ export const SyncedLyricsView: React.FC = () => {
         // Lyrics are not in LRC format
       }
       
-      toast.success("Les paroles ont été récupérées avec succès");
     } catch (error: any) {
       console.error('Error generating lyrics:', error);
       setError(error.message || "Impossible de récupérer les paroles");
