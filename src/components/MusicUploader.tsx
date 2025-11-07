@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Upload, FolderOpen, Music } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -411,7 +410,6 @@ export const MusicUploader = () => {
         lyricsFound = await processLrcFile(lrcFile, fileId, title, artist);
         
         if (lyricsFound) {
-          toast.success(`Paroles synchronisées importées depuis le fichier LRC`);
         }
       } else {
         console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
@@ -426,9 +424,7 @@ export const MusicUploader = () => {
         // Récupération des paroles en arrière-plan (passer la durée en secondes)
         fetchLyrics(title, artist, fileId, duration, undefined).then(lyrics => {
           if (lyrics) {
-            toast.success(`Paroles récupérées pour "${title}"`, {
-              id: lyricsToastId
-            });
+            toast.dismiss(lyricsToastId);
           } else {
             toast.error(`Impossible de trouver les paroles pour "${title}"`, {
               id: lyricsToastId
