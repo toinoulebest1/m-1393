@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   AlertDialog,
@@ -30,9 +29,10 @@ interface Song {
 interface ReportSongDialogProps {
   song: Song | null;
   onClose: () => void;
+  open: boolean;
 }
 
-export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
+export const ReportSongDialog = ({ song, onClose, open }: ReportSongDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState<ReportReason>("audio_quality");
 
@@ -77,7 +77,7 @@ export const ReportSongDialog = ({ song, onClose }: ReportSongDialogProps) => {
   };
 
   return (
-    <AlertDialog open={!!song} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog open={open} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent className="max-w-[400px] p-6 gap-0">
         <button
           onClick={onClose}
