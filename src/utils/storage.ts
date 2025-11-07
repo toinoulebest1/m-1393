@@ -127,94 +127,35 @@ export const searchDeezerIdByTitleArtist = async (title: string, artist: string)
 };
 
 
-export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
-  const FORCE_DEEZMATE_FLAC = true;
-  console.log('🔍 Récupération URL pour:', filePath, 'Deezer ID:', deezerId, 'Song ID:', songId);
-
-  // ========== STRATÉGIE FORCÉE: DEEZMATE/FLAC UNIQUEMENT ==========
-  if (FORCE_DEEZMATE_FLAC) {
-    console.log("🎯 Source forcée: Deezmate (FLAC). La preview (filePath) sera ignorée si un ID Deezer est trouvé.");
-
-    let finalDeezerId = deezerId;
-
-    // ÉTAPE 1: Assurer d'avoir un ID Deezer
-    if (!finalDeezerId && songId && !songId.startsWith('deezer-')) {
-      try {
-        const { data: songData } = await supabase.from('songs').select('deezer_id').eq('id', songId).single();
-        if (songData?.deezer_id) {
-          console.log('🔥 ID Deezer trouvé dans la DB:', songData.deezer_id);
-          finalDeezerId = songData.deezer_id;
-        }
-      } catch (error) {
-        console.warn('⚠️ Erreur recherche deezer_id dans DB:', error);
-      }
-    }
-
-    if (!finalDeezerId && songTitle && songArtist) {
-      try {
-        const foundId = await searchDeezerIdByTitleArtist(songTitle, songArtist);
-        if (foundId) {
-          console.log('🔥 ID Deezer trouvé par recherche:', foundId);
-          finalDeezerId = foundId;
-        }
-      } catch (error) {
-        console.warn('⚠️ Erreur recherche deezer_id par titre/artiste:', error);
-      }
-    }
-    
-    if (!finalDeezerId && songId && songId.startsWith('deezer-')) {
-        finalDeezerId = songId.replace('deezer-', '');
-        console.log('🔥 ID Deezer extrait du songId:', finalDeezerId);
-    }
-
-    // ÉTAPE 2: Utiliser l'ID Deezer si disponible
-    if (finalDeezerId) {
-      console.log(`🚀 Tentative Deezmate avec ID: ${finalDeezerId}`);
-      try {
-        const result = await audioProxyService.getAudioUrl(finalDeezerId, 'FLAC');
-        if (result && result.url && (result.url.startsWith('http') || result.url.startsWith('blob:'))) {
-          console.log('✅ [FORCED] URL audio Deezmate récupérée:', result.url.substring(0, 50) + '...');
-          
-          if (songId && !deezerId) {
-            void supabase.from('songs').update({ deezer_id: finalDeezerId }).eq('id', songId);
-          }
-          
-          return result;
-        }
-        throw new Error("Le service audio n'a pas retourné d'URL valide.");
-      } catch (error) {
-        console.error("❌ [FORCED] Erreur service audio:", error);
-        throw new Error("La source Deezmate (forcée) a échoué. Impossible de lire la musique.");
-      }
-    }
-  }
-
-  // ========== FALLBACK: STORAGE LOCAL (HORS DEEZER) ==========
-  console.log('⚠️ Fallback vers le stockage local (Supabase/Dropbox).');
+export const getAudioFileUrl = async (filePath: string): Promise<{ url: string; duration?: number }> => {
+  console.log('🗄️ Fallback vers le stockage local (Supabase/Dropbox) pour:', filePath);
   
+  // Ne pas essayer de lire des URLs Deezer ici, cette fonction est un fallback.
   if (filePath && (filePath.includes('dzcdn.net') || filePath.startsWith('deezer:'))) {
-      throw new Error("La source Deezmate a échoué et les previews sont désactivées. Impossible de lire la musique.");
+      throw new Error("Ce fichier est une référence Deezer et doit être lu via le service proxy.");
   }
 
   try {
+    // Pour l'instant, on ne gère que Supabase Storage comme fallback.
+    // La logique Dropbox pourrait être réintégrée ici si nécessaire.
     const { data, error } = await supabase.storage
       .from('audio')
       .createSignedUrl(filePath, 3600);
 
     if (error) {
       console.error('❌ Erreur Supabase Storage:', error);
-      throw new Error(`Impossible de récupérer le fichier. Essayez de le chercher sur Deezer via la recherche.`);
+      throw new Error(`Impossible de récupérer le fichier depuis le stockage. ${error.message}`);
     }
 
     if (!data?.signedUrl) {
-      throw new Error('Fichier introuvable. Utilisez la recherche Deezer pour trouver cette musique.');
+      throw new Error('Fichier introuvable dans le stockage.');
     }
 
-    console.log('✅ URL Supabase récupérée (fichier local)');
+    console.log('✅ URL Supabase (stockage local) récupérée.');
     return { url: data.signedUrl };
   } catch (error) {
-    console.error('❌ Musique introuvable:', error);
-    throw new Error(`Cette musique n'est pas disponible. Utilisez la recherche Deezer pour la trouver.`);
+    console.error('❌ Musique introuvable dans le stockage local:', error);
+    throw new Error(`Cette musique n'est pas disponible dans le stockage local.`);
   }
 };
 
