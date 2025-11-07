@@ -147,8 +147,8 @@ class AudioProxyService {
           }
         }
         
-        // Assembler le blob
-        const blob = new Blob(chunks);
+        // Assembler le blob avec le bon type MIME
+        const blob = new Blob(chunks, { type: 'audio/flac' });
         const downloadTime = performance.now() - downloadStart;
         
         console.log("✅ FLAC téléchargé:", blob.size, "bytes");
