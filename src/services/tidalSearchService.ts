@@ -15,8 +15,18 @@ class TidalSearchService {
   private cache = new Map<string, string>(); // Clé: "titre|artiste" → Tidal ID
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly searchInstances = [
+    'https://aether.squid.wtf',
+    'https://zeus.squid.wtf',
+    'https://kraken.squid.wtf',
+    'https://wolf.qqdl.site',
+    'https://maus.qqdl.site',
+    'https://vogel.qqdl.site',
+    'https://katze.qqdl.site',
+    'https://hund.qqdl.site',
+    'https://phoenix.squid.wtf',
+    'https://shiva.squid.wtf',
     'https://chaos.squid.wtf',
-    'https://aether.squid.wtf'
+    'https://tidal.kinoplus.online'
   ];
 
   /**
@@ -36,8 +46,9 @@ class TidalSearchService {
       try {
         console.log(`🔍 Recherche Tidal via ${instance}:`, title, artist);
         
-        // Utiliser les paramètres s (song) et a (artist) au lieu de q
-        const url = `${instance}/search?s=${encodeURIComponent(title)}&a=${encodeURIComponent(artist)}&limit=5`;
+        // Combiner titre et artiste dans un seul paramètre de recherche 's' pour de meilleurs résultats
+        const searchQuery = `${title} ${artist}`;
+        const url = `${instance}/search?s=${encodeURIComponent(searchQuery)}&limit=5`;
         
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
