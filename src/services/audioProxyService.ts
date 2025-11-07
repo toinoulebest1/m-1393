@@ -222,7 +222,10 @@ class AudioProxyService {
       console.log("✅ FLAC téléchargé:", blob.size, "bytes");
       console.log("📝 Type MIME:", blob.type);
       
-      return { blob, duration: data.duration };
+      // Créer un nouveau blob avec le bon type MIME si nécessaire
+      const correctedBlob = blob.type === 'audio/flac' ? blob : new Blob([blob], { type: 'audio/flac' });
+      
+      return { blob: correctedBlob, duration: data.duration };
     }
 
     throw new Error('URL Flacdownloader invalide');
