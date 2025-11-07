@@ -3,7 +3,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 
-const PROXY_TIMEOUT = 1500; // 1.5 secondes
+const PROXY_TIMEOUT = 2500; // 2.5 secondes
 
 class AudioProxyService {
   /**
@@ -70,20 +70,14 @@ class AudioProxyService {
 
   /**
    * Essayer le proxy Flacdownloader.
+   * Cette méthode retourne directement l'URL du proxy pour que le navigateur la streame.
    */
   private async tryFlacdownloaderProxy(trackId: string): Promise<{ url: string; duration?: number }> {
-    console.log("🎵 Tentative Flacdownloader Proxy...");
-    const promise = supabase.functions.invoke('flacdownloader-proxy', {
-      body: { deezerId: trackId },
-    });
+    console.log("🎵 Construction de l'URL du proxy Flacdownloader...");
+    const proxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${trackId}`;
     
-    const { data, error } = await this.withTimeout(promise, PROXY_TIMEOUT, 'Flacdownloader');
-
-    if (error) throw new Error(`Flacdownloader Proxy a échoué: ${error.message}`);
-    // Le proxy flacdownloader retourne directement une URL, pas un JSON
-    if (typeof data?.url !== 'string') throw new Error('Réponse Flacdownloader invalide');
-
-    return { url: data.url, duration: data.duration };
+    // On ne peut pas connaître la durée à l'avance avec cette méthode
+    return Promise.resolve({ url: proxyUrl });
   }
 
   /**

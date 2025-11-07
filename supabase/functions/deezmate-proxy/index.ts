@@ -4,7 +4,7 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 Deno.serve(async (req: Request) => {
@@ -13,8 +13,22 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const url = new URL(req.url);
-  const trackId = url.searchParams.get('trackId');
+  let trackId: string | null = null;
+
+  try {
+    if (req.method === 'POST') {
+      const body = await req.json();
+      trackId = body.trackId;
+    } else { // Fallback to GET
+      const url = new URL(req.url);
+      trackId = url.searchParams.get('trackId');
+    }
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   if (!trackId) {
     return new Response(JSON.stringify({ error: 'Missing trackId parameter' }), {

@@ -4,7 +4,7 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 Deno.serve(async (req: Request) => {
@@ -13,12 +13,23 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const url = new URL(req.url);
-  const deezerId = url.searchParams.get('deezerId');
-  const share = url.searchParams.get('share');
+  let deezerId: string | null = null;
+  let share: string | null = null;
 
-  if (req.method !== 'GET') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+  try {
+    if (req.method === 'POST') {
+      const body = await req.json();
+      deezerId = body.deezerId;
+      share = body.share;
+    } else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      deezerId = url.searchParams.get('deezerId');
+      share = url.searchParams.get('share');
+    } else {
+      return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+    }
+  } catch (e) {
+    return new Response('Invalid request', { status: 400, headers: corsHeaders });
   }
 
   try {
