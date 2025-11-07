@@ -155,7 +155,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     console.log('🚀 Récupération audio via Deezmate/Flacdownloader');
     
     try {
-      const result = await audioProxyService.getAudioUrl(deezerId, 'LOSSLESS');
+      const result = await audioProxyService.getAudioUrl(deezerId, 'FLAC');
       
       if (result && result.url && result.url.startsWith('http')) {
         console.log('✅ URL audio récupérée:', result.url.substring(0, 50) + '...');
@@ -178,7 +178,7 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
     }
   }
 
-  // ÉTAPE 3: Si pas de deezerId mais on a titre+artiste, recherche parallélisée
+  // ÉTAPE 2: Si pas de deezer_id mais on a titre+artiste, recherche parallélisée
   if (!deezerId && songTitle && songArtist) {
     console.log('🔎 Recherche parallèle Deezer ID...');
     
@@ -186,111 +186,48 @@ export const getAudioFileUrl = async (filePath: string, deezerId?: string, songT
       // Recherche directe Deezer ID
       const foundDeezerId = await searchDeezerIdByTitleArtist(songTitle, songArtist).catch(() => null);
       
-      // Si on a trouvé un ID Deezer, chercher l'ID Tidal et utiliser le multi-proxy
+      // Si on a trouvé un ID Deezer, utiliser le service audio
       if (foundDeezerId) {
-        console.log('🔍 Recherche Tidal ID pour:', songTitle, songArtist);
+        console.log('🚀 Récupération audio (recherche) via Deezmate/Flacdownloader, ID:', foundDeezerId);
         
-        const tidalId = await tidalSearchService.searchTidalId(songTitle, songArtist);
-        
-        if (tidalId) {
-          console.log('🚀 Récupération audio (recherche) via multi-proxy, Tidal ID:', tidalId);
+        try {
+          const proxyResult = await audioProxyService.getAudioUrl(foundDeezerId, 'FLAC');
           
-          try {
-            const proxyResult = await audioProxyService.getAudioUrl(tidalId, 'LOSSLESS');
+          if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
+            console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));
             
-            if (proxyResult && proxyResult.url && proxyResult.url.startsWith('http')) {
-              console.log('✅ URL audio récupérée (recherche):', proxyResult.url.substring(0, 50));
-              
-              const duration = proxyResult.duration;
-              if (duration) {
-                console.log('✅ Durée récupérée depuis les métadonnées Tidal (recherche):', duration, 'secondes');
-              }
-              
-              // Mettre à jour le deezer_id et tidal_id dans la DB
-              if (songId) {
-                void supabase.from('songs')
-                  .update({ 
-                    deezer_id: foundDeezerId,
-                    tidal_id: tidalId 
-                  })
-                  .eq('id', songId);
-              }
-              
-              return { url: proxyResult.url, duration };
+            const duration = proxyResult.duration;
+            if (duration) {
+              console.log('✅ Durée récupérée depuis les métadonnées (recherche):', duration, 'secondes');
             }
             
-            console.warn('⚠️ Multi-proxy: pas d\'URL valide (recherche)');
-          } catch (error) {
-            console.warn('⚠️ Multi-proxy échec (recherche):', error);
-          }
-        } else {
-          console.warn("⚠️ Impossible de trouver l'ID Tidal pour la recherche");
-
-          // NOUVEAU: Fallback vers flacdownloader-proxy si le multi-proxy a échoué
-          console.log('🔄 Tentative de fallback (recherche) via flacdownloader-proxy...');
-          try {
-            const flacProxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${foundDeezerId}`;
-            console.log('🔗 URL du proxy flacdownloader (recherche):', flacProxyUrl);
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const response = await fetch(flacProxyUrl, { method: 'HEAD', signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (response.ok || response.status === 405) {
-              console.log('✅ flacdownloader-proxy a répondu (recherche), utilisation de l\'URL.');
-              // Mettre à jour le deezer_id dans la DB
-              if (songId) {
-                void supabase.from('songs').update({ deezer_id: foundDeezerId }).eq('id', songId);
-              }
-              return { url: flacProxyUrl };
-            } else {
-              const errorText = response.statusText;
-              console.warn(`⚠️ flacdownloader-proxy a échoué (recherche) avec le statut: ${response.status} ${errorText}`);
+            // Mettre à jour le deezer_id dans la DB
+            if (songId) {
+              void supabase.from('songs')
+                .update({ deezer_id: foundDeezerId })
+                .eq('id', songId);
             }
-          } catch (error) {
-            console.warn('⚠️ Erreur lors de l\'appel à flacdownloader-proxy (recherche):', error);
+            
+            return { url: proxyResult.url, duration };
           }
+          
+          console.warn('⚠️ Service audio: pas d\'URL valide (recherche)');
+        } catch (error) {
+          console.warn('⚠️ Service audio échec (recherche):', error);
         }
+      } else {
+        console.warn("⚠️ Impossible de trouver l'ID Deezer pour la recherche");
       }
     } catch (error) {
       console.warn('⚠️ Erreur recherche Deezer:', error);
     }
   }
 
-  // ========== FALLBACK: DEEZER PREVIEW PUIS STORAGE LOCAL ==========
+  // ========== FALLBACK: STORAGE LOCAL ==========
   
-  console.log('⚠️ Aucun lien haute qualité disponible');
-  
-  // Si on a un deezerId, essayer d'obtenir le lien preview Deezer
-  if (deezerId) {
-    try {
-      console.log('🔄 Tentative récupération lien preview Deezer...');
-      const { data, error } = await supabase.functions.invoke('deezer-proxy', {
-        body: { 
-          endpoint: `/track/${deezerId}`
-        }
-      });
-      
-      if (!error && data?.preview) {
-        console.log('✅ Lien preview Deezer récupéré');
-        const duration = data.duration || undefined;
-        if (duration) {
-          console.log('✅ Durée récupérée depuis API Deezer (preview):', duration, 'secondes');
-        }
-        return { url: data.preview, duration };
-      }
-    } catch (error) {
-      console.warn('⚠️ Erreur récupération preview Deezer:', error);
-    }
-  }
+  console.log('⚠️ Aucun lien haute qualité disponible, fallback vers storage local...');
   
   // Fallback vers storage local
-  console.log('⚠️ Fallback vers storage local...');
-  
-  // Extraire l'ID du fichier (enlever les préfixes comme "audio/")
-  const localId = filePath.includes('/') ? filePath.split('/').pop() : filePath;
-  
   console.log('📦 Tentative récupération depuis Supabase Storage. localId:', localId);
   
   // Fallback final: Supabase Storage pour fichiers uploadés

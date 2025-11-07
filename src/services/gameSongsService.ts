@@ -29,6 +29,24 @@ const isValidDeezerPreview = (url: string): boolean => {
   return isDeezerCdn && !isInvalidService;
 };
 
+/**
+ * Vérifie si l'URL est une URL audio valide (plus spécifique aux jeux)
+ */
+const isValidGameAudioUrl = (url: string): boolean => {
+  if (!url) return false;
+  
+  // Accepter les URLs de fichiers locaux
+  const isLocalFile = url.includes('supabase') || url.startsWith('blob:');
+  
+  // Accepter les URLs de streaming valides
+  const isValidStreaming = 
+    url.startsWith('http') && 
+    !url.includes('token=') &&
+    !url.includes('.mp4'); // On préfère l'audio pour les jeux
+  
+  return isLocalFile || isValidStreaming;
+};
+
 // Différentes requêtes Deezer pour varier les musiques
 const deezerQueries = [
   'top hits 2024',
@@ -100,13 +118,13 @@ export const fetchGameSongs = async (minSongs: number = 20): Promise<GameSong[]>
           isDeezer: true
         }))
         .filter((track: GameSong) => {
-          // Filtrer les tracks sans preview ou avec des URLs non valides
+          // Filtrer les tracks sans URL ou avec des URLs non valides
           if (!track.url) {
-            console.log(`❌ Track sans preview: ${track.title}`);
+            console.log(`❌ Track sans URL: ${track.title}`);
             return false;
           }
-          if (!isValidDeezerPreview(track.url)) {
-            console.log(`❌ Preview invalide (Tidal/autre): ${track.title} - ${track.url}`);
+          if (!isValidGameAudioUrl(track.url)) {
+            console.log(`❌ URL invalide pour les jeux: ${track.title} - ${track.url}`);
             return false;
           }
           return true;
