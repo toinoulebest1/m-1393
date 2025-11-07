@@ -86,7 +86,6 @@ export const useAudioControl = ({
             const error = e instanceof Event ? (audio.error?.message || 'Erreur média inconnue') : e;
             console.error("❌ Watchdog: Erreur média. Source invalide.", error);
             cleanup();
-            // Vider la source pour éviter que le player reste en état d'erreur
             audio.src = ''; 
             reject(new Error(error));
           };
@@ -95,10 +94,10 @@ export const useAudioControl = ({
           
           audio.addEventListener('canplay', onCanPlay);
           audio.addEventListener('error', onError);
-          audio.addEventListener('stalled', onError); // Gère les cas de blocage réseau
+          audio.addEventListener('stalled', onError);
           
           audio.src = url;
-          audio.load(); // Important pour déclencher les événements
+          audio.load();
         });
       };
 
@@ -107,34 +106,42 @@ export const useAudioControl = ({
         let audioUrlResult: { url: string; duration?: number } | null = null;
         let wasFromCache = false;
 
-        // 1. Cache IndexedDB (priorité absolue)
+        // 1. Cache IndexedDB (priorité absolue pour toutes les pistes)
         const cachedDiskUrl = await getFromCache(song.url);
         if (cachedDiskUrl) {
           audioUrlResult = { url: cachedDiskUrl };
           wasFromCache = true;
           console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
+          // Le watchdog validera même le cache
+          await validateUrlWithWatchdog(audioUrlResult.url);
         }
 
-        // 2. Si pas en cache, construire la chaîne de fallback
+        // 2. Si pas en cache, choisir la bonne stratégie (Réseau Deezer vs Stockage Local)
         if (!audioUrlResult) {
-          const providers = [];
-          if (song.deezer_id) {
-            providers.push({ name: 'Deezmate', func: () => audioProxyService.tryDeezmate(song.deezer_id!) });
-            providers.push({ name: 'Flacdownloader', func: () => audioProxyService.tryFlacdownloader(song.deezer_id!) });
-          }
-          providers.push({ name: 'Stockage Local', func: () => getAudioFileUrl(song.url) });
+          const providers: { name: string; func: () => Promise<{ url: string; duration?: number; }> }[] = [];
+          const deezerId = song.deezer_id || (song.url.startsWith('deezer:') ? song.url.split(':')[1] : null);
 
+          if (deezerId) {
+            console.log(`🎵 Piste Deezer détectée (ID: ${deezerId}). Utilisation des proxies audio.`);
+            providers.push({ name: 'Deezmate', func: () => audioProxyService.tryDeezmate(deezerId) });
+            providers.push({ name: 'Flacdownloader', func: () => audioProxyService.tryFlacdownloader(deezerId) });
+          } else {
+            console.log(`🗄️ Piste locale détectée. Utilisation du stockage local.`);
+            providers.push({ name: 'Stockage Local', func: () => getAudioFileUrl(song.url) });
+          }
+
+          // Boucle de fallback sur les fournisseurs définis
           for (const provider of providers) {
             try {
               console.log(`➡️ Tentative avec la source: ${provider.name}`);
               const result = await provider.func();
-              await validateUrlWithWatchdog(result.url);
+              await validateUrlWithWatchdog(result.url); // Le watchdog valide la source
               audioUrlResult = result;
               console.log(`✅ Succès avec ${provider.name}`);
-              break; // Sortir de la boucle si une source est valide
+              break; // On a trouvé une source valide, on arrête
             } catch (error) {
               console.warn(`⚠️ Échec avec ${provider.name}:`, (error as Error).message);
-              // Continuer vers le provider suivant
+              // La boucle continue avec le fournisseur suivant
             }
           }
         }
@@ -143,7 +150,6 @@ export const useAudioControl = ({
           throw new Error("Toutes les sources audio ont échoué. Musique indisponible.");
         }
         
-        // La lecture a déjà été initiée par le watchdog, il suffit de confirmer l'état
         const success = await AutoplayManager.playAudio(audio);
         
         if (success) {
@@ -151,7 +157,6 @@ export const useAudioControl = ({
           console.log("✅ Lecture démarrée avec succès.");
           if (apiDurationRef && audioUrlResult.duration) apiDurationRef.current = audioUrlResult.duration;
 
-          // --- Tâches non critiques, différées ---
           setTimeout(() => {
             console.log("🚀 Lancement des tâches post-lecture...");
             updateMediaSessionMetadata(song);
