@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ChevronDown, MoreVertical } from "lucide-react";
+import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ChevronDown, MoreVertical, Cast, Pencil, Search } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
 import { parseLrc } from "@/utils/lrcParser";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,9 +11,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import { extractDominantColor } from "@/utils/colorExtractor";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useCast } from "@/contexts/CastContext";
+import { LyricsEditDialog } from "@/components/LyricsEditDialog";
+import DeezerSearchDialog from "@/components/DeezerSearchDialog";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites, refreshCurrentSong } = usePlayer();
   const navigate = useNavigate();
   const location = useLocation();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
@@ -31,6 +40,9 @@ export const SyncedLyricsView: React.FC = () => {
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const syncIntervalRef = useRef<number | null>(null);
   const progressUpdateIntervalRef = useRef<number | null>(null);
+  const { discoverDevices } = useCast();
+  const [isLyricsEditDialogOpen, setIsLyricsEditDialogOpen] = useState(false);
+  const [isDeezerSearchOpen, setIsDeezerSearchOpen] = useState(false);
 
   // Default colors for songs without image or during loading (Spotify theme colors)
   const DEFAULT_COLORS = {
@@ -316,6 +328,12 @@ export const SyncedLyricsView: React.FC = () => {
     }
   };
 
+  const onLyricsSaved = () => {
+    if (currentSong) {
+      fetchLyrics(currentSong.id);
+    }
+  };
+
   const handleClose = () => {
     setAnimationStage("exit");
     setTimeout(() => {
@@ -519,9 +537,27 @@ export const SyncedLyricsView: React.FC = () => {
           <p className="text-xs font-bold uppercase tracking-wider text-white/80">En lecture</p>
           <p className="truncate text-sm font-semibold text-white max-w-[200px]">{currentSong.album_name || currentSong.artist}</p>
         </div>
-        <Button variant="ghost" size="icon" className="rounded-full bg-black/20 text-white/80 hover:bg-black/40">
-          <MoreVertical className="h-5 w-5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full bg-black/20 text-white/80 hover:bg-black/40">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="bg-spotify-dark border-white/10 text-white">
+            <DropdownMenuItem onClick={discoverDevices}>
+              <Cast className="mr-2 h-4 w-4" />
+              <span>Diffuser</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsLyricsEditDialogOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              <span>Modifier les paroles</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsDeezerSearchOpen(true)}>
+              <Search className="mr-2 h-4 w-4" />
+              <span>Rechercher sur Deezer</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Main content */}
@@ -790,6 +826,28 @@ export const SyncedLyricsView: React.FC = () => {
           </div>
         </div>
       </div>
+      {currentSong && (
+        <>
+          <LyricsEditDialog
+            isOpen={isLyricsEditDialogOpen}
+            onClose={() => setIsLyricsEditDialogOpen(false)}
+            songId={currentSong.id}
+            songTitle={currentSong.title}
+            artist={currentSong.artist}
+            initialLyrics={lyricsText || ""}
+            onSaved={onLyricsSaved}
+          />
+          <DeezerSearchDialog
+            open={isDeezerSearchOpen}
+            onClose={() => setIsDeezerSearchOpen(false)}
+            song={currentSong}
+            onUpdateSuccess={() => {
+              refreshCurrentSong();
+              setIsDeezerSearchOpen(false);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };
