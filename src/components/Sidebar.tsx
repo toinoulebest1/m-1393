@@ -138,17 +138,6 @@ export const Sidebar = () => {
 
           <ThemeToggle />
 
-          <div className="px-3 py-2">
-            <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-              Découvrir
-            </h2>
-            <div className="space-y-1">
-              <MusicUploader onUploadComplete={handleUploadComplete} />
-              <TidalSearchDialog onSongSelected={handleSongSelected} />
-            </div>
-          </div>
-          
-          
         </div>
 
         <div className="mt-4 border-t border-white/10 pt-4">
