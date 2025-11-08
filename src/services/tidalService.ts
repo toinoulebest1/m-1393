@@ -1,6 +1,6 @@
 import { Song } from '@/types/player';
 
-const SEARCH_API_URL = 'https://frankfurt.monochrome.tf/search/?s=';
+const SEARCH_API_URL = 'https://tidal.kinoplus.online/search/?s=';
 const STREAM_API_URL = 'https://tidal.kinoplus.online/track/';
 
 // Helper pour formater la durée de secondes en MM:SS
