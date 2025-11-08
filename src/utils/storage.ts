@@ -42,59 +42,64 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 export const getAudioFileUrl = async (filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
-  console.log(`[storage.getAudioFileUrl] Getting URL for filePath: "${filePath}"`);
+  console.log(`[storage.getAudioFileUrl] Début de la récupération pour filePath: "${filePath}" (Titre: ${songTitle || 'N/A'}, Artiste: ${songArtist || 'N/A'}, ID: ${songId || 'N/A'})`);
   const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
 
   if (tidalId) {
-    console.log(`[storage.getAudioFileUrl] Detected Tidal ID: ${tidalId}. Calling getTidalStreamUrl...`);
+    console.log(`[storage.getAudioFileUrl] Tidal ID détecté: ${tidalId}. Tentative de récupération via getTidalStreamUrl...`);
     try {
       const result = await getTidalStreamUrl(tidalId);
       if (result?.url) {
-        console.log('[storage.getAudioFileUrl] Successfully got Tidal stream URL.');
+        console.log('[storage.getAudioFileUrl] ✅ URL de stream Tidal récupérée avec succès.');
         return { url: result.url };
       }
-      console.warn('[storage.getAudioFileUrl] getTidalStreamUrl did not return a URL. Falling back...');
+      console.warn('[storage.getAudioFileUrl] ⚠️ getTidalStreamUrl n\'a pas retourné d\'URL. Fallback...');
     } catch (error) {
-      console.warn('[storage.getAudioFileUrl] Error getting Tidal stream URL, falling back...', error);
+      console.warn('[storage.getAudioFileUrl] ⚠️ Erreur lors de la récupération de l\'URL Tidal, fallback vers les sources locales:', error);
     }
   }
   
-  console.log('[storage.getAudioFileUrl] Not a Tidal track or fallback. Treating as local file:', filePath);
+  console.log('[storage.getAudioFileUrl] Pas une piste Tidal ou fallback. Traitement comme fichier local (Supabase/Dropbox) pour filePath:', filePath);
 
   // Logique pour les fichiers locaux uniquement (Supabase/Dropbox)
   
   // Tenter Dropbox si activé
   if (isDropboxEnabledForReading() && songId) {
+    console.log('[storage.getAudioFileUrl] Dropbox est activé pour la lecture. Tentative de récupération du lien partagé Dropbox pour songId:', songId);
     try {
       const dropboxUrl = await getDropboxSharedLink(songId);
       if (dropboxUrl) {
-        console.log('✅ URL Dropbox récupérée');
+        console.log('✅ URL Dropbox récupérée.');
         return { url: dropboxUrl };
       }
+      console.log('⚠️ Aucun lien Dropbox partagé trouvé pour songId:', songId, '. Fallback vers Supabase.');
     } catch (error) {
-      console.warn('⚠️ Échec récupération lien Dropbox, fallback vers Supabase:', error);
+      console.warn('⚠️ Échec de la récupération du lien Dropbox, fallback vers Supabase:', error);
     }
+  } else {
+    console.log('[storage.getAudioFileUrl] Dropbox n\'est pas activé pour la lecture ou songId manquant. Passage direct à Supabase.');
   }
 
   // Fallback vers Supabase Storage
+  console.log('[storage.getAudioFileUrl] Tentative de récupération de l\'URL signée Supabase pour filePath:', filePath);
   try {
     const { data, error } = await supabase.storage
       .from('audio')
       .createSignedUrl(filePath, 3600);
 
     if (error) {
-      console.error('❌ Erreur Supabase Storage:', error);
-      throw new Error(`Impossible de récupérer le fichier.`);
+      console.error('❌ Erreur Supabase Storage lors de la création de l\'URL signée:', error);
+      throw new Error(`Impossible de récupérer le fichier audio depuis Supabase: ${error.message}`);
     }
 
     if (!data?.signedUrl) {
-      throw new Error('Fichier introuvable.');
+      throw new Error('Fichier audio introuvable ou URL signée non générée par Supabase.');
     }
 
-    console.log('✅ URL Supabase récupérée (fichier local)');
+    console.log('✅ URL Supabase récupérée (fichier local).');
     return { url: data.signedUrl };
   } catch (error) {
-    console.error('❌ Musique introuvable:', error);
+    console.error('❌ Erreur finale lors de la récupération de la musique:', error);
     throw error;
   }
 };
