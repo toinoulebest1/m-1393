@@ -6,7 +6,7 @@ import { Pause, Play, SkipForward, Trophy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { SoundEffects, SoundType } from "@/components/SoundEffects";
 import { getAudioFileUrl } from "@/utils/storage";
-import { fetchGameSongs, type GameSong } from "@/services/gameSongsService";
+import { fetchRandomGameSongs, type GameSong } from "@/services/gameSongsService";
 
 type Song = GameSong;
 
@@ -34,7 +34,7 @@ export function RewindQuizGame() {
   useEffect(() => {
     const loadSongs = async () => {
       try {
-        const gameSongs = await fetchGameSongs(20);
+        const gameSongs = await fetchRandomGameSongs(20);
         
         if (gameSongs.length < 4) {
           toast.error("Pas assez de chansons disponibles. Essayez de rechercher des musiques sur Deezer.");
