@@ -219,7 +219,7 @@ export const Player = () => {
       }
       console.log("========================");
       
-      isPlaying ? pause() : play();
+      isPlaying ? pause() : play(currentSong);
     } else if (!isAudioReady) {
       toast.info("Chargement de l'audio en cours...", {
         duration: 2000
