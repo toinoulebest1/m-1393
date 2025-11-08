@@ -77,9 +77,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Stocker la durée de l'API pour MediaSession
   const apiDurationRef = useRef<number | undefined>(undefined);
 
-  // États de répétition (sans queue)
-  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
-
   // Prédiction intelligente de la prochaine chanson
   const { predictNextSongs, preloadPredictedSongs, recordTransition, cancelAllPreloads } = useIntelligentPreloader();
   const predictedNextRef = useRef<Song | null>(null);
@@ -345,14 +342,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       toast.info("Pas de chanson précédente");
     }
   }, [isChangingSong, history, play, cancelAllPreloads, queue, previousSongFromQueue]);
-
-  const toggleRepeat = useCallback(() => {
-    setRepeatMode(current => {
-      if (current === 'none') return 'all';
-      if (current === 'all') return 'one';
-      return 'none';
-    });
-  }, []);
 
   // Restauration de la lecture au chargement - OPTIMISÉ
   useEffect(() => {
