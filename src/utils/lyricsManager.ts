@@ -8,7 +8,10 @@ import { toast } from 'sonner';
 export const fetchAndSaveLyrics = async (
   songId: string,
   songTitle: string,
-  artist?: string
+  artist?: string,
+  duration?: string,
+  albumName?: string,
+  isDeezer?: boolean
 ): Promise<void> => {
   try {
     console.log('🎵 Récupération automatique des paroles pour:', songTitle, 'par', artist);
