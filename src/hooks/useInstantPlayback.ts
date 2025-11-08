@@ -28,7 +28,7 @@ export const useInstantPlayback = (songs: any[]) => {
     // Lancer le préchargement après un court délai pour ne pas bloquer le rendu
     const timer = setTimeout(() => {
       preloadSongUrls();
-    }, 100);
+    }, 750); // Augmenté à 750ms pour un meilleur debounce lors de la saisie
 
     return () => clearTimeout(timer);
   }, [songs]);
