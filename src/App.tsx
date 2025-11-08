@@ -21,6 +21,9 @@ import AdminHistory from "./pages/AdminHistory";
 // import SongMetadataUpdate from "./pages/SongMetadataUpdate"; // Supprimé
 import Reports from "./pages/Reports";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
+import { useSessionQuery } from "./hooks/useSessionQuery";
+import { useBanStatus } from "./hooks/useBanStatus";
+import BannedUserPage from "./components/BannedUserPage";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,7 @@ function App() {
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/top100" element={<Top100 />} />
                     <Route path="/games/blind-test" element={<BlindTest />} />
+                    <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
 
                     {/* Routes Admin */}
                     <Route path="/admin/maintenance" element={<MaintenanceAdmin />} />
