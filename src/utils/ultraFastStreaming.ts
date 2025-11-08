@@ -6,7 +6,7 @@
 import { getAudioFileUrl } from './storage';
 import { UltraFastCache } from './ultraFastCache';
 import { supabase } from '@/integrations/supabase/client';
-import { getFromCache, cacheCurrentSong } from './audioCache';
+import { getFromCache, cacheCurrentSong, isInCache } from './audioCache';
 import { memoryCache } from './memoryCache';
 import { getTidalStreamUrl } from '@/services/tidalService';
 
@@ -16,6 +16,41 @@ export class UltraFastStreaming {
   private static requestCount = 0;
 
   /**
+   * Lance le processus de mise en cache en arrière-plan sans bloquer la lecture.
+   */
+  private static async backgroundCache(
+    cacheKey: string,
+    sourceUrl: string,
+    songId?: string,
+    songTitle?: string
+  ): Promise<void> {
+    const logPrefix = `[BACKGROUND_CACHE] | Key: "${cacheKey}" |`;
+    console.log(`${logPrefix} START`);
+
+    try {
+      // Vérifier une dernière fois si un autre processus ne l'a pas déjà mis en cache
+      if (await isInCache(cacheKey)) {
+        console.log(`${logPrefix} ABORTED: Already in cache.`);
+        return;
+      }
+
+      console.log(`${logPrefix} Fetching from source: ${sourceUrl.substring(0, 100)}...`);
+      const response = await fetch(sourceUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      console.log(`${logPrefix} Blob created. Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB.`);
+
+      await cacheCurrentSong(cacheKey, blob, songId || cacheKey, songTitle);
+      console.log(`${logPrefix} SUCCESS: Caching complete.`);
+    } catch (error) {
+      console.error(`${logPrefix} FAILED:`, error);
+    }
+  }
+
+  /**
    * Obtention URL ultra-rapide avec stratégies parallèles
    */
   public static async getAudioUrlUltraFast(
@@ -23,76 +58,56 @@ export class UltraFastStreaming {
     songTitle?: string,
     songArtist?: string,
     songId?: string
-  ): Promise<{ url: string; duration?: number }> {
+  ): Promise<{ url:string; duration?: number }> {
     this.requestCount++;
     const reqId = this.requestCount;
-    console.log(`[STREAMING] #${reqId} | START | getAudioUrlUltraFast | Path: "${filePath}", ID: ${songId || 'N/A'}`);
+    const logPrefix = `[STREAMING] #${reqId} | Path: "${filePath}" |`;
+    console.log(`${logPrefix} START`);
 
-    // Priorité 1: Cache IndexedDB (pour la restauration de session)
-    console.log(`[STREAMING] #${reqId} | STEP 1 | Checking IndexedDB cache for key: "${filePath}"`);
+    // Priorité 1: Cache IndexedDB (le plus rapide pour les lectures répétées)
+    console.log(`${logPrefix} STEP 1: Checking IndexedDB...`);
     const cachedBlobUrl = await getFromCache(filePath);
     if (cachedBlobUrl) {
-      console.log(`[STREAMING] #${reqId} | SUCCESS | Found in IndexedDB. Returning blob URL.`);
+      console.log(`${logPrefix} SUCCESS: Found in IndexedDB. Returning blob URL.`);
       return { url: cachedBlobUrl };
     }
-    console.log(`[STREAMING] #${reqId} | INFO | Not found in IndexedDB.`);
+    console.log(`${logPrefix} INFO: Not in IndexedDB.`);
 
-    // Priorité 2: Piste TIDAL (si le filePath est un ID Tidal)
-    const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
-    if (tidalId) {
-      console.log(`[STREAMING] #${reqId} | INFO | Tidal track detected. ID: ${tidalId}. Attempting to get stream URL...`);
-      try {
-        const tidalStream = await getTidalStreamUrl(tidalId);
-        if (tidalStream?.url) {
-          console.log(`[STREAMING] #${reqId} | INFO | Tidal stream URL obtained. Now treating it as a direct URL to download and cache.`);
-          // On a l'URL du flux, maintenant on la télécharge et la met en cache.
-          // Le `filePath` (ex: 'tidal:12345') est utilisé comme clé de cache.
-          return await this.streamingDirect(filePath, songTitle, songArtist, songId, false, reqId, tidalStream.url);
-        }
-        throw new Error('URL de flux Tidal non trouvée.');
-      } catch (error) {
-        console.warn(`[STREAMING] #${reqId} | WARN | Failed to get Tidal stream.`, error);
-        // On laisse tomber pour ne pas essayer d'autres méthodes qui échoueront
-        throw error;
-      }
-    }
+    // Si pas dans le cache, on obtient une URL distante pour la lecture immédiate
+    // et on lance la mise en cache en arrière-plan.
 
-    // Priorité 3: Si filePath est déjà une URL HTTP/HTTPS directe
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      console.log(`[STREAMING] #${reqId} | INFO | Path is a direct HTTP(S) URL. Starting download & cache process.`);
-      return await this.streamingDirect(filePath, songTitle, songArtist, songId, true, reqId);
-    }
-
-    // Priorité 4: Cache mémoire (ultra-rapide)
-    console.log(`[STREAMING] #${reqId} | STEP 2 | Checking memory cache...`);
-    const cachedMemoryUrl = memoryCache.get(filePath);
-    if (cachedMemoryUrl) {
-      console.log(`[STREAMING] #${reqId} | SUCCESS | Found in memory cache. Returning URL.`);
-      return { url: cachedMemoryUrl };
-    }
-    console.log(`[STREAMING] #${reqId} | INFO | Not found in memory cache.`);
-
-    // 5. Vérifier si déjà en cours de récupération
-    if (this.promisePool.has(filePath)) {
-      console.log(`[STREAMING] #${reqId} | INFO | Promise for this path already in pool. Awaiting result.`);
-      return await this.promisePool.get(filePath)!;
-    }
-
-    // 6. Téléchargement, mise en cache, PUIS lecture (pour les fichiers locaux Supabase)
-    console.log(`[STREAMING] #${reqId} | ACTION | No cache hit. Initiating download & cache process for local file.`);
-    const promise = this.streamingDirect(filePath, songTitle, songArtist, songId, false, reqId);
-    this.promisePool.set(filePath, promise);
+    let remoteStream: { url: string; duration?: number } | null = null;
+    const isTidal = filePath.startsWith('tidal:');
+    const isHttp = filePath.startsWith('http');
 
     try {
-      const result = await promise;
-      console.log(`[STREAMING] #${reqId} | SUCCESS | Download & cache process finished. Ready for playback from local blob.`);
-      if (result.duration) {
-        console.log(`[STREAMING] #${reqId} | INFO | Duration retrieved:`, result.duration, "seconds");
+      if (isTidal) {
+        const tidalId = filePath.split(':')[1];
+        console.log(`${logPrefix} STEP 2: Getting Tidal stream URL...`);
+        remoteStream = await getTidalStreamUrl(tidalId);
+      } else if (isHttp) {
+        console.log(`${logPrefix} STEP 2: Path is a direct HTTP URL.`);
+        remoteStream = { url: filePath };
+      } else {
+        console.log(`${logPrefix} STEP 2: Getting Supabase/local file URL...`);
+        remoteStream = await getAudioFileUrl(filePath, songTitle, songArtist, songId);
       }
-      return result;
-    } finally {
-      this.promisePool.delete(filePath);
-      console.log(`[STREAMING] #${reqId} | CLEANUP | Promise removed from pool.`);
+
+      if (!remoteStream || !remoteStream.url) {
+        throw new Error("Impossible d'obtenir une URL de streaming distante.");
+      }
+
+      console.log(`${logPrefix} SUCCESS: Got remote URL for instant playback: ${remoteStream.url.substring(0, 100)}...`);
+
+      // Lancer la mise en cache en arrière-plan SANS l'attendre (ne pas mettre await ici)
+      this.backgroundCache(filePath, remoteStream.url, songId, songTitle);
+
+      // Retourner immédiatement l'URL distante pour que la lecture commence
+      return remoteStream;
+
+    } catch (error) {
+      console.error(`${logPrefix} FAILED: Could not get any playable URL.`, error);
+      throw error;
     }
   }
 
