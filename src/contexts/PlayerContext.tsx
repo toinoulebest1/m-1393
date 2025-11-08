@@ -319,13 +319,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const restorePlayback = async () => {
       const savedSong = localStorage.getItem('currentSong');
       const savedProgressValue = localStorage.getItem('audioProgress');
+      const savedIsPlaying = localStorage.getItem('isPlaying'); // Récupérer l'état de lecture sauvegardé
       
       console.log("🔄 Restauration de la lecture...");
       console.log("Chanson sauvegardée:", savedSong ? "OUI" : "NON");
       console.log("Position sauvegardée:", savedProgressValue);
+      console.log("État de lecture sauvegardé:", savedIsPlaying);
       
       if (savedSong) {
         const song = JSON.parse(savedSong);
+        const shouldResumePlaying = savedIsPlaying ? JSON.parse(savedIsPlaying) : false; // Déterminer si la lecture doit reprendre
+        
         try {
           console.log("🎵 Restauration de:", song.title, "ID:", song.id);
           setIsAudioReady(false);
@@ -349,7 +353,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRef.current.preload = "auto";
           
           // Gestionnaires d'événements pour le chargement
-          const handleCanPlay = () => {
+          const handleCanPlay = async () => { // Rendre async pour await play()
             console.log("🎵 Audio prêt à être lu");
             setIsAudioReady(true);
             
@@ -358,6 +362,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               console.log("⏰ Restauration position à:", savedTime, "secondes");
               audioRef.current.currentTime = savedTime;
               setProgress((savedTime / audioRef.current.duration) * 100);
+            }
+            
+            // Si la chanson était en lecture, tenter de la relancer
+            if (shouldResumePlaying) {
+              console.log("▶️ Tentative de reprise de la lecture...");
+              try {
+                await audioRef.current.play();
+                setIsPlaying(true);
+              } catch (playError) {
+                console.warn("⚠️ Échec de la reprise automatique de la lecture:", playError);
+                toast.info("La lecture n'a pas pu reprendre automatiquement. Veuillez cliquer sur Play.");
+                setIsPlaying(false);
+              }
             }
             
             // Nettoyer les event listeners
@@ -370,6 +387,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsAudioReady(false);
             localStorage.removeItem('currentSong');
             localStorage.removeItem('audioProgress');
+            localStorage.removeItem('isPlaying'); // Supprimer aussi l'état de lecture en cas d'erreur
             
             // Nettoyer les event listeners
             audioRef.current.removeEventListener('canplay', handleCanPlay);
@@ -390,6 +408,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.error("❌ Erreur lors de la restauration de la lecture:", error);
           localStorage.removeItem('currentSong');
           localStorage.removeItem('audioProgress');
+          localStorage.removeItem('isPlaying');
           setIsAudioReady(false);
         }
       } else {
@@ -571,10 +590,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (currentSong) {
       localStorage.setItem('currentSong', JSON.stringify(currentSong));
+      localStorage.setItem('isPlaying', JSON.stringify(isPlaying)); // Persister l'état de lecture
+    } else {
+      // Si currentSong est null, effacer toutes les données de lecture persistées
+      localStorage.removeItem('currentSong');
+      localStorage.removeItem('audioProgress');
+      localStorage.removeItem('isPlaying');
     }
-  }, [currentSong]);
-
-
+  }, [currentSong, isPlaying]); // Ajouter isPlaying aux dépendances
 
   // Logique de crossfade et de fin de piste
   useEffect(() => {
