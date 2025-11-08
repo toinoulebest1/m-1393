@@ -331,6 +331,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const song = JSON.parse(savedSong);
         const shouldResumePlaying = savedIsPlaying ? JSON.parse(savedIsPlaying) : false; // Déterminer si la lecture doit reprendre
         
+        // *** LA CORRECTION EST ICI ***
+        // On fournit immédiatement la durée à partir des métadonnées sauvegardées,
+        // sans attendre que l'élément audio la charge.
+        apiDurationRef.current = durationToSeconds(song.duration);
+        console.log(`✅ Durée API restaurée depuis localStorage: ${apiDurationRef.current}s pour "${song.title}"`);
+
         try {
           console.log("🎵 Restauration de:", song.title, "ID:", song.id);
           setIsAudioReady(false);
