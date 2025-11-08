@@ -72,7 +72,6 @@ export const fetchGameSongs = async (minSongs: number = 20): Promise<GameSong[]>
       url: song.file_path,
       imageUrl: song.image_url,
       duration: song.duration || '0:00',
-      isDeezer: false
     }));
 
     console.log(`✅ ${formattedLocalSongs.length} chansons locales récupérées pour le jeu.`);

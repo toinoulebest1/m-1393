@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/utils/dateUtils";
+import { searchTidalTracks } from '@/services/tidalService';
 
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];
 
@@ -107,13 +108,6 @@ const SearchPage = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (!user && searchFilter === "playlist") {
-        setResults([]);
-        setPlaylistResults([]);
-        setIsLoading(false);
-        return;
-      }
-
       if (searchFilter === "playlist") {
         let playlistQuery = supabase.from('playlists').select('*');
         if (!isWildcardSearch) {
@@ -142,109 +136,65 @@ const SearchPage = () => {
         }
         setPlaylistResults(visiblePlaylists);
         setResults([]);
-      } else if (searchFilter === "all") {
-        let songQuery = supabase.from('songs').select('*');
-        if (!isWildcardSearch) {
-          songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
-        } else {
-          songQuery = songQuery.limit(500);
-        }
-
-        let playlistQuery = supabase.from('playlists').select('*');
-        if (!isWildcardSearch) {
-          playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
-        }
-
-        const [songResult, playlistResult] = await Promise.all([songQuery, playlistQuery]);
-        if (songResult.error) throw songResult.error;
-        if (playlistResult.error) throw playlistResult.error;
-
-        let localSongs = songResult.data || [];
-        if (isWildcardSearch && localSongs.length > 0) {
-          localSongs = localSongs.sort(() => Math.random() - 0.5).slice(0, 20);
-        }
-
-        const formattedResults = localSongs.map(song => ({
-          id: song.id,
-          title: song.title,
-          artist: song.artist || '',
-          duration: song.duration || '0:00',
-          url: song.file_path,
-          imageUrl: song.image_url,
-          bitrate: '320 kbps',
-          genre: song.genre,
-          album_name: song.album_name,
-          isLocal: true
-        }));
-
-        const uniqueMap = new Map();
-        formattedResults.forEach(song => uniqueMap.set(song.id, song));
-        const uniqueResults = Array.from(uniqueMap.values());
-
-        const visiblePlaylists = [];
-        if (playlistResult.data && user) {
-          for (const playlist of playlistResult.data) {
-            if (playlist.user_id === user.id) {
-              visiblePlaylists.push({ ...playlist, isSharedByFriend: false });
-              continue;
-            }
-            const { data: canView, error: canViewError } = await supabase.rpc('can_view_playlist', {
-              playlist_id: playlist.id,
-              viewer_user_id: user.id
-            });
-            if (canViewError) continue;
-            if (canView) {
-              const { data: ownerProfile } = await supabase.from('profiles').select('username').eq('id', playlist.user_id).single();
-              visiblePlaylists.push({ ...playlist, isSharedByFriend: true, profiles: ownerProfile });
-            }
-          }
-        }
-        setResults(uniqueResults);
-        setPlaylistResults(visiblePlaylists);
-      } else {
-        let queryBuilder = supabase.from('songs').select('*');
-        if (!isWildcardSearch) {
-          if (searchFilter === "title") {
-            queryBuilder = queryBuilder.ilike('title', `%${query}%`);
-          } else if (searchFilter === "artist") {
-            queryBuilder = queryBuilder.ilike('artist', `%${query}%`);
-          } else if (searchFilter === "genre") {
-            if (selectedGenre) {
-              queryBuilder = queryBuilder.eq('genre', selectedGenre);
-            }
-          }
-        } else {
-          queryBuilder = queryBuilder.limit(500);
-        }
-
-        const { data, error } = await queryBuilder;
-        if (error) throw error;
-
-        let songs = data || [];
-        if (isWildcardSearch && songs.length > 0) {
-          songs = songs.sort(() => Math.random() - 0.5).slice(0, 20);
-        }
-
-        const formattedResults = songs.map(song => ({
-          id: song.id,
-          title: song.title,
-          artist: song.artist || '',
-          duration: song.duration || '0:00',
-          url: song.file_path,
-          imageUrl: song.image_url,
-          bitrate: '320 kbps',
-          genre: song.genre,
-          album_name: song.album_name,
-          isLocal: true
-        }));
-
-        const uniqueMap = new Map();
-        formattedResults.forEach(song => uniqueMap.set(song.id, song));
-        const uniqueResults = Array.from(uniqueMap.values());
-
-        setResults(uniqueResults);
-        setPlaylistResults([]);
+        setIsLoading(false);
+        return;
       }
+
+      // --- DUAL SEARCH FOR SONGS (Local + Tidal) ---
+      const tidalSongsPromise = searchTidalTracks(query);
+
+      let localSongsPromise;
+      let songQuery = supabase.from('songs').select('*');
+      if (!isWildcardSearch) {
+        if (searchFilter === "all") {
+          songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
+        } else if (searchFilter === "title") {
+          songQuery = songQuery.ilike('title', `%${query}%`);
+        } else if (searchFilter === "artist") {
+          songQuery = songQuery.ilike('artist', `%${query}%`);
+        }
+      } else {
+        songQuery = songQuery.limit(500);
+      }
+      localSongsPromise = songQuery;
+
+      const [tidalSongs, localSongsResult] = await Promise.all([tidalSongsPromise, localSongsPromise]);
+
+      if (localSongsResult.error) {
+        console.error("Supabase search error:", localSongsResult.error);
+      }
+
+      let localSongs = localSongsResult.data || [];
+      if (isWildcardSearch && localSongs.length > 0) {
+        localSongs = localSongs.sort(() => Math.random() - 0.5).slice(0, 20);
+      }
+
+      const uniqueSongs = new Map<string, any>();
+
+      localSongs.forEach(song => {
+        const key = `${song.title.toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`;
+        uniqueSongs.set(key, {
+          id: song.id,
+          title: song.title,
+          artist: song.artist || '',
+          duration: song.duration || '0:00',
+          url: song.tidal_id ? `tidal:${song.tidal_id}` : song.file_path,
+          imageUrl: song.image_url,
+          album_name: song.album_name,
+          isLocal: true,
+        });
+      });
+
+      tidalSongs.forEach(song => {
+        const key = `${song.title.toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`;
+        if (!uniqueSongs.has(key)) {
+          uniqueSongs.set(key, song);
+        }
+      });
+
+      setResults(Array.from(uniqueSongs.values()));
+      setPlaylistResults([]);
+
     } catch (error) {
       console.error('Erreur de recherche:', error);
       toast.error("Erreur lors de la recherche");
