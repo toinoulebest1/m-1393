@@ -272,7 +272,7 @@ export const CastProvider: React.FC<{ children: React.ReactNode }> = ({ children
           contentType = 'application/x-mpegURL';
         } else if (audioUrl.includes('.mp3')) {
           contentType = 'audio/mpeg';
-        } else if (audioUrl.includes('.m4a') || audioUrl.includes('.aac')) {
+        } else if (audioUrl.includes('.m4a') || audioUrl.includes('.aac') || audioUrl.includes('.mp4')) {
           contentType = 'audio/mp4';
         }
 
