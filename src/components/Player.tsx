@@ -168,21 +168,15 @@ export const Player = () => {
     console.log("Toggling mute to:", newMutedState);
   };
 
-  const handleProgressChange = (value: number[]) => {
+  const handleSeek = (value: number[]) => {
     const newProgress = value[0];
     const audioElement = getCurrentAudioElement();
-    if (audioElement && audioElement.duration) {
-      // Set seeking flag to prevent auto-update conflicts
-      isSeekingRef.current = true;
-      
+    if (audioElement && audioElement.duration && !isNaN(audioElement.duration)) {
       const newTime = (newProgress / 100) * audioElement.duration;
-      audioElement.currentTime = newTime;
-      setProgress(newProgress);
-      
-      // Clear seeking flag after a short delay
-      setTimeout(() => {
-        isSeekingRef.current = false;
-      }, 200);
+      if (!isNaN(newTime)) {
+        audioElement.currentTime = newTime;
+        setProgress(newProgress); // Update context once on commit
+      }
     }
   };
 
@@ -315,7 +309,7 @@ export const Player = () => {
             value={[progress]}
             max={100}
             step={0.1}
-            onValueChange={handleProgressChange}
+            onValueCommit={handleSeek}
             disabled={!currentSong}
             className={cn(
               "absolute top-0 w-full h-4", // Augmente la zone tactile
@@ -517,7 +511,7 @@ export const Player = () => {
               max={100}
               step={0.1}
               className="flex-1"
-              onValueChange={handleProgressChange}
+              onValueCommit={handleSeek}
               disabled={isChangingSong || !currentSong || !isAudioReady}
             />
             <span className="text-xs text-spotify-neutral w-12">
