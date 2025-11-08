@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-// import { getAudioCacheStats, clearAudioCache } from '@/utils/audioCache'; // DÉSACTIVÉ
-// import { clearAllAudioCaches } from '@/utils/clearAllCaches'; // DÉSACTIVÉ
+import { clearAllAudioCaches } from '@/utils/clearAllCaches';
 import { toast } from 'sonner';
+import { UltraFastCache } from '@/utils/ultraFastCache';
 
 interface CacheStats {
   count: number;
@@ -20,8 +19,8 @@ export const AudioCacheManager: React.FC = () => {
   const loadStats = async () => {
     setIsLoading(true);
     try {
-      // Cache IndexedDB désactivé
-      setStats({ count: 0, totalSize: 0, oldestFile: 0 });
+      const cacheStats = await UltraFastCache.getStats();
+      setStats(cacheStats);
     } catch (error) {
       console.error("Erreur chargement stats cache:", error);
       setStats({ count: 0, totalSize: 0, oldestFile: 0 });
@@ -31,8 +30,19 @@ export const AudioCacheManager: React.FC = () => {
   };
 
   const handleClearCache = async () => {
-    if (window.confirm("Cache IndexedDB désactivé - rien à vider")) {
-      toast.info("Cache IndexedDB désactivé");
+    if (window.confirm("Êtes-vous sûr de vouloir vider tous les caches audio ? Cette action est irréversible.")) {
+      setIsClearing(true);
+      const toastId = toast.loading("Nettoyage des caches en cours...");
+      try {
+        await clearAllAudioCaches();
+        toast.success("Tous les caches audio ont été vidés avec succès.", { id: toastId });
+        await loadStats(); // Rafraîchir les stats après le nettoyage
+      } catch (error) {
+        console.error("Erreur lors du vidage des caches:", error);
+        toast.error("Une erreur est survenue lors du nettoyage des caches.", { id: toastId });
+      } finally {
+        setIsClearing(false);
+      }
     }
   };
 
