@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/utils/dateUtils";
 import { searchTidalTracks } from '@/services/tidalService';
+import { useInstantPlayback } from "@/hooks/useInstantPlayback";
 
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];
 
@@ -45,6 +46,9 @@ const SearchPage = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Lance le préchargement des URLs dès que les résultats de recherche sont disponibles
+  useInstantPlayback(results);
 
   useEffect(() => {
     const scrollKey = `scroll-${location.pathname}`;
