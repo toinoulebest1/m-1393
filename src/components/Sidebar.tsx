@@ -97,6 +97,7 @@ export const Sidebar = () => {
   const handleLanguageChange = (value: string) => {
     i18n.changeLanguage(value);
   };
+  const { play } = usePlayerContext();
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -111,7 +112,8 @@ export const Sidebar = () => {
     // Handle upload complete logic
   };
   const handleSongSelected = (song: Song) => {
-    // Handle song selection logic
+    play(song);
+    toast.success(`Lecture de "${song.title}"`);
   };
   return <div className="hidden md:flex fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex-col h-full z-50">
       <div className="mb-8">

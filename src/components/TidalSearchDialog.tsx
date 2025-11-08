@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Loader2, Music, PlusCircle } from 'lucide-react';
+import { Search, Loader2, Music, PlusCircle, Play } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,7 +107,7 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
                       onClick={() => onSongSelected(song)}
                       title="Lire ce titre"
                     >
-                      <PlusCircle className="h-5 w-5 text-gray-400 group-hover:text-white" />
+                      <Play className="h-5 w-5 text-gray-400 group-hover:text-white" />
                     </Button>
                     <Button
                       variant="ghost"
