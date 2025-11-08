@@ -55,19 +55,19 @@ export const isInCache = async (url: string): Promise<boolean> => {
  */
 export const getFromCache = async (url: string): Promise<string | null> => {
   try {
-    console.log("🔍 getFromCache appelé pour URL:", url);
+    console.log("🔍 [CACHE] getFromCache appelé pour URL:", url);
     const db = await initAudioCache();
-    console.log("✅ DB initialisée");
+    console.log("✅ [CACHE] DB initialisée");
     
     const cachedFile = await db.get('audio-files', url);
-    console.log("📦 Résultat DB get:", cachedFile ? "TROUVÉ" : "NULL");
+    console.log("📦 [CACHE] Résultat DB get:", cachedFile ? "TROUVÉ" : "NON TROUVÉ");
     
     if (!cachedFile) {
-      console.log("❌ Aucun fichier en cache pour cette URL");
+      console.log("❌ [CACHE] Aucun fichier en cache pour cette URL.");
       return null;
     }
     
-    console.log("✅ Fichier trouvé en cache, taille:", (cachedFile.blob.size / 1024 / 1024).toFixed(2), "MB");
+    console.log(`✅ [CACHE] Fichier trouvé en cache ! Taille: ${(cachedFile.blob.size / 1024 / 1024).toFixed(2)} MB`);
     
     // Met à jour la date de dernier accès
     await db.put('audio-files', {
@@ -77,10 +77,10 @@ export const getFromCache = async (url: string): Promise<string | null> => {
     
     // Crée une URL pour le blob
     const blobUrl = URL.createObjectURL(cachedFile.blob);
-    console.log("✅ Blob URL créée:", blobUrl.substring(0, 50) + "...");
+    console.log("✅ [CACHE] Blob URL créée:", blobUrl.substring(0, 50) + "...");
     return blobUrl;
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération depuis le cache:', error);
+    console.error('❌ [CACHE] Erreur lors de la récupération depuis le cache:', error);
     return null;
   }
 };
@@ -105,9 +105,9 @@ export const addToCache = async (url: string, blob: Blob): Promise<void> => {
       size: blob.size
     });
     
-    console.log(`Fichier audio mis en cache: ${url} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`[CACHE] Fichier audio mis en cache: ${url} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
   } catch (error) {
-    console.error('Erreur lors de l\'ajout au cache:', error);
+    console.error('[CACHE] Erreur lors de l\'ajout au cache:', error);
   }
 };
 
@@ -124,7 +124,7 @@ const cleanCacheIfNeeded = async (): Promise<void> => {
     for (const file of allFiles) {
       if (file.lastAccessed < expiryTime) {
         await db.delete('audio-files', file.url);
-        console.log(`Fichier expiré supprimé du cache: ${file.url}`);
+        console.log(`[CACHE] Fichier expiré supprimé du cache: ${file.url}`);
       }
     }
     
@@ -140,11 +140,11 @@ const cleanCacheIfNeeded = async (): Promise<void> => {
         
         await db.delete('audio-files', file.url);
         totalSize -= file.blob.size;
-        console.log(`Fichier supprimé du cache pour libérer de l'espace: ${file.url}`);
+        console.log(`[CACHE] Fichier supprimé du cache pour libérer de l'espace: ${file.url}`);
       }
     }
   } catch (error) {
-    console.error('Erreur lors du nettoyage du cache:', error);
+    console.error('[CACHE] Erreur lors du nettoyage du cache:', error);
   }
 };
 
@@ -156,12 +156,12 @@ export const preloadAudio = async (url: string): Promise<string | null> => {
     // Vérifie d'abord si le fichier est déjà en cache
     const cachedUrl = await getFromCache(url);
     if (cachedUrl) {
-      console.log(`Utilisation du fichier audio en cache: ${url}`);
+      console.log(`[CACHE] Utilisation du fichier audio en cache: ${url}`);
       return cachedUrl;
     }
 
     // Sinon, télécharge et met en cache
-    console.log(`Préchargement du fichier audio: ${url}`);
+    console.log(`[CACHE] Préchargement du fichier audio: ${url}`);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Erreur de téléchargement: ${response.status} ${response.statusText}`);
@@ -172,7 +172,7 @@ export const preloadAudio = async (url: string): Promise<string | null> => {
     
     return URL.createObjectURL(blob);
   } catch (error) {
-    console.error(`Erreur lors du préchargement de l'audio: ${url}`, error);
+    console.error(`[CACHE] Erreur lors du préchargement de l'audio: ${url}`, error);
     return null;
   }
 };
@@ -197,7 +197,7 @@ export const getAudioCacheStats = async (): Promise<{
         : 0
     };
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques du cache:', error);
+    console.error('[CACHE] Erreur lors de la récupération des statistiques du cache:', error);
     return { count: 0, totalSize: 0, oldestFile: 0 };
   }
 };
@@ -208,13 +208,13 @@ export const getAudioCacheStats = async (): Promise<{
  */
 export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, title?: string): Promise<void> => {
   try {
-    console.log("💾 cacheCurrentSong appelé - URL:", url, "Song ID:", songId, "Blob size:", (blob.size / 1024 / 1024).toFixed(2), "MB");
+    console.log(`💾 [CACHE] Début de 'cacheCurrentSong' pour "${title}" (ID: ${songId}). Taille du Blob: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
     
     const db = await initAudioCache();
     
     // Récupérer toutes les entrées du cache
     const allFiles = await db.getAll('audio-files');
-    console.log("📦 Fichiers en cache avant nettoyage:", allFiles.length);
+    console.log(`📦 [CACHE] Fichiers en cache avant nettoyage: ${allFiles.length}`);
     
     // Garder les 2 dernières chansons (celle en cours + 1 précédente pour rollback)
     // Trier par lastAccessed (plus récent d'abord)
@@ -225,12 +225,13 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
       const file = sortedFiles[i];
       if (file.url !== url) { // Ne pas supprimer celle qu'on va ajouter
         await db.delete('audio-files', file.url);
-        console.log(`🗑️ Ancienne chanson supprimée du cache: ${file.url.substring(0, 50)}...`);
+        console.log(`🗑️ [CACHE] Ancienne chanson supprimée du cache: ${file.url.substring(0, 50)}...`);
       }
     }
     
     // Ajouter ou mettre à jour la chanson actuelle
     const now = Date.now();
+    console.log(`➕ [CACHE] Ajout/Mise à jour de "${title}" dans IndexedDB.`);
     await db.put('audio-files', {
       url,
       blob,
@@ -241,7 +242,7 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
     
     // Vérifier que l'ajout a réussi
     const verifyCache = await db.get('audio-files', url);
-    console.log("✅ Vérification cache après ajout:", verifyCache ? "OK" : "ÉCHEC");
+    console.log("✅ [CACHE] Vérification après ajout:", verifyCache ? `OK, trouvé dans DB.` : "ÉCHEC, non trouvé dans DB.");
     
     // Sauvegarder l'info dans localStorage pour persistance après refresh
     const cacheInfo = {
@@ -251,11 +252,11 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
       timestamp: now
     };
     localStorage.setItem('cachedCurrentSong', JSON.stringify(cacheInfo));
-    console.log("💾 localStorage mis à jour avec titre:", cacheInfo);
+    console.log("💾 [CACHE] localStorage mis à jour avec les infos de la chanson:", cacheInfo.title);
     
-    console.log(`✅ Chanson actuelle mise en cache avec succès: ${url.substring(0, 50)}... (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`✅ [CACHE] Chanson actuelle "${title}" mise en cache avec succès.`);
   } catch (error) {
-    console.error('❌ Erreur lors de la mise en cache de la chanson actuelle:', error);
+    console.error(`❌ [CACHE] Erreur critique dans 'cacheCurrentSong' pour "${title}":`, error);
   }
 };
 
@@ -267,8 +268,8 @@ export const clearAudioCache = async (): Promise<void> => {
     const db = await initAudioCache();
     await db.clear('audio-files');
     localStorage.removeItem('cachedCurrentSong');
-    console.log('Cache audio vidé avec succès');
+    console.log('[CACHE] Cache audio vidé avec succès');
   } catch (error) {
-    console.error('Erreur lors du vidage du cache audio:', error);
+    console.error('[CACHE] Erreur lors du vidage du cache audio:', error);
   }
 };

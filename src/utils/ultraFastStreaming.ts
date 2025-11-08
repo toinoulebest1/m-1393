@@ -79,14 +79,14 @@ export class UltraFastStreaming {
       if (result && result.url && !result.url.startsWith('blob:')) {
         (async () => {
           try {
-            console.log("🚀 Démarrage de la mise en cache en arrière-plan pour:", songTitle);
+            console.log(`🚀 [STREAMING] Démarrage de la mise en cache en arrière-plan pour: "${songTitle}"`);
             const response = await fetch(result.url);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const blob = await response.blob();
             await cacheCurrentSong(filePath, blob, songId || filePath, songTitle);
-            console.log("✅ Mise en cache en arrière-plan terminée pour:", songTitle);
+            console.log(`✅ [STREAMING] Mise en cache en arrière-plan terminée pour: "${songTitle}"`);
           } catch (e) {
-            console.error("❌ Échec de la mise en cache en arrière-plan:", e);
+            console.error(`❌ [STREAMING] Échec de la mise en cache en arrière-plan pour "${songTitle}":`, e);
           }
         })();
       }
