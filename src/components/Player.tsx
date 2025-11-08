@@ -415,8 +415,8 @@ export const Player = () => {
                 />
               </div>
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                <span className="text-sm font-semibold text-white truncate">{displayedSong.title}</span>
-                <span className="text-xs text-spotify-neutral truncate">{displayedSong.artist || 'Unknown Artist'}</span>
+                <span className="text-sm font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
+                <span className="text-xs text-spotify-neutral truncate">{displayedSong?.artist || 'Unknown Artist'}</span>
               </div>
             </div>
           </div>
