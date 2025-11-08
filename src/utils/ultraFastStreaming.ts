@@ -36,8 +36,9 @@ export class UltraFastStreaming {
 
     // Priorité 2: Si filePath est déjà une URL HTTP/HTTPS directe, la retourner telle quelle.
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-      console.log('[UltraFastStreaming.getAudioUrlUltraFast] ✅ filePath est déjà une URL directe. Retourne l\'URL telle quelle.');
-      return { url: filePath };
+      console.log('[UltraFastStreaming.getAudioUrlUltraFast] ✅ filePath est déjà une URL directe. Tentative de téléchargement et mise en cache...');
+      // Même pour une URL directe, on télécharge et on met en cache pour la reprise.
+      return await this.streamingDirect(filePath, songTitle, songArtist, songId, true);
     }
 
     // Priorité 3: Piste TIDAL (si le filePath est un ID Tidal)
@@ -47,7 +48,7 @@ export class UltraFastStreaming {
       try {
         const result = await getTidalStreamUrl(tidalId);
         if (result?.url) {
-          console.log('✅ [UltraFastStreaming.getAudioUrlUltraFast] Flux Tidal récupéré avec succès.');
+          console.log('✅ [UltraFastStreaming.getAudioUrlUltraFast] Flux Tidal récupéré avec succès. On ne met pas en cache les flux Tidal.');
           return { url: result.url };
         }
         throw new Error('URL de flux Tidal non trouvée.');
@@ -56,7 +57,7 @@ export class UltraFastStreaming {
       }
     }
 
-    // Priorité 4: Cache mémoire (ultra-rapide)
+    // Priorité 4: Cache mémoire (ultra-rapide) - Moins pertinent avec la nouvelle logique mais gardé pour la forme
     const cachedMemoryUrl = memoryCache.get(filePath);
     if (cachedMemoryUrl) {
       console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache mémoire (Priorité 4).");
@@ -69,32 +70,14 @@ export class UltraFastStreaming {
       return await this.promisePool.get(filePath)!;
     }
 
-    // 6. Streaming direct via getAudioFileUrl (pour les fichiers locaux)
-    console.log("[UltraFastStreaming.getAudioUrlUltraFast] Aucune URL en cache ou promesse existante. Lancement du streaming direct via getAudioFileUrl.");
+    // 6. Téléchargement, mise en cache, PUIS lecture.
+    console.log("[UltraFastStreaming.getAudioUrlUltraFast] Aucune URL en cache. Lancement du téléchargement et de la mise en cache.");
     const promise = this.streamingDirect(filePath, songTitle, songArtist, songId);
     this.promisePool.set(filePath, promise);
 
-    // Lancer la mise en cache en arrière-plan sans bloquer la lecture
-    promise.then(result => {
-      if (result && result.url && !result.url.startsWith('blob:')) {
-        (async () => {
-          try {
-            console.log(`🚀 [STREAMING] Démarrage de la mise en cache en arrière-plan pour: "${songTitle}"`);
-            const response = await fetch(result.url);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const blob = await response.blob();
-            await cacheCurrentSong(filePath, blob, songId || filePath, songTitle);
-            console.log(`✅ [STREAMING] Mise en cache en arrière-plan terminée pour: "${songTitle}"`);
-          } catch (e) {
-            console.error(`❌ [STREAMING] Échec de la mise en cache en arrière-plan pour "${songTitle}":`, e);
-          }
-        })();
-      }
-    });
-
     try {
       const result = await promise;
-      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis le réseau via streaming direct.");
+      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ Chanson téléchargée, mise en cache et prête à être lue depuis le blob local.");
       if (result.duration) {
         console.log("✅ Durée récupérée:", result.duration, "secondes");
       }
@@ -106,29 +89,56 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Streaming direct optimisé
+   * Télécharge, met en cache, puis retourne une URL locale (Blob URL).
    */
   private static async streamingDirect(
     filePath: string,
     songTitle?: string,
     songArtist?: string,
-    songId?: string
+    songId?: string,
+    isDirectUrl = false
   ): Promise<{ url: string; duration?: number }> {
-    console.log("🚀 [UltraFastStreaming.streamingDirect] Démarrage du streaming direct pour filePath:", filePath);
+    console.log("🚀 [UltraFastStreaming.streamingDirect] Démarrage du téléchargement pour mise en cache:", filePath);
     const startTime = performance.now();
 
     try {
-      // Appel à tryNetwork qui utilise getAudioFileUrl pour les chemins locaux
-      const result = await this.tryNetwork(filePath, songTitle, songArtist, songId);
-      if (result) {
-        const elapsed = performance.now() - startTime;
-        console.log("🌐 [UltraFastStreaming.streamingDirect] Récupération réseau directe réussie en", elapsed.toFixed(2), "ms.");
-        return result;
+      let audioUrl: string | undefined;
+      let duration: number | undefined;
+
+      if (isDirectUrl) {
+        audioUrl = filePath;
+      } else {
+        const result = await getAudioFileUrl(filePath, songTitle, songArtist, songId);
+        audioUrl = result?.url;
+        duration = result?.duration;
+      }
+
+      if (!audioUrl) {
+        throw new Error("Impossible d'obtenir une URL source pour le téléchargement.");
+      }
+
+      console.log(`[STREAMING] Téléchargement depuis: ${audioUrl.substring(0, 100)}...`);
+      const response = await fetch(audioUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      throw new Error("Aucune source audio disponible via le réseau direct.");
+      const blob = await response.blob();
+      console.log(`[STREAMING] Téléchargement terminé. Taille: ${(blob.size / 1024 / 1024).toFixed(2)} MB.`);
+
+      // Mise en cache (maintenant une étape bloquante)
+      await cacheCurrentSong(filePath, blob, songId || filePath, songTitle);
+      
+      // Créer une URL locale à partir du Blob téléchargé
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const elapsed = performance.now() - startTime;
+      console.log("✅ [UltraFastStreaming.streamingDirect] Téléchargement et mise en cache réussis en", elapsed.toFixed(2), "ms.");
+      
+      return { url: blobUrl, duration };
+
     } catch (error) {
-      console.error("❌ [UltraFastStreaming.streamingDirect] Erreur lors du streaming direct:", error);
+      console.error("❌ [UltraFastStreaming.streamingDirect] Erreur lors du téléchargement et de la mise en cache:", error);
       throw error;
     }
   }
@@ -136,7 +146,7 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide (utilise getAudioFileUrl pour les chemins locaux)
    */
-private static async tryNetwork(filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
+  private static async tryNetwork(filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
     console.log(`[UltraFastStreaming.tryNetwork] Tentative de récupération réseau pour filePath: "${filePath}"`);
     try {
       // getAudioFileUrl est maintenant responsable uniquement des fichiers locaux
