@@ -12,10 +12,10 @@ const formatDuration = (seconds: number): string => {
 };
 
 // Helper pour construire l'URL de l'image de l'album
-const getImageUrl = (coverId: string, resolution: number = 320): string => {
+const getImageUrl = (coverId: string, resolution: number = 1280): string => {
     if (!coverId) return '/placeholder.svg';
     const formattedId = coverId.replace(/-/g, '/');
-    return `https://images.tidal.com/images/${formattedId}/${resolution}x${resolution}.jpg`;
+    return `https://resources.tidal.com/images/${formattedId}/${resolution}x${resolution}.jpg`;
 }
 
 export const searchTidalTracks = async (query: string): Promise<Song[]> => {
