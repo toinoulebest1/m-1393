@@ -1,24 +1,23 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Song } from '@/types/player';
+import { getAudioFileUrl } from '@/utils/storage';
+import { updateMediaSessionMetadata, durationToSeconds } from '@/utils/mediaSession';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
-import { toast } from 'sonner';
-import { updateMediaSessionMetadata, updatePositionState } from '@/utils/mediaSession';
-import { durationToSeconds } from '@/lib/utils';
 
 interface UseAudioControlProps {
-  audioRef: React.MutableRefObject<HTMLAudioElement>;
-  nextAudioRef: React.MutableRefObject<HTMLAudioElement>;
+  audioRef: React.RefObject<HTMLAudioElement>;
+  nextAudioRef: React.RefObject<HTMLAudioElement>;
   currentSong: Song | null;
   setCurrentSong: (song: Song | null) => void;
   isChangingSong: boolean;
   setIsChangingSong: (isChanging: boolean) => void;
   volume: number;
   setIsPlaying: (isPlaying: boolean) => void;
-  changeTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
-  setNextSongPreloaded: (preloaded: boolean) => void;
-  preloadNextTracks: () => void;
+  changeTimeoutRef: React.MutableRefObject<number | null>;
+  setNextSongPreloaded: (isPreloaded: boolean) => void;
+  preloadNextTracks: () => Promise<void>;
   setDisplayedSong: (song: Song | null) => void;
-  apiDurationRef: React.MutableRefObject<number | null>;
+  apiDurationRef: React.MutableRefObject<number | undefined>;
 }
 
 export const useAudioControl = ({
@@ -34,177 +33,152 @@ export const useAudioControl = ({
   setNextSongPreloaded,
   preloadNextTracks,
   setDisplayedSong,
-  apiDurationRef,
+  apiDurationRef
 }: UseAudioControlProps) => {
-  const [playbackRate, setPlaybackRateState] = useState(1);
 
   const play = useCallback(async (song: Song) => {
+    console.log(`[useAudioControl.play] Received request to play song: ${song?.title}`);
+    if (!song) {
+      console.error("💥 Erreur critique lors de la lecture: la chanson est indéfinie");
+      return;
+    }
     if (isChangingSong) {
-      console.log("[useAudioControl.play] Changement de chanson déjà en cours, annulation de la nouvelle requête.");
+      console.warn("⚠️ Tentative de lecture pendant un changement de chanson, ignorée.");
       return;
     }
 
     setIsChangingSong(true);
-    console.log("[useAudioControl.play] Received request to play song:", song);
+    setDisplayedSong(song);
+
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
+    }
 
     try {
-      // Arrêter la chanson actuelle si elle est en cours de lecture
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-      }
-
-      console.log("[useAudioControl.play] Changing song to:", song.title, "(ID:", song.id, ")");
-      setCurrentSong(song);
-      setDisplayedSong(song); // Mettre à jour immédiatement la chanson affichée
-
-      // Utiliser UltraFastStreaming pour obtenir l'URL de la chanson
-      const { url: audioUrl, duration } = await UltraFastStreaming.getAudioUrlUltraFast(
+      const result = await UltraFastStreaming.getAudioUrlUltraFast(
         song.url,
         song.title,
         song.artist,
         song.id
       );
+      if (!result || !result.url) throw new Error("URL audio non trouvée");
 
-      if (!audioUrl) {
-        throw new Error("Aucune URL audio disponible pour la lecture.");
-      }
+      audioRef.current!.src = result.url;
+      audioRef.current!.volume = volume / 100;
+      
+      // Mettre à jour la durée de l'API
+      apiDurationRef.current = durationToSeconds(song.duration);
 
-      audioRef.current.src = audioUrl;
-      audioRef.current.load(); // Charger la nouvelle source
-      apiDurationRef.current = duration || durationToSeconds(song.duration); // Mettre à jour la durée de l'API
-
-      // Attendre que la nouvelle chanson soit prête à être jouée
-      await new Promise<void>((resolve, reject) => {
-        const onCanPlay = () => {
-          cleanup();
-          resolve();
-        };
-        const onError = (e: Event) => {
-          cleanup();
-          console.error("Erreur de chargement audio:", e);
-          reject(new Error("Erreur de chargement audio."));
-        };
-        const cleanup = () => {
-          audioRef.current.removeEventListener('canplay', onCanPlay);
-          audioRef.current.removeEventListener('error', onError);
-        };
-
-        audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
-        audioRef.current.addEventListener('error', onError, { once: true });
-
-        // Si déjà prêt, résoudre immédiatement
-        if (audioRef.current.readyState >= 3) {
-          resolve();
-        }
-      });
-
-      audioRef.current.volume = volume / 100;
-      audioRef.current.playbackRate = playbackRate;
-
-      await audioRef.current.play();
+      await audioRef.current!.play();
+      
       setIsPlaying(true);
-      updateMediaSessionMetadata(song); // Mettre à jour les métadonnées de la session média
+      setCurrentSong(song);
+      updateMediaSessionMetadata(song);
 
-      // Précharger la prochaine piste après un court délai
-      if (changeTimeoutRef.current) {
-        clearTimeout(changeTimeoutRef.current);
-      }
-      changeTimeoutRef.current = setTimeout(() => {
-        preloadNextTracks();
-      }, 1000); // Délai d'une seconde avant de précharger la suivante
+      // Précharger la piste suivante
+      preloadNextTracks();
 
     } catch (error) {
-      console.error("💥 Erreur critique lors de la lecture:", error);
-      toast.error("Erreur de lecture", {
-        description: (error as Error).message || "Impossible de lire la chanson."
-      });
+      console.error("💥 Erreur lors de la lecture:", error);
       setIsPlaying(false);
-      setCurrentSong(null);
-      setDisplayedSong(null);
     } finally {
-      setIsChangingSong(false);
+      changeTimeoutRef.current = window.setTimeout(() => {
+        setIsChangingSong(false);
+        setNextSongPreloaded(false);
+      }, 500);
     }
   }, [
-    audioRef,
-    setCurrentSong,
-    setIsPlaying,
-    volume,
-    playbackRate,
     isChangingSong,
+    volume,
+    audioRef,
+    nextAudioRef,
     setIsChangingSong,
+    setIsPlaying,
+    setCurrentSong,
     changeTimeoutRef,
+    setNextSongPreloaded,
     preloadNextTracks,
     setDisplayedSong,
     apiDurationRef
   ]);
 
   const pause = useCallback(() => {
-    audioRef.current.pause();
-    setIsPlaying(false);
-  }, [audioRef, setIsPlaying]);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      console.log("Audio paused");
+    }
+  }, [setIsPlaying, audioRef]);
+
+  const resume = useCallback(() => {
+    if (audioRef.current && audioRef.current.paused) {
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setIsPlaying(true);
+          console.log("Audio resumed");
+        }).catch(error => {
+          console.error("Audio resume failed:", error);
+          setIsPlaying(false);
+        });
+      }
+    }
+  }, [setIsPlaying, audioRef]);
 
   const updateVolume = useCallback((newVolume: number) => {
-    audioRef.current.volume = newVolume / 100;
-  }, [audioRef]);
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100;
+    }
+    if (nextAudioRef.current) {
+      nextAudioRef.current.volume = newVolume / 100;
+    }
+  }, [audioRef, nextAudioRef]);
 
   const updateProgress = useCallback((newProgress: number) => {
-    if (audioRef.current && apiDurationRef.current) {
-      audioRef.current.currentTime = (newProgress / 100) * apiDurationRef.current;
+    if (audioRef.current && audioRef.current.duration) {
+      audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
     }
-  }, [audioRef, apiDurationRef]);
+  }, [audioRef]);
 
-  const updatePlaybackRate = useCallback((rate: number) => {
-    setPlaybackRateState(rate);
+  const updatePlaybackRate = useCallback((rate: number, setPlaybackRate: (rate: number) => void) => {
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
+      setPlaybackRate(rate);
     }
   }, [audioRef]);
 
   const stopCurrentSong = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.src = ''; // Effacer la source pour libérer les ressources
+      audioRef.current.src = '';
+    }
+    if (nextAudioRef.current) {
+      nextAudioRef.current.pause();
+      nextAudioRef.current.src = '';
     }
     setIsPlaying(false);
     setCurrentSong(null);
     setDisplayedSong(null);
-    setNextSongPreloaded(false);
-    apiDurationRef.current = null;
-    if (changeTimeoutRef.current) {
-      clearTimeout(changeTimeoutRef.current);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
     }
-  }, [audioRef, setIsPlaying, setCurrentSong, setDisplayedSong, setNextSongPreloaded, changeTimeoutRef, apiDurationRef]);
+  }, [audioRef, nextAudioRef, setIsPlaying, setCurrentSong, setDisplayedSong]);
 
   const refreshCurrentSong = useCallback(async () => {
     if (currentSong) {
-      console.log("[useAudioControl.refreshCurrentSong] Rafraîchissement de la chanson actuelle:", currentSong.title);
-      const wasPlaying = !audioRef.current.paused;
-      const currentTime = audioRef.current.currentTime;
-
       await play(currentSong);
-
-      if (audioRef.current && currentTime > 0) {
-        audioRef.current.currentTime = currentTime;
-      }
-      if (!wasPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
     }
-  }, [currentSong, audioRef, play, setIsPlaying]);
+  }, [currentSong, play]);
 
-  const getCurrentAudioElement = useCallback(() => audioRef.current, [audioRef]);
+  const getCurrentAudioElement = useCallback(() => {
+    if (audioRef.current && audioRef.current.src) {
+      return audioRef.current;
+    }
+    if (nextAudioRef.current && nextAudioRef.current.src) {
+      return nextAudioRef.current;
+    }
+    return null;
+  }, [audioRef, nextAudioRef]);
 
-  return {
-    play,
-    pause,
-    updateVolume,
-    updateProgress,
-    updatePlaybackRate,
-    stopCurrentSong,
-    refreshCurrentSong,
-    getCurrentAudioElement,
-    playbackRate,
-  };
+  return { play, pause, resume, updateVolume, updateProgress, updatePlaybackRate, stopCurrentSong, refreshCurrentSong, getCurrentAudioElement };
 };

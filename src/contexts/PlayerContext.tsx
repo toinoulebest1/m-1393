@@ -179,6 +179,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { 
     play, 
     pause, 
+    resume,
     updateVolume, 
     updateProgress, 
     updatePlaybackRate, 
@@ -835,6 +836,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHistory,
     play,
     pause,
+    resume,
     setVolume,
     setProgress,
     nextSong,

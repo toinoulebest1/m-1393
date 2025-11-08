@@ -31,6 +31,7 @@ export const Player = () => {
     isAudioReady,
     play,
     pause,
+    resume,
     setVolume,
     setProgress,
     nextSong,
@@ -219,7 +220,7 @@ export const Player = () => {
       }
       console.log("========================");
       
-      isPlaying ? pause() : play(currentSong);
+      isPlaying ? pause() : resume();
     } else if (!isAudioReady) {
       toast.info("Chargement de l'audio en cours...", {
         duration: 2000
