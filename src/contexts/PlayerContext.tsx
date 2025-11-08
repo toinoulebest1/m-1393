@@ -392,7 +392,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 console.log("[RESTORE] Playback resumed successfully.");
               } catch (playError) {
                 console.warn("[RESTORE] Autoplay failed:", playError);
-                toast.info("La lecture n'a pas pu reprendre automatiquement. Veuillez cliquer sur Play.");
                 setIsPlaying(false);
               }
             }
