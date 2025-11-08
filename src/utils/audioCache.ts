@@ -54,22 +54,23 @@ export const isInCache = async (url: string): Promise<boolean> => {
  * Récupère un fichier audio du cache
  */
 export const getFromCache = async (url: string): Promise<string | null> => {
+  const logPrefix = `[CACHE] getFromCache | URL: "${url.substring(0, 50)}..." |`;
   try {
-    console.log("🔍 [CACHE] getFromCache appelé pour URL:", url);
+    console.log(`${logPrefix} START`);
     const db = await initAudioCache();
-    console.log("✅ [CACHE] DB initialisée");
+    console.log(`${logPrefix} DB Initialized.`);
     
     const cachedFile = await db.get('audio-files', url);
-    console.log("📦 [CACHE] Résultat DB get:", cachedFile ? "TROUVÉ" : "NON TROUVÉ");
     
     if (!cachedFile) {
-      console.log("❌ [CACHE] Aucun fichier en cache pour cette URL.");
+      console.log(`${logPrefix} RESULT: NOT FOUND in IndexedDB.`);
       return null;
     }
     
-    console.log(`✅ [CACHE] Fichier trouvé en cache ! Taille: ${(cachedFile.blob.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`${logPrefix} RESULT: FOUND in IndexedDB! Size: ${(cachedFile.blob.size / 1024 / 1024).toFixed(2)} MB`);
     
     // Met à jour la date de dernier accès
+    console.log(`${logPrefix} ACTION: Updating lastAccessed timestamp.`);
     await db.put('audio-files', {
       ...cachedFile,
       lastAccessed: Date.now()
@@ -77,10 +78,10 @@ export const getFromCache = async (url: string): Promise<string | null> => {
     
     // Crée une URL pour le blob
     const blobUrl = URL.createObjectURL(cachedFile.blob);
-    console.log("✅ [CACHE] Blob URL créée:", blobUrl.substring(0, 50) + "...");
+    console.log(`${logPrefix} SUCCESS: Created blob URL: ${blobUrl.substring(0, 50)}...`);
     return blobUrl;
   } catch (error) {
-    console.error('❌ [CACHE] Erreur lors de la récupération depuis le cache:', error);
+    console.error(`${logPrefix} FAILED:`, error);
     return null;
   }
 };
@@ -207,31 +208,35 @@ export const getAudioCacheStats = async (): Promise<{
  * Garde les 2 dernières chansons pour permettre le retour en arrière si erreur
  */
 export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, title?: string): Promise<void> => {
+  const logPrefix = `[CACHE] cacheCurrentSong | Title: "${title}" | ID: ${songId} |`;
   try {
-    console.log(`💾 [CACHE] Début de 'cacheCurrentSong' pour "${title}" (ID: ${songId}). Taille du Blob: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`${logPrefix} START | Blob size: ${(blob.size / 1024 / 1024).toFixed(2)} MB.`);
     
     const db = await initAudioCache();
+    console.log(`${logPrefix} DB Initialized.`);
     
-    // Récupérer toutes les entrées du cache
+    // Récupérer toutes les entrées du cache pour le nettoyage
     const allFiles = await db.getAll('audio-files');
-    console.log(`📦 [CACHE] Fichiers en cache avant nettoyage: ${allFiles.length}`);
+    console.log(`${logPrefix} Cleanup Phase | Found ${allFiles.length} files in cache before cleanup.`);
     
     // Garder les 2 dernières chansons (celle en cours + 1 précédente pour rollback)
-    // Trier par lastAccessed (plus récent d'abord)
-    const sortedFiles = [...allFiles].sort((a, b) => b.lastAccessed - a.lastAccessed);
-    
-    // Supprimer uniquement les anciennes (garder les 2 plus récentes)
-    for (let i = 1; i < sortedFiles.length; i++) { // On garde la plus récente (i=0), on supprime le reste
-      const file = sortedFiles[i];
-      if (file.url !== url) { // Ne pas supprimer celle qu'on va ajouter
-        await db.delete('audio-files', file.url);
-        console.log(`🗑️ [CACHE] Ancienne chanson supprimée du cache: ${file.url.substring(0, 50)}...`);
+    const MAX_CACHED_SONGS = 2;
+    if (allFiles.length >= MAX_CACHED_SONGS) {
+      const sortedFiles = [...allFiles].sort((a, b) => b.lastAccessed - a.lastAccessed);
+      console.log(`${logPrefix} Cleanup Phase | Cache has ${sortedFiles.length} items (>=${MAX_CACHED_SONGS}). Cleaning up old entries.`);
+      for (let i = MAX_CACHED_SONGS - 1; i < sortedFiles.length; i++) {
+          const file = sortedFiles[i];
+          // Ne pas supprimer la chanson qu'on est en train d'ajouter, au cas où elle serait déjà dans la liste mais pas en tête
+          if (file.url !== url) { 
+              await db.delete('audio-files', file.url);
+              console.log(`${logPrefix} Cleanup Phase | Deleted old song from cache: ${file.url.substring(0, 50)}...`);
+          }
       }
     }
     
     // Ajouter ou mettre à jour la chanson actuelle
     const now = Date.now();
-    console.log(`➕ [CACHE] Ajout/Mise à jour de "${title}" dans IndexedDB.`);
+    console.log(`${logPrefix} ACTION: Putting/updating song in IndexedDB...`);
     await db.put('audio-files', {
       url,
       blob,
@@ -239,10 +244,16 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
       lastAccessed: now,
       size: blob.size
     });
+    console.log(`${logPrefix} SUCCESS: 'put' command executed.`);
     
     // Vérifier que l'ajout a réussi
+    console.log(`${logPrefix} VERIFICATION: Reading back from DB to confirm write...`);
     const verifyCache = await db.get('audio-files', url);
-    console.log("✅ [CACHE] Vérification après ajout:", verifyCache ? `OK, trouvé dans DB.` : "ÉCHEC, non trouvé dans DB.");
+    if (verifyCache) {
+        console.log(`${logPrefix} VERIFICATION: SUCCESS! Found song in DB with size ${(verifyCache.blob.size / 1024 / 1024).toFixed(2)} MB.`);
+    } else {
+        console.error(`${logPrefix} VERIFICATION: FAILED! Song NOT found in DB after 'put' command.`);
+    }
     
     // Sauvegarder l'info dans localStorage pour persistance après refresh
     const cacheInfo = {
@@ -252,11 +263,11 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
       timestamp: now
     };
     localStorage.setItem('cachedCurrentSong', JSON.stringify(cacheInfo));
-    console.log("💾 [CACHE] localStorage mis à jour avec les infos de la chanson:", cacheInfo.title);
+    console.log(`${logPrefix} INFO: Updated localStorage with current song info.`);
     
-    console.log(`✅ [CACHE] Chanson actuelle "${title}" mise en cache avec succès.`);
+    console.log(`${logPrefix} COMPLETE: Caching finished successfully.`);
   } catch (error) {
-    console.error(`❌ [CACHE] Erreur critique dans 'cacheCurrentSong' pour "${title}":`, error);
+    console.error(`${logPrefix} FAILED: Critical error during caching process:`, error);
   }
 };
 
