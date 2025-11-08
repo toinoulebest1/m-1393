@@ -87,7 +87,7 @@ export const useAudioControl = ({
             console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
           } else {
             // 3. Réseau (le plus lent)
-            const result = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+            const result = await getAudioFileUrl(song.url, song.title, song.artist, song.id);
             if (!result?.url) throw new Error("URL audio non disponible depuis le réseau");
             audioUrl = result.url;
             apiDuration = result.duration;
@@ -132,7 +132,7 @@ export const useAudioControl = ({
             }
             
             // Autres tâches
-            fetchLyricsInBackground(song.id, song.title, song.artist, song.duration, song.album_name, song.isDeezer);
+            fetchLyricsInBackground(song.id, song.title, song.artist, song.duration, song.album_name);
             preloadNextTracks();
           }, 100); // Différer de 100ms
 

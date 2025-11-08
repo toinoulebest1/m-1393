@@ -21,11 +21,9 @@ export class UltraFastStreaming {
    */
   public static async getAudioUrlUltraFast(
     filePath: string,
-    deezerId?: string,
     songTitle?: string,
     songArtist?: string,
     songId?: string,
-    isDeezer?: boolean,
     tidalId?: string
   ): Promise<{ url: string; duration?: number }> {
     const effectiveTidalId = tidalId || (filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined);
@@ -60,7 +58,7 @@ export class UltraFastStreaming {
     }
 
     // 2. Streaming direct
-    const promise = this.streamingDirect(filePath, filePath, deezerId, songTitle, songArtist, songId, isDeezer, effectiveTidalId);
+    const promise = this.streamingDirect(filePath, filePath, songTitle, songArtist, songId, effectiveTidalId);
     this.promisePool.set(filePath, promise);
 
     try {
@@ -81,17 +79,15 @@ export class UltraFastStreaming {
   private static async streamingDirect(
     filePath: string,
     songUrl: string,
-    deezerId?: string,
     songTitle?: string,
     songArtist?: string,
     songId?: string,
-    isDeezer?: boolean,
     tidalId?: string
   ): Promise<{ url: string; duration?: number }> {
     console.log("🚀 Streaming direct");
 
     try {
-      const result = await this.tryNetwork(songUrl, deezerId, songTitle, songArtist, songId);
+      const result = await this.tryNetwork(songUrl, songTitle, songArtist, songId);
       if (result) {
         const elapsed = performance.now() - startTime;
         console.log("🌐 NETWORK DIRECT:", elapsed.toFixed(2), "ms");
@@ -108,9 +104,9 @@ export class UltraFastStreaming {
   /**
    * Tentative réseau ultra-rapide
    */
-private static async tryNetwork(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
+private static async tryNetwork(songUrl: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
     try {
-      const result = await getAudioFileUrl(songUrl, deezerId, songTitle, songArtist, songId);
+      const result = await getAudioFileUrl(songUrl, songTitle, songArtist, songId);
       if (result && typeof result.url === 'string') {
         // Validation rapide de l'URL pour éviter les liens cassés (500) ou expirés
         const controller = new AbortController();

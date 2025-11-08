@@ -45,7 +45,6 @@ export const searchTidalTracks = async (query: string): Promise<Song[]> => {
       imageUrl: getImageUrl(item.album?.cover),
       album_name: item.album?.title,
       tidal_id: item.id.toString(),
-      isDeezer: true, // Marqueur pour indiquer une piste externe
     }));
 
     console.log(`[TidalService] Mapped ${songs.length} songs from search results.`);

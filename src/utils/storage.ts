@@ -41,7 +41,7 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
   return data.path;
 };
 
-export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
+export const getAudioFileUrl = async (filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
   console.log(`[storage.getAudioFileUrl] Getting URL for filePath: "${filePath}"`);
   const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
 

@@ -28,11 +28,13 @@ const createNextAudio = () => {
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Nettoyage complet du localStorage (supprimer toutes les queues)
   useEffect(() => {
-    console.log("🧹 Nettoyage COMPLET - suppression de toutes les queues...");
+    console.log("🧹 Nettoyage COMPLET - suppression de toutes les anciennes données...");
     localStorage.removeItem('queue');
     localStorage.removeItem('lastSearchResults');
     localStorage.removeItem('shuffleMode');
     localStorage.removeItem('repeatMode');
+    localStorage.removeItem('currentSong');
+    localStorage.removeItem('audioProgress');
   }, []);
 
   // Hooks personnalisés qui encapsulent la logique
@@ -104,7 +106,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (error) {
           // Gérer le cas où la chanson n'existe pas encore dans la table 'songs'
           // (par exemple, juste après un upload avant que la page ne soit rafraîchie)
-          if (error.code === '23503') { // Foreign key violation
+          if (error.code === '23503' && !currentSong.id.startsWith('tidal-')) { // Foreign key violation, and not a tidal song
             console.warn(`La chanson ${currentSong.id} n'existe pas dans la table 'songs'. Tentative d'insertion.`);
             const { error: insertError } = await supabase.from('songs').insert({
               id: currentSong.id,
@@ -208,7 +210,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const result = await getAudioFileUrl(
         song.url,
-        song.deezer_id,
         song.title,
         song.artist
       );
@@ -329,7 +330,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("📡 Récupération DIRECTE depuis le réseau (cache désactivé)...");
           const result = await getAudioFileUrl(
             song.url,
-            song.deezer_id,
             song.title,
             song.artist,
             song.id

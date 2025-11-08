@@ -1,4 +1,3 @@
-
 export interface Song {
   id: string;
   title: string;
@@ -11,8 +10,7 @@ export interface Song {
   user_id?: string;
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
-  deezer_id?: string; // Deezer track ID for Deezmate API
-  isDeezer?: boolean; // Flag for Deezer tracks
+  tidal_id?: string; // Tidal track ID
 }
 
 export interface FavoriteStat {

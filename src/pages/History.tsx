@@ -77,7 +77,6 @@ const History = () => {
             image_url,
             genre,
             album_name,
-            deezer_id,
             tidal_id
           )
         `)
