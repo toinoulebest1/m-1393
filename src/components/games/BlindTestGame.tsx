@@ -138,6 +138,13 @@ export function BlindTestGame() {
       return;
     }
 
+    // Activer le masquage AVANT de charger la nouvelle chanson
+    setMaskingState({
+      title: gameMode === 'title' || gameMode === 'both',
+      artist: gameMode === 'artist' || gameMode === 'both',
+      image: true,
+    });
+
     const nextSong = songsList[index];
     
     setQueue([nextSong]);
