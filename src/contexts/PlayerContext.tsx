@@ -881,7 +881,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return (
     <PlayerContext.Provider value={value}>
       {children}
-    </Player.Provider>
+    </PlayerContext.Provider>
   );
 };
 
