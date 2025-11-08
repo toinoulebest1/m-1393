@@ -26,9 +26,11 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
       setSearchResults([]);
       return;
     }
+    console.log(`[TidalSearchDialog] Starting search for: "${query}"`);
     setIsSearching(true);
     try {
       const results = await searchTidalTracks(query);
+      console.log(`[TidalSearchDialog] Received ${results.length} results.`);
       setSearchResults(results);
     } catch (error) {
       console.error("La recherche a échoué", error);
@@ -42,6 +44,7 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
+    console.log(`[TidalSearchDialog] Input changed: "${query}"`);
     setSearchQuery(query);
     debouncedSearch(query);
   };
@@ -49,6 +52,11 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
   const handleAddToQueue = (song: Song) => {
     addToQueue(song);
     toast.success(`"${song.title}" ajoutée à la file d'attente`);
+  };
+
+  const handleSelectAndPlay = (song: Song) => {
+    console.log('[TidalSearchDialog] Song selected to play:', song);
+    onSongSelected(song);
   };
 
   return (
@@ -104,7 +112,7 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
                      <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onSongSelected(song)}
+                      onClick={() => handleSelectAndPlay(song)}
                       title="Lire ce titre"
                     >
                       <Play className="h-5 w-5 text-gray-400 group-hover:text-white" />

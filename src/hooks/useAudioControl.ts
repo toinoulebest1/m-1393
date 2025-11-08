@@ -44,8 +44,11 @@ export const useAudioControl = ({
   const cachingTimeoutRef = useRef<number | null>(null);
 
   const play = useCallback(async (song?: Song) => {
+    if (song) {
+      console.log('[useAudioControl.play] Received request to play song:', song);
+    }
     if (song && (!currentSong || song.id !== currentSong.id)) {
-      console.log(`Changement de chanson vers: ${song.title}`);
+      console.log(`[useAudioControl.play] Changing song to: ${song.title} (ID: ${song.id})`);
       
       if (cachingTimeoutRef.current) {
         clearTimeout(cachingTimeoutRef.current);

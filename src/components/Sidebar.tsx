@@ -112,6 +112,7 @@ export const Sidebar = () => {
     // Handle upload complete logic
   };
   const handleSongSelected = (song: Song) => {
+    console.log('[Sidebar] handleSongSelected called with:', song);
     play(song);
     toast.success(`Lecture de "${song.title}"`);
   };

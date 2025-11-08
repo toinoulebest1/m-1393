@@ -42,22 +42,24 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
+  console.log(`[storage.getAudioFileUrl] Getting URL for filePath: "${filePath}"`);
   const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
 
   if (tidalId) {
+    console.log(`[storage.getAudioFileUrl] Detected Tidal ID: ${tidalId}. Calling getTidalStreamUrl...`);
     try {
-      console.log('⚡️ [storage] Tentative de récupération du flux Tidal...');
       const result = await getTidalStreamUrl(tidalId);
       if (result?.url) {
-        console.log('✅ [storage] Flux Tidal récupéré avec succès');
+        console.log('[storage.getAudioFileUrl] Successfully got Tidal stream URL.');
         return { url: result.url };
       }
+      console.warn('[storage.getAudioFileUrl] getTidalStreamUrl did not return a URL. Falling back...');
     } catch (error) {
-      console.warn('⚠️ [storage] Échec de la récupération du flux Tidal, fallback...', error);
+      console.warn('[storage.getAudioFileUrl] Error getting Tidal stream URL, falling back...', error);
     }
   }
   
-  console.log('🔍 Récupération URL pour le fichier local:', filePath);
+  console.log('[storage.getAudioFileUrl] Not a Tidal track or fallback. Treating as local file:', filePath);
 
   // Logique pour les fichiers locaux uniquement (Supabase/Dropbox)
   
