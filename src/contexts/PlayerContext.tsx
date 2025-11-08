@@ -27,15 +27,13 @@ const createNextAudio = () => {
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Nettoyage complet du localStorage (supprimer toutes les queues)
+  // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
-    console.log("🧹 Nettoyage COMPLET - suppression de toutes les anciennes données...");
+    console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
     localStorage.removeItem('queue');
     localStorage.removeItem('lastSearchResults');
     localStorage.removeItem('shuffleMode');
     localStorage.removeItem('repeatMode');
-    localStorage.removeItem('currentSong');
-    localStorage.removeItem('audioProgress');
   }, []);
 
   // Hooks personnalisés qui encapsulent la logique
