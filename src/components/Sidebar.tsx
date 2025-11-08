@@ -6,6 +6,9 @@ import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MusicUploader } from "./MusicUploader";
+import { usePlayerContext } from '@/contexts/PlayerContext';
+import { Song } from '@/types/player';
+import { TidalSearchDialog } from './TidalSearchDialog';
 import { ThemeToggle } from "./ThemeToggle";
 import { AdBanner } from "./AdBanner";
 import { useState, useEffect } from "react";
@@ -104,6 +107,12 @@ export const Sidebar = () => {
       toast.error(t('common.logoutError'));
     }
   };
+  const handleUploadComplete = (song: Song) => {
+    // Handle upload complete logic
+  };
+  const handleSongSelected = (song: Song) => {
+    // Handle song selection logic
+  };
   return <div className="hidden md:flex fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex-col h-full z-50">
       <div className="mb-8">
         <div className="flex items-center gap-2">
@@ -141,7 +150,15 @@ export const Sidebar = () => {
 
           <ThemeToggle />
 
-          <MusicUploader />
+          <div className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+              Découvrir
+            </h2>
+            <div className="space-y-1">
+              <MusicUploader onUploadComplete={handleUploadComplete} />
+              <TidalSearchDialog onSongSelected={handleSongSelected} />
+            </div>
+          </div>
           
           
         </div>

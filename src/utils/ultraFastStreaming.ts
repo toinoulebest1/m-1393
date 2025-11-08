@@ -6,8 +6,12 @@
 import { getAudioFileUrl } from './storage';
 import { UltraFastCache } from './ultraFastCache';
 import { supabase } from '@/integrations/supabase/client';
+import { getFromCache, cacheCurrentSong } from './audioCache';
+import { memoryCache } from './memoryCache';
+import { getTidalStreamUrl } from '@/services/tidalService';
 
 export class UltraFastStreaming {
+  private static instance: UltraFastStreaming;
   private static promisePool = new Map<string, Promise<{ url: string; duration?: number }>>();
   private static requestCount = 0;
 
@@ -15,22 +19,49 @@ export class UltraFastStreaming {
    * Obtention URL ultra-rapide avec stratégies parallèles
    * CACHE DÉSACTIVÉ pour debug
    */
-  static async getAudioUrlUltraFast(songUrl: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> {
-    const startTime = performance.now();
-    this.requestCount++;
-    
-    console.log("🚀 Ultra-fast streaming (SANS CACHE):", songUrl);
+  public static async getAudioUrlUltraFast(
+    filePath: string,
+    deezerId?: string,
+    songTitle?: string,
+    songArtist?: string,
+    songId?: string,
+    isDeezer?: boolean,
+    tidalId?: string
+  ): Promise<{ url: string; duration?: number }> {
+    const effectiveTidalId = tidalId || (filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined);
+
+    // Priorité 1: Piste TIDAL
+    if (effectiveTidalId) {
+      try {
+        console.log('⚡️ Tentative de récupération du flux Tidal...');
+        const result = await getTidalStreamUrl(effectiveTidalId);
+        if (result?.url) {
+          console.log('✅ Flux Tidal récupéré avec succès');
+          return { url: result.url };
+        }
+        throw new Error('URL de flux Tidal non trouvée.');
+      } catch (error) {
+        console.warn('⚠️ Échec de la récupération du flux Tidal, fallback...', error);
+      }
+    }
+
+    // Priorité 2: Cache mémoire (ultra-rapide)
+    const cachedMemoryUrl = memoryCache.get(filePath);
+    if (cachedMemoryUrl) {
+      console.log("✅ URL récupérée depuis cache mémoire:", cachedMemoryUrl.substring(0, 100) + "...");
+      return { url: cachedMemoryUrl };
+    }
 
     // CACHE DÉSACTIVÉ - toujours récupérer depuis le réseau
     // 1. Vérifier si déjà en cours de récupération
-    if (this.promisePool.has(songUrl)) {
+    if (this.promisePool.has(filePath)) {
       console.log("⏳ Réutilisation promesse existante");
-      return await this.promisePool.get(songUrl)!;
+      return await this.promisePool.get(filePath)!;
     }
 
     // 2. Streaming direct
-    const promise = this.streamingDirect(songUrl, startTime, deezerId, songTitle, songArtist, songId);
-    this.promisePool.set(songUrl, promise);
+    const promise = this.streamingDirect(filePath, filePath, deezerId, songTitle, songArtist, songId, isDeezer, effectiveTidalId);
+    this.promisePool.set(filePath, promise);
 
     try {
       const result = await promise;
@@ -40,14 +71,23 @@ export class UltraFastStreaming {
       }
       return result;
     } finally {
-      this.promisePool.delete(songUrl);
+      this.promisePool.delete(filePath);
     }
   }
 
   /**
    * Streaming direct optimisé
    */
-  private static async streamingDirect(songUrl: string, startTime: number, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> {
+  private static async streamingDirect(
+    filePath: string,
+    songUrl: string,
+    deezerId?: string,
+    songTitle?: string,
+    songArtist?: string,
+    songId?: string,
+    isDeezer?: boolean,
+    tidalId?: string
+  ): Promise<{ url: string; duration?: number }> {
     console.log("🚀 Streaming direct");
 
     try {

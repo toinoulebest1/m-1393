@@ -152,6 +152,9 @@ importers:
       lastfm-node-client:
         specifier: ^2.2.0
         version: 2.2.0
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       lucide-react:
         specifier: ^0.462.0
         version: 0.462.0(react@18.3.1)

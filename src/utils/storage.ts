@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, isDropboxEnabledForReading, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
 import { getDropboxConfig } from './dropboxStorage';
+import { getTidalStreamUrl } from '@/services/tidalService';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité à Dropbox si activé
@@ -41,6 +42,21 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 };
 
 export const getAudioFileUrl = async (filePath: string, deezerId?: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
+  const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
+
+  if (tidalId) {
+    try {
+      console.log('⚡️ [storage] Tentative de récupération du flux Tidal...');
+      const result = await getTidalStreamUrl(tidalId);
+      if (result?.url) {
+        console.log('✅ [storage] Flux Tidal récupéré avec succès');
+        return { url: result.url };
+      }
+    } catch (error) {
+      console.warn('⚠️ [storage] Échec de la récupération du flux Tidal, fallback...', error);
+    }
+  }
+  
   console.log('🔍 Récupération URL pour le fichier local:', filePath);
 
   // Logique pour les fichiers locaux uniquement (Supabase/Dropbox)

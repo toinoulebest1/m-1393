@@ -59,6 +59,7 @@
     "idb": "^8.0.1",
     "input-otp": "^1.2.4",
     "lastfm-node-client": "^2.2.0",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.462.0",
     "music-metadata-browser": "^2.5.11",
     "next-themes": "^0.3.0",
