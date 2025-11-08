@@ -142,31 +142,9 @@ private static async tryNetwork(filePath: string, songTitle?: string, songArtist
       // getAudioFileUrl est maintenant responsable uniquement des fichiers locaux
       const result = await getAudioFileUrl(filePath, songTitle, songArtist, songId);
       if (result && typeof result.url === 'string') {
-        console.log(`[UltraFastStreaming.tryNetwork] URL obtenue de getAudioFileUrl: ${result.url.substring(0, 100)}...`);
-        // Validation rapide de l'URL pour éviter les liens cassés (500) ou expirés
-        const controller = new AbortController();
-        const timeout = setTimeout(() => {
-          controller.abort();
-          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL timeout (1500ms) pour: ${songTitle || filePath}`);
-        }, 1500);
-        try {
-          const head = await fetch(result.url, { method: 'HEAD', signal: controller.signal });
-          clearTimeout(timeout);
-          if (head.ok || head.status === 405) { // Certains endpoints ne supportent pas HEAD
-            console.log(`[UltraFastStreaming.tryNetwork] ✅ Validation URL réussie (status: ${head.status}) pour: ${songTitle || filePath}`);
-            return result;
-          }
-          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL échouée (status: ${head.status}) pour: ${songTitle || filePath}`);
-          return null;
-        } catch (e: any) {
-          clearTimeout(timeout);
-          if (e.name === 'AbortError') {
-            // Le timeout a déjà loggé l'erreur
-          } else {
-            console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Erreur lors de la validation de l'URL pour: ${songTitle || filePath}`, e);
-          }
-          return null;
-        }
+        console.log(`[UltraFastStreaming.tryNetwork] ✅ URL obtenue de getAudioFileUrl: ${result.url.substring(0, 100)}...`);
+        // La validation HEAD est supprimée car elle est incompatible avec les URL signées de Supabase.
+        return result;
       }
       console.log('[UltraFastStreaming.tryNetwork] getAudioFileUrl n\'a pas retourné d\'URL valide.');
       return null;
