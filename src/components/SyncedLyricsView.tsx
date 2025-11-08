@@ -21,7 +21,7 @@ import { useCast } from "@/contexts/CastContext";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
 
 export const SyncedLyricsView: React.FC = () => {
-  const { currentSong, progress, isPlaying, play, pause, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites, refreshCurrentSong } = usePlayer();
+  const { currentSong, progress, isPlaying, play, pause, resume, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites, refreshCurrentSong } = usePlayer();
   const navigate = useNavigate();
   const location = useLocation();
   const [parsedLyrics, setParsedLyrics] = useState<any>(null);
@@ -454,7 +454,7 @@ export const SyncedLyricsView: React.FC = () => {
     if (isPlaying) {
       pause();
     } else {
-      play();
+      resume();
     }
   };
 
