@@ -2,13 +2,12 @@ import { useCallback, useRef } from 'react';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
-import { updateMediaSessionMetadata } from '@/utils/mediaSession';
+import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { Song } from '@/types/player';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 import { AutoplayManager } from '@/utils/autoplayManager';
 import { cacheCurrentSong, getFromCache } from '@/utils/audioCache';
 import { memoryCache } from '@/utils/memoryCache';
-import { audioProxyService } from '@/services/audioProxyService';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -48,7 +47,9 @@ export const useAudioControl = ({
     if (song && (!currentSong || song.id !== currentSong.id)) {
       console.log(`Changement de chanson vers: ${song.title}`);
       
-      if (cachingTimeoutRef.current) clearTimeout(cachingTimeoutRef.current);
+      if (cachingTimeoutRef.current) {
+        clearTimeout(cachingTimeoutRef.current);
+      }
       
       audioRef.current.pause();
       audioRef.current.src = '';
@@ -60,107 +61,61 @@ export const useAudioControl = ({
       
       AutoplayManager.registerUserInteraction();
 
-      const audio = audioRef.current;
-      audio.volume = volume / 100;
-
-      // --- Watchdog pour valider une URL ---
-      const validateUrlWithWatchdog = (url: string): Promise<void> => {
-        return new Promise((resolve, reject) => {
-          const watchdogTimeout = 3000; // 3 secondes pour considérer la source KO
-          let timer: number;
-
-          const cleanup = () => {
-            clearTimeout(timer);
-            audio.removeEventListener('canplay', onCanPlay);
-            audio.removeEventListener('error', onError);
-            audio.removeEventListener('stalled', onError);
-          };
-
-          const onCanPlay = () => {
-            console.log("✅ Watchdog: 'canplay' reçu. Source valide.");
-            cleanup();
-            resolve();
-          };
-
-          const onError = (e: Event | string) => {
-            const error = e instanceof Event ? (audio.error?.message || 'Erreur média inconnue') : e;
-            console.error("❌ Watchdog: Erreur média. Source invalide.", error);
-            cleanup();
-            // Vider la source pour éviter que le player reste en état d'erreur
-            audio.src = ''; 
-            reject(new Error(error));
-          };
-
-          timer = window.setTimeout(() => onError('Timeout du watchdog'), watchdogTimeout);
-          
-          audio.addEventListener('canplay', onCanPlay);
-          audio.addEventListener('error', onError);
-          audio.addEventListener('stalled', onError); // Gère les cas de blocage réseau
-          
-          audio.src = url;
-          audio.load(); // Important pour déclencher les événements
-        });
-      };
-
       try {
+        const audio = audioRef.current;
+        audio.volume = volume / 100;
+        
         const startTime = performance.now();
-        let audioUrlResult: { url: string; duration?: number } | null = null;
+        let audioUrl: string;
+        let apiDuration: number | undefined;
         let wasFromCache = false;
 
-        // 1. Cache IndexedDB (priorité absolue)
-        const cachedDiskUrl = await getFromCache(song.url);
-        if (cachedDiskUrl) {
-          audioUrlResult = { url: cachedDiskUrl };
-          wasFromCache = true;
-          console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
-        }
-
-        // 2. Si pas en cache, construire la chaîne de fallback
-        if (!audioUrlResult) {
-          const providers = [];
-          if (song.deezer_id) {
-            providers.push({ name: 'Deezmate', func: () => audioProxyService.tryDeezmate(song.deezer_id!) });
-            providers.push({ name: 'Flacdownloader', func: () => audioProxyService.tryFlacdownloader(song.deezer_id!) });
+        // 1. Cache mémoire (ultra-rapide)
+        const cachedMemoryUrl = memoryCache.get(song.url);
+        if (cachedMemoryUrl) {
+          audioUrl = cachedMemoryUrl;
+          console.log("✅⚡ Cache mémoire HIT!", (performance.now() - startTime).toFixed(1), "ms");
+        } else {
+          // 2. Cache IndexedDB (rapide)
+          const cachedDiskUrl = await getFromCache(song.url);
+          if (cachedDiskUrl) {
+            audioUrl = cachedDiskUrl;
+            wasFromCache = true;
+            console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
+          } else {
+            // 3. Réseau (le plus lent)
+            const result = await getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+            if (!result?.url) throw new Error("URL audio non disponible depuis le réseau");
+            audioUrl = result.url;
+            apiDuration = result.duration;
+            console.log("✅⚡ Réseau OK!", (performance.now() - startTime).toFixed(1), "ms");
           }
-          providers.push({ name: 'Stockage Local', func: () => getAudioFileUrl(song.url) });
-
-          for (const provider of providers) {
-            try {
-              console.log(`➡️ Tentative avec la source: ${provider.name}`);
-              const result = await provider.func();
-              await validateUrlWithWatchdog(result.url);
-              audioUrlResult = result;
-              console.log(`✅ Succès avec ${provider.name}`);
-              break; // Sortir de la boucle si une source est valide
-            } catch (error) {
-              console.warn(`⚠️ Échec avec ${provider.name}:`, (error as Error).message);
-              // Continuer vers le provider suivant
-            }
-          }
+          // Mettre en cache mémoire pour les relectures rapides
+          memoryCache.set(song.url, audioUrl);
         }
 
-        if (!audioUrlResult?.url) {
-          throw new Error("Toutes les sources audio ont échoué. Musique indisponible.");
+        if (apiDuration && apiDurationRef) {
+          apiDurationRef.current = apiDuration;
         }
-        
-        // La lecture a déjà été initiée par le watchdog, il suffit de confirmer l'état
+
+        audio.src = audioUrl;
         const success = await AutoplayManager.playAudio(audio);
         
         if (success) {
           setIsPlaying(true);
           console.log("✅ Lecture démarrée avec succès.");
-          if (apiDurationRef && audioUrlResult.duration) apiDurationRef.current = audioUrlResult.duration;
 
           // --- Tâches non critiques, différées ---
           setTimeout(() => {
             console.log("🚀 Lancement des tâches post-lecture...");
             updateMediaSessionMetadata(song);
             
+            // Mise en cache en arrière-plan si nécessaire
             if (!wasFromCache) {
               cachingTimeoutRef.current = window.setTimeout(() => {
                 (async () => {
                   try {
-                    const response = await fetch(audioUrlResult!.url);
+                    const response = await fetch(audioUrl);
                     if (response.ok) {
                       const blob = await response.blob();
                       await cacheCurrentSong(song.url, blob, song.id, song.title);
@@ -173,9 +128,10 @@ export const useAudioControl = ({
               }, 3000);
             }
             
+            // Autres tâches
             fetchLyricsInBackground(song.id, song.title, song.artist, song.duration, song.album_name, song.isDeezer);
             preloadNextTracks();
-          }, 100);
+          }, 100); // Différer de 100ms
 
         } else {
           console.log("⚠️ Lecture en attente d'activation utilisateur");
@@ -190,10 +146,11 @@ export const useAudioControl = ({
         setIsPlaying(false);
       }
     } else if (audioRef.current) {
+      // Reprise de la lecture
       const success = await AutoplayManager.playAudio(audioRef.current);
       if (success) setIsPlaying(true);
     }
-  }, [currentSong, isChangingSong, volume, audioRef, setCurrentSong, setDisplayedSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, preloadNextTracks, apiDurationRef]);
+  }, [currentSong, isChangingSong, volume, audioRef, nextAudioRef, setCurrentSong, setDisplayedSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, preloadNextTracks, apiDurationRef]);
 
   const pause = useCallback(() => {
     audioRef.current.pause();
