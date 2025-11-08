@@ -74,12 +74,12 @@ export class UltraFastCache {
   /**
    * Warm cache pour URLs pré-calculées
    */
-static setWarm(songUrl: string, audioUrl: string): void {
+  static setWarm(songUrl: string, audioUrl: string): void {
     warmCache.set(songUrl, { url: audioUrl, ts: Date.now() });
     console.log("🔥 WARM CACHE:", songUrl);
   }
 
-static getWarm(songUrl: string): string | null {
+  static getWarm(songUrl: string): string | null {
     const entry = warmCache.get(songUrl);
     if (!entry) return null;
 
@@ -117,62 +117,6 @@ static getWarm(songUrl: string): string | null {
     l0Cache = [];
     warmCache.clear();
     console.log("🧹 L0 Cache nettoyé");
-  }
-
-  static async getAudioUrlUltraFast(filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> {
-    const cacheKey = songId || filePath;
-    const logTag = `[UltraFastCache for "${songTitle || cacheKey}"]`;
-
-    if (this.cache.has(cacheKey)) {
-      console.log(`${logTag} ✅ URL récupérée depuis le cache L0.`);
-      return this.cache.get(cacheKey)!.data;
-    }
-
-    console.log(`${logTag} 🏁 URL non trouvée dans le cache L0. Démarrage de la récupération...`);
-    
-    // Utiliser une promesse pour éviter les requêtes multiples pour la même ressource
-    if (this.promiseCache.has(cacheKey)) {
-      console.log(`${logTag} ⏳ Une récupération est déjà en cours, en attente du résultat...`);
-      return this.promiseCache.get(cacheKey)!;
-    }
-
-    const promise = getAudioFileUrl(filePath, songTitle, songArtist, songId)
-      .then(data => {
-        console.log(`${logTag} ✅ Récupération terminée. Mise en cache L0.`);
-        this.cache.set(cacheKey, { data, timestamp: Date.now() });
-        this.promiseCache.delete(cacheKey); // Nettoyer la promesse une fois résolue
-        return data;
-      })
-      .catch(error => {
-        this.promiseCache.delete(cacheKey); // Nettoyer en cas d'erreur aussi
-        throw error;
-      });
-
-    this.promiseCache.set(cacheKey, promise);
-    return promise;
-  }
-
-  static cleanup() {
-    this.cache.clear();
-    this.promiseCache.clear();
-    console.log('🧹 Cache L0 ultra-rapide et promesses en cours nettoyés.');
-  }
-
-  static async getStats(): Promise<{ count: number, totalSize: number, oldestFile: number }> {
-    const count = this.cache.size;
-    let oldestTimestamp = Infinity;
-    
-    this.cache.forEach(item => {
-      if (item.timestamp < oldestTimestamp) {
-        oldestTimestamp = item.timestamp;
-      }
-    });
-
-    return {
-      count,
-      totalSize: 0, // La taille n'est pas suivie pour ce cache d'URLs
-      oldestFile: oldestTimestamp === Infinity ? 0 : oldestTimestamp,
-    };
   }
 }
 
