@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PlayerPreferences } from '@/types/player';
-import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { getAudioFileUrl } from '@/utils/storage';
 
 export const usePlayerPreferences = () => {
   const [preferences, setPreferences] = useState<PlayerPreferences>({
@@ -42,10 +42,9 @@ export const usePlayerPreferences = () => {
     loadPreferences();
   }, []);
 
-  // Fonction pour précharger les pistes suivantes avec système ultra-rapide
+  // Fonction pour précharger les pistes suivantes
   const preloadNextTracks = useCallback(async () => {
     try {
-      // On récupère les données du contexte 
       const currentSongStr = localStorage.getItem('currentSong');
       const queueStr = localStorage.getItem('queue');
       
@@ -57,19 +56,20 @@ export const usePlayerPreferences = () => {
       if (!currentSong || queue.length === 0) return;
       
       const currentIndex = queue.findIndex((song: any) => song.id === currentSong.id);
-      if (currentIndex === -1) return;
+      if (currentIndex === -1 || currentIndex + 1 >= queue.length) return;
       
-      // Précharger uniquement la prochaine chanson pour ne pas surcharger
       const nextTrack = queue[currentIndex + 1];
       
-      if (nextTrack) {
+      if (nextTrack && nextTrack.url) {
         console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
-        const { audioProxyService } = await import('@/services/audioProxyService');
-        await audioProxyService.preloadTrack(nextTrack.deezer_id || nextTrack.id);
+        // On appelle getAudioFileUrl pour "chauffer" le cache (ex: obtenir une URL signée de Supabase)
+        // Pas besoin de stocker l'URL ici, juste de lancer la requête.
+        await getAudioFileUrl(nextTrack.url, undefined, nextTrack.title, nextTrack.artist, nextTrack.id);
         console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }
     } catch (error) {
-      console.error("Erreur lors du préchargement des pistes:", error);
+      // L'échec du préchargement est silencieux pour ne pas impacter l'expérience utilisateur
+      console.warn("Erreur (silencieuse) lors du préchargement des pistes:", error);
     }
   }, []);
 
