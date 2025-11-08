@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
-import { Song, PlayerContextType, MaskingState } from '@/types/player';
+import { Song, PlayerContextType } from '@/types/player';
 import { usePlayerState } from '@/hooks/usePlayerState';
 import { usePlayerFavorites } from '@/hooks/usePlayerFavorites';
 import { useAudioControl } from '@/hooks/useAudioControl';
@@ -71,7 +71,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [nextSongPreloaded, setNextSongPreloaded] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [displayedSong, setDisplayedSong] = useState<Song | null>(null);
-  const [maskingState, setMaskingState] = useState<MaskingState | null>(null);
   
   // Stocker la durée de l'API pour MediaSession
   const apiDurationRef = useRef<number | undefined>(undefined);
@@ -892,8 +891,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getCurrentAudioElement,
     isSeeking,
     setIsSeeking,
-    maskingState,
-    setMaskingState,
   };
 
   return (
