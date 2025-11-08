@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { clearAllAudioCaches } from '@/utils/clearAllCaches';
 import { toast } from 'sonner';
-import { UltraFastCache } from '@/utils/ultraFastCache';
+import { getAudioCacheStats } from '@/utils/audioCache';
 
 interface CacheStats {
   count: number;
@@ -19,7 +19,7 @@ export const AudioCacheManager: React.FC = () => {
   const loadStats = async () => {
     setIsLoading(true);
     try {
-      const cacheStats = await UltraFastCache.getStats();
+      const cacheStats = await getAudioCacheStats();
       setStats(cacheStats);
     } catch (error) {
       console.error("Erreur chargement stats cache:", error);

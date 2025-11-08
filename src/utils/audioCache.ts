@@ -1,4 +1,3 @@
-
 /**
  * Système de cache pour les fichiers audio
  * Optimise les performances en évitant les téléchargements répétés
@@ -192,7 +191,7 @@ export const getAudioCacheStats = async (): Promise<{
     
     return {
       count: allFiles.length,
-      totalSize: allFiles.reduce((sum, file) => sum + file.blob.size, 0),
+      totalSize: allFiles.reduce((sum, file) => sum + (file.size || file.blob.size), 0),
       oldestFile: allFiles.length > 0 
         ? Math.min(...allFiles.map(file => file.timestamp))
         : 0
@@ -222,7 +221,7 @@ export const cacheCurrentSong = async (url: string, blob: Blob, songId: string, 
     const sortedFiles = [...allFiles].sort((a, b) => b.lastAccessed - a.lastAccessed);
     
     // Supprimer uniquement les anciennes (garder les 2 plus récentes)
-    for (let i = 2; i < sortedFiles.length; i++) {
+    for (let i = 1; i < sortedFiles.length; i++) { // On garde la plus récente (i=0), on supprime le reste
       const file = sortedFiles[i];
       if (file.url !== url) { // Ne pas supprimer celle qu'on va ajouter
         await db.delete('audio-files', file.url);

@@ -27,13 +27,20 @@ export class UltraFastStreaming {
     this.requestCount++;
     console.log(`[UltraFastStreaming.getAudioUrlUltraFast] Requête #${this.requestCount} pour filePath: "${filePath}" (ID: ${songId || 'N/A'})`);
 
-    // Priorité 1: Si filePath est déjà une URL HTTP/HTTPS directe, la retourner telle quelle.
+    // Priorité 1: Cache IndexedDB (pour la restauration de session)
+    const cachedBlobUrl = await getFromCache(filePath);
+    if (cachedBlobUrl) {
+      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache IndexedDB (Priorité 1).");
+      return { url: cachedBlobUrl };
+    }
+
+    // Priorité 2: Si filePath est déjà une URL HTTP/HTTPS directe, la retourner telle quelle.
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
       console.log('[UltraFastStreaming.getAudioUrlUltraFast] ✅ filePath est déjà une URL directe. Retourne l\'URL telle quelle.');
       return { url: filePath };
     }
 
-    // Priorité 2: Piste TIDAL (si le filePath est un ID Tidal)
+    // Priorité 3: Piste TIDAL (si le filePath est un ID Tidal)
     const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
     if (tidalId) {
       console.log('[UltraFastStreaming.getAudioUrlUltraFast] Tentative de récupération du flux Tidal en priorité...');
@@ -49,23 +56,41 @@ export class UltraFastStreaming {
       }
     }
 
-    // Priorité 3: Cache mémoire (ultra-rapide)
+    // Priorité 4: Cache mémoire (ultra-rapide)
     const cachedMemoryUrl = memoryCache.get(filePath);
     if (cachedMemoryUrl) {
-      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache mémoire (Priorité 3).");
+      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache mémoire (Priorité 4).");
       return { url: cachedMemoryUrl };
     }
 
-    // 4. Vérifier si déjà en cours de récupération
+    // 5. Vérifier si déjà en cours de récupération
     if (this.promisePool.has(filePath)) {
       console.log("[UltraFastStreaming.getAudioUrlUltraFast] ⏳ Réutilisation promesse existante pour filePath:", filePath);
       return await this.promisePool.get(filePath)!;
     }
 
-    // 5. Streaming direct via getAudioFileUrl (pour les fichiers locaux)
+    // 6. Streaming direct via getAudioFileUrl (pour les fichiers locaux)
     console.log("[UltraFastStreaming.getAudioUrlUltraFast] Aucune URL en cache ou promesse existante. Lancement du streaming direct via getAudioFileUrl.");
     const promise = this.streamingDirect(filePath, songTitle, songArtist, songId);
     this.promisePool.set(filePath, promise);
+
+    // Lancer la mise en cache en arrière-plan sans bloquer la lecture
+    promise.then(result => {
+      if (result && result.url && !result.url.startsWith('blob:')) {
+        (async () => {
+          try {
+            console.log("🚀 Démarrage de la mise en cache en arrière-plan pour:", songTitle);
+            const response = await fetch(result.url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const blob = await response.blob();
+            await cacheCurrentSong(filePath, blob, songId || filePath, songTitle);
+            console.log("✅ Mise en cache en arrière-plan terminée pour:", songTitle);
+          } catch (e) {
+            console.error("❌ Échec de la mise en cache en arrière-plan:", e);
+          }
+        })();
+      }
+    });
 
     try {
       const result = await promise;
