@@ -2,9 +2,12 @@ import { useEffect } from 'react';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 // Précharge instantanée des URLs audio pour lecture ultra-rapide
-export const useInstantPlayback = (songs: any[]) => {
+export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
   useEffect(() => {
-    if (!songs || songs.length === 0) return;
+    if (!enabled || !songs || songs.length === 0) {
+      console.log("[useInstantPlayback] Preloading disabled or no songs to preload.");
+      return;
+    }
 
     const preloadSongUrls = async () => {
       // Précharger les 5 premières chansons en parallèle
@@ -31,5 +34,5 @@ export const useInstantPlayback = (songs: any[]) => {
     }, 750); // Augmenté à 750ms pour un meilleur debounce lors de la saisie
 
     return () => clearTimeout(timer);
-  }, [songs]);
+  }, [songs, enabled]);
 };

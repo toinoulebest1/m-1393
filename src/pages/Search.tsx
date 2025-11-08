@@ -48,7 +48,7 @@ const SearchPage = () => {
   const location = useLocation();
 
   // Lance le préchargement des URLs dès que les résultats de recherche sont disponibles
-  useInstantPlayback(results);
+  useInstantPlayback(results, !isLoading && results.length > 0);
 
   useEffect(() => {
     const scrollKey = `scroll-${location.pathname}`;
