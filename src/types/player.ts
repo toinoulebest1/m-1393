@@ -47,6 +47,8 @@ export interface PlayerContextType {
   history: Song[];
   isChangingSong: boolean;
   isAudioReady: boolean;
+  maskingState: MaskingState | null; // État pour le masquage
+  setMaskingState: (state: MaskingState | null) => void; // Fonction pour mettre à jour l'état
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (queue: Song[]) => void;

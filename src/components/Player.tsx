@@ -41,6 +41,7 @@ export const Player = () => {
     toggleFavorite,
     getCurrentAudioElement,
     setIsSeeking,
+    maskingState,
   } = usePlayer();
 
   const [metadataOpacity, setMetadataOpacity] = useState(1);
@@ -285,8 +286,6 @@ export const Player = () => {
     handleFavoriteToggle();
   };
 
-  const isMasked = displayedSong?.title === '...' || displayedSong?.artist === '...';
-
   if (isMobile) {
     return (
       <div 
@@ -322,14 +321,14 @@ export const Player = () => {
                   alt="Current Song"
                   className={cn(
                     "w-14 h-14 rounded-md object-cover flex-shrink-0",
-                    isMasked && "blur-md"
+                    maskingState?.image && "blur-md"
                   )}
-                  onContextMenu={(e) => isMasked && e.preventDefault()}
+                  onContextMenu={(e) => maskingState?.image && e.preventDefault()}
                 />
               )}
               <div className="flex flex-col overflow-hidden">
-                <span className="text-base font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
-                <span className="text-sm text-spotify-neutral truncate">{displayedSong?.artist || "..."}</span>
+                <span className="text-base font-semibold text-white truncate">{maskingState?.title ? "..." : displayedSong?.title || "No song playing"}</span>
+                <span className="text-sm text-spotify-neutral truncate">{maskingState?.artist ? "..." : displayedSong?.artist || "..."}</span>
               </div>
             </div>
 
@@ -419,15 +418,15 @@ export const Player = () => {
                   alt="Current Song"
                   className={cn(
                     "w-full h-full object-cover",
-                    isMasked && "blur-md"
+                    maskingState?.image && "blur-md"
                   )}
                   crossOrigin="anonymous"
-                  onContextMenu={(e) => isMasked && e.preventDefault()}
+                  onContextMenu={(e) => maskingState?.image && e.preventDefault()}
                 />
               </div>
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                <span className="text-sm font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
-                <span className="text-xs text-spotify-neutral truncate">{displayedSong?.artist || 'Unknown Artist'}</span>
+                <span className="text-sm font-semibold text-white truncate">{maskingState?.title ? "..." : (displayedSong?.title || "No song playing")}</span>
+                <span className="text-xs text-spotify-neutral truncate">{maskingState?.artist ? "..." : (displayedSong?.artist || 'Unknown Artist')}</span>
               </div>
             </div>
           </div>
