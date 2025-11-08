@@ -38,11 +38,13 @@ export const Player = () => {
     toggleShuffle,
     toggleRepeat,
     toggleFavorite,
-    getCurrentAudioElement
+    getCurrentAudioElement,
+    setIsSeeking
   } = usePlayer();
 
   const [metadataOpacity, setMetadataOpacity] = useState(1);
   const [previousSongData, setPreviousSongData] = useState<{ title: string; artist: string; imageUrl: string } | null>(null);
+  const [localProgress, setLocalProgress] = useState<number | null>(null);
 
   // We need to get the required parameters for useAudioControl from the PlayerContext
   // For now, let's create a simplified version that just handles volume updates
@@ -74,32 +76,7 @@ export const Player = () => {
   
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const isSeekingRef = useRef(false);
   const playerRef = useRef<HTMLDivElement>(null);
-
-  // Update progress in real-time
-  useEffect(() => {
-    const audioElement = getCurrentAudioElement();
-    if (!audioElement) return;
-
-    const updateProgress = () => {
-      // Don't update progress if user is seeking
-      if (isSeekingRef.current) return;
-      
-      if (audioElement.duration && !isNaN(audioElement.duration)) {
-        const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
-        setProgress(progressPercent);
-      }
-    };
-
-    audioElement.addEventListener('timeupdate', updateProgress);
-    audioElement.addEventListener('loadedmetadata', updateProgress);
-
-    return () => {
-      audioElement.removeEventListener('timeupdate', updateProgress);
-      audioElement.removeEventListener('loadedmetadata', updateProgress);
-    };
-  }, [getCurrentAudioElement, setProgress]);
 
   // Gérer la transition des métadonnées pendant le crossfade
   useEffect(() => {
@@ -168,16 +145,25 @@ export const Player = () => {
     console.log("Toggling mute to:", newMutedState);
   };
 
-  const handleSeek = (value: number[]) => {
+  const handleSeekCommit = (value: number[]) => {
     const newProgress = value[0];
     const audioElement = getCurrentAudioElement();
     if (audioElement && audioElement.duration && !isNaN(audioElement.duration)) {
       const newTime = (newProgress / 100) * audioElement.duration;
       if (!isNaN(newTime)) {
         audioElement.currentTime = newTime;
-        setProgress(newProgress); // Update context once on commit
+        setProgress(newProgress);
       }
     }
+    // Fin du déplacement
+    setIsSeeking(false);
+    setLocalProgress(null);
+  };
+
+  const handleProgressChange = (value: number[]) => {
+    // Début du déplacement
+    setIsSeeking(true);
+    setLocalProgress(value[0]);
   };
 
   // Enhanced volume change handler with better debugging
@@ -306,10 +292,11 @@ export const Player = () => {
       >
         <div onClick={(e) => e.stopPropagation()}>
           <Slider
-            value={[progress]}
+            value={localProgress !== null ? [localProgress] : [progress]}
             max={100}
             step={0.1}
-            onValueCommit={handleSeek}
+            onValueChange={handleProgressChange}
+            onValueCommit={handleSeekCommit}
             disabled={!currentSong}
             className={cn(
               "absolute top-0 w-full h-4", // Augmente la zone tactile
@@ -507,11 +494,12 @@ export const Player = () => {
               {formatTime((getCurrentAudioElement()?.currentTime || 0))}
             </span>
             <Slider
-              value={[progress]}
+              value={localProgress !== null ? [localProgress] : [progress]}
               max={100}
               step={0.1}
               className="flex-1"
-              onValueCommit={handleSeek}
+              onValueChange={handleProgressChange}
+              onValueCommit={handleSeekCommit}
               disabled={isChangingSong || !currentSong || !isAudioReady}
             />
             <span className="text-xs text-spotify-neutral w-12">

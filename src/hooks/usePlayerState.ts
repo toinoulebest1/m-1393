@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Song } from '@/types/player';
 
@@ -21,6 +20,7 @@ export const usePlayerState = () => {
   const [history, setHistory] = useState<Song[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isSeeking, setIsSeeking] = useState(false);
 
   // Fonction pour arrêter la chanson actuelle en cas d'indisponibilité
   const stopCurrentSong = () => {
@@ -48,6 +48,8 @@ export const usePlayerState = () => {
     setSearchQuery,
     playbackRate,
     setPlaybackRate,
-    stopCurrentSong
+    stopCurrentSong,
+    isSeeking,
+    setIsSeeking
   };
 };

@@ -44,7 +44,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isChangingSong, setIsChangingSong,
     history, setHistory,
     searchQuery, setSearchQuery,
-    playbackRate, setPlaybackRate
+    playbackRate, setPlaybackRate,
+    isSeeking, setIsSeeking
   } = usePlayerState();
 
   const {
@@ -450,6 +451,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!audio) return;
 
     const handleTimeUpdate = () => {
+      // NE PAS METTRE À JOUR si l'utilisateur est en train de déplacer le curseur
+      if (isSeeking) return;
+
       const currentTime = audio.currentTime;
       const duration = apiDurationRef.current || audio.duration;
 
@@ -601,7 +605,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.mediaSession.setActionHandler('stop', null);
       }
     };
-  }, [currentSong, setProgress, isChangingSong, stopCurrentSong]);
+  }, [currentSong, setProgress, isChangingSong, stopCurrentSong, isSeeking]);
 
   // Persistance des données
   useEffect(() => {
@@ -860,7 +864,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSearchQuery,
     setPlaybackRate: updatePlaybackRate,
     refreshCurrentSong,
-    getCurrentAudioElement
+    getCurrentAudioElement,
+    isSeeking,
+    setIsSeeking
   };
 
   return (
