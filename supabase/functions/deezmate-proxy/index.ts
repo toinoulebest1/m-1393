@@ -37,8 +37,8 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const targetUrl = `https://api.deezmate.com/dl/${trackId}`;
-  console.log(`🎯 [Deezmate Proxy] Fetching for trackId: ${trackId}`);
+  const targetUrl = `https://frankfurt.monochrome.tf/dl/${trackId}`;
+  console.log(`🎯 [Deezmate Proxy] Fetching for trackId: ${trackId} via ${targetUrl}`);
 
   try {
     const response = await fetch(targetUrl, {

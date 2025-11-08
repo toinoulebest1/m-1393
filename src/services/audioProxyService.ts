@@ -1,29 +1,26 @@
 /**
- * Service de proxy audio pour Deezer avec Deezmate et Flacdownloader
+ * Service de proxy audio pour Deezer via l'instance frankfurt.monochrome.tf
  */
 import { supabase } from '@/integrations/supabase/client';
 
-const PROXY_TIMEOUT = 2500; // 2.5 secondes
+const PROXY_TIMEOUT = 5000; // 5 secondes
 
 class AudioProxyService {
   /**
-   * Obtenir l'URL audio en interrogeant les services en parallèle avec timeouts.
+   * Obtenir l'URL audio en interrogeant le service.
    */
   async getAudioUrl(trackId: string, quality: string = 'FLAC'): Promise<{ url: string; duration?: number } | null> {
-    console.log(`🚀 Récupération URL pour ${trackId} via services parallèles...`);
+    console.log(`🚀 Récupération URL pour ${trackId} via frankfurt.monochrome.tf...`);
 
     try {
-      const result = await Promise.any([
-        this.tryDeezmateProxy(trackId),
-        this.tryFlacdownloaderProxy(trackId),
-      ]);
-
+      const result = await this.tryDeezmateProxy(trackId);
       if (result) {
         console.log(`✅ URL trouvée pour ${trackId}:`, result.url.substring(0, 70) + "...");
         return result;
       }
+      throw new Error("Aucun résultat du proxy");
     } catch (error) {
-      console.error(`❌ Toutes les sources ont échoué pour ${trackId}:`, error);
+      console.error(`❌ La source a échoué pour ${trackId}:`, error);
     }
 
     return null;
@@ -55,7 +52,7 @@ class AudioProxyService {
    * Essayer le proxy Deezmate.
    */
   private async tryDeezmateProxy(trackId: string): Promise<{ url: string; duration?: number }> {
-    console.log("🎵 Tentative Deezmate Proxy...");
+    console.log("🎵 Tentative Deezmate Proxy (via frankfurt.monochrome.tf)...");
     const promise = supabase.functions.invoke('deezmate-proxy', {
       body: { trackId },
     });
@@ -66,18 +63,6 @@ class AudioProxyService {
     if (!data.success || !data.links?.flac) throw new Error('Réponse Deezmate invalide');
     
     return { url: data.links.flac };
-  }
-
-  /**
-   * Essayer le proxy Flacdownloader.
-   * Cette méthode retourne directement l'URL du proxy pour que le navigateur la streame.
-   */
-  private async tryFlacdownloaderProxy(trackId: string): Promise<{ url: string; duration?: number }> {
-    console.log("🎵 Construction de l'URL du proxy Flacdownloader...");
-    const proxyUrl = `${supabase.functions.getURL('flacdownloader-proxy')}?deezerId=${trackId}`;
-    
-    // On ne peut pas connaître la durée à l'avance avec cette méthode
-    return Promise.resolve({ url: proxyUrl });
   }
 
   /**
