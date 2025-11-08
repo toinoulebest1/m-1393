@@ -14,7 +14,7 @@ import History from "./pages/History";
 import Playlists from "./pages/Playlists";
 import PlaylistDetail from "./pages/PlaylistDetail";
 import Top100 from "./pages/Top100";
-import BlindTest from "./pages/BlindTest";
+import GamesPage from "./pages/Games";
 import MaintenanceAdmin from "./pages/MaintenanceAdmin";
 import AdminHistory from "./pages/AdminHistory";
 // import ManageAudioSources from "./pages/ManageAudioSources"; // Supprimé
@@ -51,7 +51,7 @@ function App() {
                     <Route path="/playlist/:id" element={<PlaylistDetail />} />
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/top100" element={<Top100 />} />
-                    <Route path="/games/blind-test" element={<BlindTest />} />
+                    <Route path="/games" element={<GamesPage />} />
                     <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
 
                     {/* Routes Admin */}

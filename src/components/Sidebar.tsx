@@ -63,7 +63,7 @@ export const Sidebar = () => {
     icon: Trophy,
     label: t('common.top100')
   }, {
-    to: "/blind-test",
+    to: "/games",
     icon: Gamepad2,
     label: t('common.games')
   }];
