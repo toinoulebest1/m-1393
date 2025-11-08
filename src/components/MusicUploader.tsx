@@ -3,7 +3,7 @@ import { Upload, FolderOpen, Music } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePlayer } from "@/contexts/PlayerContext";
 import * as mm from 'music-metadata-browser';
-import { uploadAudioFile, searchDeezerTrack } from "@/utils/storage";
+import { uploadAudioFile } from "@/utils/storage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -342,18 +342,10 @@ export const MusicUploader = () => {
         }
       }
 
-      // 2. Si pas de pochette dans les métadonnées, utiliser Deezer
-      if (imageUrl === "https://picsum.photos/240/240" && artist !== "Unknown Artist") {
-        console.log("Recherche de pochette sur Deezer...");
-        const deezerCover = await searchDeezerTrack(`${artist} ${title}`);
-        if (deezerCover) {
-          console.log("Pochette Deezer trouvée:", deezerCover);
-          imageUrl = deezerCover;
-          toast.success(`Pochette trouvée via Deezer pour "${title}"`);
-        } else {
-          console.log("Aucune pochette trouvée sur Deezer");
-          toast.info(`Aucune pochette trouvée pour "${title}"`);
-        }
+      // 2. Recherche de pochette sur Deezer retirée.
+      if (imageUrl === "https://picsum.photos/240/240") {
+        console.log("Aucune pochette trouvée dans les métadonnées.");
+        toast.info(`Aucune pochette trouvée pour "${title}"`);
       }
 
       const { data: songData, error: songError } = await supabase

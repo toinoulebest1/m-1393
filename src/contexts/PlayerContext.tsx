@@ -91,88 +91,44 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        let resolvedSongId = currentSong.id;
-
-        // Vérifier si la chanson existe dans 'songs'; si Deezer ou inconnue, créer/associer
-        let mustResolve = currentSong.id.startsWith('deezer-');
-        if (!mustResolve) {
-          const { data: existingById, error: existErr } = await supabase
-            .from('songs')
-            .select('id')
-            .eq('id', currentSong.id)
-            .maybeSingle();
-          if (existErr) console.warn('⚠️ Vérif chanson par id erreur:', existErr.message);
-          if (!existingById) mustResolve = true;
-        }
-
-        if (mustResolve) {
-          // Essayer par deezer_id d'abord
-          if (currentSong.deezer_id) {
-            const { data: existingByDeezer, error: deezerErr } = await supabase
-              .from('songs')
-              .select('id')
-              .eq('deezer_id', currentSong.deezer_id)
-              .maybeSingle();
-            if (deezerErr) console.warn('⚠️ Vérif chanson par deezer_id erreur:', deezerErr.message);
-
-            if (existingByDeezer?.id) {
-              resolvedSongId = existingByDeezer.id;
-            } else {
-              // Créer une entrée minimale dans songs pour permettre la jointure de l'historique
-              const insertPayload: any = {
-                title: currentSong.title,
-                artist: currentSong.artist,
-                file_path: currentSong.url || `deezer:${currentSong.deezer_id}`,
-                image_url: currentSong.imageUrl || null,
-                duration: currentSong.duration || null,
-                deezer_id: currentSong.deezer_id,
-                uploaded_by: session.user.id
-              };
-              const { data: inserted, error: insErr } = await supabase
-                .from('songs')
-                .insert(insertPayload)
-                .select('id')
-                .single();
-              if (insErr) {
-                console.error('❌ Insertion chanson Deezer échouée:', insErr);
-              } else if (inserted?.id) {
-                resolvedSongId = inserted.id;
-              }
-            }
-          } else {
-            // Pas de deezer_id: créer une entrée générique si nécessaire
-            const insertPayload: any = {
-              title: currentSong.title,
-              artist: currentSong.artist,
-              file_path: currentSong.url || currentSong.id,
-              image_url: currentSong.imageUrl || null,
-              duration: currentSong.duration || null,
-              uploaded_by: session.user.id
-            };
-            const { data: inserted, error: insErr } = await supabase
-              .from('songs')
-              .insert(insertPayload)
-              .select('id')
-              .single();
-            if (insErr) {
-              console.error('❌ Insertion chanson générique échouée:', insErr);
-            } else if (inserted?.id) {
-              resolvedSongId = inserted.id;
-            }
-          }
-        }
-
-        // Enregistrer dans play_history
+        // La logique complexe de résolution d'ID Deezer est supprimée.
+        // On assume que currentSong.id est l'ID correct de la table 'songs'.
         const { error } = await supabase
           .from('play_history')
           .insert({
             user_id: session.user.id,
-            song_id: resolvedSongId,
+            song_id: currentSong.id,
             played_at: new Date().toISOString()
           });
 
         if (error) {
-          console.error('❌ Erreur enregistrement historique:', error);
+          // Gérer le cas où la chanson n'existe pas encore dans la table 'songs'
+          // (par exemple, juste après un upload avant que la page ne soit rafraîchie)
+          if (error.code === '23503') { // Foreign key violation
+            console.warn(`La chanson ${currentSong.id} n'existe pas dans la table 'songs'. Tentative d'insertion.`);
+            const { error: insertError } = await supabase.from('songs').insert({
+              id: currentSong.id,
+              title: currentSong.title,
+              artist: currentSong.artist,
+              file_path: currentSong.url,
+              image_url: currentSong.imageUrl,
+              duration: currentSong.duration,
+              uploaded_by: session.user.id
+            });
+
+            if (insertError) {
+              console.error("❌ Échec de l'insertion de la nouvelle chanson:", insertError);
+            } else {
+              // Réessayer d'insérer dans l'historique
+              await supabase.from('play_history').insert({
+                user_id: session.user.id,
+                song_id: currentSong.id,
+                played_at: new Date().toISOString()
+              });
+            }
+          } else {
+            console.error('❌ Erreur enregistrement historique:', error);
+          }
         } else {
           console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
         }
