@@ -17,24 +17,28 @@ export class UltraFastStreaming {
 
   /**
    * Obtention URL ultra-rapide avec stratégies parallèles
-   * CACHE DÉSACTIVÉ pour debug
    */
   public static async getAudioUrlUltraFast(
     filePath: string,
     songTitle?: string,
     songArtist?: string,
-    songId?: string,
-    tidalId?: string
+    songId?: string
   ): Promise<{ url: string; duration?: number }> {
     this.requestCount++;
-    console.log(`[UltraFastStreaming.getAudioUrlUltraFast] Requête #${this.requestCount} pour filePath: "${filePath}" (Tidal ID: ${tidalId || 'N/A'})`);
-    const effectiveTidalId = tidalId || (filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined);
+    console.log(`[UltraFastStreaming.getAudioUrlUltraFast] Requête #${this.requestCount} pour filePath: "${filePath}" (ID: ${songId || 'N/A'})`);
 
-    // Priorité 1: Piste TIDAL
-    if (effectiveTidalId) {
+    // Priorité 1: Si filePath est déjà une URL HTTP/HTTPS directe, la retourner telle quelle.
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      console.log('[UltraFastStreaming.getAudioUrlUltraFast] ✅ filePath est déjà une URL directe. Retourne l\'URL telle quelle.');
+      return { url: filePath };
+    }
+
+    // Priorité 2: Piste TIDAL (si le filePath est un ID Tidal)
+    const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
+    if (tidalId) {
       console.log('[UltraFastStreaming.getAudioUrlUltraFast] Tentative de récupération du flux Tidal en priorité...');
       try {
-        const result = await getTidalStreamUrl(effectiveTidalId);
+        const result = await getTidalStreamUrl(tidalId);
         if (result?.url) {
           console.log('✅ [UltraFastStreaming.getAudioUrlUltraFast] Flux Tidal récupéré avec succès.');
           return { url: result.url };
@@ -45,23 +49,22 @@ export class UltraFastStreaming {
       }
     }
 
-    // Priorité 2: Cache mémoire (ultra-rapide)
+    // Priorité 3: Cache mémoire (ultra-rapide)
     const cachedMemoryUrl = memoryCache.get(filePath);
     if (cachedMemoryUrl) {
-      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache mémoire (Priorité 2).");
+      console.log("[UltraFastStreaming.getAudioUrlUltraFast] ✅ URL récupérée depuis cache mémoire (Priorité 3).");
       return { url: cachedMemoryUrl };
     }
 
-    // CACHE DÉSACTIVÉ pour debug - toujours récupérer depuis le réseau
-    // 1. Vérifier si déjà en cours de récupération
+    // 4. Vérifier si déjà en cours de récupération
     if (this.promisePool.has(filePath)) {
       console.log("[UltraFastStreaming.getAudioUrlUltraFast] ⏳ Réutilisation promesse existante pour filePath:", filePath);
       return await this.promisePool.get(filePath)!;
     }
 
-    // 2. Streaming direct
-    console.log("[UltraFastStreaming.getAudioUrlUltraFast] Aucune URL en cache ou promesse existante. Lancement du streaming direct.");
-    const promise = this.streamingDirect(filePath, filePath, songTitle, songArtist, songId, effectiveTidalId);
+    // 5. Streaming direct via getAudioFileUrl (pour les fichiers locaux)
+    console.log("[UltraFastStreaming.getAudioUrlUltraFast] Aucune URL en cache ou promesse existante. Lancement du streaming direct via getAudioFileUrl.");
+    const promise = this.streamingDirect(filePath, songTitle, songArtist, songId);
     this.promisePool.set(filePath, promise);
 
     try {
@@ -82,17 +85,16 @@ export class UltraFastStreaming {
    */
   private static async streamingDirect(
     filePath: string,
-    songUrl: string,
     songTitle?: string,
     songArtist?: string,
-    songId?: string,
-    tidalId?: string
+    songId?: string
   ): Promise<{ url: string; duration?: number }> {
     console.log("🚀 [UltraFastStreaming.streamingDirect] Démarrage du streaming direct pour filePath:", filePath);
-    const startTime = performance.now(); // Déplacé ici pour mesurer le temps du tryNetwork
+    const startTime = performance.now();
 
     try {
-      const result = await this.tryNetwork(songUrl, songTitle, songArtist, songId);
+      // Appel à tryNetwork qui utilise getAudioFileUrl pour les chemins locaux
+      const result = await this.tryNetwork(filePath, songTitle, songArtist, songId);
       if (result) {
         const elapsed = performance.now() - startTime;
         console.log("🌐 [UltraFastStreaming.streamingDirect] Récupération réseau directe réussie en", elapsed.toFixed(2), "ms.");
@@ -107,35 +109,36 @@ export class UltraFastStreaming {
   }
 
   /**
-   * Tentative réseau ultra-rapide
+   * Tentative réseau ultra-rapide (utilise getAudioFileUrl pour les chemins locaux)
    */
-private static async tryNetwork(songUrl: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
-    console.log(`[UltraFastStreaming.tryNetwork] Tentative de récupération réseau pour songUrl: "${songUrl}"`);
+private static async tryNetwork(filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number } | null> {
+    console.log(`[UltraFastStreaming.tryNetwork] Tentative de récupération réseau pour filePath: "${filePath}"`);
     try {
-      const result = await getAudioFileUrl(songUrl, songTitle, songArtist, songId);
+      // getAudioFileUrl est maintenant responsable uniquement des fichiers locaux
+      const result = await getAudioFileUrl(filePath, songTitle, songArtist, songId);
       if (result && typeof result.url === 'string') {
         console.log(`[UltraFastStreaming.tryNetwork] URL obtenue de getAudioFileUrl: ${result.url.substring(0, 100)}...`);
         // Validation rapide de l'URL pour éviter les liens cassés (500) ou expirés
         const controller = new AbortController();
         const timeout = setTimeout(() => {
           controller.abort();
-          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL timeout (1500ms) pour: ${songTitle || songUrl}`);
+          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL timeout (1500ms) pour: ${songTitle || filePath}`);
         }, 1500);
         try {
           const head = await fetch(result.url, { method: 'HEAD', signal: controller.signal });
           clearTimeout(timeout);
           if (head.ok || head.status === 405) { // Certains endpoints ne supportent pas HEAD
-            console.log(`[UltraFastStreaming.tryNetwork] ✅ Validation URL réussie (status: ${head.status}) pour: ${songTitle || songUrl}`);
+            console.log(`[UltraFastStreaming.tryNetwork] ✅ Validation URL réussie (status: ${head.status}) pour: ${songTitle || filePath}`);
             return result;
           }
-          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL échouée (status: ${head.status}) pour: ${songTitle || songUrl}`);
+          console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Validation URL échouée (status: ${head.status}) pour: ${songTitle || filePath}`);
           return null;
         } catch (e: any) {
           clearTimeout(timeout);
           if (e.name === 'AbortError') {
             // Le timeout a déjà loggé l'erreur
           } else {
-            console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Erreur lors de la validation de l'URL pour: ${songTitle || songUrl}`, e);
+            console.warn(`[UltraFastStreaming.tryNetwork] ⚠️ Erreur lors de la validation de l'URL pour: ${songTitle || filePath}`, e);
           }
           return null;
         }
@@ -161,20 +164,20 @@ private static async tryNetwork(songUrl: string, songTitle?: string, songArtist?
   /**
    * Préchargement de la chanson suivante en arrière-plan
    */
-  static async preloadNext(songUrl: string): Promise<void> {
-    console.log("🔮 [UltraFastStreaming.preloadNext] Démarrage du préchargement en arrière-plan pour:", songUrl);
+  static async preloadNext(filePath: string): Promise<void> {
+    console.log("🔮 [UltraFastStreaming.preloadNext] Démarrage du préchargement en arrière-plan pour:", filePath);
     
     // Ne précharger que si pas déjà en cache
-    if (UltraFastCache.hasL0(songUrl) || UltraFastCache.getWarm(songUrl)) {
+    if (UltraFastCache.hasL0(filePath) || UltraFastCache.getWarm(filePath)) {
       console.log("✅ [UltraFastStreaming.preloadNext] Chanson déjà en cache, pas de préchargement nécessaire.");
       return;
     }
     
     try {
-      await this.getAudioUrlUltraFast(songUrl);
-      console.log("✅ [UltraFastStreaming.preloadNext] Préchargement terminé avec succès pour:", songUrl);
+      await this.getAudioUrlUltraFast(filePath);
+      console.log("✅ [UltraFastStreaming.preloadNext] Préchargement terminé avec succès pour:", filePath);
     } catch (error) {
-      console.warn("⚠️ [UltraFastStreaming.preloadNext] Échec du préchargement pour:", songUrl, error);
+      console.warn("⚠️ [UltraFastStreaming.preloadNext] Échec du préchargement pour:", filePath, error);
     }
   }
 

@@ -7,27 +7,7 @@ export interface GameSong {
   url: string;
   imageUrl?: string;
   duration: string;
-  isDeezer?: boolean;
 }
-
-/**
- * Vérifie si l'URL est une preview Deezer valide et jouable
- */
-const isValidDeezerPreview = (url: string): boolean => {
-  if (!url) return false;
-  
-  // Les previews Deezer valides sont sur cdns-preview-X.dzcdn.net
-  const isDeezerCdn = url.includes('dzcdn.net') && url.includes('.mp3');
-  
-  // Exclure les liens Tidal, Spotify ou autres services avec tokens
-  const isInvalidService = 
-    url.includes('tidal.com') || 
-    url.includes('spotify.com') ||
-    url.includes('token=') ||
-    url.includes('.mp4'); // Les previews Deezer sont en MP3, pas MP4
-  
-  return isDeezerCdn && !isInvalidService;
-};
 
 /**
  * Vérifie si l'URL est une URL audio valide (plus spécifique aux jeux)

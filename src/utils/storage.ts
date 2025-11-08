@@ -43,26 +43,10 @@ export const uploadAudioFile = async (file: File, fileName: string): Promise<str
 
 export const getAudioFileUrl = async (filePath: string, songTitle?: string, songArtist?: string, songId?: string): Promise<{ url: string; duration?: number }> => {
   console.log(`[storage.getAudioFileUrl] Début de la récupération pour filePath: "${filePath}" (Titre: ${songTitle || 'N/A'}, Artiste: ${songArtist || 'N/A'}, ID: ${songId || 'N/A'})`);
-  const tidalId = filePath?.startsWith('tidal:') ? filePath.split(':')[1] : undefined;
 
-  if (tidalId) {
-    console.log(`[storage.getAudioFileUrl] Tidal ID détecté: ${tidalId}. Tentative de récupération via getTidalStreamUrl...`);
-    try {
-      const result = await getTidalStreamUrl(tidalId);
-      if (result?.url) {
-        console.log('[storage.getAudioFileUrl] ✅ URL de stream Tidal récupérée avec succès.');
-        return { url: result.url };
-      }
-      console.warn('[storage.getAudioFileUrl] ⚠️ getTidalStreamUrl n\'a pas retourné d\'URL. Fallback...');
-    } catch (error) {
-      console.warn('[storage.getAudioFileUrl] ⚠️ Erreur lors de la récupération de l\'URL Tidal, fallback vers les sources locales:', error);
-    }
-  }
-  
-  console.log('[storage.getAudioFileUrl] Pas une piste Tidal ou fallback. Traitement comme fichier local (Supabase/Dropbox) pour filePath:', filePath);
+  // Cette fonction est maintenant dédiée aux fichiers locaux.
+  // Les URLs directes (http/https) et les IDs Tidal sont gérés par UltraFastStreaming.
 
-  // Logique pour les fichiers locaux uniquement (Supabase/Dropbox)
-  
   // Tenter Dropbox si activé
   if (isDropboxEnabledForReading() && songId) {
     console.log('[storage.getAudioFileUrl] Dropbox est activé pour la lecture. Tentative de récupération du lien partagé Dropbox pour songId:', songId);

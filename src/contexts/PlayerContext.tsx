@@ -12,6 +12,7 @@ import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
 import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { getFromCache } from '@/utils/audioCache';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -115,7 +116,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               file_path: currentSong.url,
               image_url: currentSong.imageUrl,
               duration: currentSong.duration,
-              uploaded_by: session.user.id
+              uploaded_by: session.user.id,
+              tidal_id: currentSong.tidal_id // Inclure tidal_id si présent
             });
 
             if (insertError) {
@@ -208,10 +210,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Prépare l'élément audio suivant avec l'URL et attend le canplay
   const prepareNextAudio = async (song: Song) => {
     try {
-      const result = await getAudioFileUrl(
+      // Utiliser UltraFastStreaming pour obtenir l'URL, car il gère toutes les sources
+      const result = await UltraFastStreaming.getAudioUrlUltraFast(
         song.url,
         song.title,
-        song.artist
+        song.artist,
+        song.id
       );
       if (!result || !result.url || typeof result.url !== 'string') throw new Error('URL invalide pour la prochaine piste');
       nextAudioRef.current.src = result.url;
@@ -326,9 +330,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.log("🎵 Restauration de:", song.title, "ID:", song.id);
           setIsAudioReady(false);
           
-          // CACHE DÉSACTIVÉ - toujours récupérer depuis le réseau
-          console.log("📡 Récupération DIRECTE depuis le réseau (cache désactivé)...");
-          const result = await getAudioFileUrl(
+          // Utiliser UltraFastStreaming pour obtenir l'URL
+          console.log("📡 Récupération via UltraFastStreaming...");
+          const result = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url,
             song.title,
             song.artist,
