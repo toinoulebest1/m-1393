@@ -1,13 +1,9 @@
-import { useCallback, useRef } from 'react';
-import { usePlayer } from '@/contexts/PlayerContext';
-import { getAudioFileUrl } from '@/utils/storage';
-import { toast } from 'sonner';
-import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Song } from '@/types/player';
-import { fetchLyricsInBackground } from '@/utils/lyricsManager';
-import { AutoplayManager } from '@/utils/autoplayManager';
-import { cacheCurrentSong, getFromCache } from '@/utils/audioCache';
-import { memoryCache } from '@/utils/memoryCache';
+import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { toast } from 'sonner';
+import { updateMediaSessionMetadata, updatePositionState } from '@/utils/mediaSession';
+import { durationToSeconds } from '@/lib/utils';
 
 interface UseAudioControlProps {
   audioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -15,14 +11,14 @@ interface UseAudioControlProps {
   currentSong: Song | null;
   setCurrentSong: (song: Song | null) => void;
   isChangingSong: boolean;
-  setIsChangingSong: (value: boolean) => void;
+  setIsChangingSong: (isChanging: boolean) => void;
   volume: number;
-  setIsPlaying: (value: boolean) => void;
-  changeTimeoutRef: React.MutableRefObject<number | null>;
-  setNextSongPreloaded: (value: boolean) => void;
-  preloadNextTracks: () => Promise<void>;
+  setIsPlaying: (isPlaying: boolean) => void;
+  changeTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  setNextSongPreloaded: (preloaded: boolean) => void;
+  preloadNextTracks: () => void;
   setDisplayedSong: (song: Song | null) => void;
-  apiDurationRef?: React.MutableRefObject<number | undefined>;
+  apiDurationRef: React.MutableRefObject<number | null>;
 }
 
 export const useAudioControl = ({
@@ -38,137 +34,109 @@ export const useAudioControl = ({
   setNextSongPreloaded,
   preloadNextTracks,
   setDisplayedSong,
-  apiDurationRef
+  apiDurationRef,
 }: UseAudioControlProps) => {
+  const [playbackRate, setPlaybackRateState] = useState(1);
 
-  const cachingTimeoutRef = useRef<number | null>(null);
-
-  const play = useCallback(async (song?: Song) => {
-    if (song) {
-      console.log('[useAudioControl.play] Received request to play song:', song);
+  const play = useCallback(async (song: Song) => {
+    if (isChangingSong) {
+      console.log("[useAudioControl.play] Changement de chanson déjà en cours, annulation de la nouvelle requête.");
+      return;
     }
-    if (song && (!currentSong || song.id !== currentSong.id)) {
-      console.log(`[useAudioControl.play] Changing song to: ${song.title} (ID: ${song.id})`);
-      
-      if (cachingTimeoutRef.current) {
-        clearTimeout(cachingTimeoutRef.current);
+
+    setIsChangingSong(true);
+    console.log("[useAudioControl.play] Received request to play song:", song);
+
+    try {
+      // Arrêter la chanson actuelle si elle est en cours de lecture
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
       }
-      
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      setIsChangingSong(true);
-      
+
+      console.log("[useAudioControl.play] Changing song to:", song.title, "(ID:", song.id, ")");
       setCurrentSong(song);
-      setDisplayedSong(song);
-      setNextSongPreloaded(false);
-      
-      AutoplayManager.registerUserInteraction();
+      setDisplayedSong(song); // Mettre à jour immédiatement la chanson affichée
 
-      try {
-        const audio = audioRef.current;
-        audio.volume = volume / 100;
-        
-        const startTime = performance.now();
-        let audioUrl: string;
-        let apiDuration: number | undefined;
-        let wasFromCache = false;
+      // Utiliser UltraFastStreaming pour obtenir l'URL de la chanson
+      const { url: audioUrl, duration } = await UltraFastStreaming.getAudioUrlUltraFast(
+        song.url,
+        song.title,
+        song.artist,
+        song.id
+      );
 
-        // 1. Cache mémoire (ultra-rapide)
-        const cachedMemoryUrl = memoryCache.get(song.url);
-        if (cachedMemoryUrl) {
-          audioUrl = cachedMemoryUrl;
-          console.log("✅⚡ Cache mémoire HIT!", (performance.now() - startTime).toFixed(1), "ms");
-        } else {
-          // 2. Cache IndexedDB (rapide)
-          const cachedDiskUrl = await getFromCache(song.url);
-          if (cachedDiskUrl) {
-            audioUrl = cachedDiskUrl;
-            wasFromCache = true;
-            console.log("✅⚡ Cache IndexedDB HIT!", (performance.now() - startTime).toFixed(1), "ms");
-          } else {
-            // 3. Réseau (le plus lent)
-            const result = await getAudioFileUrl(song.url, song.title, song.artist, song.id);
-            if (!result?.url) throw new Error("URL audio non disponible depuis le réseau");
-            audioUrl = result.url;
-            apiDuration = result.duration;
-            console.log("✅⚡ Réseau OK!", (performance.now() - startTime).toFixed(1), "ms");
-          }
-          // Mettre en cache mémoire pour les relectures rapides
-          memoryCache.set(song.url, audioUrl);
-        }
-
-        if (apiDuration && apiDurationRef) {
-          apiDurationRef.current = apiDuration;
-        }
-
-        audio.src = audioUrl;
-        const success = await AutoplayManager.playAudio(audio);
-        
-        if (success) {
-          setIsPlaying(true);
-          console.log("✅ Lecture démarrée avec succès.");
-
-          // --- Tâches non critiques, différées ---
-          setTimeout(() => {
-            console.log("🚀 Lancement des tâches post-lecture...");
-            updateMediaSessionMetadata(song);
-            
-            // Mise en cache en arrière-plan si nécessaire
-            if (!wasFromCache) {
-              cachingTimeoutRef.current = window.setTimeout(() => {
-                (async () => {
-                  try {
-                    const response = await fetch(audioUrl);
-                    if (response.ok) {
-                      const blob = await response.blob();
-                      await cacheCurrentSong(song.url, blob, song.id, song.title);
-                      console.log("✅ Chanson mise en cache en arrière-plan:", song.title);
-                    }
-                  } catch (e) {
-                    console.warn('⚠️ Échec de la mise en cache en arrière-plan:', e);
-                  }
-                })();
-              }, 3000);
-            }
-            
-            // Autres tâches
-            fetchLyricsInBackground(song.id, song.title, song.artist, song.duration, song.album_name);
-            preloadNextTracks();
-          }, 100); // Différer de 100ms
-
-        } else {
-          console.log("⚠️ Lecture en attente d'activation utilisateur");
-        }
-        
-        setIsChangingSong(false);
-
-      } catch (error) {
-        // Gère l'erreur "AbortError" qui se produit lorsque l'utilisateur change de chanson rapidement.
-        // C'est un comportement normal et attendu, pas une erreur critique.
-        if ((error as DOMException).name === 'AbortError') {
-          console.log('La lecture a été interrompue par une nouvelle action. C\'est normal.');
-          return; // On sort sans afficher d'erreur, la nouvelle action prend le relais.
-        }
-
-        console.error("💥 Erreur critique lors de la lecture:", error);
-        toast.error("Musique indisponible", { description: (error as Error).message });
-        setIsChangingSong(false);
-        setIsPlaying(false);
+      if (!audioUrl) {
+        throw new Error("Aucune URL audio disponible pour la lecture.");
       }
-    } else if (audioRef.current) {
-      // Reprise de la lecture
-      try {
-        const success = await AutoplayManager.playAudio(audioRef.current);
-        if (success) setIsPlaying(true);
-      } catch (error) {
-        if ((error as DOMException).name === 'AbortError') {
-          console.log('La reprise de lecture a été interrompue. C\'est normal.');
-          return;
+
+      audioRef.current.src = audioUrl;
+      audioRef.current.load(); // Charger la nouvelle source
+      apiDurationRef.current = duration || durationToSeconds(song.duration); // Mettre à jour la durée de l'API
+
+      // Attendre que la nouvelle chanson soit prête à être jouée
+      await new Promise<void>((resolve, reject) => {
+        const onCanPlay = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = (e: Event) => {
+          cleanup();
+          console.error("Erreur de chargement audio:", e);
+          reject(new Error("Erreur de chargement audio."));
+        };
+        const cleanup = () => {
+          audioRef.current.removeEventListener('canplay', onCanPlay);
+          audioRef.current.removeEventListener('error', onError);
+        };
+
+        audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
+        audioRef.current.addEventListener('error', onError, { once: true });
+
+        // Si déjà prêt, résoudre immédiatement
+        if (audioRef.current.readyState >= 3) {
+          resolve();
         }
-        console.error("💥 Erreur critique lors de la reprise:", error);
+      });
+
+      audioRef.current.volume = volume / 100;
+      audioRef.current.playbackRate = playbackRate;
+
+      await audioRef.current.play();
+      setIsPlaying(true);
+      updateMediaSessionMetadata(song); // Mettre à jour les métadonnées de la session média
+
+      // Précharger la prochaine piste après un court délai
+      if (changeTimeoutRef.current) {
+        clearTimeout(changeTimeoutRef.current);
       }
+      changeTimeoutRef.current = setTimeout(() => {
+        preloadNextTracks();
+      }, 1000); // Délai d'une seconde avant de précharger la suivante
+
+    } catch (error) {
+      console.error("💥 Erreur critique lors de la lecture:", error);
+      toast.error("Erreur de lecture", {
+        description: (error as Error).message || "Impossible de lire la chanson."
+      });
+      setIsPlaying(false);
+      setCurrentSong(null);
+      setDisplayedSong(null);
+    } finally {
+      setIsChangingSong(false);
     }
-  }, [currentSong, isChangingSong, volume, audioRef, nextAudioRef, setCurrentSong, setDisplayedSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, preloadNextTracks, apiDurationRef]);
+  }, [
+    audioRef,
+    setCurrentSong,
+    setIsPlaying,
+    volume,
+    playbackRate,
+    isChangingSong,
+    setIsChangingSong,
+    changeTimeoutRef,
+    preloadNextTracks,
+    setDisplayedSong,
+    apiDurationRef
+  ]);
 
   const pause = useCallback(() => {
     audioRef.current.pause();
@@ -176,37 +144,67 @@ export const useAudioControl = ({
   }, [audioRef, setIsPlaying]);
 
   const updateVolume = useCallback((newVolume: number) => {
-    if (audioRef.current) audioRef.current.volume = newVolume / 100;
-    return newVolume;
+    audioRef.current.volume = newVolume / 100;
   }, [audioRef]);
 
   const updateProgress = useCallback((newProgress: number) => {
-    if (audioRef.current?.duration) {
-      audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
+    if (audioRef.current && apiDurationRef.current) {
+      audioRef.current.currentTime = (newProgress / 100) * apiDurationRef.current;
     }
-    return newProgress;
-  }, [audioRef]);
+  }, [audioRef, apiDurationRef]);
 
   const updatePlaybackRate = useCallback((rate: number) => {
-    if (audioRef.current) audioRef.current.playbackRate = rate;
-    return rate;
+    setPlaybackRateState(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+    }
   }, [audioRef]);
 
   const stopCurrentSong = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      audioRef.current.src = ''; // Effacer la source pour libérer les ressources
     }
-  }, [audioRef]);
+    setIsPlaying(false);
+    setCurrentSong(null);
+    setDisplayedSong(null);
+    setNextSongPreloaded(false);
+    apiDurationRef.current = null;
+    if (changeTimeoutRef.current) {
+      clearTimeout(changeTimeoutRef.current);
+    }
+  }, [audioRef, setIsPlaying, setCurrentSong, setDisplayedSong, setNextSongPreloaded, changeTimeoutRef, apiDurationRef]);
 
   const refreshCurrentSong = useCallback(async () => {
-    if (!currentSong) return;
-    // Logique de rafraîchissement...
-  }, [currentSong, setCurrentSong]);
+    if (currentSong) {
+      console.log("[useAudioControl.refreshCurrentSong] Rafraîchissement de la chanson actuelle:", currentSong.title);
+      const wasPlaying = !audioRef.current.paused;
+      const currentTime = audioRef.current.currentTime;
 
-  const getCurrentAudioElement = useCallback(() => {
-    return audioRef.current;
-  }, [audioRef]);
+      await play(currentSong);
 
-  return { play, pause, updateVolume, updateProgress, updatePlaybackRate, stopCurrentSong, refreshCurrentSong, getCurrentAudioElement };
+      if (audioRef.current && currentTime > 0) {
+        audioRef.current.currentTime = currentTime;
+      }
+      if (!wasPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  }, [currentSong, audioRef, play, setIsPlaying]);
+
+  const getCurrentAudioElement = useCallback(() => audioRef.current, [audioRef]);
+
+  return {
+    play,
+    pause,
+    updateVolume,
+    updateProgress,
+    updatePlaybackRate,
+    stopCurrentSong,
+    refreshCurrentSong,
+    getCurrentAudioElement,
+    playbackRate,
+  };
 };
