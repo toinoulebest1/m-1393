@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { findCurrentLyricLine, LrcLine } from '@/utils/lrcParser';
 import { Progress } from '@/components/ui/progress';
@@ -95,13 +94,12 @@ export const LrcPlayer: React.FC<LrcPlayerProps> = ({
       if (current >= 0 && containerRef.current && !userScrolling) {
         setTimeout(() => {
           if (activeLineRef.current && containerRef.current) {
-            // Scroll the active line to the center of the container
+            // Scroll the active line to the top of the container, not the center
             const containerHeight = containerRef.current.clientHeight;
             const lineTop = activeLineRef.current.offsetTop;
-            const lineHeight = activeLineRef.current.clientHeight;
             
-            // Calculate position to center the line
-            const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+            // Calculate position to scroll the line to the top 20% of the view
+            const scrollPosition = lineTop - (containerHeight * 0.2);
             
             containerRef.current.scrollTo({
               top: scrollPosition,
