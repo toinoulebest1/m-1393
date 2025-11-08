@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, uploadLyricsToDropbox } from './dropboxStorage';
+import { toast } from 'sonner';
 
 /**
  * Récupère automatiquement les paroles d'une chanson depuis LRCLIB
@@ -7,17 +8,14 @@ import { isDropboxEnabled, uploadLyricsToDropbox } from './dropboxStorage';
 export const fetchAndSaveLyrics = async (
   songId: string,
   songTitle: string,
-  artist: string,
-  duration?: string,
-  albumName?: string,
-  isDeezer?: boolean
-): Promise<{ syncedLyrics: string | null; plainLyrics: string | null }> => {
+  artist?: string
+): Promise<void> => {
   try {
     console.log('🎵 Récupération automatique des paroles pour:', songTitle, 'par', artist);
 
     // Pour les musiques Deezer/Tidal, ne pas essayer de vérifier/sauvegarder dans la DB
     // car elles n'ont pas d'UUID valide
-    if (!isDeezer && !songId.startsWith('deezer-')) {
+    if (!songId.startsWith('deezer-')) {
       // Vérifier si les paroles existent déjà pour les musiques locales
       const { data: existingLyrics } = await supabase
         .from('lyrics')
@@ -27,10 +25,7 @@ export const fetchAndSaveLyrics = async (
 
       if (existingLyrics?.content) {
         console.log('✅ Paroles déjà en cache');
-        return {
-          syncedLyrics: existingLyrics.content.includes('[') ? existingLyrics.content : null,
-          plainLyrics: existingLyrics.content
-        };
+        return;
       }
     }
 
@@ -59,13 +54,13 @@ export const fetchAndSaveLyrics = async (
 
     if (response.data.error) {
       console.warn('⚠️ Paroles non trouvées:', response.data.error);
-      return { syncedLyrics: null, plainLyrics: null };
+      return;
     }
 
     const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
 
     // Sauvegarder dans la base de données uniquement pour les musiques locales (avec UUID valide)
-    if (!isDeezer && !songId.startsWith('deezer-')) {
+    if (!songId.startsWith('deezer-')) {
       const { error: insertError } = await supabase
         .from('lyrics')
         .upsert({
@@ -93,13 +88,12 @@ export const fetchAndSaveLyrics = async (
     }
 
     console.log('✅ Paroles récupérées et sauvegardées');
-    return {
-      syncedLyrics: response.data.syncedLyrics,
-      plainLyrics: response.data.lyrics
-    };
   } catch (error) {
     console.error('❌ Erreur récupération paroles:', error);
-    return { syncedLyrics: null, plainLyrics: null };
+    toast({
+      id: 'src/utils/lyricsManager.ts',
+      description: error.message || "Impossible de récupérer les paroles pour cette chanson.",
+    });
   }
 };
 

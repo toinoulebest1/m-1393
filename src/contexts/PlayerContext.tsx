@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } from '@/utils/mediaSession';
 import { getFromCache } from '@/utils/audioCache';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 
 // Contexte global et audio
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -158,6 +159,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     (async () => {
       try {
         console.log("🔄 Début prédiction pour:", currentSong.title, "ID:", currentSong.id);
+        
+        // Lancer la recherche de paroles en arrière-plan
+        fetchLyricsInBackground(
+          currentSong.id, 
+          currentSong.title, 
+          currentSong.artist, 
+          currentSong.duration, 
+          currentSong.album_name,
+          !!currentSong.tidal_id
+        );
+
         const preds = await predictNextSongs(currentSong, history);
         predictedNextRef.current = preds[0] || null;
         
