@@ -464,7 +464,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // Mettre à jour la Media Session uniquement avec des données valides
-      updatePositionState(duration, currentTime, audio.playbackRate);
+      // La durée de l'API est prioritaire, sinon on utilise la durée réelle de l'élément audio
+      const validDuration = apiDurationRef.current || audio.duration;
+      if (validDuration && !isNaN(validDuration) && validDuration > 0) {
+        updatePositionState(validDuration, currentTime, audio.playbackRate);
+      }
     };
 
     const handleLoadedMetadata = () => {
@@ -479,7 +483,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         
         // Mettre à jour MediaSession avec la durée
-        updatePositionState(duration, currentTime, audio.playbackRate);
+        if (duration && !isNaN(duration) && duration > 0) {
+          updatePositionState(duration, currentTime, audio.playbackRate);
+        }
       }
     };
 
@@ -509,7 +515,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             apiDurationRef.current = durationToSeconds(currentSong.duration);
           }
           const duration = apiDurationRef.current || audio.duration;
-          if (duration && !isNaN(duration) && duration !== Infinity) {
+          if (duration && !isNaN(duration) && duration > 0) {
             updatePositionState(duration, audio.currentTime, audio.playbackRate);
           }
         } catch (e) {
@@ -524,7 +530,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigator.mediaSession.playbackState = 'paused';
         try {
           const duration = apiDurationRef.current || audio.duration;
-          if (duration && !isNaN(duration) && duration !== Infinity) {
+          if (duration && !isNaN(duration) && duration > 0) {
             updatePositionState(duration, audio.currentTime, audio.playbackRate);
           }
         } catch (e) {

@@ -10,6 +10,7 @@ export const updateMediaSessionMetadata = (song: {
   artist: string;
   imageUrl?: string;
   genre?: string;
+  album_name?: string;
   duration?: string;
 }) => {
   if ('mediaSession' in navigator) {
@@ -28,7 +29,7 @@ export const updateMediaSessionMetadata = (song: {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: song.title,
       artist: song.artist,
-      album: song.genre || 'Unknown Album',
+      album: song.album_name || song.genre || 'Unknown Album',
       artwork: artwork,
     });
   }
