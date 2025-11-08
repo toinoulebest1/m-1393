@@ -30,7 +30,7 @@ const isValidGameAudioUrl = (url: string): boolean => {
 /**
  * Récupère des chansons locales pour les jeux.
  */
-export const fetchGameSongs = async (minSongs: number = 20): Promise<GameSong[]> => {
+export const fetchRandomGameSongs = async (minSongs: number = 20): Promise<GameSong[]> => {
   try {
     // Récupérer TOUTES les chansons locales pour pouvoir les mélanger
     const { data: localSongs, error: localError } = await supabase
