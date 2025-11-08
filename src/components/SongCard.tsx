@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -122,6 +121,7 @@ export const SongCard = ({
             src={song.imageUrl}
             alt={song.title}
             className="w-full h-full object-cover"
+            crossOrigin="anonymous"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-muted">

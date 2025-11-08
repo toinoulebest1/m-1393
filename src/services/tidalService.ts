@@ -62,10 +62,15 @@ export const getTidalStreamUrl = async (trackId: string): Promise<{ url: string 
   try {
     const response = await fetch(`${STREAM_API_URL}?id=${trackId}&quality=LOSSLESS`);
     console.log(`[TidalService] Stream API response status: ${response.status}`);
+    
+    const responseBody = await response.text(); // Lire la réponse en texte brut d'abord
+    
     if (!response.ok) {
+      console.error(`[TidalService] Stream API error response body:`, responseBody);
       throw new Error(`La récupération du flux Tidal a échoué: ${response.status}`);
     }
-    const data = await response.json();
+
+    const data = JSON.parse(responseBody); // Essayer de parser le JSON
     console.log('[TidalService] Raw stream data received:', data);
 
     if (data && data.OriginalTrackUrl) {
@@ -73,7 +78,7 @@ export const getTidalStreamUrl = async (trackId: string): Promise<{ url: string 
       return { url: data.OriginalTrackUrl };
     }
 
-    console.warn('[TidalService] OriginalTrackUrl not found in stream response.');
+    console.warn('[TidalService] OriginalTrackUrl not found in stream response. Full response:', data);
     return null;
   } catch (error) {
     console.error('Erreur lors de la récupération de l\'URL du flux Tidal:', error);

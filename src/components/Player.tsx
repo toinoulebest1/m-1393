@@ -391,6 +391,7 @@ export const Player = () => {
                     src={previousSongData.imageUrl}
                     alt="Previous album art"
                     className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
                   />
                 </div>
                 <div className="flex flex-col overflow-hidden min-w-0 flex-1">
@@ -410,6 +411,7 @@ export const Player = () => {
                   src={displayedSong.imageUrl || 'https://picsum.photos/100'}
                   alt="Current Song"
                   className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
                 />
               </div>
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">

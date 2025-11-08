@@ -103,6 +103,7 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
                     src={song.imageUrl}
                     alt={song.album_name}
                     className="w-12 h-12 rounded-md mr-4 object-cover"
+                    crossOrigin="anonymous"
                   />
                   <div className="flex-1">
                     <p className="font-semibold text-white truncate">{song.title}</p>
