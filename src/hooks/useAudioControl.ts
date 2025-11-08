@@ -143,6 +143,13 @@ export const useAudioControl = ({
         setIsChangingSong(false);
 
       } catch (error) {
+        // Gère l'erreur "AbortError" qui se produit lorsque l'utilisateur change de chanson rapidement.
+        // C'est un comportement normal et attendu, pas une erreur critique.
+        if ((error as DOMException).name === 'AbortError') {
+          console.log('La lecture a été interrompue par une nouvelle action. C\'est normal.');
+          return; // On sort sans afficher d'erreur, la nouvelle action prend le relais.
+        }
+
         console.error("💥 Erreur critique lors de la lecture:", error);
         toast.error("Musique indisponible", { description: (error as Error).message });
         setIsChangingSong(false);
@@ -150,8 +157,16 @@ export const useAudioControl = ({
       }
     } else if (audioRef.current) {
       // Reprise de la lecture
-      const success = await AutoplayManager.playAudio(audioRef.current);
-      if (success) setIsPlaying(true);
+      try {
+        const success = await AutoplayManager.playAudio(audioRef.current);
+        if (success) setIsPlaying(true);
+      } catch (error) {
+        if ((error as DOMException).name === 'AbortError') {
+          console.log('La reprise de lecture a été interrompue. C\'est normal.');
+          return;
+        }
+        console.error("💥 Erreur critique lors de la reprise:", error);
+      }
     }
   }, [currentSong, isChangingSong, volume, audioRef, nextAudioRef, setCurrentSong, setDisplayedSong, setIsChangingSong, setIsPlaying, setNextSongPreloaded, preloadNextTracks, apiDurationRef]);
 
