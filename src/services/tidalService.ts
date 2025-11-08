@@ -73,8 +73,15 @@ export const getTidalStreamUrl = async (trackId: string): Promise<{ url: string 
     const data = JSON.parse(responseBody); // Essayer de parser le JSON
     console.log('[TidalService] Raw stream data received:', data);
 
-    if (data && data.OriginalTrackUrl) {
-      console.log(`[TidalService] Found stream URL: ${data.OriginalTrackUrl}`);
+    // Gère le nouveau format de réponse (tableau) et l'ancien (objet)
+    if (Array.isArray(data)) {
+      const streamInfo = data.find(item => item && typeof item === 'object' && 'OriginalTrackUrl' in item);
+      if (streamInfo && streamInfo.OriginalTrackUrl) {
+        console.log(`[TidalService] Found stream URL in array: ${streamInfo.OriginalTrackUrl}`);
+        return { url: streamInfo.OriginalTrackUrl };
+      }
+    } else if (data && data.OriginalTrackUrl) {
+      console.log(`[TidalService] Found stream URL in object: ${data.OriginalTrackUrl}`);
       return { url: data.OriginalTrackUrl };
     }
 

@@ -105,8 +105,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (error) {
           // Gérer le cas où la chanson n'existe pas encore dans la table 'songs'
-          // (par exemple, juste après un upload avant que la page ne soit rafraîchie)
-          if (error.code === '23503' && !currentSong.id.startsWith('tidal-')) { // Foreign key violation, and not a tidal song
+          // (par exemple, juste après un upload ou pour une chanson Tidal)
+          if (error.code === '23503') { // Foreign key violation
             console.warn(`La chanson ${currentSong.id} n'existe pas dans la table 'songs'. Tentative d'insertion.`);
             const { error: insertError } = await supabase.from('songs').insert({
               id: currentSong.id,
