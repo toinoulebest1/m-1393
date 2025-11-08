@@ -90,8 +90,7 @@ export const fetchAndSaveLyrics = async (
     console.log('✅ Paroles récupérées et sauvegardées');
   } catch (error) {
     console.error('❌ Erreur récupération paroles:', error);
-    toast({
-      id: 'src/utils/lyricsManager.ts',
+    toast.error("Erreur de récupération des paroles", {
       description: error.message || "Impossible de récupérer les paroles pour cette chanson.",
     });
   }
