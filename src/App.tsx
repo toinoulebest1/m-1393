@@ -23,7 +23,7 @@ import Reports from "./pages/Reports";
 import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import { useSessionQuery } from "./hooks/useSessionQuery";
 import { useBanStatus } from "./hooks/useBanStatus";
-import BannedUserPage from "./components/BannedUserPage";
+import { BannedUserPage } from "./components/BannedUserPage";
 
 const queryClient = new QueryClient();
 
