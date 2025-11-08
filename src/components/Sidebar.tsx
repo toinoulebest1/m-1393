@@ -74,21 +74,6 @@ export const Sidebar = () => {
       label: t('common.reports')
     });
     links.push({
-      to: "/metadata-update",
-      icon: Database,
-      label: t('common.metadata')
-    });
-    links.push({
-      to: "/add-songs",
-      icon: CloudUpload,
-      label: "Ajouter des chansons"
-    });
-    links.push({
-      to: "/admin/history",
-      icon: Clock,
-      label: "Gestion historique"
-    });
-    links.push({
       to: "/maintenance-admin",
       icon: Settings,
       label: "Maintenance"
