@@ -14,7 +14,7 @@ type Song = GameSong;
 type GameMode = "artist" | "title" | "both";
 
 export function BlindTestGame() {
-  const { play, pause, isPlaying, currentSong, setQueue } = usePlayer();
+  const { play, pause, isPlaying, currentSong, setQueue, setMaskingState } = usePlayer();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -34,6 +34,25 @@ export function BlindTestGame() {
   const timerSoundRef = useRef(false);
   const soundTimeoutRef = useRef<number | null>(null);
   
+  useEffect(() => {
+    // Activer le masquage lorsque le jeu commence et qu'aucune réponse n'est donnée
+    if (gameStarted && !gameOver && correctAnswer === null) {
+      setMaskingState({
+        title: gameMode === 'title' || gameMode === 'both',
+        artist: gameMode === 'artist' || gameMode === 'both',
+        image: true,
+      });
+    } else {
+      // Désactiver le masquage à la fin du jeu, ou quand la réponse est révélée
+      setMaskingState(null);
+    }
+
+    // Nettoyage à la sortie du composant
+    return () => {
+      setMaskingState(null);
+    };
+  }, [gameStarted, gameOver, correctAnswer, gameMode, setMaskingState]);
+
   useEffect(() => {
     const loadSongs = async () => {
       try {

@@ -40,7 +40,8 @@ export const Player = () => {
     toggleRepeat,
     toggleFavorite,
     getCurrentAudioElement,
-    setIsSeeking
+    setIsSeeking,
+    maskingState,
   } = usePlayer();
 
   const [metadataOpacity, setMetadataOpacity] = useState(1);
@@ -318,12 +319,16 @@ export const Player = () => {
                 <img
                   src={displayedSong.imageUrl}
                   alt="Current Song"
-                  className="w-14 h-14 rounded-md object-cover flex-shrink-0"
+                  className={cn(
+                    "w-14 h-14 rounded-md object-cover flex-shrink-0",
+                    maskingState?.image && "blur-md"
+                  )}
+                  onContextMenu={(e) => maskingState?.image && e.preventDefault()}
                 />
               )}
               <div className="flex flex-col overflow-hidden">
-                <span className="text-base font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
-                <span className="text-sm text-spotify-neutral truncate">{displayedSong?.artist || "..."}</span>
+                <span className="text-base font-semibold text-white truncate">{maskingState?.title ? "..." : displayedSong?.title || "No song playing"}</span>
+                <span className="text-sm text-spotify-neutral truncate">{maskingState?.artist ? "..." : displayedSong?.artist || "..."}</span>
               </div>
             </div>
 
@@ -411,13 +416,17 @@ export const Player = () => {
                 <img
                   src={displayedSong.imageUrl || 'https://picsum.photos/100'}
                   alt="Current Song"
-                  className="w-full h-full object-cover"
+                  className={cn(
+                    "w-full h-full object-cover",
+                    maskingState?.image && "blur-md"
+                  )}
                   crossOrigin="anonymous"
+                  onContextMenu={(e) => maskingState?.image && e.preventDefault()}
                 />
               </div>
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                <span className="text-sm font-semibold text-white truncate">{displayedSong?.title || "No song playing"}</span>
-                <span className="text-xs text-spotify-neutral truncate">{displayedSong?.artist || 'Unknown Artist'}</span>
+                <span className="text-sm font-semibold text-white truncate">{maskingState?.title ? "..." : (displayedSong?.title || "No song playing")}</span>
+                <span className="text-xs text-spotify-neutral truncate">{maskingState?.artist ? "..." : (displayedSong?.artist || 'Unknown Artist')}</span>
               </div>
             </div>
           </div>

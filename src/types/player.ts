@@ -25,6 +25,12 @@ export interface PlayerPreferences {
   crossfadeDuration: number;
 }
 
+export interface MaskingState {
+  title: boolean;
+  artist: boolean;
+  image: boolean;
+}
+
 export interface PlayerContextType {
   currentSong: Song | null;
   displayedSong: Song | null;
@@ -41,13 +47,14 @@ export interface PlayerContextType {
   history: Song[];
   isChangingSong: boolean;
   isAudioReady: boolean;
+  maskingState: MaskingState | null; // État pour le masquage
+  setMaskingState: (state: MaskingState | null) => void; // Fonction pour mettre à jour l'état
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (queue: Song[]) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
   pause: () => void;
-  setVolume: (volume: number) => void;
   setProgress: (progress: number) => void;
   nextSong: () => void;
   previousSong: () => void;
