@@ -28,8 +28,7 @@ export const usePlayerQueue = ({
         return [];
       }
     }
-    const savedSong = localStorage.getItem('currentSong');
-    return savedSong ? [JSON.parse(savedSong)] : [];
+    return [];
   });
   
   const [shuffleMode, setShuffleMode] = useState(false);

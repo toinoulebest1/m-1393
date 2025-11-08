@@ -51,7 +51,7 @@ export interface PlayerContextType {
   setMaskingState: (state: MaskingState | null) => void; // Fonction pour mettre à jour l'état
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
-  setQueue: (queue: Song[]) => void;
+  setQueue: (queue: Song[] | ((prevQueue: Song[]) => Song[])) => void;
   setHistory: (history: Song[]) => void;
   play: (song?: Song) => void;
   pause: () => void;

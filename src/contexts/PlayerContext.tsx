@@ -7,6 +7,7 @@ import { usePlayerPreferences } from '@/hooks/usePlayerPreferences';
 import { useIntelligentPreloader } from '@/hooks/useIntelligentPreloader';
 import { useToast } from "@/hooks/use-toast";
 import { AutoplayManager } from "@/utils/autoplayManager";
+import { usePlayerQueue } from '@/hooks/usePlayerQueue';
 
 import { getAudioFileUrl } from '@/utils/storage';
 import { toast } from 'sonner';
@@ -213,6 +214,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     apiDurationRef
   });
 
+  const {
+    queue,
+    setQueue,
+    shuffleMode,
+    repeatMode,
+    addToQueue,
+    toggleShuffle,
+    toggleRepeat,
+    nextSong: nextSongFromQueue,
+    previousSong: previousSongFromQueue,
+  } = usePlayerQueue({
+    currentSong,
+    isChangingSong,
+    setIsChangingSong,
+    play,
+  });
+
   // Wrapper function for setVolume that updates both state and audio element
   const setVolume = useCallback((newVolume: number) => {
     setVolumeState(newVolume);
@@ -257,8 +275,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log("Changement de chanson déjà en cours");
       return;
     }
+    // Priorité à la file d'attente si elle existe
+    if (queue.length > 1) {
+      await nextSongFromQueue();
+      return;
+    }
 
-    console.log("=== BOUTON SUIVANT CLIQUÉ ===");
+    console.log("=== BOUTON SUIVANT CLIQUÉ (HORS QUEUE) ===");
     
     // Annuler les préchargements intelligents
     cancelAllPreloads();
@@ -295,15 +318,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       toast.info("Pas de chanson suivante disponible");
     }
     console.log("=================================");
-  }, [isChangingSong, play, cancelAllPreloads, currentSong, history]);
+  }, [isChangingSong, play, cancelAllPreloads, currentSong, history, queue, nextSongFromQueue]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours");
       return;
     }
+    // Priorité à la file d'attente si elle existe
+    if (queue.length > 1) {
+      await previousSongFromQueue();
+      return;
+    }
 
-    console.log("=== BOUTON PRÉCÉDENT CLIQUÉ ===");
+    console.log("=== BOUTON PRÉCÉDENT CLIQUÉ (HORS QUEUE) ===");
 
     // Annuler les préchargements intelligents
     cancelAllPreloads();
@@ -316,7 +344,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else {
       toast.info("Pas de chanson précédente");
     }
-  }, [isChangingSong, history, play, cancelAllPreloads]);
+  }, [isChangingSong, history, play, cancelAllPreloads, queue, previousSongFromQueue]);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {
@@ -844,6 +872,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.removeItem('currentSong');
     }
     
+    setQueue(prevQueue => prevQueue.filter(song => song.id !== songId));
     setHistory(prevHistory => prevHistory.filter(song => song.id !== songId));
     
     if (favorites.some(song => song.id === songId)) {
@@ -851,7 +880,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     toast.success("La chanson a été supprimée de votre bibliothèque");
-  }, [currentSong, setCurrentSong, stopCurrentSong, setHistory, favorites, removeFavorite]);
+  }, [currentSong, setCurrentSong, stopCurrentSong, setQueue, setHistory, favorites, removeFavorite]);
 
   // L'objet context complet sans queue
   const value = {
@@ -860,8 +889,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isPlaying,
     progress,
     volume,
-    queue: [], // Queue désactivée
-    shuffleMode: false, // Pas de shuffle sans queue
+    queue,
+    shuffleMode,
     repeatMode,
     favorites,
     searchQuery,
@@ -872,7 +901,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isAudioReady,
     stopCurrentSong,
     removeSong,
-    setQueue: () => {}, // Fonction vide
+    setQueue,
     setHistory,
     play,
     pause,
@@ -881,8 +910,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setProgress,
     nextSong,
     previousSong,
-    addToQueue: () => {}, // Fonction vide
-    toggleShuffle: () => {}, // Fonction vide
+    addToQueue,
+    toggleShuffle,
     toggleRepeat,
     toggleFavorite,
     removeFavorite,
