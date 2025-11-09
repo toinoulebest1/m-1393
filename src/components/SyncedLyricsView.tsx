@@ -305,8 +305,72 @@ export const SyncedLyricsView: React.FC = () => {
     };
   }, []);
 
+  // Generate lyrics function
+  const generateLyrics = async () => {
+    if (!currentSong?.artist) {
+      const errorMessage = "Impossible de récupérer les paroles sans le nom de l'artiste.";
+      setError(errorMessage);
+      toast.error(errorMessage);
+      setIsLoadingLyrics(false);
+      return;
+    }
+    
+    setIsGenerating(true);
+    setError(null);
+    try {
+      let durationInSeconds: number | undefined;
+      if (currentSong.duration) {
+        const parts = currentSong.duration.split(':');
+        if (parts.length === 2) {
+          durationInSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+      }
+      
+      const response = await supabase.functions.invoke('generate-lyrics', {
+        body: { 
+          songTitle: currentSong.title, 
+          artist: currentSong.artist,
+          duration: durationInSeconds,
+          albumName: currentSong.album_name
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (response.data.error) throw new Error(response.data.error);
+
+      if (response.data.lyrics) {
+        const newLyrics = response.data.lyrics;
+        setLyricsText(newLyrics);
+        if (isLrcFormat(newLyrics)) {
+          try {
+            setParsedLyrics(parseLrc(newLyrics));
+          } catch (e) {
+            setParsedLyrics(null);
+          }
+        } else {
+          setParsedLyrics(null);
+        }
+        toast.success("Paroles récupérées avec succès !");
+      } else if (response.data.message) {
+        toast.info(response.data.message);
+        await fetchLyrics(currentSong.id, true); // Re-fetch, but prevent recursion
+      } else {
+        setError("Aucune parole trouvée pour cette chanson.");
+      }
+      
+    } catch (error: any) {
+      console.error('Error generating lyrics:', error);
+      const errorMessage = error.message || "Impossible de récupérer les paroles";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsGenerating(false);
+      setIsLoadingLyrics(false);
+    }
+  };
+
   // Function to fetch lyrics
-  const fetchLyrics = async (songId: string) => {
+  const fetchLyrics = async (songId: string, skipGenerate = false) => {
     if (!songId) {
       setIsLoadingLyrics(false);
       return;
@@ -315,6 +379,7 @@ export const SyncedLyricsView: React.FC = () => {
     if (songId.startsWith('deezer-')) {
       setLyricsText(null);
       setParsedLyrics(null);
+      setError("La génération de paroles n'est pas supportée pour les titres Deezer.");
       setIsLoadingLyrics(false);
       setIsChangingSong(false);
       return;
@@ -337,25 +402,28 @@ export const SyncedLyricsView: React.FC = () => {
       if (data && data.content) {
         const lyrics = data.content;
         setLyricsText(lyrics);
-        
         if (isLrcFormat(lyrics)) {
           try {
-            const parsed = parseLrc(lyrics);
-            setParsedLyrics(parsed);
+            setParsedLyrics(parseLrc(lyrics));
           } catch (parseError) {
             setParsedLyrics(null);
           }
         } else {
           setParsedLyrics(null);
         }
+        setIsLoadingLyrics(false);
       } else {
-        setLyricsText(null);
-        setParsedLyrics(null);
+        if (!skipGenerate) {
+          await generateLyrics();
+        } else {
+          setError("Aucune parole trouvée pour cette chanson.");
+          setIsLoadingLyrics(false);
+        }
       }
     } catch (error) {
       setError("Une erreur inattendue est survenue lors du chargement des paroles.");
-    } finally {
       setIsLoadingLyrics(false);
+    } finally {
       setIsChangingSong(false);
     }
   };
@@ -377,73 +445,6 @@ export const SyncedLyricsView: React.FC = () => {
         navigate(-1);
       }
     }, 150);
-  };
-
-  // Generate lyrics function
-  const generateLyrics = async () => {
-    if (!currentSong?.artist) {
-      setError("Impossible de récupérer les paroles sans le nom de l'artiste.");
-      toast.error("Impossible de récupérer les paroles sans le nom de l'artiste.");
-      return;
-    }
-    
-    setIsGenerating(true);
-    setError(null);
-    try {
-      // Convert duration from MM:SS format to seconds
-      let durationInSeconds: number | undefined;
-      if (currentSong.duration) {
-        const parts = currentSong.duration.split(':');
-        if (parts.length === 2) {
-          durationInSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-        }
-      }
-      
-      const response = await supabase.functions.invoke('generate-lyrics', {
-        body: { 
-          songTitle: currentSong.title, 
-          artist: currentSong.artist,
-          duration: durationInSeconds,
-          albumName: currentSong.album_name
-        },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      
-      if (response.data.error) {
-        throw new Error(response.data.error);
-      }
-
-      // Directly use the lyrics from the function's response
-      if (response.data.lyrics) {
-        const newLyrics = response.data.lyrics;
-        setLyricsText(newLyrics);
-        if (isLrcFormat(newLyrics)) {
-          try {
-            setParsedLyrics(parseLrc(newLyrics));
-          } catch (e) {
-            setParsedLyrics(null);
-          }
-        } else {
-          setParsedLyrics(null);
-        }
-        toast.success("Paroles récupérées avec succès !");
-      } else if (response.data.message) {
-        // This case handles when lyrics already exist, so we fetch them
-        toast.info(response.data.message);
-        await fetchLyrics(currentSong.id);
-      }
-      
-    } catch (error: any) {
-      console.error('Error generating lyrics:', error);
-      setError(error.message || "Impossible de récupérer les paroles");
-      toast.error(error.message || "Impossible de récupérer les paroles");
-    } finally {
-      setIsGenerating(false);
-      setIsLoadingLyrics(false); // Ensure loading is stopped
-    }
   };
 
   // Format time for display
@@ -692,7 +693,7 @@ export const SyncedLyricsView: React.FC = () => {
             {isLoadingLyrics ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
-                <span className="text-lg text-spotify-neutral">Chargement des paroles...</span>
+                <span className="text-lg text-spotify-neutral">Recherche des paroles...</span>
               </div>
             ) : lyricsText ? (
               <div className="w-full h-full flex items-start justify-center overflow-hidden">
@@ -723,13 +724,6 @@ export const SyncedLyricsView: React.FC = () => {
                   )}
                 </div>
               </div>
-            ) : error ? (
-              <div className="flex-grow max-w-3xl mx-auto w-full p-6">
-                <Alert variant="destructive" className="mb-4">
-                  <AlertTitle>Erreur</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              </div>
             ) : (
               <div className="flex-grow text-center p-4 md:p-6 w-full">
                 <div className="flex flex-col items-center justify-center h-full text-center">
@@ -737,17 +731,18 @@ export const SyncedLyricsView: React.FC = () => {
                   <h2 className="text-xl font-bold text-white mb-2">
                     Pas de paroles disponibles
                   </h2>
+                  {error && <p className="text-red-400 max-w-md mb-4">{error}</p>}
                   <p className="text-spotify-neutral max-w-md mb-6">
-                    Cette chanson n'a pas de paroles synchronisées. Vous pouvez essayer de les générer.
+                    Nous n'avons pas trouvé de paroles pour cette chanson. Vous pouvez réessayer.
                   </p>
                   <Button onClick={generateLyrics} disabled={isGenerating}>
                     {isGenerating ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Génération...
+                        Recherche...
                       </>
                     ) : (
-                      "Générer les paroles"
+                      "Réessayer de générer les paroles"
                     )}
                   </Button>
                 </div>
