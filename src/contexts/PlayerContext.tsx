@@ -160,6 +160,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log("🔄 Début prédiction pour:", currentSong.title, "ID:", currentSong.id);
         
         // Lancer la recherche de paroles en arrière-plan
+        console.log('[PlayerContext] Appel de fetchLyricsInBackground avec:', {
+          songId: currentSong.id,
+          songTitle: currentSong.title,
+          artist: currentSong.artist,
+          duration: currentSong.duration,
+          albumName: currentSong.album_name,
+          isTidal: !!currentSong.tidal_id,
+          tidalId: currentSong.tidal_id
+        });
         fetchLyricsInBackground(
           currentSong.id, 
           currentSong.title, 

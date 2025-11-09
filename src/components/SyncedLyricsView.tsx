@@ -286,6 +286,7 @@ export const SyncedLyricsView: React.FC = () => {
       setIsLoadingLyrics(false);
       return;
     }
+    console.log(`[SyncedLyricsView] fetchLyrics appelé pour songId: ${songId}`);
     
     // Skip DB lookups for non-UUID IDs (e.g., Deezer tracks)
     if (songId.startsWith('deezer-')) {
@@ -296,18 +297,27 @@ export const SyncedLyricsView: React.FC = () => {
     
     try {
       // Get lyrics from Supabase
+      console.log(`[SyncedLyricsView] Interrogation de la table 'lyrics' pour song_id: ${songId}`);
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
         .eq('song_id', songId)
         .maybeSingle();
         
-      if (error || !data) {
+      if (error) {
+        console.error(`[SyncedLyricsView] Erreur Supabase:`, error);
+        setIsLoadingLyrics(false);
+        return;
+      }
+
+      if (!data) {
+        console.log(`[SyncedLyricsView] Aucune parole trouvée dans la DB pour ${songId}.`);
         setIsLoadingLyrics(false);
         return;
       }
       
       const lyrics = data.content;
+      console.log(`[SyncedLyricsView] Paroles trouvées dans la DB. Contenu:`, lyrics.substring(0, 100) + '...');
       setLyricsText(lyrics);
       
       // Parse LRC format lyrics
