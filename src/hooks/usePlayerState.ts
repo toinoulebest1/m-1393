@@ -17,7 +17,10 @@ export const usePlayerState = () => {
   const [progress, setProgress] = useState(savedProgress);
   const [volume, setVolume] = useState(70);
   const [isChangingSong, setIsChangingSong] = useState(false);
-  const [history, setHistory] = useState<Song[]>([]);
+  const [history, setHistory] = useState<Song[]>(() => {
+    const savedHistory = localStorage.getItem('playHistory');
+    return savedHistory ? JSON.parse(savedHistory) : [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isSeeking, setIsSeeking] = useState(false);

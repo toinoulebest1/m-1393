@@ -226,6 +226,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isChangingSong,
     setIsChangingSong,
     play,
+    history,
+    setHistory,
   });
 
   // Wrapper function for setVolume that updates both state and audio element
@@ -233,6 +235,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setVolumeState(newVolume);
     updateVolume(newVolume);
   }, [setVolumeState, updateVolume]);
+
+  // Ajoute la chanson à l'historique local quand elle change
+  useEffect(() => {
+    if (currentSong) {
+      setHistory(prevHistory => {
+        // Éviter d'ajouter la même chanson deux fois de suite
+        if (prevHistory.length > 0 && prevHistory[prevHistory.length - 1].id === currentSong.id) {
+          return prevHistory;
+        }
+        return [...prevHistory, currentSong];
+      });
+    }
+  }, [currentSong, setHistory]);
 
   // Prépare l'élément audio suivant avec l'URL et attend le canplay
   const prepareNextAudio = async (song: Song) => {

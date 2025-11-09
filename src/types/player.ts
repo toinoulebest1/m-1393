@@ -31,6 +31,15 @@ export interface MaskingState {
   image: boolean;
 }
 
+export interface UsePlayerQueueProps {
+  currentSong: Song | null;
+  isChangingSong: boolean;
+  setIsChangingSong: (value: boolean) => void;
+  play: (song: Song) => Promise<void>;
+  history: Song[];
+  setHistory: (history: Song[] | ((prevHistory: Song[]) => Song[])) => void;
+}
+
 export interface PlayerContextType {
   currentSong: Song | null;
   displayedSong: Song | null;
@@ -52,9 +61,10 @@ export interface PlayerContextType {
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (queue: Song[] | ((prevQueue: Song[]) => Song[])) => void;
-  setHistory: (history: Song[]) => void;
+  setHistory: (history: Song[] | ((prevHistory: Song[]) => Song[])) => void;
   play: (song?: Song) => void;
   pause: () => void;
+  resume: () => void;
   setProgress: (progress: number) => void;
   nextSong: () => void;
   previousSong: () => void;

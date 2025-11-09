@@ -8,13 +8,17 @@ interface UsePlayerQueueProps {
   isChangingSong: boolean;
   setIsChangingSong: (value: boolean) => void;
   play: (song: Song) => Promise<void>;
+  history: Song[];
+  setHistory: (history: Song[] | ((prevHistory: Song[]) => Song[])) => void;
 }
 
 export const usePlayerQueue = ({
   currentSong,
   isChangingSong,
   setIsChangingSong,
-  play
+  play,
+  history,
+  setHistory,
 }: UsePlayerQueueProps) => {
   const { fetchSimilarSongsByGenre } = useGenreBasedQueue();
   
@@ -31,6 +35,7 @@ export const usePlayerQueue = ({
     return [];
   });
   
+  const [shuffledQueue, setShuffledQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
 
@@ -57,8 +62,21 @@ export const usePlayerQueue = ({
   }, []);
 
   const toggleShuffle = useCallback(() => {
-    setShuffleMode(prev => !prev);
-  }, []);
+    setShuffleMode(prev => {
+      const newShuffleMode = !prev;
+      if (newShuffleMode) {
+        // Activer le shuffle : mélanger la queue
+        const newShuffledQueue = [...queue].sort(() => Math.random() - 0.5);
+        setShuffledQueue(newShuffledQueue);
+        toast.success("Lecture aléatoire activée");
+      } else {
+        // Désactiver le shuffle
+        setShuffledQueue([]);
+        toast.info("Lecture aléatoire désactivée");
+      }
+      return newShuffleMode;
+    });
+  }, [queue]);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode(current => {
@@ -76,96 +94,45 @@ export const usePlayerQueue = ({
       return;
     }
     
-    console.log("=== NEXT SONG DEBUG ===");
-    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
-    console.log("Queue length:", queue.length);
-    console.log("Queue songs:", queue.map(s => `${s.title} (${s.id})`));
+    const activeQueue = shuffleMode ? shuffledQueue : queue;
     
-    if (!currentSong || queue.length === 0) {
+    console.log("=== NEXT SONG DEBUG ===");
+    console.log("Shuffle mode:", shuffleMode);
+    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
+    console.log("Active Queue length:", activeQueue.length);
+    
+    if (!currentSong || activeQueue.length === 0) {
       console.log("No current song or queue is empty");
       return;
     }
     
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    console.log("Current index in queue:", currentIndex);
+    const currentIndex = activeQueue.findIndex(song => song.id === currentSong.id);
+    console.log("Current index in active queue:", currentIndex);
     
     if (currentIndex === -1) {
-      console.log("Current song not found in queue");
-      console.log("Trying to find song by title/artist...");
-      
-      // Essayer de trouver par titre et artiste si l'ID ne correspond pas
-      const fallbackIndex = queue.findIndex(song => 
-        song.title === currentSong.title && song.artist === currentSong.artist
-      );
-      
-      if (fallbackIndex !== -1) {
-        console.log("Found song by title/artist at index:", fallbackIndex);
-        const nextIndex = fallbackIndex + 1;
-        if (nextIndex < queue.length) {
-          console.log(`Playing next song: ${queue[nextIndex].title}`);
-          await play(queue[nextIndex]);
-          return;
-        }
-      }
-      
-      // 🎵 Charger automatiquement une chanson du même genre
-      console.log("🎵 Chargement d'une chanson similaire par genre...");
-      const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
-      
-      // Filtrer pour exclure les chansons déjà dans la queue
-      const queueIds = new Set(queue.map(s => s.id));
-      const newSongs = similarSongs.filter(song => !queueIds.has(song.id));
-      
-      if (newSongs.length > 0) {
-        console.log(`✅ Chanson similaire trouvée: ${newSongs[0].title}`);
-        setQueueInternal(prevQueue => {
-          const newQueue = [...prevQueue, newSongs[0]];
-          localStorage.setItem('queue', JSON.stringify(newQueue));
-          return newQueue;
-        });
-        await play(newSongs[0]);
-      } else {
-        console.log("⚠️ Toutes les chansons similaires sont déjà dans la queue");
-        toast.info("Aucune nouvelle chanson similaire trouvée");
+      // Si la chanson n'est pas dans la file active (ex: jouée depuis la recherche)
+      // On joue la première chanson de la file active
+      if (activeQueue.length > 0) {
+        await play(activeQueue[0]);
       }
       return;
     }
     
     const nextIndex = currentIndex + 1;
-    if (nextIndex < queue.length) {
-      console.log(`Playing next song: ${queue[nextIndex].title}`);
-      await play(queue[nextIndex]);
+    if (nextIndex < activeQueue.length) {
+      console.log(`Playing next song: ${activeQueue[nextIndex].title}`);
+      await play(activeQueue[nextIndex]);
     } else {
       console.log("End of queue reached");
-      if (repeatMode === 'all' && queue.length > 0) {
+      if (repeatMode === 'all' && activeQueue.length > 0) {
         console.log("Repeating playlist from beginning");
-        await play(queue[0]);
+        await play(activeQueue[0]);
       } else {
-        // 🎵 Charger automatiquement une chanson du même genre
-        console.log("🎵 Chargement d'une chanson similaire par genre...");
-        const similarSongs = await fetchSimilarSongsByGenre(currentSong, 10);
-        
-        // Filtrer pour exclure les chansons déjà dans la queue
-        const queueIds = new Set(queue.map(s => s.id));
-        const newSongs = similarSongs.filter(song => !queueIds.has(song.id));
-        
-        if (newSongs.length > 0) {
-          console.log(`✅ Chanson similaire trouvée: ${newSongs[0].title}`);
-          setQueueInternal(prevQueue => {
-            const newQueue = [...prevQueue, newSongs[0]];
-            localStorage.setItem('queue', JSON.stringify(newQueue));
-            return newQueue;
-          });
-          // Jouer la chanson similaire
-          await play(newSongs[0]);
-        } else {
-          console.log("⚠️ Toutes les chansons similaires sont déjà dans la queue");
-          toast.info("Fin de la playlist - Aucune nouvelle chanson similaire trouvée");
-        }
+        toast.info("Fin de la playlist");
       }
     }
     console.log("=====================");
-  }, [currentSong, isChangingSong, queue, play, repeatMode, fetchSimilarSongsByGenre]);
+  }, [currentSong, isChangingSong, queue, shuffledQueue, shuffleMode, play, repeatMode, fetchSimilarSongsByGenre]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
@@ -174,55 +141,23 @@ export const usePlayerQueue = ({
     }
     
     console.log("=== PREVIOUS SONG DEBUG ===");
-    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
-    console.log("Queue length:", queue.length);
-    
-    if (!currentSong || queue.length === 0) {
-      console.log("No current song or queue is empty");
-      return;
-    }
-    
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    console.log("Current index in queue:", currentIndex);
-    
-    if (currentIndex === -1) {
-      console.log("Current song not found in queue");
+    console.log("History length:", history.length);
+
+    if (history.length > 1) {
+      // L'historique contient [..., avant-dernière, dernière (actuelle)]
+      // On veut jouer l'avant-dernière.
+      const previousSongInHistory = history[history.length - 2];
       
-      // Essayer de trouver par titre et artiste si l'ID ne correspond pas
-      const fallbackIndex = queue.findIndex(song => 
-        song.title === currentSong.title && song.artist === currentSong.artist
-      );
-      
-      if (fallbackIndex !== -1) {
-        console.log("Found song by title/artist at index:", fallbackIndex);
-        if (fallbackIndex > 0) {
-          console.log(`Playing previous song: ${queue[fallbackIndex - 1].title}`);
-          await play(queue[fallbackIndex - 1]);
-          return;
-        }
-      }
-      
-      console.log("Could not find current song in queue, playing last song");
-      if (queue.length > 0) {
-        await play(queue[queue.length - 1]);
-      }
-      return;
-    }
-    
-    if (currentIndex > 0) {
-      console.log(`Playing previous song: ${queue[currentIndex - 1].title}`);
-      await play(queue[currentIndex - 1]);
+      // On retire la chanson actuelle de l'historique pour ne pas la rajouter
+      setHistory(h => h.slice(0, -1));
+
+      await play(previousSongInHistory);
     } else {
-      console.log("Already at first track");
-      if (repeatMode === 'all' && queue.length > 0) {
-        console.log("Going to last song in playlist");
-        await play(queue[queue.length - 1]);
-      } else {
-        toast.info("Déjà au début de la playlist");
-      }
+      toast.info("Pas de chanson précédente dans l'historique");
     }
+
     console.log("=========================");
-  }, [currentSong, isChangingSong, queue, play, repeatMode]);
+  }, [isChangingSong, history, play, setHistory]);
 
   const getNextSong = useCallback((): Song | null => {
     if (!currentSong || queue.length === 0) return null;
