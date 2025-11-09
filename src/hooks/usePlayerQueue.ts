@@ -172,6 +172,7 @@ export const usePlayerQueue = ({
     queue,
     setQueue,
     shuffleMode,
+    shuffledQueue,
     setShuffleMode,
     repeatMode,
     setRepeatMode,

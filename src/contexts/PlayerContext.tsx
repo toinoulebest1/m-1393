@@ -215,6 +215,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue,
     setQueue,
     shuffleMode,
+    shuffledQueue, // Ajout de shuffledQueue ici
     repeatMode,
     addToQueue,
     toggleShuffle,
