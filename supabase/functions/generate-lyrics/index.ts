@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const GENIUS_API_KEY = Deno.env.get("GENIUS_API_KEY");
+const FUNCTION_RESPONSE_TIMEOUT = 8000; // 8 secondes
 
 interface SongDetails {
   songTitle: string;
@@ -20,28 +21,19 @@ interface SongDetails {
 }
 
 async function searchSongOnGenius(query: string) {
-  console.log(`[Genius] Searching for: "${query}"`);
   const url = `https://api.genius.com/search?q=${encodeURIComponent(query)}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${GENIUS_API_KEY}` },
   });
-  if (!response.ok) {
-    console.error(`[Genius] API search failed with status: ${response.status}`);
-    throw new Error(`Genius API search failed: ${response.statusText}`);
-  }
+  if (!response.ok) throw new Error(`Genius API search failed: ${response.statusText}`);
   const data = await response.json();
-  console.log(`[Genius] Found ${data.response.hits.length} hits.`);
   return data.response.hits;
 }
 
 async function getLyricsFromGenius(songPath: string) {
-  console.log(`[Genius] Fetching lyrics from path: ${songPath}`);
   const url = `https://api.genius.com${songPath}`;
   const response = await fetch(url);
-  if (!response.ok) {
-    console.error(`[Genius] Failed to fetch lyrics page with status: ${response.status}`);
-    throw new Error(`Failed to fetch lyrics page: ${response.statusText}`);
-  }
+  if (!response.ok) throw new Error(`Failed to fetch lyrics page: ${response.statusText}`);
   const html = await response.text();
   const lyricsRegex = /<div data-lyrics-container="true".*?>([\s\S]*?)<\/div>/g;
   let lyricsContent = "";
@@ -49,87 +41,51 @@ async function getLyricsFromGenius(songPath: string) {
   while ((match = lyricsRegex.exec(html)) !== null) {
     lyricsContent += match[1];
   }
-  if (!lyricsContent) {
-    console.warn("[Genius] Could not extract lyrics content from HTML.");
-    return null;
-  }
-  console.log("[Genius] Successfully extracted lyrics content.");
+  if (!lyricsContent) return null;
   return lyricsContent.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").trim();
 }
 
+async function getAndSaveLyrics(supabase: any, body: SongDetails): Promise<string | null> {
+  const { songTitle, artist, duration, albumName, imageUrl, filePath, tidalId, deezerId } = body;
+
+  let { data: songData } = await supabase
+    .from("songs").select("id").eq("title", songTitle).eq("artist", artist).maybeSingle();
+
+  let songId: string;
+  if (!songData) {
+    const { data: newSong, error: insertError } = await supabase
+      .from("songs")
+      .insert({
+        title: songTitle, artist, album_name: albumName,
+        duration: duration ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : undefined,
+        image_url: imageUrl, file_path: filePath || `tidal:${tidalId || deezerId}`,
+        tidal_id: tidalId, deezer_id: deezerId,
+      }).select("id").single();
+    if (insertError) throw new Error("Failed to create new song entry.");
+    songId = newSong.id;
+  } else {
+    songId = songData.id;
+  }
+
+  const hits = await searchSongOnGenius(`${songTitle} ${artist}`);
+  if (hits.length === 0) return null;
+
+  const songPath = hits[0].result.path;
+  const lyrics = await getLyricsFromGenius(songPath);
+  if (!lyrics) return null;
+
+  await supabase.from("lyrics").upsert({ song_id: songId, content: lyrics }, { onConflict: 'song_id' });
+
+  return lyrics;
+}
+
 serve(async (req) => {
-  console.log("--- New generate-lyrics request ---");
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const handleAsyncLyricGeneration = async (body: SongDetails) => {
-    try {
-      const { songTitle, artist, duration, albumName, imageUrl, filePath, tidalId, deezerId } = body;
-      
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-        { auth: { persistSession: false } }
-      );
-      console.log("2. [Async] Supabase client initialized.");
-
-      let { data: songData, error: songSearchError } = await supabase
-        .from("songs").select("id").eq("title", songTitle).eq("artist", artist).maybeSingle();
-
-      if (songSearchError) throw new Error(`DB error searching for song: ${songSearchError.message}`);
-
-      let songId: string;
-      if (!songData) {
-        console.log(`3. [Async] Song not found. Creating...`);
-        const { data: newSong, error: insertError } = await supabase
-          .from("songs")
-          .insert({
-            title: songTitle, artist, album_name: albumName,
-            duration: duration ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : undefined,
-            image_url: imageUrl, file_path: filePath || `tidal:${tidalId || deezerId}`,
-            tidal_id: tidalId, deezer_id: deezerId,
-          }).select("id").single();
-        if (insertError) throw new Error("Failed to create new song entry.");
-        songId = newSong.id;
-        console.log(`   - New song created with ID: ${songId}`);
-      } else {
-        songId = songData.id;
-        console.log(`3. [Async] Song found with ID: ${songId}`);
-      }
-
-      console.log(`4. [Async] Fetching from Genius...`);
-      const hits = await searchSongOnGenius(`${songTitle} ${artist}`);
-      if (hits.length === 0) {
-        console.warn("   - Song not found on Genius.");
-        return; // End of process
-      }
-
-      const songPath = hits[0].result.path;
-      const lyrics = await getLyricsFromGenius(songPath);
-      if (!lyrics) {
-        console.error("   - Could not extract lyrics from Genius page.");
-        return; // End of process
-      }
-
-      console.log(`5. [Async] Saving lyrics to DB for song_id: ${songId}`);
-      const { error: lyricsInsertError } = await supabase
-        .from("lyrics").insert({ song_id: songId, content: lyrics });
-
-      if (lyricsInsertError) {
-        console.error("DB Error saving lyrics:", lyricsInsertError);
-      } else {
-        console.log("6. [Async] Lyrics saved successfully!");
-      }
-    } catch (error) {
-      console.error("!!! Unhandled error in async lyric generation:", error);
-    }
-  };
-
   try {
     const body: SongDetails = await req.json();
-    console.log("1. Received request body:", body);
-    
     const { songTitle, artist } = body;
     if (!songTitle || !artist) {
       return new Response(JSON.stringify({ error: "songTitle and artist are required" }), {
@@ -143,29 +99,46 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    let { data: songData } = await supabase
-      .from("songs").select("id").eq("title", songTitle).eq("artist", artist).maybeSingle();
-    
-    if (songData) {
-      const { data: existingLyrics } = await supabase
-        .from("lyrics").select("id").eq("song_id", songData.id).maybeSingle();
+    // Check if lyrics already exist
+    const { data: song } = await supabase.from("songs").select("id").eq("title", songTitle).eq("artist", artist).maybeSingle();
+    if (song) {
+      const { data: existingLyrics } = await supabase.from("lyrics").select("content").eq("song_id", song.id).maybeSingle();
       if (existingLyrics) {
-        console.log("   - Lyrics already exist. Exiting.");
-        return new Response(JSON.stringify({ message: "Lyrics already exist for this song." }), {
+        return new Response(JSON.stringify({ lyrics: existingLyrics.content }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
-    // Don't await this call. This lets the function run in the background.
-    handleAsyncLyricGeneration(body);
+    // Race between fetching lyrics and a timeout
+    const lyricsPromise = getAndSaveLyrics(supabase, body);
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), FUNCTION_RESPONSE_TIMEOUT)
+    );
 
-    console.log("2. Accepted request. Generation will continue in background.");
-    return new Response(JSON.stringify({ message: "Lyric generation started." }), {
-      status: 202, // Accepted
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-
+    try {
+      const lyrics = await Promise.race([lyricsPromise, timeoutPromise]);
+      if (lyrics) {
+        // Success within timeout
+        return new Response(JSON.stringify({ lyrics }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        // Found no lyrics, but process finished
+        return new Response(JSON.stringify({ message: "No lyrics found." }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } catch (error) {
+      if (error.message === "Timeout") {
+        // Timeout occurred, respond with 202 and let it finish in background
+        return new Response(JSON.stringify({ message: "Lyric generation is taking longer than expected and will continue in the background." }), {
+          status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Other error during lyric fetching
+      throw error;
+    }
   } catch (error) {
     console.error("!!! Unhandled error in generate-lyrics function:", error);
     return new Response(JSON.stringify({ error: error.message }), {

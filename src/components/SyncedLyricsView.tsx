@@ -310,6 +310,21 @@ export const SyncedLyricsView: React.FC = () => {
     };
   }, []);
 
+  const handleFoundLyrics = (lyrics: string) => {
+    setLyricsText(lyrics);
+    if (isLrcFormat(lyrics)) {
+      try {
+        setParsedLyrics(parseLrc(lyrics));
+      } catch (parseError) {
+        setParsedLyrics(null);
+      }
+    } else {
+      setParsedLyrics(null);
+    }
+    setIsLoadingLyrics(false);
+    setIsGenerating(false);
+  };
+
   // Generate lyrics function
   const generateLyrics = async () => {
     if (!currentSong || !currentSong.artist || !currentSong.title) {
@@ -345,7 +360,7 @@ export const SyncedLyricsView: React.FC = () => {
 
       console.log("Calling 'generate-lyrics' with payload:", payload);
       
-      const { error: functionError } = await supabase.functions.invoke('generate-lyrics', {
+      const { data, error: functionError } = await supabase.functions.invoke('generate-lyrics', {
         body: payload,
       });
 
@@ -354,17 +369,22 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(`L'appel à la fonction a échoué: ${functionError.message}`);
       }
 
-      toast.info("La recherche de paroles a été lancée. Les résultats apparaîtront bientôt.");
-      
-      // Set a timeout to avoid infinite loading
-      if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
-      generationTimeoutRef.current = setTimeout(() => {
-        console.warn("Timeout: La génération de paroles a pris trop de temps.");
-        setError("La recherche de paroles a expiré. Veuillez réessayer.");
-        toast.warning("La recherche de paroles a pris plus de temps que prévu.");
-        setIsGenerating(false);
-        setIsLoadingLyrics(false);
-      }, 30000); // 30 seconds timeout
+      if (data?.lyrics) {
+        // Fast path: lyrics returned directly
+        toast.success("Paroles trouvées !");
+        handleFoundLyrics(data.lyrics);
+      } else {
+        // Slow path: wait for realtime update
+        toast.info("La recherche de paroles a été lancée. Les résultats apparaîtront bientôt.");
+        if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
+        generationTimeoutRef.current = setTimeout(() => {
+          console.warn("Timeout: La génération de paroles a pris trop de temps.");
+          setError("La recherche de paroles a expiré. Veuillez réessayer.");
+          toast.warning("La recherche de paroles a pris plus de temps que prévu.");
+          setIsGenerating(false);
+          setIsLoadingLyrics(false);
+        }, 30000); // 30 seconds timeout
+      }
       
     } catch (error: any) {
       console.error('Error in generateLyrics function:', error);
@@ -407,18 +427,7 @@ export const SyncedLyricsView: React.FC = () => {
       }
 
       if (data && data.content) {
-        const lyrics = data.content;
-        setLyricsText(lyrics);
-        if (isLrcFormat(lyrics)) {
-          try {
-            setParsedLyrics(parseLrc(lyrics));
-          } catch (parseError) {
-            setParsedLyrics(null);
-          }
-        } else {
-          setParsedLyrics(null);
-        }
-        setIsLoadingLyrics(false);
+        handleFoundLyrics(data.content);
       } else {
         if (!skipGenerate) {
           await generateLyrics();
