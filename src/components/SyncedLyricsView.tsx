@@ -275,6 +275,7 @@ export const SyncedLyricsView: React.FC = () => {
               setParsedLyrics(null);
             }
             setIsLoadingLyrics(false);
+            setIsGenerating(false); // Stop generation indicator
           }
         }
       )
@@ -340,7 +341,7 @@ export const SyncedLyricsView: React.FC = () => {
 
       console.log("Calling 'generate-lyrics' with payload:", payload);
       
-      const { data, error: functionError } = await supabase.functions.invoke('generate-lyrics', {
+      const { error: functionError } = await supabase.functions.invoke('generate-lyrics', {
         body: payload,
       });
 
@@ -349,37 +350,16 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(`L'appel à la fonction a échoué: ${functionError.message}`);
       }
 
-      if (data.error) {
-        console.error("Edge function returned an error:", data.error);
-        throw new Error(data.error);
-      }
-
-      if (data.lyrics) {
-        const newLyrics = data.lyrics;
-        setLyricsText(newLyrics);
-        if (isLrcFormat(newLyrics)) {
-          try {
-            setParsedLyrics(parseLrc(newLyrics));
-          } catch (e) {
-            setParsedLyrics(null);
-          }
-        } else {
-          setParsedLyrics(null);
-        }
-        toast.success("Paroles récupérées avec succès !");
-      } else if (data.message) {
-        toast.info(data.message);
-        await fetchLyrics(currentSong.id, true); // Re-fetch, but prevent recursion
-      } else {
-        setError("Aucune parole trouvée pour cette chanson.");
-      }
+      // With async, we no longer expect lyrics in the response.
+      // We just wait for the realtime update.
+      toast.info("La recherche de paroles a été lancée. Les résultats apparaîtront bientôt.");
+      // Keep isGenerating true, it will be set to false by the realtime listener.
       
     } catch (error: any) {
       console.error('Error in generateLyrics function:', error);
-      const errorMessage = error.message || "Impossible de récupérer les paroles";
+      const errorMessage = error.message || "Impossible de lancer la génération des paroles";
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
       setIsGenerating(false);
       setIsLoadingLyrics(false);
     }
@@ -706,7 +686,7 @@ export const SyncedLyricsView: React.FC = () => {
           
           {/* Lyrics content */}
           <div className="flex-grow w-full overflow-hidden flex flex-col order-last md:order-first">
-            {isLoadingLyrics ? (
+            {isLoadingLyrics || isGenerating ? (
               <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-spotify-accent mb-4" />
                 <span className="text-lg text-spotify-neutral">Recherche des paroles...</span>
@@ -755,7 +735,7 @@ export const SyncedLyricsView: React.FC = () => {
                     {isGenerating ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Recherche...
+                        Recherche en cours...
                       </>
                     ) : (
                       "Réessayer de générer les paroles"
