@@ -36,16 +36,24 @@ export const searchTidalTracks = async (query: string): Promise<Song[]> => {
       return [];
     }
 
-    const songs: Song[] = data.items.map((item: any) => ({
-      id: `tidal-${item.id}`, // Préfixe pour éviter les collisions avec les chansons locales
-      title: item.title,
-      artist: item.artist?.name || (item.artists && item.artists[0]?.name) || 'Artiste inconnu',
-      duration: formatDuration(item.duration),
-      url: `tidal:${item.id}`, // Schéma d'URL personnalisé pour identifier les pistes Tidal
-      imageUrl: getImageUrl(item.album?.cover),
-      album_name: item.album?.title,
-      tidal_id: item.id.toString(),
-    }));
+    const songs: Song[] = data.items.map((item: any) => {
+      const artistName = item.artist?.name || (item.artists && item.artists[0]?.name) || 'Artiste inconnu';
+      const albumTitle = item.album?.title || 'Album inconnu';
+      const imageUrl = getImageUrl(item.album?.cover || ''); // Ensure a default or empty string for getImageUrl
+
+      console.log(`[TidalService] Mapping item: ${item.id}, Title: ${item.title}, Artist: ${artistName}, Album: ${albumTitle}, Image: ${imageUrl}`);
+
+      return {
+        id: `tidal-${item.id}`, // Préfixe pour éviter les collisions avec les chansons locales
+        title: item.title,
+        artist: artistName,
+        duration: formatDuration(item.duration),
+        url: `tidal:${item.id}`, // Schéma d'URL personnalisé pour identifier les pistes Tidal
+        imageUrl: imageUrl,
+        album_name: albumTitle,
+        tidal_id: item.id.toString(),
+      };
+    });
 
     console.log(`[TidalService] Mapped ${songs.length} songs from search results.`);
     return songs;
