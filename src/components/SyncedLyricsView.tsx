@@ -307,8 +307,8 @@ export const SyncedLyricsView: React.FC = () => {
 
   // Generate lyrics function
   const generateLyrics = async () => {
-    if (!currentSong?.artist) {
-      const errorMessage = "Impossible de récupérer les paroles sans le nom de l'artiste.";
+    if (!currentSong || !currentSong.artist || !currentSong.title) {
+      const errorMessage = "Informations sur la chanson incomplètes pour générer les paroles.";
       setError(errorMessage);
       toast.error(errorMessage);
       setIsLoadingLyrics(false);
@@ -317,6 +317,7 @@ export const SyncedLyricsView: React.FC = () => {
     
     setIsGenerating(true);
     setError(null);
+    
     try {
       let durationInSeconds: number | undefined;
       if (currentSong.duration) {
@@ -325,25 +326,36 @@ export const SyncedLyricsView: React.FC = () => {
           durationInSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
         }
       }
+
+      const payload = {
+        songTitle: currentSong.title,
+        artist: currentSong.artist,
+        duration: durationInSeconds,
+        albumName: currentSong.album_name,
+        imageUrl: currentSong.imageUrl,
+        filePath: currentSong.url,
+        tidalId: currentSong.tidal_id,
+        deezerId: currentSong.id.startsWith('deezer-') ? currentSong.id.replace('deezer-', '') : undefined,
+      };
+
+      console.log("Calling 'generate-lyrics' with payload:", payload);
       
-      const response = await supabase.functions.invoke('generate-lyrics', {
-        body: { 
-          songTitle: currentSong.title, 
-          artist: currentSong.artist,
-          duration: durationInSeconds,
-          albumName: currentSong.album_name,
-          imageUrl: currentSong.imageUrl,
-          filePath: currentSong.url,
-          tidalId: currentSong.tidal_id,
-          deezerId: currentSong.id.startsWith('deezer-') ? currentSong.id : undefined,
-        },
+      const { data, error: functionError } = await supabase.functions.invoke('generate-lyrics', {
+        body: payload,
       });
 
-      if (response.error) throw new Error(response.error.message);
-      if (response.data.error) throw new Error(response.data.error);
+      if (functionError) {
+        console.error("Edge function invocation error:", functionError);
+        throw new Error(`L'appel à la fonction a échoué: ${functionError.message}`);
+      }
 
-      if (response.data.lyrics) {
-        const newLyrics = response.data.lyrics;
+      if (data.error) {
+        console.error("Edge function returned an error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (data.lyrics) {
+        const newLyrics = data.lyrics;
         setLyricsText(newLyrics);
         if (isLrcFormat(newLyrics)) {
           try {
@@ -355,15 +367,15 @@ export const SyncedLyricsView: React.FC = () => {
           setParsedLyrics(null);
         }
         toast.success("Paroles récupérées avec succès !");
-      } else if (response.data.message) {
-        toast.info(response.data.message);
+      } else if (data.message) {
+        toast.info(data.message);
         await fetchLyrics(currentSong.id, true); // Re-fetch, but prevent recursion
       } else {
         setError("Aucune parole trouvée pour cette chanson.");
       }
       
     } catch (error: any) {
-      console.error('Error generating lyrics:', error);
+      console.error('Error in generateLyrics function:', error);
       const errorMessage = error.message || "Impossible de récupérer les paroles";
       setError(errorMessage);
       toast.error(errorMessage);
