@@ -331,6 +331,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             id: song.id,
             title: song.title,
             url: song.url,
+            tidal_id: song.tidal_id, // Ajout pour le débogage
           });
         } catch (e) {
           console.error('[RESTORE] FAILED to parse song from localStorage. Clearing invalid data.', e);
@@ -412,6 +413,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRef.current.load();
           
           setCurrentSong(song);
+          setDisplayedSong(song); // S'assurer que l'affichage est aussi mis à jour
           
           console.log("[RESTORE] Restoration initiated, waiting for audio element events...");
         } catch (error) {
