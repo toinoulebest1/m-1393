@@ -193,23 +193,6 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
                   {t("common.edit")}
                 </Button>
               )}
-              
-              {!lyrics && !isLoading && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={generateLyrics}
-                  disabled={isGenerating || !artist}
-                  className="ml-2 shrink-0"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Music className="h-4 w-4 mr-2" />
-                  )}
-                  {t("common.fetchLyrics")}
-                </Button>
-              )}
             </div>
           </DialogTitle>
           <DialogDescription className="break-words">
@@ -238,7 +221,7 @@ export const LyricsModal: React.FC<LyricsModalProps> = ({
               <p>{t("common.noLyricsAvailable")}</p>
               <p className="text-sm mt-2">
                 {artist 
-                  ? t("common.clickFetchLyrics")
+                  ? "Les paroles pour cette chanson ne sont pas disponibles."
                   : t("common.cannotFetchWithoutArtist")}
               </p>
             </div>

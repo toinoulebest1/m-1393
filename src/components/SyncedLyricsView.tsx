@@ -702,19 +702,6 @@ export const SyncedLyricsView: React.FC = () => {
                   <AlertTitle>Erreur</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
-                
-                <Button
-                  onClick={generateLyrics}
-                  disabled={isGenerating || !currentSong.artist}
-                  className="mt-4"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Music className="h-4 w-4 mr-2" />
-                  )}
-                  Réessayer
-                </Button>
               </div>
             ) : (
               <div className="flex-grow text-center p-4 md:p-6 w-full">
@@ -724,22 +711,8 @@ export const SyncedLyricsView: React.FC = () => {
                     Pas de paroles disponibles
                   </h2>
                   <p className="text-spotify-neutral max-w-md mb-6">
-                    Cette chanson n'a pas de paroles synchronisées
+                    Cette chanson n'a pas de paroles synchronisées.
                   </p>
-                  
-                  <Button
-                    onClick={generateLyrics}
-                    disabled={isGenerating || !currentSong.artist}
-                    variant="outline"
-                    className="mx-auto"
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Music className="h-4 w-4 mr-2" />
-                    )}
-                    Récupérer les paroles
-                  </Button>
                 </div>
               </div>
             )}
