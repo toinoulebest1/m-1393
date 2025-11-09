@@ -322,6 +322,7 @@ export const SyncedLyricsView: React.FC = () => {
         .from('lyrics')
         .select('content')
         .eq('song_id', songId)
+        .limit(1)
         .maybeSingle();
         
       if (error) {

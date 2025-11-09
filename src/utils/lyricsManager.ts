@@ -23,6 +23,7 @@ export const fetchAndSaveLyrics = async (
       .from('lyrics')
       .select('content')
       .eq('song_id', songId)
+      .limit(1)
       .maybeSingle();
 
     if (checkError) {
@@ -72,7 +73,7 @@ export const fetchAndSaveLyrics = async (
       console.log(`[lyricsManager] 6. Sauvegarde dans la DB pour song_id: ${songId}`);
       const { error: insertError } = await supabase
         .from('lyrics')
-        .upsert({ song_id: songId, content: lyricsContent });
+        .upsert({ song_id: songId, content: lyricsContent }, { onConflict: 'song_id' });
 
       if (insertError) {
         console.error('[lyricsManager] 6.1. ERREUR lors de la sauvegarde dans la DB:', insertError);
