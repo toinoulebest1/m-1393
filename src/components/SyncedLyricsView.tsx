@@ -265,11 +265,17 @@ export const SyncedLyricsView: React.FC = () => {
         },
         (payload) => {
           console.log('[Realtime] Changement détecté pour les paroles:', payload);
-          toast.info("Les paroles viennent d'être mises à jour !");
-          // Re-fetch lyrics when a change is detected
-          console.log('[Realtime] Re-fetch des paroles suite à la notification...');
-          setIsLoadingLyrics(true); // Show loader while re-fetching
-          fetchLyrics(currentSongId);
+          if (payload.new && (payload.new as any).content) {
+            toast.info("Les paroles viennent d'être mises à jour !");
+            const newLyrics = (payload.new as any).content;
+            setLyricsText(newLyrics);
+            if (isLrcFormat(newLyrics)) {
+              setParsedLyrics(parseLrc(newLyrics));
+            } else {
+              setParsedLyrics(null);
+            }
+            setIsLoadingLyrics(false);
+          }
         }
       )
       .subscribe();
@@ -410,10 +416,25 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(response.data.error);
       }
 
-      // Re-fetch lyrics from DB to ensure we have the latest version
-      await fetchLyrics(currentSong.id);
-      
-      toast.success("Paroles récupérées avec succès !");
+      // Directly use the lyrics from the function's response
+      if (response.data.lyrics) {
+        const newLyrics = response.data.lyrics;
+        setLyricsText(newLyrics);
+        if (isLrcFormat(newLyrics)) {
+          try {
+            setParsedLyrics(parseLrc(newLyrics));
+          } catch (e) {
+            setParsedLyrics(null);
+          }
+        } else {
+          setParsedLyrics(null);
+        }
+        toast.success("Paroles récupérées avec succès !");
+      } else if (response.data.message) {
+        // This case handles when lyrics already exist, so we fetch them
+        toast.info(response.data.message);
+        await fetchLyrics(currentSong.id);
+      }
       
     } catch (error: any) {
       console.error('Error generating lyrics:', error);
@@ -421,6 +442,7 @@ export const SyncedLyricsView: React.FC = () => {
       toast.error(error.message || "Impossible de récupérer les paroles");
     } finally {
       setIsGenerating(false);
+      setIsLoadingLyrics(false); // Ensure loading is stopped
     }
   };
 
@@ -716,8 +738,18 @@ export const SyncedLyricsView: React.FC = () => {
                     Pas de paroles disponibles
                   </h2>
                   <p className="text-spotify-neutral max-w-md mb-6">
-                    Cette chanson n'a pas de paroles synchronisées.
+                    Cette chanson n'a pas de paroles synchronisées. Vous pouvez essayer de les générer.
                   </p>
+                  <Button onClick={generateLyrics} disabled={isGenerating}>
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Génération...
+                      </>
+                    ) : (
+                      "Générer les paroles"
+                    )}
+                  </Button>
                 </div>
               </div>
             )}
