@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Song } from '@/types/player';
 import { toast } from 'sonner';
 import { useGenreBasedQueue } from './useGenreBasedQueue';
@@ -38,6 +38,14 @@ export const usePlayerQueue = ({
   const [shuffledQueue, setShuffledQueue] = useState<Song[]>([]);
   const [shuffleMode, setShuffleMode] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
+
+  // Recalculer la file d'attente mélangée si la file principale change
+  useEffect(() => {
+    if (shuffleMode) {
+      const newShuffledQueue = [...queue].sort(() => Math.random() - 0.5);
+      setShuffledQueue(newShuffledQueue);
+    }
+  }, [queue, shuffleMode]);
 
   // Create a properly typed setQueue function that accepts both arrays and callback functions
   const setQueue = useCallback((value: Song[] | ((prevQueue: Song[]) => Song[])) => {
@@ -103,19 +111,17 @@ export const usePlayerQueue = ({
     
     if (!currentSong || activeQueue.length === 0) {
       console.log("No current song or queue is empty");
+      toast.info("La file d'attente est vide.");
       return;
     }
     
-    const currentIndex = activeQueue.findIndex(song => song.id === currentSong.id);
+    let currentIndex = activeQueue.findIndex(song => song.id === currentSong.id);
     console.log("Current index in active queue:", currentIndex);
     
+    // Si la chanson actuelle n'est pas dans la file (cas rare), on commence par la première
     if (currentIndex === -1) {
-      // Si la chanson n'est pas dans la file active (ex: jouée depuis la recherche)
-      // On joue la première chanson de la file active
-      if (activeQueue.length > 0) {
-        await play(activeQueue[0]);
-      }
-      return;
+      console.warn("Current song not found in active queue. Starting from the beginning.");
+      currentIndex = -1; // Pour que nextIndex devienne 0
     }
     
     const nextIndex = currentIndex + 1;
