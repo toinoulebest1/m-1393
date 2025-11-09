@@ -3,7 +3,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mic, Music, Loader2, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Heart, ChevronDown, MoreVertical, Cast, Flag } from "lucide-react";
 import { LrcPlayer } from "@/components/LrcPlayer";
-import { parseLrc } from "@/utils/lrcParser";
+import { parseLrc, isLrcFormat } from "@/utils/lrcParser";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -232,7 +232,9 @@ export const SyncedLyricsView: React.FC = () => {
 
   // Detect song change and show loading overlay if applicable
   useEffect(() => {
+    console.log('[SyncedLyricsView] useEffect[currentSong?.id] déclenché.');
     if (currentSong && currentSong.id !== currentSongId) {
+      console.log(`[SyncedLyricsView] Changement de chanson détecté. Ancien ID: ${currentSongId}, Nouvel ID: ${currentSong.id}`);
       setIsChangingSong(true);
       setParsedLyrics(null);
       setLyricsText(null);
@@ -240,6 +242,8 @@ export const SyncedLyricsView: React.FC = () => {
       setIsLoadingLyrics(true);
       setCurrentSongId(currentSong.id);
       fetchLyrics(currentSong.id);
+    } else if (currentSong && currentSong.id === currentSongId) {
+      console.log('[SyncedLyricsView] ID de chanson inchangé, pas de re-fetch.');
     }
   }, [currentSong?.id]);
 
@@ -263,6 +267,7 @@ export const SyncedLyricsView: React.FC = () => {
           console.log('[Realtime] Changement détecté pour les paroles:', payload);
           toast.info("Les paroles viennent d'être mises à jour !");
           // Re-fetch lyrics when a change is detected
+          console.log('[Realtime] Re-fetch des paroles suite à la notification...');
           fetchLyrics(currentSongId);
         }
       )
@@ -296,13 +301,12 @@ export const SyncedLyricsView: React.FC = () => {
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
     if (!songId) {
+      console.log('[SyncedLyricsView] fetchLyrics annulé: songId est nul.');
       setIsLoadingLyrics(false);
       return;
     }
     console.log(`[SyncedLyricsView] fetchLyrics appelé pour songId: ${songId}`);
     
-    // Pour les sources externes comme Deezer, on ne cherche pas dans la DB.
-    // Pour Tidal, on continue car les paroles sont sauvegardées dans notre DB.
     if (songId.startsWith('deezer-')) {
       console.log('[SyncedLyricsView] Piste Deezer, pas de recherche de paroles en DB.');
       setIsLoadingLyrics(false);
@@ -313,8 +317,7 @@ export const SyncedLyricsView: React.FC = () => {
     }
     
     try {
-      // Get lyrics from Supabase
-      console.log(`[SyncedLyricsView] Interrogation de la table 'lyrics' pour song_id: ${songId}`);
+      console.log(`[SyncedLyricsView] 1. Interrogation de la table 'lyrics' pour song_id: ${songId}`);
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
@@ -322,32 +325,43 @@ export const SyncedLyricsView: React.FC = () => {
         .maybeSingle();
         
       if (error) {
-        console.error(`[SyncedLyricsView] Erreur Supabase:`, error);
+        console.error(`[SyncedLyricsView] 2. Erreur Supabase:`, error);
+        setError("Erreur de chargement des paroles depuis la base de données.");
         setIsLoadingLyrics(false);
         return;
       }
 
-      if (!data) {
-        console.log(`[SyncedLyricsView] Aucune parole trouvée dans la DB pour ${songId}.`);
+      if (!data || !data.content) {
+        console.log(`[SyncedLyricsView] 2. Aucune parole trouvée dans la DB pour ${songId}.`);
+        setLyricsText(null);
+        setParsedLyrics(null);
         setIsLoadingLyrics(false);
         return;
       }
       
       const lyrics = data.content;
-      console.log(`[SyncedLyricsView] Paroles trouvées dans la DB. Contenu:`, lyrics.substring(0, 100) + '...');
+      console.log(`[SyncedLyricsView] 2. Paroles trouvées dans la DB. Contenu (100 premiers caractères):`, lyrics.substring(0, 100) + '...');
       setLyricsText(lyrics);
       
-      // Parse LRC format lyrics
-      try {
-        const parsed = parseLrc(lyrics);
-        setParsedLyrics(parsed);
-      } catch (parseError) {
-        console.error('SyncedLyricsView: Error parsing lyrics', parseError);
-        // Still show raw lyrics text even if parsing fails
+      console.log('[SyncedLyricsView] 3. Tentative de parsing LRC...');
+      if (isLrcFormat(lyrics)) {
+        try {
+          const parsed = parseLrc(lyrics);
+          console.log('[SyncedLyricsView] 3.1. Parsing LRC réussi.', parsed);
+          setParsedLyrics(parsed);
+        } catch (parseError) {
+          console.error('[SyncedLyricsView] 3.2. Erreur de parsing LRC:', parseError);
+          setParsedLyrics(null); // Afficher en texte brut si le parsing échoue
+        }
+      } else {
+        console.log('[SyncedLyricsView] 3.1. Le format n\'est pas LRC, affichage en texte brut.');
+        setParsedLyrics(null);
       }
     } catch (error) {
-      console.error('SyncedLyricsView: Error fetching lyrics', error);
+      console.error('[SyncedLyricsView] Erreur globale dans fetchLyrics:', error);
+      setError("Une erreur inattendue est survenue lors du chargement des paroles.");
     } finally {
+      console.log('[SyncedLyricsView] 4. Fin de fetchLyrics.');
       setIsLoadingLyrics(false);
       setIsChangingSong(false);
     }
