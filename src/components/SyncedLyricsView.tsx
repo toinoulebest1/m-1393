@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCast } from "@/contexts/CastContext";
 import { ReportSongDialog } from "@/components/ReportSongDialog";
+import { fetchAndSaveLyrics } from '@/utils/lyricsManager';
 
 export const SyncedLyricsView: React.FC = () => {
   const { currentSong, progress, isPlaying, play, pause, resume, nextSong, previousSong, setProgress, volume, setVolume, getCurrentAudioElement, toggleFavorite, favorites, refreshCurrentSong } = usePlayer();
@@ -325,7 +326,7 @@ export const SyncedLyricsView: React.FC = () => {
     setIsGenerating(false);
   };
 
-  // Generate lyrics function
+  // Generate lyrics function (for non-Tidal songs)
   const generateLyrics = async () => {
     if (!currentSong || !currentSong.artist || !currentSong.title) {
       const errorMessage = "Informations sur la chanson incomplètes pour générer les paroles.";
@@ -397,12 +398,40 @@ export const SyncedLyricsView: React.FC = () => {
   };
 
   // Function to fetch lyrics
-  const fetchLyrics = async (songId: string, skipGenerate = false) => {
-    if (!songId) {
+  const fetchLyrics = async (songId: string) => {
+    if (!songId || !currentSong) {
       setIsLoadingLyrics(false);
       return;
     }
     
+    setIsLoadingLyrics(true);
+    setError(null);
+
+    // Prioritize Tidal API if available
+    if (currentSong.tidal_id || songId.startsWith('tidal-')) {
+      console.log("Chanson Tidal détectée, utilisation de l'API Tidal directe.");
+      const lyrics = await fetchAndSaveLyrics(
+        songId,
+        currentSong.title,
+        currentSong.artist,
+        currentSong.duration,
+        currentSong.album_name,
+        true,
+        currentSong.tidal_id
+      );
+
+      if (lyrics) {
+        handleFoundLyrics(lyrics);
+      } else {
+        // Fallback to Genius if Tidal fails
+        console.log("API Tidal n'a rien retourné, fallback sur Genius.");
+        await generateLyrics();
+      }
+      setIsChangingSong(false);
+      return;
+    }
+
+    // Fallback for Deezer and other sources
     if (songId.startsWith('deezer-')) {
       setLyricsText(null);
       setParsedLyrics(null);
@@ -412,15 +441,16 @@ export const SyncedLyricsView: React.FC = () => {
       return;
     }
     
+    // Default to DB check then Genius generation
     try {
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from('lyrics')
         .select('content')
         .eq('song_id', songId)
         .limit(1)
         .maybeSingle();
         
-      if (error) {
+      if (dbError) {
         setError("Erreur de chargement des paroles depuis la base de données.");
         setIsLoadingLyrics(false);
         return;
@@ -429,12 +459,7 @@ export const SyncedLyricsView: React.FC = () => {
       if (data && data.content) {
         handleFoundLyrics(data.content);
       } else {
-        if (!skipGenerate) {
-          await generateLyrics();
-        } else {
-          setError("Aucune parole trouvée pour cette chanson.");
-          setIsLoadingLyrics(false);
-        }
+        await generateLyrics();
       }
     } catch (error) {
       setError("Une erreur inattendue est survenue lors du chargement des paroles.");
