@@ -331,7 +331,11 @@ export const SyncedLyricsView: React.FC = () => {
           songTitle: currentSong.title, 
           artist: currentSong.artist,
           duration: durationInSeconds,
-          albumName: currentSong.album_name
+          albumName: currentSong.album_name,
+          imageUrl: currentSong.imageUrl,
+          filePath: currentSong.url,
+          tidalId: currentSong.tidal_id,
+          deezerId: currentSong.id.startsWith('deezer-') ? currentSong.id : undefined,
         },
       });
 

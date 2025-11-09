@@ -14,6 +14,10 @@ interface SongDetails {
   artist: string;
   duration?: number;
   albumName?: string;
+  imageUrl?: string;
+  filePath?: string;
+  tidalId?: string;
+  deezerId?: string;
 }
 
 async function searchSongOnGenius(query: string) {
@@ -65,7 +69,16 @@ serve(async (req) => {
   }
 
   try {
-    const { songTitle, artist, duration, albumName }: SongDetails = await req.json();
+    const { 
+      songTitle, 
+      artist, 
+      duration, 
+      albumName,
+      imageUrl,
+      filePath,
+      tidalId,
+      deezerId
+    }: SongDetails = await req.json();
     
     if (!songTitle || !artist) {
       return new Response(JSON.stringify({ error: "songTitle and artist are required" }), {
@@ -74,33 +87,57 @@ serve(async (req) => {
       });
     }
 
-    // Use the Service Role Key for admin-level access.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } }
     );
 
-    const { data: songData, error: songError } = await supabase
+    // 1. Try to find the song
+    let { data: songData } = await supabase
       .from("songs")
       .select("id")
       .eq("title", songTitle)
       .eq("artist", artist)
-      .single();
+      .maybeSingle();
 
-    if (songError || !songData) {
-      return new Response(JSON.stringify({ error: "Song not found in database" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let songId: string;
+
+    // 2. If song doesn't exist, create it
+    if (!songData) {
+      console.log(`Song "${songTitle}" by "${artist}" not found. Creating it.`);
+      const { data: newSong, error: insertError } = await supabase
+        .from("songs")
+        .insert({
+          title: songTitle,
+          artist: artist,
+          album_name: albumName,
+          duration: duration ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : undefined,
+          image_url: imageUrl,
+          file_path: filePath || `tidal:${tidalId || deezerId}`, // Fallback path
+          tidal_id: tidalId,
+          deezer_id: deezerId,
+        })
+        .select("id")
+        .single();
+
+      if (insertError) {
+        console.error("Error creating new song:", insertError);
+        throw new Error("Failed to create a new entry for the song in the database.");
+      }
+      
+      songId = newSong.id;
+      console.log(`New song created with ID: ${songId}`);
+    } else {
+      songId = songData.id;
     }
-    const songId = songData.id;
 
+    // 3. Check if lyrics already exist for this song ID
     const { data: existingLyrics } = await supabase
       .from("lyrics")
       .select("id")
       .eq("song_id", songId)
-      .single();
+      .maybeSingle();
 
     if (existingLyrics) {
       return new Response(JSON.stringify({ message: "Lyrics already exist for this song." }), {
@@ -109,6 +146,7 @@ serve(async (req) => {
       });
     }
 
+    // 4. Fetch lyrics from Genius
     const hits = await searchSongOnGenius(`${songTitle} ${artist}`);
     if (hits.length === 0) {
       return new Response(JSON.stringify({ error: "Song not found on Genius" }), {
@@ -127,17 +165,17 @@ serve(async (req) => {
       });
     }
 
-    // Save to DB in the background (don't await)
-    supabase
+    // 5. Save lyrics to the database
+    const { error: lyricsInsertError } = await supabase
       .from("lyrics")
-      .insert({ song_id: songId, content: lyrics })
-      .then(({ error }) => {
-        if (error) {
-          console.error("Error saving lyrics to Supabase:", error);
-        } else {
-          console.log("Lyrics saved to Supabase successfully.");
-        }
-      });
+      .insert({ song_id: songId, content: lyrics });
+
+    if (lyricsInsertError) {
+      console.error("Error saving lyrics to Supabase:", lyricsInsertError);
+      throw new Error("Failed to save lyrics to the database.");
+    }
+
+    console.log("Lyrics saved to Supabase successfully.");
 
     // Return lyrics immediately to the client
     return new Response(JSON.stringify({ lyrics }), {
