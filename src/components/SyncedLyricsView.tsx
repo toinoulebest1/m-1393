@@ -41,6 +41,7 @@ export const SyncedLyricsView: React.FC = () => {
   const progressUpdateIntervalRef = useRef<number | null>(null);
   const { discoverDevices } = useCast();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Default colors for songs without image or during loading (Spotify theme colors)
   const DEFAULT_COLORS = {
@@ -235,6 +236,7 @@ export const SyncedLyricsView: React.FC = () => {
     console.log('[SyncedLyricsView] useEffect[currentSong?.id] déclenché.');
     if (currentSong && currentSong.id !== currentSongId) {
       console.log(`[SyncedLyricsView] Changement de chanson détecté. Ancien ID: ${currentSongId}, Nouvel ID: ${currentSong.id}`);
+      if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
       setIsChangingSong(true);
       setParsedLyrics(null);
       setLyricsText(null);
@@ -266,6 +268,7 @@ export const SyncedLyricsView: React.FC = () => {
         (payload) => {
           console.log('[Realtime] Changement détecté pour les paroles:', payload);
           if (payload.new && (payload.new as any).content) {
+            if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
             toast.info("Les paroles viennent d'être mises à jour !");
             const newLyrics = (payload.new as any).content;
             setLyricsText(newLyrics);
@@ -284,6 +287,7 @@ export const SyncedLyricsView: React.FC = () => {
     // Cleanup function to remove the subscription when the component unmounts or song changes
     return () => {
       console.log(`[Realtime] Désabonnement des paroles pour song_id: ${currentSongId}`);
+      if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
       supabase.removeChannel(channel);
     };
   }, [currentSongId]);
@@ -350,10 +354,17 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(`L'appel à la fonction a échoué: ${functionError.message}`);
       }
 
-      // With async, we no longer expect lyrics in the response.
-      // We just wait for the realtime update.
       toast.info("La recherche de paroles a été lancée. Les résultats apparaîtront bientôt.");
-      // Keep isGenerating true, it will be set to false by the realtime listener.
+      
+      // Set a timeout to avoid infinite loading
+      if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = setTimeout(() => {
+        console.warn("Timeout: La génération de paroles a pris trop de temps.");
+        setError("La recherche de paroles a expiré. Veuillez réessayer.");
+        toast.warning("La recherche de paroles a pris plus de temps que prévu.");
+        setIsGenerating(false);
+        setIsLoadingLyrics(false);
+      }, 30000); // 30 seconds timeout
       
     } catch (error: any) {
       console.error('Error in generateLyrics function:', error);
