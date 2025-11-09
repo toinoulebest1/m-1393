@@ -287,76 +287,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log("Changement de chanson déjà en cours");
       return;
     }
-    // Priorité à la file d'attente si elle existe
-    if (queue.length > 1) {
-      await nextSongFromQueue();
-      return;
-    }
-
-    console.log("=== BOUTON SUIVANT CLIQUÉ (HORS QUEUE) ===");
-    
-    // Annuler les préchargements intelligents
-    cancelAllPreloads();
-
-    const nextPredicted = predictedNextRef.current;
-    console.log("🔍 DEBUG NEXT SONG:");
-    console.log("- Chanson actuelle:", currentSong?.title, "ID:", currentSong?.id);
-    console.log("- Chanson prédite:", nextPredicted?.title, "ID:", nextPredicted?.id);
-    console.log("- Historique (dernières 15):", history.slice(-15).map(s => s.title).join(", "));
-    
-    if (nextPredicted && nextPredicted.id !== currentSong?.id) {
-      console.log("✅ Lecture de la chanson prédite:", nextPredicted.title, "ID:", nextPredicted.id);
-      await play(nextPredicted);
-    } else if (currentSong && nextPredicted?.id === currentSong?.id) {
-      console.warn("⚠️ Prédiction obsolète (même chanson), nouvelle prédiction...");
-      toast.info("Recherche d'une chanson suivante...");
-      
-      const newPreds = await predictNextSongs(currentSong, history);
-      const newNextSong = newPreds[0];
-
-      if (newNextSong && newNextSong.id !== currentSong.id) {
-        console.log("✅ Nouvelle prédiction trouvée, lecture:", newNextSong.title);
-        predictedNextRef.current = newNextSong;
-        await play(newNextSong);
-      } else {
-        console.error("❌ Impossible de trouver une chanson suivante différente.");
-        toast.error("Erreur: chanson suivante non trouvée.");
-      }
-    } else if (nextPredicted?.id === currentSong?.id) {
-      console.error("❌ BUG: La prédiction pointe vers la même chanson!");
-      toast.error("Erreur: même chanson détectée");
-    } else {
-      console.warn("⚠️ Aucune chanson prédite disponible");
-      toast.info("Pas de chanson suivante disponible");
-    }
-    console.log("=================================");
-  }, [isChangingSong, play, cancelAllPreloads, currentSong, history, queue, nextSongFromQueue]);
+    await nextSongFromQueue();
+  }, [isChangingSong, nextSongFromQueue]);
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
       console.log("Changement de chanson déjà en cours");
       return;
     }
-    // Priorité à la file d'attente si elle existe
-    if (queue.length > 1) {
-      await previousSongFromQueue();
-      return;
-    }
-
-    console.log("=== BOUTON PRÉCÉDENT CLIQUÉ (HORS QUEUE) ===");
-
-    // Annuler les préchargements intelligents
-    cancelAllPreloads();
-
-    if (history.length > 1) {
-      // Revenir à la chanson précédente dans l'historique
-      const prevSong = history[history.length - 2];
-      console.log("◀️ Lecture de la chanson précédente:", prevSong.title);
-      await play(prevSong);
-    } else {
-      toast.info("Pas de chanson précédente");
-    }
-  }, [isChangingSong, history, play, cancelAllPreloads, queue, previousSongFromQueue]);
+    await previousSongFromQueue();
+  }, [isChangingSong, previousSongFromQueue]);
 
   // Restauration de la lecture au chargement - OPTIMISÉ
   useEffect(() => {
@@ -687,9 +627,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (timeLeft <= transitionTime && timeLeft > 0 && !fadingRef.current) {
         console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
         
-        const nextSongPredicted = predictedNextRef.current;
-        if (!nextSongPredicted) {
-          console.log("Pas de chanson suivante disponible");
+        // Utiliser la logique de file d'attente pour la prochaine chanson
+        const activeQueue = shuffleMode ? shuffledQueue : queue;
+        const currentIndex = activeQueue.findIndex(s => s.id === currentSong.id);
+        const nextSongInQueue = activeQueue[currentIndex + 1];
+
+        if (!nextSongInQueue) {
+          console.log("Pas de chanson suivante dans la file d'attente pour le crossfade.");
           return;
         }
 
@@ -700,8 +644,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const artistElement = document.getElementById('next-song-artist');
 
         if (alertElement && titleElement && artistElement) {
-          titleElement.textContent = nextSongPredicted.title;
-          artistElement.textContent = nextSongPredicted.artist;
+          titleElement.textContent = nextSongInQueue.title;
+          artistElement.textContent = nextSongInQueue.artist;
           alertElement.classList.remove('opacity-0', 'translate-y-2');
           alertElement.classList.add('opacity-100', 'translate-y-0');
 
@@ -713,15 +657,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (!nextAudioRef.current.src || !nextSongPreloaded) {
           console.log("Préparation de la prochaine piste pour le crossfade...");
-          prepareNextAudio(nextSongPredicted).then(() => {
-            startCrossfade(timeLeft, nextSongPredicted);
+          prepareNextAudio(nextSongInQueue).then(() => {
+            startCrossfade(timeLeft, nextSongInQueue);
           }).catch((e) => {
             console.error('Impossible de préparer la prochaine piste:', e);
-            // Tentative de fallback: démarrer quand même avec préchargement intelligent
-            preloadNextTracks().finally(() => startCrossfade(timeLeft, nextSongPredicted));
+            // Tentative de fallback: démarrer quand même
+            startCrossfade(timeLeft, nextSongInQueue);
           });
         } else {
-          startCrossfade(timeLeft, nextSongPredicted);
+          startCrossfade(timeLeft, nextSongInQueue);
         }
       }
     };
@@ -787,7 +731,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 audioRef.current.currentTime = 0;
               }
               
-              const nextTrack = predictedNextRef.current;
+              const nextTrack = nextSong;
               if (nextTrack) {
                 // Mettre à jour la durée de l'API pour la nouvelle chanson
                 apiDurationRef.current = durationToSeconds(nextTrack.duration);
@@ -822,7 +766,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log("=== SONG ENDED ===");
       console.log("Chanson terminée:", currentSong?.title);
       console.log("Fondu en cours:", fadingRef.current);
-      console.log("Chanson suivante prédite:", predictedNextRef.current?.title);
       
       if (!fadingRef.current) {
         console.log("Lecture terminée naturellement sans crossfade");
@@ -833,21 +776,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(err => console.error("Erreur lors de la répétition:", err));
         } else {
-          const nextTrack = predictedNextRef.current;
-          
-          if (nextTrack) {
-            console.log("Passage à la chanson suivante prédite:", nextTrack.title);
-            
-            if ('mediaSession' in navigator) {
-              updateMediaSessionMetadata(nextTrack);
-            }
-            
-            play(nextTrack);
-          } else {
-            console.log("Pas de chanson suivante");
-            setIsPlaying(false);
-            toast.info("Lecture terminée");
-          }
+          // Utiliser la logique de file d'attente pour passer à la suivante
+          nextSongFromQueue();
         }
       }
       console.log("==================");
@@ -866,7 +796,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearInterval(fadeIntervalRef.current);
       }
     };
-  }, [currentSong, nextSongPreloaded, play, repeatMode, preferences.crossfadeEnabled, volume]);
+  }, [currentSong, nextSongPreloaded, play, repeatMode, preferences.crossfadeEnabled, volume, queue, shuffleMode, shuffledQueue, nextSongFromQueue]);
 
   // Fonction pour supprimer une chanson de toutes les listes
   const removeSong = useCallback((songId: string) => {

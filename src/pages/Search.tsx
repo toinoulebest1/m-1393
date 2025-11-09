@@ -212,12 +212,14 @@ const SearchPage = () => {
       if (isPlaying) {
         pause();
       } else {
-        play();
+        // Si on relance la même chanson, on s'assure que la queue est bien la bonne
+        const newQueue = [...results];
+        setQueue(newQueue);
+        play(); // On utilise play() sans argument pour reprendre la lecture
       }
       return;
     }
     const newQueue = [...results];
-    localStorage.setItem('queue', JSON.stringify(newQueue));
     setQueue(newQueue);
     play(song);
   };
