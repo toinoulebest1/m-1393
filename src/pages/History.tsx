@@ -103,7 +103,6 @@ const History = () => {
               bitrate: '320 kbps',
               genre: item.songs.genre,
               album_name: item.songs.album_name,
-              deezer_id: item.songs.deezer_id,
               tidal_id: item.songs.tidal_id,
               isLocal: true,
               playedAt: item.played_at

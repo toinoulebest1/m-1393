@@ -11,6 +11,7 @@ export interface Song {
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
   tidal_id?: string; // Tidal track ID
+  isLocal?: boolean;
 }
 
 export interface FavoriteStat {
