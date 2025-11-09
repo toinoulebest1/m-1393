@@ -80,12 +80,12 @@ export const MusicUploader = () => {
 
   const extractMetadata = async (file: File) => {
     try {
-      console.log("Tentative d'extraction des métadonnées pour:", file.name);
+      // console.log("Tentative d'extraction des métadonnées pour:", file.name);
       const metadata = await mm.parseBlob(file);
-      console.log("Métadonnées extraites avec succès:", metadata.common);
+      // console.log("Métadonnées extraites avec succès:", metadata.common);
       
       if (!metadata.common.picture || metadata.common.picture.length === 0) {
-        console.log("Pas de pochette dans les métadonnées");
+        // console.log("Pas de pochette dans les métadonnées");
         return {
           artist: metadata.common.artist,
           title: metadata.common.title,
@@ -94,10 +94,10 @@ export const MusicUploader = () => {
       }
 
       const picture = metadata.common.picture[0];
-      console.log("Pochette trouvée dans les métadonnées:", {
-        format: picture.format,
-        taille: picture.data.length
-      });
+      // console.log("Pochette trouvée dans les métadonnées:", {
+      //   format: picture.format,
+      //   taille: picture.data.length
+      // });
 
       return {
         artist: metadata.common.artist || undefined,
@@ -113,17 +113,17 @@ export const MusicUploader = () => {
   // Fonction modifiée pour traiter un fichier LRC et l'associer correctement à un fichier audio
   const processLrcFile = async (lrcFile: File, songId: string, title: string, artist: string): Promise<boolean> => {
     try {
-      console.log(`Traitement du fichier LRC pour la chanson ${title}:`, lrcFile.name);
+      // console.log(`Traitement du fichier LRC pour la chanson ${title}:`, lrcFile.name);
       
       // Lire le contenu du fichier LRC
       const lrcContent = await lrcFile.text();
       
       // Parser le fichier LRC
       const parsedLrc = parseLrc(lrcContent);
-      console.log("Fichier LRC parsé:", parsedLrc);
+      // console.log("Fichier LRC parsé:", parsedLrc);
       
       if (parsedLrc.lines.length === 0) {
-        console.log("Le fichier LRC ne contient pas de paroles valides");
+        // console.log("Le fichier LRC ne contient pas de paroles valides");
         return false;
       }
       
@@ -143,7 +143,7 @@ export const MusicUploader = () => {
         return false;
       }
       
-      console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
+      // console.log("Paroles du fichier LRC enregistrées avec succès pour:", songId);
       return true;
     } catch (error) {
       console.error("Erreur lors du traitement du fichier LRC:", error);
@@ -153,7 +153,7 @@ export const MusicUploader = () => {
 
   const fetchLyrics = async (title: string, artist: string, songId: string, duration?: number, albumName?: string) => {
     try {
-      console.log(`Récupération des paroles pour: ${title} de ${artist}`);
+      // console.log(`Récupération des paroles pour: ${title} de ${artist}`);
       
       const { data, error } = await supabase.functions.invoke('generate-lyrics', {
         body: { 
@@ -170,7 +170,7 @@ export const MusicUploader = () => {
       }
       
       if (data && data.lyrics) {
-        console.log("Paroles récupérées avec succès");
+        // console.log("Paroles récupérées avec succès");
         
         // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
         const lyricsContent = data.syncedLyrics || data.lyrics;
@@ -186,7 +186,7 @@ export const MusicUploader = () => {
         if (saveLyricsError) {
           console.error("Erreur lors de l'enregistrement des paroles:", saveLyricsError);
         } else {
-          console.log("Paroles enregistrées avec succès pour:", songId);
+          // console.log("Paroles enregistrées avec succès pour:", songId);
         }
         
         return data.lyrics;
@@ -230,7 +230,7 @@ export const MusicUploader = () => {
             
             // Vérifier si la durée correspond avec ±2 secondes de tolérance
             if (Math.abs(songDuration - duration) <= 2) {
-              console.log(`Doublon détecté: "${song.title}" par ${song.artist} (durées: ${songDuration}s vs ${duration}s)`);
+              // console.log(`Doublon détecté: "${song.title}" par ${song.artist} (durées: ${songDuration}s vs ${duration}s)`);
               return true;
             }
           }
@@ -248,7 +248,7 @@ export const MusicUploader = () => {
   };
 
   const processAudioFile = async (file: File) => {
-    console.log("Début du traitement pour:", file.name);
+    // console.log("Début du traitement pour:", file.name);
     
     if (!file.type.startsWith('audio/')) {
       toast.error("Type de fichier non supporté");
@@ -276,7 +276,7 @@ export const MusicUploader = () => {
           resolve(tempAudio.duration);
         });
         tempAudio.addEventListener('error', (e) => {
-          console.error("Erreur lors du chargement de l'audio:", e);
+          console.error("Erreur lors du chargement de l'audio temporaire:", e);
           reject(e);
         });
         tempAudio.src = tempAudioUrl;
@@ -291,7 +291,7 @@ export const MusicUploader = () => {
         return null;
       }
 
-      console.log("Stockage du fichier audio:", fileId);
+      // console.log("Stockage du fichier audio:", fileId);
       setUploadProgress(0);
       setIsUploading(true);
 
@@ -336,7 +336,7 @@ export const MusicUploader = () => {
           const uint8Array = new Uint8Array(metadataResult.picture.data);
           const blob = new Blob([uint8Array.buffer], { type: metadataResult.picture.format });
           imageUrl = URL.createObjectURL(blob);
-          console.log("Pochette créée depuis les métadonnées");
+          // console.log("Pochette créée depuis les métadonnées");
         } catch (error) {
           console.error("Erreur lors de la création du blob:", error);
         }
@@ -344,7 +344,7 @@ export const MusicUploader = () => {
 
       // 2. Recherche de pochette sur Deezer retirée.
       if (imageUrl === "https://picsum.photos/240/240") {
-        console.log("Aucune pochette trouvée dans les métadonnées.");
+        // console.log("Aucune pochette trouvée dans les métadonnées.");
         toast.info(`Aucune pochette trouvée pour "${title}"`);
       }
 
@@ -370,7 +370,7 @@ export const MusicUploader = () => {
       
       // Recherche améliorée des fichiers LRC correspondants
       const baseFileName = file.name.replace(/\.[^/.]+$/, "");
-      console.log("Recherche de fichiers LRC pour le nom de base:", baseFileName);
+      // console.log("Recherche de fichiers LRC pour le nom de base:", baseFileName);
       
       // Vérifier différents formats possibles de noms de fichiers LRC
       const possibleLrcNames = [
@@ -383,7 +383,7 @@ export const MusicUploader = () => {
         `${artist.toLowerCase()} - ${title.toLowerCase()}.lrc`  // artiste - titre en minuscules
       ];
       
-      console.log("Recherche parmi les noms de fichiers LRC possibles:", possibleLrcNames);
+      // console.log("Recherche parmi les noms de fichiers LRC possibles:", possibleLrcNames);
       
       let lyricsFound = false;
       let lrcFile: File | undefined;
@@ -391,7 +391,7 @@ export const MusicUploader = () => {
       // Rechercher parmi tous les noms possibles
       for (const lrcName of possibleLrcNames) {
         if (lrcFilesRef.current.has(lrcName)) {
-          console.log(`Fichier LRC correspondant trouvé: ${lrcName}`);
+          // console.log(`Fichier LRC correspondant trouvé: ${lrcName}`);
           lrcFile = lrcFilesRef.current.get(lrcName);
           break;
         }
@@ -404,8 +404,8 @@ export const MusicUploader = () => {
         if (lyricsFound) {
         }
       } else {
-        console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
-        console.log("Noms de fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
+        // console.log("Aucun fichier LRC correspondant trouvé parmi", lrcFilesRef.current.size, "fichiers LRC en cache");
+        // console.log("Noms de fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
       }
       
       // Si aucun fichier LRC n'a été trouvé, essayer de récupérer les paroles en ligne
@@ -463,7 +463,7 @@ export const MusicUploader = () => {
       if (fileName.endsWith('.lrc')) {
         // Stocker les fichiers LRC par nom complet et aussi par nom sans extension
         lrcFilesRef.current.set(file.name, file);
-        console.log("Fichier LRC détecté et mis en cache:", file.name);
+        // console.log("Fichier LRC détecté et mis en cache:", file.name);
         
         // Afficher un toast pour informer l'utilisateur que des fichiers LRC ont été détectés
         toast.info(`Fichier de paroles détecté: ${file.name}`);
@@ -477,12 +477,12 @@ export const MusicUploader = () => {
       return;
     }
 
-    console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
-    console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
+    // console.log("Nombre de fichiers audio trouvés:", audioFiles.length);
+    // console.log("Nombre de fichiers LRC trouvés:", lrcFilesRef.current.size);
     
     // Afficher les noms des fichiers LRC pour le débogage
     if (lrcFilesRef.current.size > 0) {
-      console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
+      // console.log("Fichiers LRC en cache:", Array.from(lrcFilesRef.current.keys()));
     }
 
     // Traiter les fichiers séquentiellement pour éviter les erreurs de rate limiting
@@ -497,7 +497,7 @@ export const MusicUploader = () => {
     }
 
     const validSongs = processedSongs.filter((song): song is NonNullable<typeof song> => song !== null);
-    console.log("Chansons valides traitées:", validSongs);
+    // console.log("Chansons valides traitées:", validSongs);
 
     if (validSongs.length > 0) {
       validSongs.forEach(song => addToQueue(song));

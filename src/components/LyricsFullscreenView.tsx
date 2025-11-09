@@ -11,7 +11,6 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Slider } from "@/components/ui/slider";
 import ColorThief from "colorthief";
 import { parseLrc, findCurrentLyricLine, isLrcFormat as checkIsLrcFormat, convertTextToLrc, ParsedLrc, LrcLine } from "@/utils/lrcParser";
-import { LrcPlayer } from "./LrcPlayer";
 
 // Define the Song interface since we can't import it from PlayerContext
 interface Song {

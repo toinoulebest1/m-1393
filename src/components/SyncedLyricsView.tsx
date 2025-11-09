@@ -234,9 +234,9 @@ export const SyncedLyricsView: React.FC = () => {
 
   // Detect song change and show loading overlay if applicable
   useEffect(() => {
-    console.log('[SyncedLyricsView] useEffect[currentSong?.id] déclenché.');
+    // console.log('[SyncedLyricsView] useEffect[currentSong?.id] déclenché.');
     if (currentSong && currentSong.id !== currentSongId) {
-      console.log(`[SyncedLyricsView] Changement de chanson détecté. Ancien ID: ${currentSongId}, Nouvel ID: ${currentSong.id}`);
+      // console.log(`[SyncedLyricsView] Changement de chanson détecté. Ancien ID: ${currentSongId}, Nouvel ID: ${currentSong.id}`);
       if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
       setIsChangingSong(true);
       setParsedLyrics(null);
@@ -246,7 +246,7 @@ export const SyncedLyricsView: React.FC = () => {
       setCurrentSongId(currentSong.id);
       fetchLyrics(currentSong.id);
     } else if (currentSong && currentSong.id === currentSongId) {
-      console.log('[SyncedLyricsView] ID de chanson inchangé, pas de re-fetch.');
+      // console.log('[SyncedLyricsView] ID de chanson inchangé, pas de re-fetch.');
     }
   }, [currentSong?.id]);
 
@@ -254,7 +254,7 @@ export const SyncedLyricsView: React.FC = () => {
   useEffect(() => {
     if (!currentSongId) return;
 
-    console.log(`[Realtime] Abonnement aux paroles pour song_id: ${currentSongId}`);
+    // console.log(`[Realtime] Abonnement aux paroles pour song_id: ${currentSongId}`);
 
     const channel = supabase
       .channel(`lyrics:${currentSongId}`)
@@ -267,7 +267,7 @@ export const SyncedLyricsView: React.FC = () => {
           filter: `song_id=eq.${currentSongId}`,
         },
         (payload) => {
-          console.log('[Realtime] Changement détecté pour les paroles:', payload);
+          // console.log('[Realtime] Changement détecté pour les paroles:', payload);
           if (payload.new && (payload.new as any).content) {
             if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
             toast.info("Les paroles viennent d'être mises à jour !");
@@ -287,7 +287,7 @@ export const SyncedLyricsView: React.FC = () => {
 
     // Cleanup function to remove the subscription when the component unmounts or song changes
     return () => {
-      console.log(`[Realtime] Désabonnement des paroles pour song_id: ${currentSongId}`);
+      // console.log(`[Realtime] Désabonnement des paroles pour song_id: ${currentSongId}`);
       if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
       supabase.removeChannel(channel);
     };
@@ -359,7 +359,7 @@ export const SyncedLyricsView: React.FC = () => {
         deezerId: currentSong.id.startsWith('deezer-') ? currentSong.id.replace('deezer-', '') : undefined,
       };
 
-      console.log("Calling 'generate-lyrics' with payload:", payload);
+      // console.log("Calling 'generate-lyrics' with payload:", payload);
       
       const { data, error: functionError } = await supabase.functions.invoke('generate-lyrics', {
         body: payload,
@@ -409,7 +409,7 @@ export const SyncedLyricsView: React.FC = () => {
 
     // Prioritize Tidal API if available
     if (currentSong.tidal_id || songId.startsWith('tidal-')) {
-      console.log("Chanson Tidal détectée, utilisation de l'API Tidal directe.");
+      // console.log("Chanson Tidal détectée, utilisation de l'API Tidal directe.");
       const lyrics = await fetchAndSaveLyrics(
         songId,
         currentSong.title,
@@ -424,7 +424,7 @@ export const SyncedLyricsView: React.FC = () => {
         handleFoundLyrics(lyrics);
       } else {
         // Fallback to Genius if Tidal fails
-        console.log("API Tidal n'a rien retourné, fallback sur Genius.");
+        // console.log("API Tidal n'a rien retourné, fallback sur Genius.");
         await generateLyrics();
       }
       setIsChangingSong(false);

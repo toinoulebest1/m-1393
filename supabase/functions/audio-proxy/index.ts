@@ -8,9 +8,9 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log(`[AudioProxy] Incoming request URL: ${req.url}`);
-  console.log(`[AudioProxy] Incoming request method: ${req.method}`);
-  console.log(`[AudioProxy] Incoming request headers:`, Object.fromEntries(req.headers.entries()));
+  // console.log(`[AudioProxy] Incoming request URL: ${req.url}`);
+  // console.log(`[AudioProxy] Incoming request method: ${req.method}`);
+  // console.log(`[AudioProxy] Incoming request headers:`, Object.fromEntries(req.headers.entries()));
 
   // Gérer les requêtes OPTIONS pour CORS
   if (req.method === 'OPTIONS') {
@@ -25,7 +25,7 @@ serve(async (req) => {
     return new Response('Missing "src" parameter (Tidal audio URL)', { status: 400, headers: corsHeaders });
   }
 
-  console.log(`[AudioProxy] Extracted Tidal audio URL (src): ${tidalAudioUrl}`);
+  // console.log(`[AudioProxy] Extracted Tidal audio URL (src): ${tidalAudioUrl}`);
 
   try {
     const fetchHeaders = {
@@ -36,14 +36,14 @@ serve(async (req) => {
         !['host', 'connection', 'accept-encoding', 'x-forwarded-for', 'x-forwarded-proto', 'x-real-ip'].includes(key.toLowerCase())
       )),
     };
-    console.log(`[AudioProxy] Fetching from Tidal with headers:`, fetchHeaders);
+    // console.log(`[AudioProxy] Fetching from Tidal with headers:`, fetchHeaders);
 
     const response = await fetch(tidalAudioUrl, {
       headers: fetchHeaders,
     });
 
-    console.log(`[AudioProxy] Response from Tidal status: ${response.status}`);
-    console.log(`[AudioProxy] Response from Tidal headers:`, Object.fromEntries(response.headers.entries()));
+    // console.log(`[AudioProxy] Response from Tidal status: ${response.status}`);
+    // console.log(`[AudioProxy] Response from Tidal headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       console.error(`[AudioProxy] Failed to fetch Tidal audio: ${response.status} ${response.statusText}`);
@@ -65,7 +65,7 @@ serve(async (req) => {
     }
 
 
-    console.log(`[AudioProxy] Successfully proxied audio from Tidal. Final response headers:`, Object.fromEntries(responseHeaders.entries()));
+    // console.log(`[AudioProxy] Successfully proxied audio from Tidal. Final response headers:`, Object.fromEntries(responseHeaders.entries()));
     return new Response(response.body, {
       status: response.status,
       headers: responseHeaders,

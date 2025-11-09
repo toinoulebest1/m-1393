@@ -137,7 +137,7 @@ const Index = () => {
           setUsername(profile.username);
         }
       } catch (error) {
-        console.log("Profile fetch error (non-critical):", error);
+        // console.log("Profile fetch error (non-critical):", error);
       }
     };
     fetchProfile();
@@ -161,9 +161,9 @@ const Index = () => {
           }
         }).subscribe((status: string) => {
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Profile realtime subscription active');
+            // console.log('✅ Profile realtime subscription active');
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            console.log('⚠️ Profile realtime subscription failed:', status, '- App will work without realtime updates');
+            // console.log('⚠️ Profile realtime subscription failed:', status, '- App will work without realtime updates');
           }
         });
 
@@ -174,10 +174,10 @@ const Index = () => {
           schema: 'public',
           table: 'songs'
         }, (payload: any) => {
-          console.log("Song change detected:", payload);
+          // console.log("Song change detected:", payload);
           // Actualiser la chanson courante si ses métadonnées ont été mises à jour
           if (refreshCurrentSong) {
-            console.log("Refreshing current song from Index.tsx");
+            // console.log("Refreshing current song from Index.tsx");
             refreshCurrentSong();
             // Force re-render after metadata update
             setTimeout(() => {
@@ -190,15 +190,15 @@ const Index = () => {
           }
         }).subscribe((status: string) => {
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Songs realtime subscription active');
+            // console.log('✅ Songs realtime subscription active');
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            console.log('⚠️ Songs realtime subscription failed:', status, '- App will work without realtime updates');
+            // console.log('⚠️ Songs realtime subscription failed:', status, '- App will work without realtime updates');
           }
         });
-        console.log('🔄 Setting up realtime subscriptions...');
+        // console.log('🔄 Setting up realtime subscriptions...');
       } catch (error) {
-        console.log('⚠️ Realtime subscriptions blocked (content blocker) - App will work without realtime updates');
-        console.log('Error details:', error);
+        // console.log('⚠️ Realtime subscriptions blocked (content blocker) - App will work without realtime updates');
+        // console.log('Error details:', error);
       }
     };
 
@@ -216,7 +216,7 @@ const Index = () => {
           supabase.removeChannel(songsChannel);
         }
       } catch (error) {
-        console.log('Cleanup error (non-critical):', error);
+        // console.log('Cleanup error (non-critical):', error);
       }
     };
   }, [userId, username, refreshCurrentSong]);

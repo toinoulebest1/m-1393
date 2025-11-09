@@ -141,7 +141,7 @@ const History = () => {
           table: 'play_history'
         },
         async (payload) => {
-          console.log('Changement détecté dans play_history:', payload);
+          // console.log('Changement détecté dans play_history:', payload);
           await loadHistory();
         }
       )

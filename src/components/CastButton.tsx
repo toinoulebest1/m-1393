@@ -26,7 +26,7 @@ export const CastButton = () => {
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen && devices.length === 0 && !isDiscovering) {
-      console.log('🔍 Opening Cast menu, discovering devices...');
+      // console.log('🔍 Opening Cast menu, discovering devices...');
       discoverDevices();
     }
   };
@@ -39,7 +39,7 @@ export const CastButton = () => {
       }
       setDlnaLoading(true);
       setDlnaUrl(null);
-      console.log('🧩 Resolving DLNA link for:', currentSong.title);
+      // console.log('🧩 Resolving DLNA link for:', currentSong.title);
       const result = await UltraFastStreaming.getAudioUrlUltraFast(
         currentSong.url,
         currentSong.title,
@@ -83,7 +83,7 @@ export const CastButton = () => {
               variant="ghost"
               size="sm"
               onClick={() => {
-                console.log('🔄 Manual device discovery requested');
+                // console.log('🔄 Manual device discovery requested');
                 discoverDevices();
               }}
               disabled={isDiscovering}
@@ -145,7 +145,7 @@ export const CastButton = () => {
                           activeDevice?.id === device.id && "bg-spotify-accent/20 text-spotify-accent hover:bg-spotify-accent/30"
                         )}
                         onClick={() => {
-                          console.log('🎯 Connecting to device:', device.name);
+                          // console.log('🎯 Connecting to device:', device.name);
                           if (activeDevice?.id === device.id) {
                             disconnectFromDevice();
                           } else {
@@ -210,7 +210,7 @@ export const CastButton = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  console.log('🔌 Disconnecting from Cast device');
+                  // console.log('🔌 Disconnecting from Cast device');
                   disconnectFromDevice();
                   setOpen(false);
                 }}

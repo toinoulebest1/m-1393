@@ -31,7 +31,7 @@ const createNextAudio = () => {
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
-    console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
+    // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
     localStorage.removeItem('queue');
     localStorage.removeItem('lastSearchResults');
     localStorage.removeItem('shuffleMode');
@@ -106,7 +106,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // Gérer le cas où la chanson n'existe pas encore dans la table 'songs'
           // (par exemple, juste après un upload ou pour une chanson Tidal)
           if (error.code === '23503') { // Foreign key violation
-            console.warn(`La chanson ${currentSong.id} n'existe pas dans la table 'songs'. Tentative d'insertion.`);
+            // console.warn(`La chanson ${currentSong.id} n'existe pas dans la table 'songs'. Tentative d'insertion.`);
             const { error: insertError } = await supabase.from('songs').insert({
               id: currentSong.id,
               title: currentSong.title,
@@ -132,7 +132,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error('❌ Erreur enregistrement historique:', error);
           }
         } else {
-          console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
+          // console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
         }
       } catch (error) {
         console.error('❌ Erreur lors de l\'enregistrement dans l\'historique:', error);
@@ -151,24 +151,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     // Enregistrer la transition
     if (previousSongRef.current && previousSongRef.current.id !== currentSong.id) {
+      // console.log("🔄 Détection de transition pour prédiction:", previousSongRef.current.title, "->", currentSong.title);
       recordTransition(previousSongRef.current, currentSong);
     }
     previousSongRef.current = currentSong;
     
     (async () => {
       try {
-        console.log("🔄 Début prédiction pour:", currentSong.title, "ID:", currentSong.id);
+        // console.log("🔄 Début prédiction pour:", currentSong.title, "ID:", currentSong.id);
         
         // Lancer la recherche de paroles en arrière-plan
-        console.log('[PlayerContext] Appel de fetchLyricsInBackground avec:', {
-          songId: currentSong.id,
-          songTitle: currentSong.title,
-          artist: currentSong.artist,
-          duration: currentSong.duration,
-          albumName: currentSong.album_name,
-          isTidal: !!currentSong.tidal_id,
-          tidalId: currentSong.tidal_id
-        });
+        // console.log('[PlayerContext] Appel de fetchLyricsInBackground avec:', {
+        //   songId: currentSong.id,
+        //   songTitle: currentSong.title,
+        //   artist: currentSong.artist,
+        //   duration: currentSong.duration,
+        //   albumName: currentSong.album_name,
+        //   isTidal: !!currentSong.tidal_id,
+        //   tidalId: currentSong.tidal_id
+        // });
         fetchLyricsInBackground(
           currentSong.id, 
           currentSong.title, 
@@ -183,8 +184,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         predictedNextRef.current = preds[0] || null;
         
         if (predictedNextRef.current) {
-          console.log("✅ Prédiction FIXÉE:", predictedNextRef.current.title, "ID:", predictedNextRef.current.id);
-          console.log("📦 Référence stockée dans predictedNextRef.current");
+          // console.log("✅ Prédiction FIXÉE:", predictedNextRef.current.title, "ID:", predictedNextRef.current.id);
+          // console.log("📦 Référence stockée dans predictedNextRef.current");
           // Précharger immédiatement
           await preloadPredictedSongs(preds);
         }
@@ -284,7 +285,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (nextAudioRef.current.readyState >= 3) resolve();
       });
       setNextSongPreloaded(true);
-      console.log('Prochaine piste prête pour crossfade:', song.title);
+      // console.log('Prochaine piste prête pour crossfade:', song.title);
     } catch (e) {
       console.error('Préparation prochaine piste échouée:', e);
       setNextSongPreloaded(false);
@@ -294,7 +295,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Fonctions de navigation SANS QUEUE - uniquement prédictions
   const nextSong = useCallback(async () => {
     if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours");
+      // console.log("Changement de chanson déjà en cours");
       return;
     }
     await nextSongFromQueue();
@@ -302,7 +303,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const previousSong = useCallback(async () => {
     if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours");
+      // console.log("Changement de chanson déjà en cours");
       return;
     }
     await previousSongFromQueue();
@@ -311,28 +312,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Restauration de la lecture au chargement - OPTIMISÉ
   useEffect(() => {
     const restorePlayback = async () => {
-      console.log('🔄 [RESTORE] Starting playback restoration...');
+      // console.log('🔄 [RESTORE] Starting playback restoration...');
       
       const savedSongString = localStorage.getItem('currentSong');
       const savedProgressValue = localStorage.getItem('audioProgress');
       const savedIsPlaying = localStorage.getItem('isPlaying');
       
-      console.log(`[RESTORE] Found in localStorage:`, {
-        savedSong: savedSongString ? 'YES' : 'NO',
-        savedProgress: savedProgressValue || 'NO',
-        savedIsPlaying: savedIsPlaying || 'NO',
-      });
+      // console.log(`[RESTORE] Found in localStorage:`, {
+      //   savedSong: savedSongString ? 'YES' : 'NO',
+      //   savedProgress: savedProgressValue || 'NO',
+      //   savedIsPlaying: savedIsPlaying || 'NO',
+      // });
       
       if (savedSongString) {
         let song: Song;
         try {
           song = JSON.parse(savedSongString);
-          console.log('[RESTORE] Successfully parsed song from localStorage:', {
-            id: song.id,
-            title: song.title,
-            url: song.url,
-            tidal_id: song.tidal_id, // Ajout pour le débogage
-          });
+          // console.log('[RESTORE] Successfully parsed song from localStorage:', {
+          //   id: song.id,
+          //   title: song.title,
+          //   url: song.url,
+          //   tidal_id: song.tidal_id, // Ajout pour le débogage
+          // });
         } catch (e) {
           console.error('[RESTORE] FAILED to parse song from localStorage. Clearing invalid data.', e);
           localStorage.removeItem('currentSong');
@@ -344,13 +345,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const shouldResumePlaying = savedIsPlaying ? JSON.parse(savedIsPlaying) : false;
         
         apiDurationRef.current = durationToSeconds(song.duration);
-        console.log(`[RESTORE] API duration restored from localStorage: ${apiDurationRef.current}s for "${song.title}"`);
+        // console.log(`[RESTORE] API duration restored from localStorage: ${apiDurationRef.current}s for "${song.title}"`);
 
         try {
-          console.log(`[RESTORE] Attempting to restore: "${song.title}" (ID: ${song.id})`);
+          // console.log(`[RESTORE] Attempting to restore: "${song.title}" (ID: ${song.id})`);
           setIsAudioReady(false);
           
-          console.log(`[RESTORE] Calling UltraFastStreaming with URL key: "${song.url}"`);
+          // console.log(`[RESTORE] Calling UltraFastStreaming with URL key: "${song.url}"`);
           const result = await UltraFastStreaming.getAudioUrlUltraFast(
             song.url,
             song.title,
@@ -362,7 +363,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error("[RESTORE] FAILED: UltraFastStreaming did not return a valid URL.");
             return;
           }
-          console.log(`[RESTORE] SUCCESS: UltraFastStreaming returned a playable URL: ${result.url.substring(0, 100)}...`);
+          // console.log(`[RESTORE] SUCCESS: UltraFastStreaming returned a playable URL: ${result.url.substring(0, 100)}...`);
 
           // Configuration audio avec gestion d'état
           audioRef.current.src = result.url;
@@ -370,22 +371,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // Gestionnaires d'événements pour le chargement
           const handleCanPlay = async () => {
-            console.log("[RESTORE] Event 'canplay' triggered.");
+            // console.log("[RESTORE] Event 'canplay' triggered.");
             setIsAudioReady(true);
             
             if (savedProgressValue) {
               const savedTime = parseFloat(savedProgressValue);
-              console.log(`[RESTORE] Restoring progress to ${savedTime} seconds.`);
+              // console.log(`[RESTORE] Restoring progress to ${savedTime} seconds.`);
               audioRef.current.currentTime = savedTime;
               setProgress((savedTime / audioRef.current.duration) * 100);
             }
             
             if (shouldResumePlaying) {
-              console.log("[RESTORE] Attempting to resume playback...");
+              // console.log("[RESTORE] Attempting to resume playback...");
               try {
                 await audioRef.current.play();
                 setIsPlaying(true);
-                console.log("[RESTORE] Playback resumed successfully.");
+                // console.log("[RESTORE] Playback resumed successfully.");
               } catch (playError) {
                 console.warn("[RESTORE] Autoplay failed:", playError);
                 setIsPlaying(false);
@@ -415,7 +416,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setCurrentSong(song);
           setDisplayedSong(song); // S'assurer que l'affichage est aussi mis à jour
           
-          console.log("[RESTORE] Restoration initiated, waiting for audio element events...");
+          // console.log("[RESTORE] Restoration initiated, waiting for audio element events...");
         } catch (error) {
           console.error("[RESTORE] FAILED: Critical error during restoration process:", error);
           localStorage.removeItem('currentSong');
@@ -424,7 +425,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setIsAudioReady(false);
         }
       } else {
-        console.log('[RESTORE] No saved song found. Restoration complete.');
+        // console.log('[RESTORE] No saved song found. Restoration complete.');
         setIsAudioReady(true);
       }
     };
@@ -490,13 +491,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handleLoadStart = () => {
       // Seulement mettre à false si on change de chanson, pas pendant le préchargement
       if (isChangingSong) {
-        console.log("🔄 Début du chargement audio");
+        // console.log("🔄 Début du chargement audio");
         setIsAudioReady(false);
       }
     };
 
     const handleCanPlay = () => {
-      console.log("✅ Audio prêt");
+      // console.log("✅ Audio prêt");
       setIsAudioReady(true);
     };
     
@@ -609,15 +610,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Persistance des données
   useEffect(() => {
     if (currentSong) {
-      console.log('[PERSISTENCE] Saving currentSong to localStorage:', {
-        id: currentSong.id,
-        title: currentSong.title,
-        url: currentSong.url,
-      });
+      // console.log('[PERSISTENCE] Saving currentSong to localStorage:', {
+      //   id: currentSong.id,
+      //   title: currentSong.title,
+      //   url: currentSong.url,
+      // });
       localStorage.setItem('currentSong', JSON.stringify(currentSong));
       localStorage.setItem('isPlaying', JSON.stringify(isPlaying)); // Persister l'état de lecture
     } else {
-      console.log('[PERSISTENCE] currentSong is null, clearing localStorage.');
+      // console.log('[PERSISTENCE] currentSong is null, clearing localStorage.');
       // Si currentSong est null, effacer toutes les données de lecture persistées
       localStorage.removeItem('currentSong');
       localStorage.removeItem('audioProgress');
@@ -638,7 +639,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const transitionTime = overlapTimeRef.current;
       
       if (timeLeft <= transitionTime && timeLeft > 0 && !fadingRef.current) {
-        console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
+        // console.log(`Démarrage du fondu enchaîné, temps restant: ${timeLeft.toFixed(2)}s, durée du fondu: ${transitionTime}s`);
         
         // Utiliser la logique de file d'attente pour la prochaine chanson
         const activeQueue = shuffleMode ? shuffledQueue : queue;
@@ -646,7 +647,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const nextSongInQueue = activeQueue[currentIndex + 1];
 
         if (!nextSongInQueue) {
-          console.log("Pas de chanson suivante dans la file d'attente pour le crossfade.");
+          // console.log("Pas de chanson suivante dans la file d'attente pour le crossfade.");
           return;
         }
 
@@ -669,7 +670,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         if (!nextAudioRef.current.src || !nextSongPreloaded) {
-          console.log("Préparation de la prochaine piste pour le crossfade...");
+          // console.log("Préparation de la prochaine piste pour le crossfade...");
           prepareNextAudio(nextSongInQueue).then(() => {
             startCrossfade(timeLeft, nextSongInQueue);
           }).catch((e) => {
@@ -684,21 +685,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
     
     const startCrossfade = (timeLeft: number, nextSong: Song) => {
-      console.log(`Début du fondu enchaîné pour ${nextSong.title}`);
+      // console.log(`Début du fondu enchaîné pour ${nextSong.title}`);
       
       nextAudioRef.current.volume = 0;
       const playPromise = nextAudioRef.current.play();
       
       if (playPromise !== undefined) {
         playPromise.then(() => {
-          console.log("Lecture de la prochaine chanson démarrée avec succès");
+          // console.log("Lecture de la prochaine chanson démarrée avec succès");
           
           // Afficher immédiatement la prochaine chanson dans l'UI, sans changer la source principale
           setDisplayedSong(nextSong);
           
           if ('mediaSession' in navigator) {
             updateMediaSessionMetadata(nextSong);
-            console.log("Métadonnées MediaSession mises à jour au début du crossfade:", nextSong.title);
+            // console.log("Métadonnées MediaSession mises à jour au début du crossfade:", nextSong.title);
           }
           
           const crossfadeDuration = overlapTimeRef.current;
@@ -708,7 +709,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const intervalTime = fadeDuration / steps;
           const volumeStep = (volume / 100) / steps;
           
-          console.log(`Paramètres du fondu: durée=${fadeDuration}ms, étapes=${steps}, intervalleTemps=${intervalTime}ms, pas de volume=${volumeStep}`);
+          // console.log(`Paramètres du fondu: durée=${fadeDuration}ms, étapes=${steps}, intervalleTemps=${intervalTime}ms, pas de volume=${volumeStep}`);
           
           let currentOutVolume = audioRef.current.volume;
           let currentInVolume = 0;
@@ -728,11 +729,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               if (audioRef.current) audioRef.current.volume = currentOutVolume;
               if (nextAudioRef.current) nextAudioRef.current.volume = currentInVolume;
               
-              if (stepCount % 10 === 0) {
-                console.log(`Progression du fondu: out=${Math.round(currentOutVolume*100)}%, in=${Math.round(currentInVolume*100)}%, étape=${stepCount}`);
-              }
+              // if (stepCount % 10 === 0) {
+              //   console.log(`Progression du fondu: out=${Math.round(currentOutVolume*100)}%, in=${Math.round(currentInVolume*100)}%, étape=${stepCount}`);
+              // }
             } else {
-              console.log("Fondu enchaîné terminé, passage à la chanson suivante");
+              // console.log("Fondu enchaîné terminé, passage à la chanson suivante");
               
               if (fadeIntervalRef.current) {
                 clearInterval(fadeIntervalRef.current);
@@ -760,7 +761,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 
                 if ('mediaSession' in navigator) {
                   updateMediaSessionMetadata(nextTrack);
-                  console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
+                  // console.log("Métadonnées MediaSession mises à jour lors du crossfade:", nextTrack.title);
                 }
                 
                 setTimeout(() => preloadNextTracks(), 1000);
@@ -776,16 +777,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     const handleEnded = () => {
-      console.log("=== SONG ENDED ===");
-      console.log("Chanson terminée:", currentSong?.title);
-      console.log("Fondu en cours:", fadingRef.current);
+      // console.log("=== SONG ENDED ===");
+      // console.log("Chanson terminée:", currentSong?.title);
+      // console.log("Fondu en cours:", fadingRef.current);
       
       if (!fadingRef.current) {
-        console.log("Lecture terminée naturellement sans crossfade");
+        // console.log("Lecture terminée naturellement sans crossfade");
         setProgress(0);
         
         if (repeatMode === 'one') {
-          console.log("Répétition de la chanson actuelle");
+          // console.log("Répétition de la chanson actuelle");
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(err => console.error("Erreur lors de la répétition:", err));
         } else {
@@ -793,7 +794,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           nextSongFromQueue();
         }
       }
-      console.log("==================");
+      // console.log("==================");
     };
 
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);

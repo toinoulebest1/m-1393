@@ -135,13 +135,13 @@ const Top100 = () => {
 
     // Intervalle de secours toutes les 5 secondes
     const intervalId = setInterval(() => {
-      console.log('🔄 TOP 100: Refresh via interval (every 5s)');
+      // console.log('🔄 TOP 100: Refresh via interval (every 5s)');
       fetchFavoriteStats(true);
     }, 5000);
 
     // Refresh quand l'utilisateur revient sur l'onglet
     const onFocus = () => {
-      console.log('🔄 TOP 100: Refresh on window focus');
+      // console.log('🔄 TOP 100: Refresh on window focus');
       fetchFavoriteStats(true);
     };
     window.addEventListener('focus', onFocus);
@@ -152,7 +152,7 @@ const Top100 = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'favorite_stats' },
         (payload) => {
-          console.log('🔄 TOP 100: Favorite stats changed for ANY user:', payload);
+          // console.log('🔄 TOP 100: Favorite stats changed for ANY user:', payload);
           fetchFavoriteStats(true);
         }
       )
@@ -160,19 +160,19 @@ const Top100 = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'hidden_songs' },
         (payload) => {
-          console.log('🔄 TOP 100: Hidden songs changed:', payload);
+          // console.log('🔄 TOP 100: Hidden songs changed:', payload);
           fetchFavoriteStats(true);
         }
       )
       .subscribe((status) => {
-        console.log('🔌 TOP 100: Realtime subscription status:', status);
+        // console.log('🔌 TOP 100: Realtime subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ TOP 100: Successfully subscribed to realtime updates for ALL users');
+          // console.log('✅ TOP 100: Successfully subscribed to realtime updates for ALL users');
         }
       });
 
     return () => {
-      console.log('🔌 TOP 100: Cleanup - unsubscribing');
+      // console.log('🔌 TOP 100: Cleanup - unsubscribing');
       clearInterval(intervalId);
       window.removeEventListener('focus', onFocus);
       supabase.removeChannel(channel);

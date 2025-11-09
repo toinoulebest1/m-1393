@@ -53,24 +53,24 @@ export const Player = () => {
   const updateVolumeDirectly = (newVolume: number) => {
     const audioElement = getCurrentAudioElement();
     if (audioElement) {
-      console.log("=== VOLUME DEBUG ===");
-      console.log("Setting volume to:", newVolume / 100);
-      console.log("Audio element muted:", audioElement.muted);
-      console.log("Audio element readyState:", audioElement.readyState);
-      console.log("Audio element paused:", audioElement.paused);
-      console.log("Audio element current time:", audioElement.currentTime);
-      console.log("Audio element duration:", audioElement.duration);
+      // console.log("=== VOLUME DEBUG ===");
+      // console.log("Setting volume to:", newVolume / 100);
+      // console.log("Audio element muted:", audioElement.muted);
+      // console.log("Audio element readyState:", audioElement.readyState);
+      // console.log("Audio element paused:", audioElement.paused);
+      // console.log("Audio element current time:", audioElement.currentTime);
+      // console.log("Audio element duration:", audioElement.duration);
       
       audioElement.volume = newVolume / 100;
       
       // Force unmute if needed
       if (audioElement.muted) {
-        console.log("Audio was muted, unmuting...");
+        // console.log("Audio was muted, unmuting...");
         audioElement.muted = false;
       }
       
-      console.log("New audio element volume:", audioElement.volume);
-      console.log("===================");
+      // console.log("New audio element volume:", audioElement.volume);
+      // console.log("===================");
     } else {
       console.error("No audio element found when trying to update volume");
     }
@@ -107,19 +107,19 @@ export const Player = () => {
   useEffect(() => {
     const audioElement = getCurrentAudioElement();
     if (audioElement && currentSong) {
-      console.log("=== AUDIO STATE DEBUG ===");
-      console.log("isPlaying:", isPlaying);
-      console.log("currentSong:", currentSong.title);
-      console.log("audio paused:", audioElement.paused);
-      console.log("audio volume:", audioElement.volume);
-      console.log("audio muted:", audioElement.muted);
-      console.log("audio src:", audioElement.src ? "loaded" : "empty");
-      console.log("audio readyState:", audioElement.readyState);
-      console.log("========================");
+      // console.log("=== AUDIO STATE DEBUG ===");
+      // console.log("isPlaying:", isPlaying);
+      // console.log("currentSong:", currentSong.title);
+      // console.log("audio paused:", audioElement.paused);
+      // console.log("audio volume:", audioElement.volume);
+      // console.log("audio muted:", audioElement.muted);
+      // console.log("audio src:", audioElement.src ? "loaded" : "empty");
+      // console.log("audio readyState:", audioElement.readyState);
+      // console.log("========================");
       
       // Force volume check when song changes
       if (audioElement.volume === 0 && volume > 0) {
-        console.log("Detected volume mismatch, fixing...");
+        // console.log("Detected volume mismatch, fixing...");
         updateVolumeDirectly(volume);
       }
     }
@@ -137,14 +137,14 @@ export const Player = () => {
     const audioElement = getCurrentAudioElement();
     if (audioElement) {
       audioElement.muted = isMuted;
-      console.log("Mute state changed to:", isMuted);
+      // console.log("Mute state changed to:", isMuted);
     }
   }, [isMuted, getCurrentAudioElement]);
 
   const toggleMute = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    console.log("Toggling mute to:", newMutedState);
+    // console.log("Toggling mute to:", newMutedState);
   };
 
   const handleSeekCommit = (value: number[]) => {
@@ -171,9 +171,9 @@ export const Player = () => {
   // Enhanced volume change handler with better debugging
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
-    console.log("=== VOLUME CHANGE ===");
-    console.log("Volume change requested:", newVolume);
-    console.log("Current context volume:", volume);
+    // console.log("=== VOLUME CHANGE ===");
+    // console.log("Volume change requested:", newVolume);
+    // console.log("Current context volume:", volume);
     
     // Update the context volume
     setVolume(newVolume);
@@ -185,41 +185,41 @@ export const Player = () => {
     setTimeout(() => {
       const audioElement = getCurrentAudioElement();
       if (audioElement) {
-        console.log("Volume verification - expected:", newVolume / 100, "actual:", audioElement.volume);
+        // console.log("Volume verification - expected:", newVolume / 100, "actual:", audioElement.volume);
         if (Math.abs(audioElement.volume - (newVolume / 100)) > 0.01) {
           console.warn("Volume mismatch detected, retrying...");
           audioElement.volume = newVolume / 100;
         }
       }
-      console.log("====================");
+      // console.log("====================");
     }, 100);
   };
 
   // Enhanced play/pause with audio verification
   const handlePlayPause = () => {
     if (currentSong && isAudioReady) {
-      console.log("=== PLAY/PAUSE DEBUG ===");
+      // console.log("=== PLAY/PAUSE DEBUG ===");
       const audioElement = getCurrentAudioElement();
       if (audioElement) {
-        console.log("Audio element state before action:");
-        console.log("- paused:", audioElement.paused);
-        console.log("- volume:", audioElement.volume);
-        console.log("- muted:", audioElement.muted);
-        console.log("- src:", audioElement.src ? "loaded" : "empty");
-        console.log("- readyState:", audioElement.readyState);
+        // console.log("Audio element state before action:");
+        // console.log("- paused:", audioElement.paused);
+        // console.log("- volume:", audioElement.volume);
+        // console.log("- muted:", audioElement.muted);
+        // console.log("- src:", audioElement.src ? "loaded" : "empty");
+        // console.log("- readyState:", audioElement.readyState);
         
         // Force volume check before playing
         if (audioElement.volume === 0 && volume > 0) {
-          console.log("Fixing zero volume before play");
+          // console.log("Fixing zero volume before play");
           audioElement.volume = volume / 100;
         }
         
         if (audioElement.muted && !isMuted) {
-          console.log("Fixing muted state before play");
+          // console.log("Fixing muted state before play");
           audioElement.muted = false;
         }
       }
-      console.log("========================");
+      // console.log("========================");
       
       isPlaying ? pause() : resume();
     } else if (!isAudioReady) {
@@ -252,15 +252,15 @@ export const Player = () => {
     }
 
     try {
-      console.log("=== FAVORITE TOGGLE DEBUG ===");
-      console.log("Current song:", currentSong);
-      console.log("Current favorites count:", favorites.length);
-      console.log("Is currently favorite:", favorites.some(fav => fav.id === currentSong.id));
+      // console.log("=== FAVORITE TOGGLE DEBUG ===");
+      // console.log("Current song:", currentSong);
+      // console.log("Current favorites count:", favorites.length);
+      // console.log("Is currently favorite:", favorites.some(fav => fav.id === currentSong.id));
       
       await toggleFavorite(currentSong);
       
-      console.log("Favorite toggle completed");
-      console.log("==============================");
+      // console.log("Favorite toggle completed");
+      // console.log("==============================");
     } catch (error) {
       console.error("Error toggling favorite:", error);
       toast.error("Erreur lors de la modification des favoris");
