@@ -243,25 +243,6 @@ export const SyncedLyricsView: React.FC = () => {
     }
   }, [currentSong?.id]);
 
-  // Auto-generate lyrics if not found in DB
-  useEffect(() => {
-    // Conditions pour lancer la génération automatique :
-    // 1. On a une chanson en cours
-    // 2. On n'est pas en train de charger/générer
-    // 3. On n'a pas de paroles
-    // 4. Pas d'erreur en cours
-    if (
-      currentSong && 
-      !isLoadingLyrics && 
-      !isGenerating && 
-      !lyricsText && 
-      !error
-    ) {
-      console.log('SyncedLyricsView: Auto-generating lyrics for', currentSong.title);
-      generateLyrics();
-    }
-  }, [currentSong?.id, isLoadingLyrics, lyricsText]);
-
   // Animation effects setup
   useEffect(() => {
     setAnimationStage("entry");
@@ -392,32 +373,10 @@ export const SyncedLyricsView: React.FC = () => {
         throw new Error(response.data.error);
       }
 
-      // Utiliser syncedLyrics si disponible, sinon utiliser plainLyrics
-      const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
+      // Re-fetch lyrics from DB to ensure we have the latest version
+      await fetchLyrics(currentSong.id);
       
-      // Save lyrics to database only for local songs with valid UUID
-      if (currentSong.id && !currentSong.id.startsWith('deezer-')) {
-        const { error: insertError } = await supabase
-          .from('lyrics')
-          .upsert({
-            song_id: currentSong.id,
-            content: lyricsContent,
-          });
-        if (insertError) {
-          throw insertError;
-        }
-      } else {
-        console.log('SyncedLyricsView: Skipping DB save for non-UUID song ID', currentSong.id);
-      }
-
-      // Refresh lyrics
-      setLyricsText(lyricsContent);
-      try {
-        const parsed = parseLrc(lyricsContent);
-        setParsedLyrics(parsed);
-      } catch (e) {
-        // Lyrics are not in LRC format
-      }
+      toast.success("Paroles récupérées avec succès !");
       
     } catch (error: any) {
       console.error('Error generating lyrics:', error);
