@@ -33,7 +33,7 @@ export const SyncedLyricsView: React.FC = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const [accentColor, setAccentColor] = useState<[number, number, number] | null>(null);
   const [animationStage, setAnimationStage] = useState<"entry" | "exit">("entry");
-  const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
+  const [isLoadingLyrics, setIsLoadingLyrics] = useState(true); // Start with loading true
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
   const [isChangingSong, setIsChangingSong] = useState<boolean>(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
@@ -239,7 +239,7 @@ export const SyncedLyricsView: React.FC = () => {
       setParsedLyrics(null);
       setLyricsText(null);
       setError(null);
-      setIsLoadingLyrics(true);
+      setIsLoadingLyrics(true); // Always set loading to true on song change
       setCurrentSongId(currentSong.id);
       fetchLyrics(currentSong.id);
     } else if (currentSong && currentSong.id === currentSongId) {
@@ -268,6 +268,7 @@ export const SyncedLyricsView: React.FC = () => {
           toast.info("Les paroles viennent d'être mises à jour !");
           // Re-fetch lyrics when a change is detected
           console.log('[Realtime] Re-fetch des paroles suite à la notification...');
+          setIsLoadingLyrics(true); // Show loader while re-fetching
           fetchLyrics(currentSongId);
         }
       )
@@ -336,7 +337,10 @@ export const SyncedLyricsView: React.FC = () => {
         console.log(`[SyncedLyricsView] 2. Aucune parole trouvée dans la DB pour ${songId}.`);
         setLyricsText(null);
         setParsedLyrics(null);
-        setIsLoadingLyrics(false);
+        // Don't set loading to false immediately, give background process a chance
+        setTimeout(() => {
+            setIsLoadingLyrics(false);
+        }, 3000); // Wait 3 seconds before showing "No lyrics"
         return;
       }
       
@@ -363,8 +367,12 @@ export const SyncedLyricsView: React.FC = () => {
       setError("Une erreur inattendue est survenue lors du chargement des paroles.");
     } finally {
       console.log('[SyncedLyricsView] 4. Fin de fetchLyrics.');
-      setIsLoadingLyrics(false);
+      // We manage isLoadingLyrics inside the try block now
       setIsChangingSong(false);
+      // Only set loading to false if lyrics are found
+      if (lyricsText) {
+        setIsLoadingLyrics(false);
+      }
     }
   };
 
