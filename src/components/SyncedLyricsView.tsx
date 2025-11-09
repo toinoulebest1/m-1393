@@ -301,10 +301,14 @@ export const SyncedLyricsView: React.FC = () => {
     }
     console.log(`[SyncedLyricsView] fetchLyrics appelé pour songId: ${songId}`);
     
-    // Skip DB lookups for non-UUID IDs (e.g., Deezer tracks)
+    // Pour les sources externes comme Deezer, on ne cherche pas dans la DB.
+    // Pour Tidal, on continue car les paroles sont sauvegardées dans notre DB.
     if (songId.startsWith('deezer-')) {
+      console.log('[SyncedLyricsView] Piste Deezer, pas de recherche de paroles en DB.');
       setIsLoadingLyrics(false);
       setIsChangingSong(false);
+      setLyricsText(null);
+      setParsedLyrics(null);
       return;
     }
     
