@@ -1,17 +1,25 @@
-
 import ColorThief from 'colorthief';
+
+const IMAGE_PROXY_URL_BASE = 'https://pwknncursthenghqgevl.supabase.co/functions/v1/image-proxy?src=';
 
 export const extractDominantColor = async (
   imageUrl: string
 ): Promise<[number, number, number] | null> => {
   try {
+    let processedImageUrl = imageUrl;
+    // Vérifier si l'URL est une URL Tidal directe (contient "resources.tidal.com")
+    // ou si elle a déjà été proxifiée par notre service Tidal (contient "tidal.kinoplus.online")
+    if (imageUrl.includes('resources.tidal.com') || imageUrl.includes('tidal.kinoplus.online')) {
+      processedImageUrl = `${IMAGE_PROXY_URL_BASE}${encodeURIComponent(imageUrl)}`;
+    }
+
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
-      img.src = imageUrl;
+      img.src = processedImageUrl; // Utiliser l'URL potentiellement proxifiée
     });
 
     const colorThief = new ColorThief();
