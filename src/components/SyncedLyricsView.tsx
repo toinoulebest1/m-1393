@@ -243,6 +243,38 @@ export const SyncedLyricsView: React.FC = () => {
     }
   }, [currentSong?.id]);
 
+  // Set up Supabase Realtime subscription for lyrics
+  useEffect(() => {
+    if (!currentSongId) return;
+
+    console.log(`[Realtime] Abonnement aux paroles pour song_id: ${currentSongId}`);
+
+    const channel = supabase
+      .channel(`lyrics:${currentSongId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lyrics',
+          filter: `song_id=eq.${currentSongId}`,
+        },
+        (payload) => {
+          console.log('[Realtime] Changement détecté pour les paroles:', payload);
+          toast.info("Les paroles viennent d'être mises à jour !");
+          // Re-fetch lyrics when a change is detected
+          fetchLyrics(currentSongId);
+        }
+      )
+      .subscribe();
+
+    // Cleanup function to remove the subscription when the component unmounts or song changes
+    return () => {
+      console.log(`[Realtime] Désabonnement des paroles pour song_id: ${currentSongId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [currentSongId]);
+
   // Animation effects setup
   useEffect(() => {
     setAnimationStage("entry");
