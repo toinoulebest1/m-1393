@@ -302,23 +302,19 @@ export const SyncedLyricsView: React.FC = () => {
   // Function to fetch lyrics
   const fetchLyrics = async (songId: string) => {
     if (!songId) {
-      console.log('[SyncedLyricsView] fetchLyrics annulé: songId est nul.');
       setIsLoadingLyrics(false);
       return;
     }
-    console.log(`[SyncedLyricsView] fetchLyrics appelé pour songId: ${songId}`);
     
     if (songId.startsWith('deezer-')) {
-      console.log('[SyncedLyricsView] Piste Deezer, pas de recherche de paroles en DB.');
-      setIsLoadingLyrics(false);
-      setIsChangingSong(false);
       setLyricsText(null);
       setParsedLyrics(null);
+      setIsLoadingLyrics(false);
+      setIsChangingSong(false);
       return;
     }
     
     try {
-      console.log(`[SyncedLyricsView] 1. Interrogation de la table 'lyrics' pour song_id: ${songId}`);
       const { data, error } = await supabase
         .from('lyrics')
         .select('content')
@@ -327,52 +323,34 @@ export const SyncedLyricsView: React.FC = () => {
         .maybeSingle();
         
       if (error) {
-        console.error(`[SyncedLyricsView] 2. Erreur Supabase:`, error);
         setError("Erreur de chargement des paroles depuis la base de données.");
         setIsLoadingLyrics(false);
         return;
       }
 
-      if (!data || !data.content) {
-        console.log(`[SyncedLyricsView] 2. Aucune parole trouvée dans la DB pour ${songId}.`);
-        setLyricsText(null);
-        setParsedLyrics(null);
-        // Don't set loading to false immediately, give background process a chance
-        setTimeout(() => {
-            setIsLoadingLyrics(false);
-        }, 3000); // Wait 3 seconds before showing "No lyrics"
-        return;
-      }
-      
-      const lyrics = data.content;
-      console.log(`[SyncedLyricsView] 2. Paroles trouvées dans la DB. Contenu (100 premiers caractères):`, lyrics.substring(0, 100) + '...');
-      setLyricsText(lyrics);
-      
-      console.log('[SyncedLyricsView] 3. Tentative de parsing LRC...');
-      if (isLrcFormat(lyrics)) {
-        try {
-          const parsed = parseLrc(lyrics);
-          console.log('[SyncedLyricsView] 3.1. Parsing LRC réussi.', parsed);
-          setParsedLyrics(parsed);
-        } catch (parseError) {
-          console.error('[SyncedLyricsView] 3.2. Erreur de parsing LRC:', parseError);
-          setParsedLyrics(null); // Afficher en texte brut si le parsing échoue
+      if (data && data.content) {
+        const lyrics = data.content;
+        setLyricsText(lyrics);
+        
+        if (isLrcFormat(lyrics)) {
+          try {
+            const parsed = parseLrc(lyrics);
+            setParsedLyrics(parsed);
+          } catch (parseError) {
+            setParsedLyrics(null);
+          }
+        } else {
+          setParsedLyrics(null);
         }
       } else {
-        console.log('[SyncedLyricsView] 3.1. Le format n\'est pas LRC, affichage en texte brut.');
+        setLyricsText(null);
         setParsedLyrics(null);
       }
     } catch (error) {
-      console.error('[SyncedLyricsView] Erreur globale dans fetchLyrics:', error);
       setError("Une erreur inattendue est survenue lors du chargement des paroles.");
     } finally {
-      console.log('[SyncedLyricsView] 4. Fin de fetchLyrics.');
-      // We manage isLoadingLyrics inside the try block now
+      setIsLoadingLyrics(false);
       setIsChangingSong(false);
-      // Only set loading to false if lyrics are found
-      if (lyricsText) {
-        setIsLoadingLyrics(false);
-      }
     }
   };
 
