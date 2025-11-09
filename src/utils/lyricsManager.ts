@@ -18,11 +18,18 @@ export const fetchAndSaveLyrics = async (
     console.log('🎵 [lyricsManager] Démarrage de fetchAndSaveLyrics pour:', songTitle);
     console.log('   [lyricsManager] Données reçues:', { songId, songTitle, artist, duration, albumName, isTidal, tidalId });
 
-    // Si un ID Tidal est présent, c'est notre source prioritaire.
-    if (tidalId) {
+    // Logique améliorée : extraire l'ID Tidal depuis le songId si possible
+    let effectiveTidalId = tidalId;
+    if (!effectiveTidalId && songId && songId.startsWith('tidal-')) {
+      effectiveTidalId = songId.substring(6); // Prend tout ce qui suit "tidal-"
+      console.log(`[lyricsManager] ID Tidal extrait depuis songId: ${effectiveTidalId}`);
+    }
+
+    // Si un ID Tidal est présent (soit via la prop, soit extrait), c'est notre source prioritaire.
+    if (effectiveTidalId) {
       try {
-        console.log(`[Tidal Lyrics] ID Tidal détecté: ${tidalId}. Tentative de récupération...`);
-        const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${tidalId}`;
+        console.log(`[Tidal Lyrics] ID Tidal détecté: ${effectiveTidalId}. Tentative de récupération...`);
+        const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${effectiveTidalId}`;
         console.log(`[Tidal Lyrics] Appel de l'API: ${tidalApiUrl}`);
         const tidalLyricsResponse = await fetch(tidalApiUrl);
         
@@ -52,7 +59,7 @@ export const fetchAndSaveLyrics = async (
         console.warn('[Tidal Lyrics] Erreur lors de la récupération via l\'API Tidal, fallback sur lrclib.', e);
       }
     } else {
-      console.log('[lyricsManager] Aucun ID Tidal fourni. Passage à la vérification de la DB.');
+      console.log('[lyricsManager] Aucun ID Tidal fourni ou extrait. Passage à la vérification de la DB.');
     }
 
     // Vérifier si les paroles existent déjà dans la DB (pour les musiques non-Tidal ou si l'API Tidal a échoué)
