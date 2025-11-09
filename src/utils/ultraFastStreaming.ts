@@ -83,8 +83,15 @@ export class UltraFastStreaming {
     try {
       if (isTidal) {
         const tidalId = filePath.split(':')[1];
-        console.log(`${logPrefix} STEP 2: Getting Tidal stream URL...`);
-        remoteStream = await getTidalStreamUrl(tidalId);
+        console.log(`${logPrefix} STEP 2: Getting Tidal stream URL via proxy...`);
+        // Obtenir l'URL directe de Tidal via le service, puis la passer au proxy
+        const directTidalUrlResult = await getTidalStreamUrl(tidalId);
+        if (!directTidalUrlResult || !directTidalUrlResult.url) {
+          throw new Error("Impossible d'obtenir l'URL directe de Tidal.");
+        }
+        // Construire l'URL du proxy Edge Function
+        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(directTidalUrlResult.url)}`;
+        remoteStream = { url: proxyUrl }; // Le proxy gérera le transcodage si nécessaire
       } else if (isHttp) {
         console.log(`${logPrefix} STEP 2: Path is a direct HTTP URL.`);
         remoteStream = { url: filePath };
@@ -100,6 +107,8 @@ export class UltraFastStreaming {
       console.log(`${logPrefix} SUCCESS: Got remote URL for instant playback: ${remoteStream.url.substring(0, 100)}...`);
 
       // Lancer la mise en cache en arrière-plan SANS l'attendre (ne pas mettre await ici)
+      // Pour les pistes Tidal, nous mettons en cache l'URL du proxy, pas l'URL directe de Tidal.
+      // Le proxy est censé renvoyer un flux compatible.
       this.backgroundCache(filePath, remoteStream.url, songId, songTitle);
 
       // Retourner immédiatement l'URL distante pour que la lecture commence
