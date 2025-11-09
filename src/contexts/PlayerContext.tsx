@@ -435,6 +435,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Garder affichage aligné quand la chanson change naturellement
   useEffect(() => {
     setDisplayedSong(currentSong);
+    console.log('[PlayerContext] displayedSong updated:', currentSong?.title, 'Image URL:', currentSong?.imageUrl);
   }, [currentSong]);
 
   // Sauvegarde en temps réel de la position - OPTIMISÉ
