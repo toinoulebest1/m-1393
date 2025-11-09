@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { corsHeaders } from "../_shared/cors.ts";
+
+// Define CORS headers directly in the function file
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const GENIUS_API_KEY = Deno.env.get("GENIUS_API_KEY");
 
@@ -98,7 +103,7 @@ serve(async (req) => {
     }
     const songId = songData.id;
 
-    const { data: existingLyrics, error: lyricsCheckError } = await supabase
+    const { data: existingLyrics } = await supabase
       .from("lyrics")
       .select("id")
       .eq("song_id", songId)
