@@ -92,21 +92,28 @@ const History = () => {
       if (historyData) {
         const uniqueSongs = new Map();
         historyData.forEach(item => {
-          if (!uniqueSongs.has(item.songs.id)) {
-            uniqueSongs.set(item.songs.id, {
-              id: item.songs.id,
-              title: item.songs.title,
-              artist: item.songs.artist || '',
-              duration: item.songs.duration || '0:00',
-              url: item.songs.file_path,
-              imageUrl: item.songs.image_url,
-              bitrate: '320 kbps',
-              genre: item.songs.genre,
-              album_name: item.songs.album_name,
-              tidal_id: item.songs.tidal_id,
-              isLocal: true,
-              playedAt: item.played_at
-            });
+          // Assurer que l'objet `songs` et son `id` existent
+          if (item.songs && item.songs.id) {
+            // Utiliser un identifiant unique pour la map pour éviter les doublons
+            const mapKey = item.songs.id;
+            
+            // Si la chanson n'est pas déjà dans la map, on l'ajoute
+            if (!uniqueSongs.has(mapKey)) {
+              uniqueSongs.set(mapKey, {
+                // On reconstruit l'objet Song complet
+                id: item.songs.id,
+                title: item.songs.title,
+                artist: item.songs.artist || '',
+                duration: item.songs.duration || '0:00',
+                // L'URL est soit le chemin du fichier, soit un identifiant Tidal
+                url: item.songs.tidal_id ? `tidal:${item.songs.tidal_id}` : item.songs.file_path,
+                imageUrl: item.songs.image_url,
+                album_name: item.songs.album_name,
+                tidal_id: item.songs.tidal_id, // On s'assure que tidal_id est bien là
+                isLocal: !item.songs.tidal_id, // Une chanson est locale si elle n'a pas d'ID Tidal
+                playedAt: item.played_at
+              });
+            }
           }
         });
 
