@@ -215,7 +215,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue,
     setQueue,
     shuffleMode,
-    shuffledQueue, // Ajout de shuffledQueue ici
+    shuffledQueue,
     repeatMode,
     addToQueue,
     toggleShuffle,
@@ -224,8 +224,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     previousSong: previousSongFromQueue,
   } = usePlayerQueue({
     currentSong,
-    isChangingSong,
-    setIsChangingSong,
     play,
     history,
     setHistory,

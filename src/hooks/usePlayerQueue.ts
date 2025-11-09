@@ -1,12 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Song } from '@/types/player';
 import { toast } from 'sonner';
-import { useGenreBasedQueue } from './useGenreBasedQueue';
+
+// Helper pour mélanger un tableau
+const shuffleArray = (array: Song[]) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
 
 interface UsePlayerQueueProps {
   currentSong: Song | null;
-  isChangingSong: boolean;
-  setIsChangingSong: (value: boolean) => void;
   play: (song: Song) => Promise<void>;
   history: Song[];
   setHistory: (history: Song[] | ((prevHistory: Song[]) => Song[])) => void;
@@ -14,171 +21,118 @@ interface UsePlayerQueueProps {
 
 export const usePlayerQueue = ({
   currentSong,
-  isChangingSong,
-  setIsChangingSong,
   play,
   history,
   setHistory,
 }: UsePlayerQueueProps) => {
-  const { fetchSimilarSongsByGenre } = useGenreBasedQueue();
-  
-  // État de la file d'attente
+  // --- ÉTATS ---
   const [queue, setQueueInternal] = useState<Song[]>(() => {
-    const savedQueue = localStorage.getItem('queue');
-    if (savedQueue) {
-      try {
-        return JSON.parse(savedQueue);
-      } catch (err) {
-        return [];
-      }
+    try {
+      const savedQueue = localStorage.getItem('queue');
+      return savedQueue ? JSON.parse(savedQueue) : [];
+    } catch {
+      return [];
     }
-    return [];
   });
-  
-  const [shuffledQueue, setShuffledQueue] = useState<Song[]>([]);
-  const [shuffleMode, setShuffleMode] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('none');
 
-  // Recalculer la file d'attente mélangée si la file principale change
+  const [shuffledQueue, setShuffledQueue] = useState<Song[]>([]);
+  
+  const [shuffleMode, setShuffleModeInternal] = useState<boolean>(() => {
+    const savedMode = localStorage.getItem('shuffleMode');
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
+
+  const [repeatMode, setRepeatModeInternal] = useState<'none' | 'one' | 'all'>(() => {
+    const savedMode = localStorage.getItem('repeatMode');
+    return savedMode ? JSON.parse(savedMode) : 'none';
+  });
+
+  // --- SYNCHRONISATION ET PERSISTANCE ---
+
+  // Recalculer la file mélangée si la file principale ou le mode shuffle change
   useEffect(() => {
     if (shuffleMode) {
-      const newShuffledQueue = [...queue].sort(() => Math.random() - 0.5);
-      setShuffledQueue(newShuffledQueue);
+      setShuffledQueue(shuffleArray(queue));
+    } else {
+      setShuffledQueue([]); // Vider si le mode shuffle est désactivé
     }
   }, [queue, shuffleMode]);
 
-  // Create a properly typed setQueue function that accepts both arrays and callback functions
-  const setQueue = useCallback((value: Song[] | ((prevQueue: Song[]) => Song[])) => {
-    if (typeof value === 'function') {
-      setQueueInternal(prevQueue => {
-        const newQueue = value(prevQueue);
-        localStorage.setItem('queue', JSON.stringify(newQueue));
-        return newQueue;
-      });
-    } else {
-      setQueueInternal(value);
-      localStorage.setItem('queue', JSON.stringify(value));
-    }
+  // --- FONCTIONS PUBLIQUES ---
+
+  const setQueue = useCallback((newQueue: Song[] | ((prevQueue: Song[]) => Song[])) => {
+    setQueueInternal(prev => {
+      const resolvedQueue = typeof newQueue === 'function' ? newQueue(prev) : newQueue;
+      localStorage.setItem('queue', JSON.stringify(resolvedQueue));
+      return resolvedQueue;
+    });
   }, []);
 
   const addToQueue = useCallback((song: Song) => {
-    setQueueInternal(prevQueue => {
-      const newQueue = [...prevQueue, song];
-      localStorage.setItem('queue', JSON.stringify(newQueue));
-      return newQueue;
-    });
+    setQueue(prev => [...prev, song]);
+    toast.info(`"${song.title}" ajoutée à la file d'attente.`);
+  }, [setQueue]);
+
+  const setShuffleMode = useCallback((mode: boolean) => {
+    setShuffleModeInternal(mode);
+    localStorage.setItem('shuffleMode', JSON.stringify(mode));
   }, []);
 
   const toggleShuffle = useCallback(() => {
-    setShuffleMode(prev => {
-      const newShuffleMode = !prev;
-      if (newShuffleMode) {
-        // Activer le shuffle : mélanger la queue
-        const newShuffledQueue = [...queue].sort(() => Math.random() - 0.5);
-        setShuffledQueue(newShuffledQueue);
-        toast.success("Lecture aléatoire activée");
-      } else {
-        // Désactiver le shuffle
-        setShuffledQueue([]);
-        toast.info("Lecture aléatoire désactivée");
-      }
-      return newShuffleMode;
-    });
-  }, [queue]);
+    setShuffleMode(!shuffleMode);
+    toast.info(`Lecture aléatoire ${!shuffleMode ? 'activée' : 'désactivée'}`);
+  }, [shuffleMode, setShuffleMode]);
 
-  const toggleRepeat = useCallback(() => {
-    setRepeatMode(current => {
-      switch (current) {
-        case 'none': return 'one';
-        case 'one': return 'all';
-        case 'all': return 'none';
-      }
-    });
+  const setRepeatMode = useCallback((mode: 'none' | 'one' | 'all') => {
+    setRepeatModeInternal(mode);
+    localStorage.setItem('repeatMode', JSON.stringify(mode));
   }, []);
 
+  const toggleRepeat = useCallback(() => {
+    const modes: ('none' | 'one' | 'all')[] = ['none', 'one', 'all'];
+    const nextMode = modes[(modes.indexOf(repeatMode) + 1) % modes.length];
+    setRepeatMode(nextMode);
+    if (nextMode === 'one') toast.info("Répéter la piste actuelle");
+    if (nextMode === 'all') toast.info("Répéter la playlist");
+    if (nextMode === 'none') toast.info("Répétition désactivée");
+  }, [repeatMode, setRepeatMode]);
+
   const nextSong = useCallback(async () => {
-    if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours, ignorer nextSong()");
-      return;
-    }
-    
     const activeQueue = shuffleMode ? shuffledQueue : queue;
-    
-    console.log("=== NEXT SONG DEBUG ===");
-    console.log("Shuffle mode:", shuffleMode);
-    console.log("Current song:", currentSong?.title, "ID:", currentSong?.id);
-    console.log("Active Queue length:", activeQueue.length);
-    
     if (!currentSong || activeQueue.length === 0) {
-      console.log("No current song or queue is empty");
       toast.info("La file d'attente est vide.");
       return;
     }
-    
-    let currentIndex = activeQueue.findIndex(song => song.id === currentSong.id);
-    console.log("Current index in active queue:", currentIndex);
-    
-    // Si la chanson actuelle n'est pas dans la file (cas rare), on commence par la première
-    if (currentIndex === -1) {
-      console.warn("Current song not found in active queue. Starting from the beginning.");
-      currentIndex = -1; // Pour que nextIndex devienne 0
-    }
-    
+
+    const currentIndex = activeQueue.findIndex(song => song.id === currentSong.id);
     const nextIndex = currentIndex + 1;
+
     if (nextIndex < activeQueue.length) {
-      console.log(`Playing next song: ${activeQueue[nextIndex].title}`);
       await play(activeQueue[nextIndex]);
     } else {
-      console.log("End of queue reached");
-      if (repeatMode === 'all' && activeQueue.length > 0) {
-        console.log("Repeating playlist from beginning");
+      if (repeatMode === 'all') {
         await play(activeQueue[0]);
       } else {
-        toast.info("Fin de la playlist");
+        toast.info("Fin de la file d'attente.");
       }
     }
-    console.log("=====================");
-  }, [currentSong, isChangingSong, queue, shuffledQueue, shuffleMode, play, repeatMode, fetchSimilarSongsByGenre]);
+  }, [currentSong, queue, shuffledQueue, shuffleMode, repeatMode, play]);
 
   const previousSong = useCallback(async () => {
-    if (isChangingSong) {
-      console.log("Changement de chanson déjà en cours, ignorer previousSong()");
-      return;
-    }
-    
-    console.log("=== PREVIOUS SONG DEBUG ===");
-    console.log("History length:", history.length);
-
     if (history.length > 1) {
-      // L'historique contient [..., avant-dernière, dernière (actuelle)]
-      // On veut jouer l'avant-dernière.
-      const previousSongInHistory = history[history.length - 2];
-      
-      // On retire la chanson actuelle de l'historique pour ne pas la rajouter
-      setHistory(h => h.slice(0, -1));
-
-      await play(previousSongInHistory);
+      const previous = history[history.length - 2];
+      setHistory(h => h.slice(0, -1)); // Enlever la chanson actuelle de l'historique
+      await play(previous);
     } else {
-      toast.info("Pas de chanson précédente dans l'historique");
+      toast.info("Pas de chanson précédente dans l'historique.");
     }
-
-    console.log("=========================");
-  }, [isChangingSong, history, play, setHistory]);
-
-  const getNextSong = useCallback((): Song | null => {
-    if (!currentSong || queue.length === 0) return null;
-    
-    const currentIndex = queue.findIndex(song => song.id === currentSong.id);
-    if (currentIndex === -1 || currentIndex + 1 >= queue.length) return null;
-    
-    return queue[currentIndex + 1];
-  }, [currentSong, queue]);
+  }, [history, play, setHistory]);
 
   return {
     queue,
     setQueue,
-    shuffleMode,
     shuffledQueue,
+    shuffleMode,
     setShuffleMode,
     repeatMode,
     setRepeatMode,
@@ -187,6 +141,5 @@ export const usePlayerQueue = ({
     toggleRepeat,
     nextSong,
     previousSong,
-    getNextSong
   };
 };
