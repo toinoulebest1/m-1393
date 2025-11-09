@@ -222,6 +222,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleRepeat,
     nextSong: nextSongFromQueue,
     previousSong: previousSongFromQueue,
+    playFromQueue,
   } = usePlayerQueue({
     currentSong,
     play,
@@ -856,6 +857,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsSeeking,
     maskingState,
     setMaskingState,
+    playFromQueue,
   };
 
   return (

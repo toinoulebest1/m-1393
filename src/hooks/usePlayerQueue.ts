@@ -73,6 +73,11 @@ export const usePlayerQueue = ({
     toast.info(`"${song.title}" ajoutée à la file d'attente.`);
   }, [setQueue]);
 
+  const playFromQueue = useCallback((songs: Song[], songToPlay: Song) => {
+    setQueue(songs);
+    play(songToPlay);
+  }, [setQueue, play]);
+
   const setShuffleMode = useCallback((mode: boolean) => {
     setShuffleModeInternal(mode);
     localStorage.setItem('shuffleMode', JSON.stringify(mode));
@@ -141,5 +146,6 @@ export const usePlayerQueue = ({
     toggleRepeat,
     nextSong,
     previousSong,
+    playFromQueue,
   };
 };

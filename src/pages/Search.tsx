@@ -41,7 +41,8 @@ const SearchPage = () => {
     currentSong,
     favorites,
     isPlaying,
-    pause
+    pause,
+    playFromQueue,
   } = usePlayer();
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
@@ -213,15 +214,11 @@ const SearchPage = () => {
         pause();
       } else {
         // Si on relance la même chanson, on s'assure que la queue est bien la bonne
-        const newQueue = [...results];
-        setQueue(newQueue);
-        play(); // On utilise play() sans argument pour reprendre la lecture
+        playFromQueue([...results], song);
       }
       return;
     }
-    const newQueue = [...results];
-    setQueue(newQueue);
-    play(song);
+    playFromQueue([...results], song);
   };
 
   const handlePlaylistClick = (playlist: any) => {
