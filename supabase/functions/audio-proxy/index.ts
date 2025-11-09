@@ -8,6 +8,10 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log(`[AudioProxy] Incoming request URL: ${req.url}`);
+  console.log(`[AudioProxy] Incoming request method: ${req.method}`);
+  console.log(`[AudioProxy] Incoming request headers:`, Object.fromEntries(req.headers.entries()));
+
   // Gérer les requêtes OPTIONS pour CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,27 +21,29 @@ serve(async (req) => {
   const tidalAudioUrl = url.searchParams.get('src');
 
   if (!tidalAudioUrl) {
+    console.error('[AudioProxy] Missing "src" parameter.');
     return new Response('Missing "src" parameter (Tidal audio URL)', { status: 400, headers: corsHeaders });
   }
 
-  console.log(`[AudioProxy] Received request for: ${tidalAudioUrl}`);
+  console.log(`[AudioProxy] Extracted Tidal audio URL (src): ${tidalAudioUrl}`);
 
   try {
-    // Ici, nous allons simuler le transcodage en renvoyant directement le flux
-    // Pour une implémentation réelle de transcodage, il faudrait intégrer
-    // un outil comme ffmpeg (via un service externe ou une bibliothèque Deno si disponible)
-    // et streamer le résultat.
-
-    // Pour l'instant, nous allons simplement "proxy" le fichier.
-    // Dans une version future, cette partie inclurait la logique de transcodage.
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36',
+      // Passer les en-têtes de la requête originale (ex: Range pour le seeking)
+      // Filtrer les en-têtes qui pourraient causer des problèmes ou ne sont pas pertinents pour le fetch en amont
+      ...Object.fromEntries(Array.from(req.headers.entries()).filter(([key]) => 
+        !['host', 'connection', 'accept-encoding', 'x-forwarded-for', 'x-forwarded-proto', 'x-real-ip'].includes(key.toLowerCase())
+      )),
+    };
+    console.log(`[AudioProxy] Fetching from Tidal with headers:`, fetchHeaders);
 
     const response = await fetch(tidalAudioUrl, {
-      headers: {
-        // Ajouter des en-têtes si nécessaire pour l'API Tidal (ex: User-Agent)
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36',
-        ...req.headers, // Passer les en-têtes de la requête originale (ex: Range pour le seeking)
-      },
+      headers: fetchHeaders,
     });
+
+    console.log(`[AudioProxy] Response from Tidal status: ${response.status}`);
+    console.log(`[AudioProxy] Response from Tidal headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       console.error(`[AudioProxy] Failed to fetch Tidal audio: ${response.status} ${response.statusText}`);
@@ -53,8 +59,13 @@ serve(async (req) => {
       responseHeaders.set('Content-Range', response.headers.get('Content-Range')!);
     }
     // Le Content-Type est déjà défini dans corsHeaders comme audio/mp4 pour la compatibilité
+    // Si Tidal renvoie un Content-Type plus spécifique et compatible, nous pouvons le conserver
+    if (response.headers.has('Content-Type') && response.headers.get('Content-Type')?.startsWith('audio/')) {
+        responseHeaders.set('Content-Type', response.headers.get('Content-Type')!);
+    }
 
-    console.log(`[AudioProxy] Successfully proxied audio from Tidal. Streaming...`);
+
+    console.log(`[AudioProxy] Successfully proxied audio from Tidal. Final response headers:`, Object.fromEntries(responseHeaders.entries()));
     return new Response(response.body, {
       status: response.status,
       headers: responseHeaders,

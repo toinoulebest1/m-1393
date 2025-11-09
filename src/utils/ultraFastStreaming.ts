@@ -84,13 +84,17 @@ export class UltraFastStreaming {
       if (isTidal) {
         const tidalId = filePath.split(':')[1];
         console.log(`${logPrefix} STEP 2: Getting Tidal stream URL via proxy...`);
+        console.log(`${logPrefix} INFO: Extracted Tidal ID: ${tidalId}`);
         // Obtenir l'URL directe de Tidal via le service, puis la passer au proxy
         const directTidalUrlResult = await getTidalStreamUrl(tidalId);
+        console.log(`${logPrefix} INFO: Result from getTidalStreamUrl:`, directTidalUrlResult);
+
         if (!directTidalUrlResult || !directTidalUrlResult.url) {
           throw new Error("Impossible d'obtenir l'URL directe de Tidal.");
         }
         // Construire l'URL du proxy Edge Function
         const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(directTidalUrlResult.url)}`;
+        console.log(`${logPrefix} INFO: Constructed proxy URL: ${proxyUrl.substring(0, 100)}...`);
         remoteStream = { url: proxyUrl }; // Le proxy gérera le transcodage si nécessaire
       } else if (isHttp) {
         console.log(`${logPrefix} STEP 2: Path is a direct HTTP URL.`);
