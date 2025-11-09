@@ -5,7 +5,7 @@ const STREAM_API_URL = 'https://tidal.kinoplus.online/track/';
 
 // Helper pour formater la durée de secondes en MM:SS
 const formatDuration = (seconds: number): string => {
-  if (isNaN(seconds)) return '0:00';
+  if (isNaN(seconds) || seconds < 0) return '0:00'; // Gérer les secondes négatives ou NaN
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -37,23 +37,34 @@ export const searchTidalTracks = async (query: string): Promise<Song[]> => {
     }
 
     const songs: Song[] = data.items.map((item: any) => {
-      const artistName = item.artist?.name || (item.artists && item.artists[0]?.name) || 'Artiste inconnu';
-      const albumTitle = item.album?.title || 'Album inconnu';
-      const imageUrl = getImageUrl(item.album?.cover || ''); // Ensure a default or empty string for getImageUrl
+      try {
+        // Vérifier si l'ID est présent et valide
+        if (!item.id) {
+          console.warn(`[TidalService] Item skipped due to missing ID:`, item);
+          return null; // Skip this item
+        }
 
-      console.log(`[TidalService] Mapping item: ${item.id}, Title: ${item.title}, Artist: ${artistName}, Album: ${albumTitle}, Image: ${imageUrl}`);
+        const artistName = item.artist?.name || (item.artists && item.artists[0]?.name) || 'Artiste inconnu';
+        const albumTitle = item.album?.title || 'Album inconnu';
+        const imageUrl = getImageUrl(item.album?.cover || '');
 
-      return {
-        id: `tidal-${item.id}`, // Préfixe pour éviter les collisions avec les chansons locales
-        title: item.title,
-        artist: artistName,
-        duration: formatDuration(item.duration),
-        url: `tidal:${item.id}`, // Schéma d'URL personnalisé pour identifier les pistes Tidal
-        imageUrl: imageUrl,
-        album_name: albumTitle,
-        tidal_id: item.id.toString(),
-      };
-    });
+        console.log(`[TidalService] Mapping item: ID=${item.id}, Title=${item.title}, Artist=${artistName}, Album=${albumTitle}, Image=${imageUrl}`);
+
+        return {
+          id: `tidal-${item.id}`, // Préfixe pour éviter les collisions avec les chansons locales
+          title: item.title || 'Titre inconnu',
+          artist: artistName,
+          duration: formatDuration(item.duration),
+          url: `tidal:${item.id}`, // Schéma d'URL personnalisé pour identifier les pistes Tidal
+          imageUrl: imageUrl,
+          album_name: albumTitle,
+          tidal_id: item.id.toString(),
+        };
+      } catch (mapError) {
+        console.error(`[TidalService] Erreur lors du mappage de l'élément Tidal (ID: ${item?.id || 'inconnu'}):`, mapError, 'Item:', item);
+        return null; // Retourne null pour cet élément en cas d'erreur
+      }
+    }).filter(Boolean); // Filtre les éléments null (ceux qui ont échoué au mappage)
 
     console.log(`[TidalService] Mapped ${songs.length} songs from search results.`);
     return songs;
