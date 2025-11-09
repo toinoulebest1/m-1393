@@ -166,7 +166,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           currentSong.artist, 
           currentSong.duration, 
           currentSong.album_name,
-          !!currentSong.tidal_id
+          !!currentSong.tidal_id,
+          currentSong.tidal_id
         );
 
         const preds = await predictNextSongs(currentSong, history);

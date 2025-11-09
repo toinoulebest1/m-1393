@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -71,123 +70,62 @@ serve(async (req) => {
   }
 
   try {
-    const { songTitle, artist, albumName, duration } = await req.json();
-    console.log('Attempting to find lyrics for:', songTitle, 'by', artist);
-    
-    if (!artist || !songTitle) {
-      console.log('Missing required parameters');
-      return new Response(
-        JSON.stringify({ 
-          lyrics: `Impossible de trouver les paroles sans le titre et l'artiste.` 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Générer des variantes du titre et de l'artiste
-    const titleVariants = generateTextVariants(songTitle);
-    const artistVariants = generateArtistVariants(artist);
-    const albumVariants = albumName ? generateTextVariants(albumName) : [undefined];
-    
-    console.log(`Trying ${titleVariants.length} title variants, ${artistVariants.length} artist variants`);
-    console.log('Artist variants:', artistVariants);
-    
-    // Try with exact duration first, then with ±2 seconds tolerance
-    const durationsToTry = duration 
-      ? [Math.round(duration), Math.round(duration) - 2, Math.round(duration) + 2]
-      : [undefined];
-    
-    let lyricsResponse;
-    let foundWithDuration = null;
-    let successfulParams = null;
-    
-    // Essayer toutes les combinaisons de variantes
-    for (const titleVariant of titleVariants) {
-      for (const artistVariant of artistVariants) {
-        for (const albumVariant of albumVariants) {
-          for (const tryDuration of durationsToTry) {
-            const tryParams = new URLSearchParams({
-              artist_name: artistVariant,
-              track_name: titleVariant,
-            });
-            
-            if (albumVariant) {
-              tryParams.append('album_name', albumVariant);
-            }
-            
-            if (tryDuration !== undefined) {
-              tryParams.append('duration', tryDuration.toString());
-            }
-            
-            const apiUrl = `https://lrclib.net/api/get?${tryParams.toString()}`;
-            console.log('Fetching lyrics from LRCLIB:', apiUrl);
-            
-            lyricsResponse = await fetch(apiUrl, {
-              headers: {
-                'User-Agent': 'MusicApp v1.0.0 (https://github.com/your-app)',
-              }
-            });
-            
-            if (lyricsResponse.ok) {
-              foundWithDuration = tryDuration;
-              successfulParams = { titleVariant, artistVariant, albumVariant };
-              console.log(`Found lyrics with: title="${titleVariant}", artist="${artistVariant}", duration=${tryDuration}`);
-              break;
-            }
-            
-            if (lyricsResponse.status !== 404) {
-              throw new Error(`LRCLIB API error: ${lyricsResponse.status} ${lyricsResponse.statusText}`);
-            }
-          }
-          if (lyricsResponse?.ok) break;
-        }
-        if (lyricsResponse?.ok) break;
+    const { songTitle, artist, duration, albumName } = await req.json()
+
+    console.log(`Recherche de paroles pour: ${songTitle} par ${artist}`)
+
+    // Étape 1: Essayer de récupérer les paroles depuis l'API Tidal si un ID Tidal est fourni
+    // (Cette logique est maintenant principalement côté client, mais on la garde en fallback)
+    // Pour l'instant, on se concentre sur LRCLIB comme demandé.
+
+    // Étape 2: Utiliser LRCLIB si l'étape 1 échoue ou n'est pas applicable
+    try {
+      let apiUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(songTitle)}&artist_name=${encodeURIComponent(artist)}`
+      if (albumName) {
+        apiUrl += `&album_name=${encodeURIComponent(albumName)}`
       }
-      if (lyricsResponse?.ok) break;
-    }
-    
-    if (!lyricsResponse || !lyricsResponse.ok) {
-      console.log('Lyrics not found for:', songTitle, 'by', artist);
-      return new Response(
-        JSON.stringify({ 
-          lyrics: `Aucune parole trouvée pour "${songTitle}" par ${artist}.`,
-          syncedLyrics: null
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const lyricsData = await lyricsResponse.json();
-    console.log('Successfully retrieved lyrics for:', songTitle, 'by', artist);
-
-    // Check if track is instrumental
-    if (lyricsData.instrumental) {
-      return new Response(
-        JSON.stringify({ 
-          lyrics: `Cette piste est instrumentale.`,
-          syncedLyrics: null
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      );
-    }
-
-    // Return both plain and synced lyrics
-    const plainLyrics = lyricsData.plainLyrics || `Aucune parole disponible pour "${songTitle}" par ${artist}.`;
-    const syncedLyrics = lyricsData.syncedLyrics || null;
-
-    return new Response(
-      JSON.stringify({ 
-        lyrics: plainLyrics,
-        syncedLyrics: syncedLyrics
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+      if (duration) {
+        apiUrl += `&duration=${duration}`
       }
-    );
+
+      console.log("Appel à l'API LRCLIB:", apiUrl)
+
+      const response = await fetch(apiUrl)
+      if (!response.ok) {
+        throw new Error(`Erreur de l'API LRCLIB: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Réponse de LRCLIB:", data)
+
+      if (data && data.length > 0) {
+        const bestMatch = data[0]
+        const lyrics = bestMatch.syncedLyrics || bestMatch.plainLyrics
+
+        if (lyrics) {
+          console.log("Paroles trouvées via LRCLIB")
+          return new Response(
+            JSON.stringify({ 
+              lyrics: bestMatch.plainLyrics,
+              syncedLyrics: bestMatch.syncedLyrics 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      console.log("Aucune parole trouvée sur LRCLIB")
+      return new Response(
+        JSON.stringify({ error: 'Paroles non trouvées sur LRCLIB' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } catch (error) {
+      console.error("Erreur lors de la récupération des paroles:", error)
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
   } catch (error) {
     console.error('Error in generate-lyrics function:', error);
     
