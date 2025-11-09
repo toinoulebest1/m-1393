@@ -11,59 +11,52 @@ export const fetchAndSaveLyrics = async (
   artist?: string,
   duration?: string,
   albumName?: string,
-  isTidal?: boolean,
+  isTidal?: boolean, // Cet argument est conservé pour la compatibilité mais ne sera plus la source de vérité
   tidalId?: string
 ): Promise<void> => {
   try {
     console.log('🎵 Récupération automatique des paroles pour:', songTitle, 'par', artist);
 
-    // Pour les musiques Tidal, ne pas essayer de vérifier/sauvegarder dans la DB
-    // car elles n'ont pas d'UUID valide
-    if (!isTidal) {
-      // Vérifier si les paroles existent déjà pour les musiques locales
-      const { data: existingLyrics } = await supabase
-        .from('lyrics')
-        .select('content')
-        .eq('song_id', songId)
-        .maybeSingle();
-
-      if (existingLyrics?.content) {
-        console.log('✅ Paroles déjà en cache');
-        return;
-      }
-    }
-
-    // Étape 1: Essayer de récupérer les paroles depuis l'API Tidal si c'est une chanson Tidal
-    if (isTidal && tidalId) {
+    // Si un ID Tidal est présent, c'est notre source prioritaire.
+    if (tidalId) {
       try {
         console.log(`[Tidal Lyrics] Tentative de récupération pour l'ID Tidal: ${tidalId}`);
         const tidalLyricsResponse = await fetch(`https://tidal.kinoplus.online/lyrics/?id=${tidalId}`);
+        
         if (tidalLyricsResponse.ok) {
           const tidalLyricsData = await tidalLyricsResponse.json();
-          // La réponse est un tableau, on prend le premier élément
           const lyricsInfo = Array.isArray(tidalLyricsData) ? tidalLyricsData[0] : tidalLyricsData;
 
           if (lyricsInfo && (lyricsInfo.subtitles || lyricsInfo.lyrics)) {
             const lyricsContent = lyricsInfo.subtitles || lyricsInfo.lyrics;
             console.log('[Tidal Lyrics] Paroles trouvées via l\'API Tidal.');
 
-            // Sauvegarder les paroles dans la base de données pour les chansons locales
-            if (!songId.startsWith('tidal-')) {
-               await supabase.from('lyrics').upsert({ song_id: songId, content: lyricsContent });
-               console.log('[Tidal Lyrics] Paroles sauvegardées dans la DB.');
-            }
+            // Sauvegarder les paroles dans la base de données, même pour les chansons Tidal,
+            // en utilisant l'UUID de la chanson locale comme clé.
+            await supabase.from('lyrics').upsert({ song_id: songId, content: lyricsContent });
+            console.log(`[Tidal Lyrics] Paroles sauvegardées dans la DB pour song_id: ${songId}.`);
             
-            // Mettre à jour l'UI (si nécessaire, dépend de l'architecture)
-            // Pour l'instant, on se contente de sauvegarder.
-            return; // On a trouvé les paroles, on arrête ici.
+            return; // On a trouvé et sauvegardé les paroles, on arrête ici.
           }
         }
       } catch (e) {
-        console.warn('[Tidal Lyrics] Erreur lors de la récupération des paroles depuis l\'API Tidal, fallback sur lrclib.', e);
+        console.warn('[Tidal Lyrics] Erreur lors de la récupération via l\'API Tidal, fallback sur lrclib.', e);
       }
     }
 
-    // Étape 2: Fallback sur l'edge function (lrclib) si l'étape 1 échoue ou n'est pas applicable
+    // Vérifier si les paroles existent déjà dans la DB (pour les musiques non-Tidal ou si l'API Tidal a échoué)
+    const { data: existingLyrics } = await supabase
+      .from('lyrics')
+      .select('content')
+      .eq('song_id', songId)
+      .maybeSingle();
+
+    if (existingLyrics?.content) {
+      console.log('✅ Paroles déjà en cache dans la DB');
+      return;
+    }
+
+    // Fallback sur l'edge function (lrclib) si aucune parole n'a été trouvée jusqu'à présent
     console.log('[LRCLIB] Fallback: Utilisation de l\'edge function generate-lyrics.');
 
     // Convertir la durée de MM:SS en secondes
@@ -96,32 +89,28 @@ export const fetchAndSaveLyrics = async (
 
     const lyricsContent = response.data.syncedLyrics || response.data.lyrics;
 
-    // Sauvegarder dans la base de données uniquement pour les musiques locales (avec UUID valide)
-    if (!isTidal) {
-      const { error: insertError } = await supabase
-        .from('lyrics')
-        .upsert({
-          song_id: songId,
-          content: lyricsContent
-        });
+    // Sauvegarder dans la base de données
+    const { error: insertError } = await supabase
+      .from('lyrics')
+      .upsert({
+        song_id: songId,
+        content: lyricsContent
+      });
 
-      if (insertError) {
-        console.error('❌ Erreur sauvegarde paroles:', insertError);
-      } else {
-        console.log('✅ Paroles sauvegardées dans la DB');
-      }
-
-      // Sauvegarder dans Dropbox si activé
-      if (isDropboxEnabled()) {
-        try {
-          await uploadLyricsToDropbox(songId, lyricsContent);
-          console.log('✅ Paroles sauvegardées dans Dropbox');
-        } catch (error) {
-          console.warn('⚠️ Échec sauvegarde Dropbox:', error);
-        }
-      }
+    if (insertError) {
+      console.error('❌ Erreur sauvegarde paroles:', insertError);
     } else {
-      console.log('ℹ️ Paroles Tidal non sauvegardées (pas d\'UUID)');
+      console.log('✅ Paroles sauvegardées dans la DB');
+    }
+
+    // Sauvegarder dans Dropbox si activé
+    if (isDropboxEnabled()) {
+      try {
+        await uploadLyricsToDropbox(songId, lyricsContent);
+        console.log('✅ Paroles sauvegardées dans Dropbox');
+      } catch (error) {
+        console.warn('⚠️ Échec sauvegarde Dropbox:', error);
+      }
     }
 
     console.log('✅ Paroles récupérées et sauvegardées');
