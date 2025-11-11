@@ -376,7 +376,7 @@ const SearchPage = () => {
           </div>
         </div>
         <Player />
-        <ReportSongDialog song={songToReport} onClose={() => setSongToReport(null)} />
+        <ReportSongDialog song={songToReport} onClose={() => setSongToReport(null)} open={!!songToReport} />
       </div>
     </Layout>
   );

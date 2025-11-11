@@ -298,6 +298,7 @@ const History = () => {
         <ReportSongDialog
           song={songToReport}
           onClose={() => setSongToReport(null)}
+          open={!!songToReport}
         />
       </div>
     </Layout>

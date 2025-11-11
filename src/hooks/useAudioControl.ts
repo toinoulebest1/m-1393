@@ -140,10 +140,9 @@ export const useAudioControl = ({
     }
   }, [audioRef]);
 
-  const updatePlaybackRate = useCallback((rate: number, setPlaybackRate: (rate: number) => void) => {
+  const updatePlaybackRate = useCallback((rate: number) => {
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
-      setPlaybackRate(rate);
     }
   }, [audioRef]);
 

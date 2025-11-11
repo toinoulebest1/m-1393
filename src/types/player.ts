@@ -4,6 +4,7 @@ export interface Song {
   artist: string;
   duration?: string;
   url: string;
+  file_path?: string;
   imageUrl?: string;
   genre?: string;
   created_at?: string;
@@ -11,6 +12,7 @@ export interface Song {
   bitrate?: string;
   album_name?: string; // Add album name for LRCLIB API
   tidal_id?: string; // Tidal track ID
+  deezer_id?: string; // Deezer track ID
   isLocal?: boolean;
 }
 
@@ -57,8 +59,8 @@ export interface PlayerContextType {
   history: Song[];
   isChangingSong: boolean;
   isAudioReady: boolean;
-  maskingState: MaskingState | null; // État pour le masquage
-  setMaskingState: (state: MaskingState | null) => void; // Fonction pour mettre à jour l'état
+  maskingState: MaskingState | null;
+  setMaskingState: (state: MaskingState | null) => void;
   stopCurrentSong: () => void;
   removeSong: (songId: string) => void;
   setQueue: (queue: Song[] | ((prevQueue: Song[]) => Song[])) => void;
@@ -67,6 +69,8 @@ export interface PlayerContextType {
   pause: () => void;
   resume: () => void;
   setProgress: (progress: number) => void;
+  setVolume: (volume: number) => void;
+  setIsSeeking: (seeking: boolean) => void;
   nextSong: () => void;
   previousSong: () => void;
   addToQueue: (song: Song) => void;
@@ -78,4 +82,5 @@ export interface PlayerContextType {
   setPlaybackRate: (rate: number) => void;
   refreshCurrentSong: () => void;
   getCurrentAudioElement: () => HTMLAudioElement;
+  playFromQueue: (songs: Song[], songToPlay: Song) => void;
 }

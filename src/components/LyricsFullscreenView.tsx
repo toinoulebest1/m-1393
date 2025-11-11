@@ -826,12 +826,14 @@ export const LyricsFullscreenView: React.FC<LyricsFullscreenViewProps> = ({
                         {parsedLyrics.album && <p>Album: {parsedLyrics.album}</p>}
                       </div>
                       
-                      {/* Composant LRC Player amélioré */}
-                      <LrcPlayer 
-                        parsedLyrics={parsedLyrics}
-                        currentTime={currentAudioTime}
-                        className="h-full"
-                      />
+                      {/* Composant LRC Player - removed as LrcPlayer is not imported */}
+                      <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">
+                        {parsedLyrics.lines?.map((line: any, index: number) => (
+                          <div key={index} className="mb-2">
+                            {line.text}
+                          </div>
+                        ))}
+                      </div>
                     </>
                   ) : (
                     <div className="whitespace-pre-line text-spotify-neutral text-base md:text-xl leading-relaxed">

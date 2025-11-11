@@ -118,7 +118,7 @@ export const useIntelligentPreloader = () => {
         console.log(`📥 Préchargement [${index + 1}/${predictions.length}]:`, song.title);
         
         // Récupérer l'URL audio avec timeout court (3s max)
-        const urlPromise = getAudioFileUrl(song.url, song.deezer_id, song.title, song.artist, song.id);
+        const urlPromise = getAudioFileUrl(song.url, song.title, song.artist, song.id);
         const timeoutPromise = new Promise<never>((_, reject) => 
           setTimeout(() => reject(new Error('URL timeout')), 3000)
         );

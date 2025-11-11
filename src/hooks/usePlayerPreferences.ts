@@ -64,7 +64,7 @@ export const usePlayerPreferences = () => {
         console.log(`🔮 Préchargement intelligent: ${nextTrack.title}`);
         // On appelle getAudioFileUrl pour "chauffer" le cache (ex: obtenir une URL signée de Supabase)
         // Pas besoin de stocker l'URL ici, juste de lancer la requête.
-        await getAudioFileUrl(nextTrack.url, undefined, nextTrack.title, nextTrack.artist, nextTrack.id);
+        await getAudioFileUrl(nextTrack.url, nextTrack.title, nextTrack.artist, nextTrack.id);
         console.log(`✅ Préchargement terminé: ${nextTrack.title}`);
       }
     } catch (error) {

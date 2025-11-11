@@ -20,9 +20,9 @@ interface Song {
   id: string;
   title: string;
   artist: string;
-  duration: string;
+  duration?: string;
   url: string;
-  file_path: string;
+  file_path?: string;
   imageUrl?: string;
 }
 

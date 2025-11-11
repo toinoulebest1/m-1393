@@ -7,6 +7,7 @@ export interface GameSong {
   url: string;
   imageUrl?: string;
   duration: string;
+  isDeezer?: boolean;
 }
 
 /**

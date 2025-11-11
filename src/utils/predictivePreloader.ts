@@ -199,7 +199,6 @@ export class PredictivePreloader {
         try {
           await UltraFastStreaming.getAudioUrlUltraFast(
             song.url,
-            song.deezer_id,
             song.title,
             song.artist,
             song.id

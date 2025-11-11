@@ -43,7 +43,7 @@ function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/home" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
-                {isBanned ? <Route path="*" element={<BannedUserPage />} /> : (
+                {isBanned ? <Route path="*" element={<BannedUserPage banInfo={{ reason: "Violation des règles", ban_type: "permanent", expires_at: null }} />} /> : (
                   <>
                     <Route path="/favorites" element={<Favorites />} />
                     <Route path="/history" element={<History />} />
