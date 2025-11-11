@@ -174,11 +174,14 @@ const SearchPage = () => {
         localSongs = localSongs.sort(() => Math.random() - 0.5).slice(0, 20);
       }
 
-      const uniqueSongs = new Map<string, any>();
+      const combinedResults: any[] = [];
+      const localSongKeys = new Set<string>();
 
+      // Add all local songs and record their keys
       localSongs.forEach(song => {
         const key = `${song.title.toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`;
-        uniqueSongs.set(key, {
+        localSongKeys.add(key);
+        combinedResults.push({
           id: song.id,
           title: song.title,
           artist: song.artist || '',
@@ -190,14 +193,15 @@ const SearchPage = () => {
         });
       });
 
+      // Add Tidal songs only if they don't already exist locally
       tidalSongs.forEach(song => {
         const key = `${song.title.toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`;
-        if (!uniqueSongs.has(key)) {
-          uniqueSongs.set(key, song);
+        if (!localSongKeys.has(key)) {
+          combinedResults.push(song);
         }
       });
 
-      setResults(Array.from(uniqueSongs.values()));
+      setResults(combinedResults);
       setPlaylistResults([]);
 
     } catch (error) {
