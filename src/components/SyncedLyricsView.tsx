@@ -367,7 +367,10 @@ export const SyncedLyricsView: React.FC = () => {
 
       if (functionError) {
         console.error("Edge function invocation error:", functionError);
-        throw new Error(`L'appel à la fonction a échoué: ${functionError.message}`);
+        // Gérer silencieusement l'erreur sans afficher de message technique
+        setIsGenerating(false);
+        setIsLoadingLyrics(false);
+        return;
       }
 
       if (data?.lyrics) {
@@ -380,8 +383,6 @@ export const SyncedLyricsView: React.FC = () => {
         if (generationTimeoutRef.current) clearTimeout(generationTimeoutRef.current);
         generationTimeoutRef.current = setTimeout(() => {
           console.warn("Timeout: La génération de paroles a pris trop de temps.");
-          setError("La recherche de paroles a expiré. Veuillez réessayer.");
-          toast.warning("La recherche de paroles a pris plus de temps que prévu.");
           setIsGenerating(false);
           setIsLoadingLyrics(false);
         }, 30000); // 30 seconds timeout
@@ -772,7 +773,6 @@ export const SyncedLyricsView: React.FC = () => {
                   <h2 className="text-xl font-bold text-white mb-2">
                     Pas de paroles disponibles
                   </h2>
-                  {error && <p className="text-red-400 max-w-md mb-4">{error}</p>}
                   <p className="text-spotify-neutral max-w-md mb-6">
                     Nous n'avons pas trouvé de paroles pour cette chanson. Vous pouvez réessayer.
                   </p>
