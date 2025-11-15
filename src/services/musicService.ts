@@ -49,7 +49,17 @@ export const searchMusicTracks = async (query: string): Promise<Song[]> => {
   console.log(`[MusicService] Recherche avec le provider: ${provider}`);
 
   if (provider === 'qobuz') {
-    return searchQobuzTracks(query);
+    try {
+      const results = await searchQobuzTracks(query);
+      if (results && results.length > 0) {
+        return results;
+      }
+      console.warn('[MusicService] Qobuz a renvoyé 0 résultat ou est bloqué (403/429). Fallback vers Tidal.');
+      return await searchTidalTracks(query);
+    } catch (err) {
+      console.warn('[MusicService] Échec de la recherche Qobuz, fallback vers Tidal.', err);
+      return await searchTidalTracks(query);
+    }
   } else {
     return searchTidalTracks(query);
   }
