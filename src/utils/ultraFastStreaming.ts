@@ -1,5 +1,5 @@
 import { getAudioFileUrl } from '@/utils/storage';
-import { getTidalStreamUrl } from '@/services/tidalService';
+import { getMusicStreamUrl, detectProviderFromUrl } from '@/services/musicService';
 import { getFromCache, addToCache, cacheCurrentSong } from './audioCache';
 import { UltraFastCache } from './ultraFastCache';
 // import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
@@ -21,6 +21,8 @@ export class UltraFastStreaming {
     console.log(`${logPrefix}   - Song ID: ${songId}`);
 
     const isTidal = filePath.startsWith('tidal:');
+    const isQobuz = filePath.startsWith('qobuz:');
+    const isMusicApi = isTidal || isQobuz;
     const isHttp = filePath.startsWith('http://') || filePath.startsWith('https://');
 
     // 1. Vérifier le cache L0 (variables globales)
@@ -54,17 +56,18 @@ export class UltraFastStreaming {
     console.log(`${logPrefix} No cache hit, fetching remote URL...`);
     let remoteStream: { url: string; duration?: number } | null = null;
     try {
-      if (isTidal) {
-        const tidalId = filePath.split(':')[1];
-        console.log(`${logPrefix} STEP 2: Getting Tidal stream URL via proxy...`);
-        console.log(`${logPrefix} INFO: Extracted Tidal ID: ${tidalId}`);
-        const directTidalUrlResult = await getTidalStreamUrl(tidalId);
-        console.log(`${logPrefix} INFO: Result from getTidalStreamUrl:`, directTidalUrlResult);
+      if (isMusicApi) {
+        const provider = detectProviderFromUrl(filePath);
+        const trackId = filePath.split(':')[1];
+        console.log(`${logPrefix} STEP 2: Getting ${provider?.toUpperCase()} stream URL via proxy...`);
+        console.log(`${logPrefix} INFO: Extracted Track ID: ${trackId}`);
+        const streamUrlResult = await getMusicStreamUrl(trackId, provider || 'tidal');
+        console.log(`${logPrefix} INFO: Result from getMusicStreamUrl:`, streamUrlResult);
 
-        if (!directTidalUrlResult || !directTidalUrlResult.url) {
-          throw new Error("Impossible d'obtenir l'URL directe de Tidal.");
+        if (!streamUrlResult || !streamUrlResult.url) {
+          throw new Error(`Impossible d'obtenir l'URL directe de ${provider?.toUpperCase()}.`);
         }
-        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(directTidalUrlResult.url)}`;
+        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(streamUrlResult.url)}`;
         console.log(`${logPrefix} INFO: Constructed proxy URL: ${proxyUrl.substring(0, 100)}...`);
         remoteStream = { url: proxyUrl };
       } else if (isHttp) {

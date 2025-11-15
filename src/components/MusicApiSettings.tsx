@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { invalidateProviderCache } from "@/services/musicService";
 
 export const MusicApiSettings = () => {
   const [selectedApi, setSelectedApi] = useState<string>("tidal");
@@ -55,6 +56,9 @@ export const MusicApiSettings = () => {
         });
 
       if (error) throw error;
+
+      // Invalider le cache du provider pour forcer le rechargement
+      invalidateProviderCache();
 
       toast.success("API musicale mise à jour avec succès");
     } catch (error) {

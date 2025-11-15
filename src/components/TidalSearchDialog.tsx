@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Song } from '@/types/player';
 import { usePlayerContext } from '@/contexts/PlayerContext';
-import { searchTidalTracks } from '@/services/tidalService';
+import { searchMusicTracks } from '@/services/musicService';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
 
@@ -29,7 +29,7 @@ export const TidalSearchDialog: React.FC<TidalSearchDialogProps> = ({ onSongSele
     console.log(`[TidalSearchDialog] Starting search for: "${query}"`);
     setIsSearching(true);
     try {
-      const results = await searchTidalTracks(query);
+      const results = await searchMusicTracks(query);
       console.log(`[TidalSearchDialog] Received ${results.length} results.`);
       setSearchResults(results);
     } catch (error) {

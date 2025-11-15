@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { isDropboxEnabled, isDropboxEnabledForReading, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
 import { generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
 import { getDropboxConfig } from './dropboxStorage';
-import { getTidalStreamUrl } from '@/services/tidalService';
+import { getMusicStreamUrl, detectProviderFromUrl } from '@/services/musicService';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
   // Priorité à Dropbox si activé
