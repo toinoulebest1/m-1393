@@ -69,6 +69,8 @@ serve(async (req) => {
 
     const doFetch = async (attempt: number) => {
       const ua = userAgents[attempt % userAgents.length];
+      const qobuzToken = Deno.env.get('QOBUZ_API_TOKEN');
+      
       const headers: Record<string, string> = {
         'User-Agent': ua,
         'Accept': 'application/json, text/plain, */*',
@@ -82,7 +84,14 @@ serve(async (req) => {
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"Windows"',
       };
-      console.log(`[QobuzProxy] Attempt ${attempt + 1} headers`, { ua, referer: headers['Referer'], origin: headers['Origin'] });
+      
+      // Ajoute le token JWT si disponible
+      if (qobuzToken) {
+        headers['Authorization'] = `Bearer ${qobuzToken}`;
+        console.log(`[QobuzProxy] Using JWT token for authentication`);
+      }
+      
+      console.log(`[QobuzProxy] Attempt ${attempt + 1} headers`, { ua, referer: headers['Referer'], origin: headers['Origin'], hasAuth: !!qobuzToken });
       return await fetch(qobuzUrl, { headers, redirect: 'follow' as RequestRedirect });
     };
 
