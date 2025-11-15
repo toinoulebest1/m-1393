@@ -1,7 +1,7 @@
 import { Song } from '@/types/player';
 
-const SEARCH_API_URL = 'https://dab.yeet.su/api/search';
-const STREAM_API_URL = 'https://dab.yeet.su/api/stream';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const QOBUZ_PROXY_URL = `${SUPABASE_URL}/functions/v1/qobuz-proxy`;
 
 // Helper pour formater la durée de secondes en MM:SS
 const formatDuration = (seconds: number): string => {
@@ -15,7 +15,9 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
   if (!query) return [];
 
   try {
-    const response = await fetch(`${SEARCH_API_URL}?q=${encodeURIComponent(query)}&offset=0&type=track`);
+    const response = await fetch(
+      `${QOBUZ_PROXY_URL}?endpoint=search&q=${encodeURIComponent(query)}&offset=0&type=track`
+    );
     
     if (!response.ok) {
       throw new Error(`La recherche Qobuz a échoué: ${response.status}`);
@@ -63,7 +65,7 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
   if (!trackId) return null;
 
   try {
-    const response = await fetch(`${STREAM_API_URL}?trackId=${trackId}`);
+    const response = await fetch(`${QOBUZ_PROXY_URL}?endpoint=stream&trackId=${trackId}`);
     
     if (!response.ok) {
       throw new Error(`La récupération du flux Qobuz a échoué: ${response.status}`);
