@@ -56,6 +56,7 @@ function App() {
 
                     {/* Routes Admin */}
                     <Route path="/admin/maintenance" element={<MaintenanceAdmin />} />
+                    <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
                     <Route path="/admin/history" element={<AdminHistory />} />
                     {/* <Route path="/admin/audio-sources" element={<ManageAudioSources />} /> */}
                     {/* <Route path="/admin/metadata" element={<SongMetadataUpdate />} /> */}
