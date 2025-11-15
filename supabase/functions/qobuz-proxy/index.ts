@@ -68,30 +68,17 @@ serve(async (req) => {
     ];
 
     const doFetch = async (attempt: number) => {
-      const ua = userAgents[attempt % userAgents.length];
       const qobuzToken = Deno.env.get('QOBUZ_API_TOKEN');
-      
+
       const headers: Record<string, string> = {
-        'User-Agent': ua,
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://dab.yeet.su/',
-        'Origin': 'https://dab.yeet.su',
-        'Connection': 'keep-alive',
-        'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache',
-        'sec-ch-ua': '"Chromium";v="120", "Not=A?Brand";v="99"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
+        'Accept': 'application/json',
       };
-      
-      // Ajoute le token JWT si disponible
+
       if (qobuzToken) {
         headers['Authorization'] = `Bearer ${qobuzToken}`;
-        console.log(`[QobuzProxy] Using JWT token for authentication`);
       }
-      
-      console.log(`[QobuzProxy] Attempt ${attempt + 1} headers`, { ua, referer: headers['Referer'], origin: headers['Origin'], hasAuth: !!qobuzToken });
+
+      console.log(`[QobuzProxy] Attempt ${attempt + 1} server-to-server headers`, { hasAuth: !!qobuzToken });
       return await fetch(qobuzUrl, { headers, redirect: 'follow' as RequestRedirect });
     };
 
