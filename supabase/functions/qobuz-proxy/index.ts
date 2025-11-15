@@ -59,25 +59,58 @@ serve(async (req) => {
 
     console.log(`[QobuzProxy] Fetching from: ${qobuzUrl}`);
 
-    // Add browser headers to bypass API detection
-    const response = await fetch(qobuzUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    // Retry avec backoff + rotation d'User-Agent pour contourner 403/429
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0'
+    ];
+
+    const doFetch = async (attempt: number) => {
+      const ua = userAgents[attempt % userAgents.length];
+      const headers: Record<string, string> = {
+        'User-Agent': ua,
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
         'Referer': 'https://dab.yeet.su/',
         'Origin': 'https://dab.yeet.su',
         'Connection': 'keep-alive',
         'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache'
-      }
-    });
+        'Cache-Control': 'no-cache',
+        // Hints client high-entropy like a real browser
+        'sec-ch-ua': '"Chromium";v="120", "Not=A?Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+      };
 
-    if (!response.ok) {
-      console.error(`[QobuzProxy] Error: ${response.status} ${response.statusText}`);
+      return await fetch(qobuzUrl, { headers, redirect: 'follow' as RequestRedirect });
+    };
+
+    let response: Response | null = null;
+    let lastStatus = 0;
+    const maxAttempts = 3;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        const jitter = Math.floor(150 + Math.random() * 350);
+        const backoff = attempt * 250 + jitter; // 150-600ms environ
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+      response = await doFetch(attempt);
+      lastStatus = response.status;
+      if (response.ok) break;
+      if (![403, 429].includes(response.status)) break; // ne retente pas pour autres codes
+      console.warn(`[QobuzProxy] Attempt ${attempt + 1}/${maxAttempts} failed with ${response.status}. Retrying...`);
+    }
+
+    if (!response || !response.ok) {
+      const status = response ? response.status : 500;
+      const statusText = response ? response.statusText : 'No response';
+      console.error(`[QobuzProxy] Error: ${status} ${statusText}`);
       return new Response(
-        JSON.stringify({ error: `Qobuz API error: ${response.status}` }), 
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: `Qobuz API error: ${status}` }),
+        { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
