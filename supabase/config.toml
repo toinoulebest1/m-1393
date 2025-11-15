@@ -64,3 +64,13 @@ verify_jwt = false
 
 [functions.flacdownloader-proxy]
 verify_jwt = false
+
+[functions.tidal-api]
+verify_jwt = false
+
+[functions.image-proxy]
+verify_jwt = false
+
+[functions.audio-proxy]
+verify_jwt = false
+
