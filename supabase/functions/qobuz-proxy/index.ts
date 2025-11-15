@@ -78,12 +78,11 @@ serve(async (req) => {
         'Connection': 'keep-alive',
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
-        // Hints client high-entropy like a real browser
         'sec-ch-ua': '"Chromium";v="120", "Not=A?Brand";v="99"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"Windows"',
       };
-
+      console.log(`[QobuzProxy] Attempt ${attempt + 1} headers`, { ua, referer: headers['Referer'], origin: headers['Origin'] });
       return await fetch(qobuzUrl, { headers, redirect: 'follow' as RequestRedirect });
     };
 
@@ -99,6 +98,13 @@ serve(async (req) => {
       }
       response = await doFetch(attempt);
       lastStatus = response.status;
+      const debugHeaders = ['server','cf-ray','content-type','x-content-type-options','x-frame-options','strict-transport-security'];
+      const picked: Record<string, string> = {};
+      for (const h of debugHeaders) {
+        const v = response.headers.get(h);
+        if (v) picked[h] = v;
+      }
+      console.log(`[QobuzProxy] Attempt ${attempt + 1} -> Status: ${response.status}`, picked);
       if (response.ok) break;
       if (![403, 429].includes(response.status)) break; // ne retente pas pour autres codes
       console.warn(`[QobuzProxy] Attempt ${attempt + 1}/${maxAttempts} failed with ${response.status}. Retrying...`);
@@ -107,9 +113,18 @@ serve(async (req) => {
     if (!response || !response.ok) {
       const status = response ? response.status : 500;
       const statusText = response ? response.statusText : 'No response';
-      console.error(`[QobuzProxy] Error: ${status} ${statusText}`);
+      let bodySnippet = '';
+      try {
+        if (response) {
+          const text = await response.text();
+          bodySnippet = text.slice(0, 500);
+        }
+      } catch (_) {}
+      const debugHeaders = response ? Object.fromEntries(Array.from(response.headers.entries()).slice(0, 20)) : {};
+      console.error(`[QobuzProxy] Error detailed: ${status} ${statusText} Body: ${bodySnippet}`);
+      console.log('[QobuzProxy] Response headers snapshot:', debugHeaders);
       return new Response(
-        JSON.stringify({ error: `Qobuz API error: ${status}` }),
+        JSON.stringify({ error: `Qobuz API error: ${status}`, statusText, bodySnippet }),
         { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
