@@ -92,14 +92,16 @@ export const MusicApiSettings = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="tidal">Tidal (kinoplus.online)</SelectItem>
-              <SelectItem value="qobuz">Qobuz (à venir)</SelectItem>
+              <SelectItem value="qobuz">Qobuz (dab.yeet.su)</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
             API actuellement sélectionnée : <span className="font-medium capitalize">{selectedApi}</span>
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            💡 L'API Tidal gratuite (kinoplus.online) est actuellement utilisée pour le streaming musical
+            💡 {selectedApi === 'tidal' 
+              ? "L'API Tidal gratuite (kinoplus.online) est utilisée pour le streaming musical"
+              : "L'API Qobuz gratuite (dab.yeet.su) est utilisée pour le streaming musical"}
           </p>
         </div>
 
