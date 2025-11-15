@@ -1,7 +1,7 @@
 import { Song } from '@/types/player';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const QOBUZ_PROXY_URL = `${SUPABASE_URL}/functions/v1/qobuz-proxy`;
+// Appel direct à l'API depuis le navigateur (bypass edge function pour éviter Cloudflare)
+const QOBUZ_API_BASE = 'https://dabmusic.xyz/api';
 
 // Helper pour formater la durée de secondes en MM:SS
 const formatDuration = (seconds: number): string => {
@@ -15,8 +15,16 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
   if (!query) return [];
 
   try {
+    // Appel direct à l'API depuis le navigateur
     const response = await fetch(
-      `${QOBUZ_PROXY_URL}?endpoint=search&q=${encodeURIComponent(query)}&offset=0&type=track`
+      `${QOBUZ_API_BASE}/search?q=${encodeURIComponent(query)}&offset=0&type=track`,
+      {
+        method: 'GET',
+        credentials: 'include', // Important pour les cookies de session si besoin
+        headers: {
+          'Accept': 'application/json',
+        }
+      }
     );
     
     if (!response.ok) {
@@ -69,7 +77,17 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
   if (!trackId) return null;
 
   try {
-    const response = await fetch(`${QOBUZ_PROXY_URL}?endpoint=stream&trackId=${trackId}`);
+    // Appel direct à l'API depuis le navigateur
+    const response = await fetch(
+      `${QOBUZ_API_BASE}/stream?trackId=${trackId}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+        }
+      }
+    );
     
     if (!response.ok) {
       throw new Error(`La récupération du flux Qobuz a échoué: ${response.status}`);
