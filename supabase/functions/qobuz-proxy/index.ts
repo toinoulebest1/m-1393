@@ -59,7 +59,19 @@ serve(async (req) => {
 
     console.log(`[QobuzProxy] Fetching from: ${qobuzUrl}`);
 
-    const response = await fetch(qobuzUrl);
+    // Add browser headers to bypass API detection
+    const response = await fetch(qobuzUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': 'https://www.qobuz.com/',
+        'Origin': 'https://www.qobuz.com',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+      }
+    });
 
     if (!response.ok) {
       console.error(`[QobuzProxy] Error: ${response.status} ${response.statusText}`);
