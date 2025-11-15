@@ -45,7 +45,6 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
           imageUrl: imageUrl,
           album_name: item.albumTitle || 'Album inconnu',
           genre: item.genre || undefined,
-          deezer_id: item.id.toString(),
         };
       } catch (mapError) {
         console.error(`[QobuzService] Erreur lors du mappage de l'élément Qobuz:`, mapError);

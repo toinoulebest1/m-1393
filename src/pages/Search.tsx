@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/utils/dateUtils";
-import { searchTidalTracks } from '@/services/tidalService';
+import { searchMusicTracks } from '@/services/musicService';
 import { useInstantPlayback } from "@/hooks/useInstantPlayback";
 
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Jazz", "Électronique", "Classique", "R&B", "Folk", "Blues", "Country", "Reggae", "Metal", "Soul", "Funk", "Dance"];
@@ -145,8 +145,8 @@ const SearchPage = () => {
         return;
       }
 
-      // --- DUAL SEARCH FOR SONGS (Local + Tidal) ---
-      const tidalSongsPromise = searchTidalTracks(query);
+      // --- DUAL SEARCH FOR SONGS (Local + Music API) ---
+      const musicApiSongsPromise = searchMusicTracks(query);
 
       let localSongsPromise;
       let songQuery = supabase.from('songs').select('*');
@@ -163,7 +163,7 @@ const SearchPage = () => {
       }
       localSongsPromise = songQuery;
 
-      const [tidalSongs, localSongsResult] = await Promise.all([tidalSongsPromise, localSongsPromise]);
+      const [musicApiSongs, localSongsResult] = await Promise.all([musicApiSongsPromise, localSongsPromise]);
 
       if (localSongsResult.error) {
         console.error("Supabase search error:", localSongsResult.error);
@@ -186,15 +186,15 @@ const SearchPage = () => {
           title: song.title,
           artist: song.artist || '',
           duration: song.duration || '0:00',
-          url: song.tidal_id ? `tidal:${song.tidal_id}` : song.file_path,
+          url: song.tidal_id ? `tidal:${song.tidal_id}` : (song.deezer_id ? `qobuz:${song.deezer_id}` : song.file_path),
           imageUrl: song.image_url,
           album_name: song.album_name,
           isLocal: true,
         });
       });
 
-      // Add Tidal songs only if they don't already exist locally
-      tidalSongs.forEach(song => {
+      // Add Music API songs only if they don't already exist locally
+      musicApiSongs.forEach(song => {
         const key = `${song.title.toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`;
         if (!localSongKeys.has(key)) {
           combinedResults.push(song);
