@@ -75,10 +75,10 @@ serve(async (req) => {
       };
 
       if (qobuzToken) {
-        headers['Authorization'] = `Bearer ${qobuzToken}`;
+        headers['Cookie'] = `session=${qobuzToken}`;
       }
 
-      console.log(`[QobuzProxy] Attempt ${attempt + 1} server-to-server headers`, { hasAuth: !!qobuzToken });
+      console.log(`[QobuzProxy] Attempt ${attempt + 1} with session cookie`, { hasCookie: !!qobuzToken });
       return await fetch(qobuzUrl, { headers, redirect: 'follow' as RequestRedirect });
     };
 
