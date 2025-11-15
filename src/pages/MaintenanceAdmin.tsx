@@ -1,9 +1,10 @@
 import { MaintenanceSettings } from "@/components/MaintenanceSettings";
 import { UserBanManagement } from "@/components/UserBanManagement";
 import { AnnouncementManagement } from "@/components/AnnouncementManagement";
+import { MusicApiSettings } from "@/components/MusicApiSettings";
 import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Ban, Megaphone } from "lucide-react";
+import { Settings, Ban, Megaphone, Music } from "lucide-react";
 
 const MaintenanceAdmin = () => {
   return (
@@ -19,7 +20,7 @@ const MaintenanceAdmin = () => {
         </div>
         
         <Tabs defaultValue="maintenance" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="maintenance" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Maintenance
@@ -31,6 +32,10 @@ const MaintenanceAdmin = () => {
             <TabsTrigger value="announcements" className="flex items-center gap-2">
               <Megaphone className="w-4 h-4" />
               Annonces
+            </TabsTrigger>
+            <TabsTrigger value="api" className="flex items-center gap-2">
+              <Music className="w-4 h-4" />
+              API Musique
             </TabsTrigger>
           </TabsList>
           
@@ -44,6 +49,10 @@ const MaintenanceAdmin = () => {
           
           <TabsContent value="announcements" className="mt-6">
             <AnnouncementManagement />
+          </TabsContent>
+          
+          <TabsContent value="api" className="mt-6">
+            <MusicApiSettings />
           </TabsContent>
         </Tabs>
       </div>
