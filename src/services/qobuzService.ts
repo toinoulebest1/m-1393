@@ -25,7 +25,9 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
     
     const data = await response.json();
 
+    // L'API dabmusic.xyz retourne { tracks: [...], albums: [...], artists: [...], pagination: {...} }
     if (!data.tracks || data.tracks.length === 0) {
+      console.warn('[QobuzService] Aucun résultat trouvé dans data.tracks');
       return [];
     }
 
@@ -36,13 +38,14 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
           return null;
         }
 
-        const imageUrl = item.images?.large || item.albumCover || '/placeholder.svg';
+        // Mapping selon le schéma OpenAPI: albumCover pour l'image
+        const imageUrl = item.albumCover || '/placeholder.svg';
 
         return {
           id: `qobuz-${item.id}`,
           title: item.title || 'Titre inconnu',
           artist: item.artist || 'Artiste inconnu',
-          duration: formatDuration(item.duration),
+          duration: formatDuration(item.duration), // duration est en secondes selon l'API
           url: `qobuz:${item.id}`,
           imageUrl: imageUrl,
           album_name: item.albumTitle || 'Album inconnu',
@@ -54,6 +57,7 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
       }
     }).filter(Boolean);
 
+    console.log(`[QobuzService] ${songs.length} pistes trouvées`);
     return songs;
   } catch (error) {
     console.error('Erreur lors de la recherche de pistes Qobuz:', error);

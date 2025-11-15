@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const QOBUZ_API_BASE = 'https://dab.yeet.su/api';
+const QOBUZ_API_BASE = 'https://dabmusic.xyz/api';
 
 serve(async (req) => {
   // Handle CORS preflight requests
