@@ -31,6 +31,9 @@ const createNextAudio = () => {
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Historique des artistes pour éviter les répétitions
+  const recentArtistsRef = useRef<string[]>([]);
+  
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
     // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
@@ -259,6 +262,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return [...prevHistory, currentSong];
       });
+      
+      // Ajouter l'artiste à l'historique pour éviter les répétitions Last.fm
+      if (currentSong.artist) {
+        const artistLower = currentSong.artist.toLowerCase();
+        // Ne pas ajouter si c'est déjà le dernier artiste de l'historique
+        if (recentArtistsRef.current[recentArtistsRef.current.length - 1] !== artistLower) {
+          recentArtistsRef.current.push(artistLower);
+          // Garder seulement les 5 derniers artistes
+          if (recentArtistsRef.current.length > 5) {
+            recentArtistsRef.current.shift();
+          }
+          console.log('[Artist History] Historique des artistes:', recentArtistsRef.current);
+        }
+      }
     }
   }, [currentSong, setHistory]);
 
@@ -828,6 +845,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
                 for (const artist of similarArtists) {
+                  // Vérifier si l'artiste a été joué récemment (dans les 5 dernières chansons)
+                  if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
+                    console.log('[LastFM Autoplay] Artiste déjà joué récemment, skip:', artist.name);
+                    continue;
+                  }
+                  
                   // D'abord essayer dans la base locale
                   let song = await lastfmService.findSongsByArtist(artist.name);
                   
