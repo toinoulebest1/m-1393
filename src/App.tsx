@@ -24,12 +24,16 @@ import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import { useSessionQuery } from "./hooks/useSessionQuery";
 import { useBanStatus } from "./hooks/useBanStatus";
 import { BannedUserPage } from "./components/BannedUserPage";
+import { useSessionDetection } from "./hooks/useSessionDetection";
 
 const queryClient = new QueryClient();
 
 function App() {
   const { data: session, isLoading } = useSessionQuery();
   const { isBanned } = useBanStatus(session?.user?.id);
+  
+  // Détection de sessions multiples
+  useSessionDetection(session?.user?.id);
 
   return (
     <QueryClientProvider client={queryClient}>
