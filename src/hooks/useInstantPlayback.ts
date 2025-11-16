@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
+import { getMusicStreamUrl, detectProviderFromUrl } from '@/services/musicService';
 
 // Précharge instantanée des URLs audio pour lecture ultra-rapide
 export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
@@ -17,6 +18,16 @@ export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
       const preloadPromises = songsToPreload.map(async (song) => {
         try {
           console.log(`⚡ Préchargement URL pour: ${song.title}`);
+          
+          // Si c'est une URL Qobuz/Tidal, précharger l'URL de streaming AVANT
+          if (song.url?.startsWith('qobuz:') || song.url?.startsWith('tidal:')) {
+            const provider = detectProviderFromUrl(song.url);
+            const trackId = song.url.split(':')[1];
+            console.log(`🔥 Préchargement URL ${provider} pour mise en cache:`, trackId);
+            await getMusicStreamUrl(trackId, provider || 'qobuz');
+          }
+          
+          // Ensuite précharger l'audio
           await UltraFastStreaming.getAudioUrlUltraFast(song.url, song.title, song.artist, song.id);
           console.log(`✅ URL préchargée pour: ${song.title}`);
         } catch (error) {
@@ -31,7 +42,7 @@ export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
     // Lancer le préchargement quasi-immédiatement
     const timer = setTimeout(() => {
       preloadSongUrls();
-    }, 100); // Réduit à 100ms pour démarrage ultra-rapide
+    }, 50); // Encore plus rapide pour précharger les URLs
 
     return () => clearTimeout(timer);
   }, [songs, enabled]);
