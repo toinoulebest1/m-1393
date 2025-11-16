@@ -109,18 +109,18 @@ Deno.serve(async (req) => {
       const sigString = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
       const signature = md5(sigString);
 
-      // Build URL with exact parameter order from working HTML example
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&request_ts=${requestTs}&request_sig=${signature}&intent=${intent}`;
+      // Build URL with ALL parameters in the URL (like the working HTML example)
+      // CRITICAL: user_auth_token and app_id MUST be in the URL, not just headers!
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?app_id=${appId}&track_id=${trackId}&format_id=${formatId}&request_ts=${requestTs}&request_sig=${signature}&intent=${intent}&user_auth_token=${userToken}`;
       
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId} ts=${requestTs}`);
       console.log(`[QobuzProxy] Signature string: trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}[SECRET]`);
+      console.log(`[QobuzProxy] Signature: ${signature}`);
       
-      // Use headers EXACTLY like the working HTML example
+      // Simple fetch without extra headers since everything is in the URL
       const response = await fetch(qobuzUrl, {
         headers: {
-          'X-User-Auth-Token': userToken,
-          'X-App-Id': appId,
-          'User-Agent': 'Mozilla/5.0'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
 
