@@ -6,7 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GENIUS_API_KEY = Deno.env.get("GENIUS_API_KEY");
 const FUNCTION_RESPONSE_TIMEOUT = 8000; // 8 secondes
 
 interface SongDetails {
@@ -20,29 +19,35 @@ interface SongDetails {
   deezerId?: string;
 }
 
-async function searchSongOnGenius(query: string) {
-  const url = `https://api.genius.com/search?q=${encodeURIComponent(query)}`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${GENIUS_API_KEY}` },
-  });
-  if (!response.ok) throw new Error(`Genius API search failed: ${response.statusText}`);
-  const data = await response.json();
-  return data.response.hits;
+async function fetchLyricsFromLrclib(artist: string, title: string): Promise<string | null> {
+  try {
+    const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
+    const response = await fetch(url);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.syncedLyrics || data.plainLyrics || null;
+    }
+  } catch (error) {
+    console.error('[generate-lyrics] Error fetching from lrclib:', error);
+  }
+  return null;
 }
 
-async function getLyricsFromGenius(songPath: string) {
-  const url = `https://api.genius.com${songPath}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch lyrics page: ${response.statusText}`);
-  const html = await response.text();
-  const lyricsRegex = /<div data-lyrics-container="true".*?>([\s\S]*?)<\/div>/g;
-  let lyricsContent = "";
-  let match;
-  while ((match = lyricsRegex.exec(html)) !== null) {
-    lyricsContent += match[1];
+async function fetchLyricsFromTidal(tidalId: string): Promise<string | null> {
+  try {
+    const url = `https://tidal.kinoplus.online/lyrics/?id=${tidalId}`;
+    const response = await fetch(url);
+    
+    if (response.ok) {
+      const data = await response.json();
+      const lyricsInfo = Array.isArray(data) ? data[0] : data;
+      return lyricsInfo?.subtitles || lyricsInfo?.lyrics || null;
+    }
+  } catch (error) {
+    console.error('[generate-lyrics] Error fetching from Tidal:', error);
   }
-  if (!lyricsContent) return null;
-  return lyricsContent.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").trim();
+  return null;
 }
 
 async function getAndSaveLyrics(supabase: any, body: SongDetails): Promise<string | null> {
@@ -67,11 +72,20 @@ async function getAndSaveLyrics(supabase: any, body: SongDetails): Promise<strin
     songId = songData.id;
   }
 
-  const hits = await searchSongOnGenius(`${songTitle} ${artist}`);
-  if (hits.length === 0) return null;
+  let lyrics: string | null = null;
 
-  const songPath = hits[0].result.path;
-  const lyrics = await getLyricsFromGenius(songPath);
+  // 1. Try lrclib first
+  if (artist && songTitle) {
+    lyrics = await fetchLyricsFromLrclib(artist, songTitle);
+    if (lyrics) console.log('[generate-lyrics] Found lyrics from lrclib');
+  }
+
+  // 2. Try Tidal if we have a Tidal ID
+  if (!lyrics && tidalId) {
+    lyrics = await fetchLyricsFromTidal(tidalId);
+    if (lyrics) console.log('[generate-lyrics] Found lyrics from Tidal');
+  }
+
   if (!lyrics) return null;
 
   await supabase.from("lyrics").upsert({ song_id: songId, content: lyrics }, { onConflict: 'song_id' });
