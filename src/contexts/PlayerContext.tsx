@@ -828,7 +828,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
                 for (const artist of similarArtists) {
-                  const song = await lastfmService.findSongsByArtist(artist.name);
+                  // D'abord essayer dans la base locale
+                  let song = await lastfmService.findSongsByArtist(artist.name);
+                  
+                  // Si pas trouvé localement, chercher sur Qobuz/Tidal
+                  if (!song) {
+                    console.log('[LastFM Autoplay] Recherche sur Qobuz/Tidal pour:', artist.name);
+                    song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
+                  }
+                  
                   if (song && song.id !== currentSong.id) {
                     nextSongToPlay = song;
                     console.log('[LastFM Autoplay] Chanson d\'artiste similaire trouvée:', song.title, 'by', song.artist);

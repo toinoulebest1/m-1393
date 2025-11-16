@@ -133,6 +133,7 @@ export const lastfmService = {
         .limit(20);
 
       if (error || !data || data.length === 0) {
+        console.log('[LastFM Service] No local songs found, searching on Qobuz/Tidal for:', artist);
         return null;
       }
 
@@ -147,6 +148,30 @@ export const lastfmService = {
       };
     } catch (error) {
       console.error('[LastFM Service] Error finding songs by artist:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Search for artist songs on Qobuz/Tidal API
+   */
+  searchArtistOnStreamingService: async (artistName: string) => {
+    try {
+      const { searchMusicTracks } = await import('@/services/musicService');
+      console.log('[LastFM Service] Searching on streaming service for:', artistName);
+      
+      const results = await searchMusicTracks(artistName);
+      
+      if (results && results.length > 0) {
+        // Retourner une chanson aléatoire des résultats
+        const randomSong = results[Math.floor(Math.random() * results.length)];
+        console.log('[LastFM Service] Found song on streaming service:', randomSong.title, 'by', randomSong.artist);
+        return randomSong;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[LastFM Service] Error searching on streaming service:', error);
       return null;
     }
   }
