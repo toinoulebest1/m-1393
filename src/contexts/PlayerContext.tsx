@@ -204,6 +204,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     })();
   }, [currentSong, predictNextSongs, preloadPredictedSongs, recordTransition]);
+  
   // Fonctions exposées à travers le contexte - définies après les hooks
   const { 
     play, 
@@ -249,6 +250,85 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     history,
     setHistory,
   });
+
+  // Précharger les recommandations Last.fm dès le début de la chanson
+  useEffect(() => {
+    if (!currentSong || !isPlaying) return;
+    
+    const activeQueue = shuffleMode ? shuffledQueue : queue;
+    
+    // Ne précharger que si la queue est vide et qu'on n'a pas déjà une recommandation
+    if (activeQueue.length === 0 && !lastfmPreloadingRef.current && !lastfmCacheRef.current) {
+      console.log('[LastFM Preload] Début du préchargement pour:', currentSong.title);
+      lastfmPreloadingRef.current = true;
+      
+      (async () => {
+        try {
+          let nextSongToPlay = null;
+          
+          // 1. Essayer de trouver des chansons similaires
+          if (currentSong.artist && currentSong.title) {
+            const similarTracks = await lastfmService.getSimilarTracks(
+              currentSong.artist,
+              currentSong.title
+            );
+            
+            for (const track of similarTracks) {
+              if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
+                continue;
+              }
+              
+              let song = await lastfmService.findSongInDatabase(
+                track.artist.name,
+                track.name
+              );
+              
+              if (!song) {
+                song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+              }
+              
+              if (song && song.id !== currentSong.id) {
+                nextSongToPlay = song;
+                console.log('[LastFM Preload] Recommandation préchargée:', song.title, 'by', song.artist);
+                break;
+              }
+            }
+          }
+          
+          // 2. Si aucune chanson similaire, essayer des artistes similaires
+          if (!nextSongToPlay && currentSong.artist) {
+            const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
+            
+            for (const artist of similarArtists) {
+              if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
+                continue;
+              }
+              
+              let song = await lastfmService.findSongsByArtist(artist.name);
+              
+              if (!song) {
+                song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
+              }
+              
+              if (song && song.id !== currentSong.id) {
+                nextSongToPlay = song;
+                console.log('[LastFM Preload] Artiste similaire préchargé:', song.title, 'by', song.artist);
+                break;
+              }
+            }
+          }
+          
+          if (nextSongToPlay) {
+            lastfmCacheRef.current = nextSongToPlay;
+          }
+        } catch (error) {
+          console.error('[LastFM Preload] Erreur:', error);
+        } finally {
+          lastfmPreloadingRef.current = false;
+        }
+      })();
+    }
+  }, [currentSong, isPlaying, queue, shuffledQueue, shuffleMode]);
 
   // Wrapper function for setVolume that updates both state and audio element
   const setVolume = useCallback((newVolume: number) => {
