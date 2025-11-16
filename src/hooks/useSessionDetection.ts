@@ -24,24 +24,38 @@ export const useSessionDetection = (userId: string | undefined) => {
       // Générer un ID de session unique
       sessionIdRef.current = generateSessionId();
       
-      console.log('[Session] Initialisation de la session:', sessionIdRef.current);
+      console.log('[Session] 🔵 Initialisation de la session:', sessionIdRef.current);
+      console.log('[Session] 🔵 User ID:', userId);
 
       try {
+        // Vérifier combien de sessions existent déjà
+        const { data: existingSessions, error: countError } = await supabase
+          .from('active_sessions')
+          .select('*')
+          .eq('user_id', userId);
+
+        console.log('[Session] 📊 Sessions existantes:', existingSessions?.length || 0);
+        if (existingSessions && existingSessions.length > 0) {
+          console.log('[Session] 📋 Liste des sessions:', existingSessions);
+        }
+
         // Enregistrer la session dans la base de données
-        const { error: insertError } = await supabase
+        const { data: insertedSession, error: insertError } = await supabase
           .from('active_sessions')
           .insert({
             user_id: userId,
             session_id: sessionIdRef.current,
             browser_info: getBrowserInfo(),
-          });
+          })
+          .select()
+          .single();
 
         if (insertError) {
-          console.error('[Session] Erreur lors de l\'enregistrement:', insertError);
+          console.error('[Session] ❌ Erreur lors de l\'enregistrement:', insertError);
           return;
         }
 
-        console.log('[Session] Session enregistrée avec succès');
+        console.log('[Session] ✅ Session enregistrée avec succès:', insertedSession);
 
         // Configurer le ping régulier (toutes les 2 minutes)
         pingIntervalRef.current = setInterval(async () => {
@@ -53,9 +67,9 @@ export const useSessionDetection = (userId: string | undefined) => {
             .eq('session_id', sessionIdRef.current);
 
           if (updateError) {
-            console.error('[Session] Erreur lors du ping:', updateError);
+            console.error('[Session] ❌ Erreur lors du ping:', updateError);
           } else {
-            console.log('[Session] Ping envoyé');
+            console.log('[Session] 💓 Ping envoyé');
           }
         }, 120000); // 2 minutes
 
@@ -63,6 +77,7 @@ export const useSessionDetection = (userId: string | undefined) => {
         await supabase.rpc('cleanup_inactive_sessions');
 
         // Écouter les nouvelles sessions via Realtime
+        console.log('[Session] 👂 Configuration de l\'écoute Realtime...');
         channelRef.current = supabase
           .channel('session-changes')
           .on(
@@ -74,11 +89,13 @@ export const useSessionDetection = (userId: string | undefined) => {
               filter: `user_id=eq.${userId}`,
             },
             (payload) => {
-              console.log('[Session] Nouvelle session détectée:', payload);
+              console.log('[Session] 🔔 Nouvelle session détectée:', payload);
+              console.log('[Session] 🔍 Ma session:', sessionIdRef.current);
+              console.log('[Session] 🔍 Nouvelle session:', payload.new.session_id);
               
               // Si ce n'est pas notre session
               if (payload.new.session_id !== sessionIdRef.current) {
-                console.log('[Session] Déconnexion: une autre session a été ouverte');
+                console.log('[Session] ⚠️ ALERTE: Déconnexion imminente - une autre session a été ouverte');
                 
                 // Afficher un message
                 toast.error('Une nouvelle session a été ouverte sur un autre navigateur. Vous allez être déconnecté.', {
@@ -87,6 +104,8 @@ export const useSessionDetection = (userId: string | undefined) => {
 
                 // Attendre un peu avant de déconnecter
                 setTimeout(async () => {
+                  console.log('[Session] 🚪 Déconnexion en cours...');
+                  
                   // Supprimer notre session
                   if (sessionIdRef.current) {
                     await supabase
@@ -99,13 +118,17 @@ export const useSessionDetection = (userId: string | undefined) => {
                   await supabase.auth.signOut();
                   navigate('/auth');
                 }, 3000);
+              } else {
+                console.log('[Session] ℹ️ C\'est notre propre session, pas de déconnexion');
               }
             }
           )
-          .subscribe();
+          .subscribe((status) => {
+            console.log('[Session] 📡 Statut du channel Realtime:', status);
+          });
 
       } catch (error) {
-        console.error('[Session] Erreur lors de l\'initialisation:', error);
+        console.error('[Session] ❌ Erreur lors de l\'initialisation:', error);
       }
     };
 
@@ -113,7 +136,7 @@ export const useSessionDetection = (userId: string | undefined) => {
 
     // Nettoyage
     return () => {
-      console.log('[Session] Nettoyage de la session');
+      console.log('[Session] 🧹 Nettoyage de la session');
       
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
@@ -129,7 +152,7 @@ export const useSessionDetection = (userId: string | undefined) => {
           .from('active_sessions')
           .delete()
           .eq('session_id', sessionIdRef.current)
-          .then(() => console.log('[Session] Session supprimée'));
+          .then(() => console.log('[Session] 🗑️ Session supprimée'));
       }
     };
   }, [userId, navigate]);
