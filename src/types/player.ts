@@ -14,6 +14,11 @@ export interface Song {
   tidal_id?: string; // Tidal track ID
   deezer_id?: string; // Deezer track ID
   isLocal?: boolean;
+  audioQuality?: {
+    bitDepth?: number;
+    samplingRate?: number;
+    isHiRes?: boolean;
+  };
 }
 
 export interface FavoriteStat {

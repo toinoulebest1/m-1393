@@ -43,6 +43,11 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
         // Mapping selon le schéma OpenAPI: albumCover pour l'image
         const imageUrl = item.albumCover || '/placeholder.svg';
 
+        // Détection Hi-Res: Qobuz fournit maximum_bit_depth et maximum_sampling_rate
+        const bitDepth = item.maximum_bit_depth || item.bit_depth;
+        const samplingRate = item.maximum_sampling_rate || item.sampling_rate;
+        const isHiRes = (bitDepth >= 24) || (samplingRate >= 88200);
+
         return {
           id: `qobuz-${item.id}`,
           title: item.title || 'Titre inconnu',
@@ -52,6 +57,11 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
           imageUrl: imageUrl,
           album_name: item.albumTitle || 'Album inconnu',
           genre: item.genre || undefined,
+          audioQuality: bitDepth || samplingRate ? {
+            bitDepth,
+            samplingRate,
+            isHiRes
+          } : undefined,
         };
       } catch (mapError) {
         console.error(`[QobuzService] Erreur lors du mappage de l'élément Qobuz:`, mapError);
