@@ -51,13 +51,22 @@ export const fetchAndSaveLyrics = async (
     if (artist && songTitle) {
       // console.log('[lyricsManager] 3.1. Tentative de récupération depuis l\'edge function qobuz-lyrics...');
       try {
-        const { data: qobuzLyricsData, error: qobuzError } = await supabase.functions.invoke(
-          `qobuz-lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(songTitle)}`
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch(
+          `https://pwknncursthenghqgevl.supabase.co/functions/v1/qobuz-lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(songTitle)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3a25uY3Vyc3RoZW5naHFnZXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY5NzEyMjcsImV4cCI6MjA1MjU0NzIyN30.EkCBv3biI6fAom63l6-UbYeRpdfm4BO3S1xR7YP7dhw'}`,
+            }
+          }
         );
         
-        if (!qobuzError && qobuzLyricsData && qobuzLyricsData.lyrics) {
-          lyricsContent = qobuzLyricsData.lyrics;
-          // console.log('[lyricsManager] 3.2. Paroles trouvées via l\'API Qobuz.');
+        if (response.ok) {
+          const qobuzLyricsData = await response.json();
+          if (qobuzLyricsData && qobuzLyricsData.lyrics) {
+            lyricsContent = qobuzLyricsData.lyrics;
+            // console.log('[lyricsManager] 3.2. Paroles trouvées via l\'API Qobuz.');
+          }
         }
       } catch (error) {
         console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'edge function qobuz-lyrics:', error);
