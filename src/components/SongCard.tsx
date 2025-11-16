@@ -168,7 +168,7 @@ export const SongCard = ({
             <img 
               src={hiResLogo} 
               alt="Hi-Res" 
-              className="h-3.5 w-auto flex-shrink-0"
+              className="h-3 w-auto flex-shrink-0"
               title={`Hi-Res ${(song as Song).audioQuality?.bitDepth}bit/${((song as Song).audioQuality?.samplingRate || 0) / 1000}kHz`}
             />
           )}
