@@ -15,7 +15,7 @@ import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } fr
 import { getFromCache } from '@/utils/audioCache';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
-import { lastfmService } from '@/services/lastfmService';
+import { spotalikeService } from '@/services/spotalikeService';
 
 import { optimizeAudioElement, createOptimizedAudio } from '@/utils/audioOptimization';
 
@@ -359,27 +359,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // 1. Essayer de trouver des chansons similaires
           if (currentSong.artist && currentSong.title) {
-            const similarTracks = await lastfmService.getSimilarTracks(
+            const similarTracks = await spotalikeService.getSimilarTracks(
               currentSong.artist,
               currentSong.title
             );
             
             // Limiter à 10 premières recommandations pour éviter trop de requêtes
             const tracksToProcess = similarTracks.slice(0, 10);
-            console.log('[LastFM Preload] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
+            console.log('[Spotalike Preload] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
             
             for (const track of tracksToProcess) {
               if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                 continue;
               }
               
-              let song = await lastfmService.findSongInDatabase(
+              let song = await spotalikeService.findSongInDatabase(
                 track.artist.name,
                 track.name
               );
               
               if (!song) {
-                song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+                song = await spotalikeService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
               }
               
               if (song && song.id !== currentSong.id) {
@@ -392,21 +392,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // 2. Si pas assez de candidats, essayer des artistes similaires
           if (candidates.length < 3 && currentSong.artist) {
-            const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
+            const similarArtists = await spotalikeService.getSimilarArtists(currentSong.artist);
             
             // Limiter à 10 premiers artistes pour éviter trop de requêtes
             const artistsToProcess = similarArtists.slice(0, 10);
-            console.log('[LastFM Preload] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
+            console.log('[Spotalike Preload] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
             
             for (const artist of artistsToProcess) {
               if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                 continue;
               }
               
-              let song = await lastfmService.findSongsByArtist(artist.name);
+              let song = await spotalikeService.findSongsByArtist(artist.name);
               
               if (!song) {
-                song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
+                song = await spotalikeService.searchArtistOnStreamingService(artist.name) as any;
               }
               
               if (song && song.id !== currentSong.id) {
@@ -422,20 +422,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (candidates.length > 0) {
             const randomIndex = Math.floor(Math.random() * candidates.length);
             nextSongToPlay = candidates[randomIndex];
-            console.log('[LastFM Preload] Recommandation préchargée (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
+            console.log('[Spotalike Preload] Recommandation préchargée (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
           }
           
           if (nextSongToPlay) {
             lastfmCacheRef.current = nextSongToPlay;
-            console.log('[LastFM Preload] ✅ Recommandation mise en cache:', nextSongToPlay.title);
+            console.log('[Spotalike Preload] ✅ Recommandation mise en cache:', nextSongToPlay.title);
           } else {
-            console.log('[LastFM Preload] ⚠️ Aucune recommandation trouvée');
+            console.log('[Spotalike Preload] ⚠️ Aucune recommandation trouvée');
           }
         } catch (error) {
-          console.error('[LastFM Preload] ❌ Erreur:', error);
+          console.error('[Spotalike Preload] ❌ Erreur:', error);
         } finally {
           lastfmPreloadingRef.current = false;
-          console.log('[LastFM Preload] Fin du préchargement');
+          console.log('[Spotalike Preload] Fin du préchargement');
         }
       })();
     } else {
@@ -1070,27 +1070,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               // 1. Essayer de trouver des chansons similaires avec track.getsimilar
               if (currentSong.artist && currentSong.title) {
-                const similarTracks = await lastfmService.getSimilarTracks(
+                const similarTracks = await spotalikeService.getSimilarTracks(
                   currentSong.artist,
                   currentSong.title
                 );
                 
                 // Limiter à 10 premières recommandations pour éviter trop de requêtes
                 const tracksToProcess = similarTracks.slice(0, 10);
-                console.log('[LastFM Autoplay] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
+                console.log('[Spotalike Autoplay] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
                 
                 for (const track of tracksToProcess) {
                   if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                     continue;
                   }
                   
-                  let song = await lastfmService.findSongInDatabase(
+                  let song = await spotalikeService.findSongInDatabase(
                     track.artist.name,
                     track.name
                   );
                   
                   if (!song) {
-                    song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+                    song = await spotalikeService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
                   }
                   
                   if (song && song.id !== currentSong.id) {
@@ -1103,21 +1103,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               // 2. Si pas assez de candidats, essayer des artistes similaires
               if (candidates.length < 3 && currentSong.artist) {
-                const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
+                const similarArtists = await spotalikeService.getSimilarArtists(currentSong.artist);
                 
                 // Limiter à 10 premiers artistes pour éviter trop de requêtes
                 const artistsToProcess = similarArtists.slice(0, 10);
-                console.log('[LastFM Autoplay] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
+                console.log('[Spotalike Autoplay] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
                 
                 for (const artist of artistsToProcess) {
                   if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                     continue;
                   }
                   
-                  let song = await lastfmService.findSongsByArtist(artist.name);
+                  let song = await spotalikeService.findSongsByArtist(artist.name);
                   
                   if (!song) {
-                    song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
+                    song = await spotalikeService.searchArtistOnStreamingService(artist.name) as any;
                   }
                   
                   if (song && song.id !== currentSong.id) {
