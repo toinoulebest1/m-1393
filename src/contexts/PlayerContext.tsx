@@ -300,6 +300,40 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [history]);
 
+  // Liste des entrées récentes pour vérif de similarité
+  const recentHistoryList = React.useMemo(() => {
+    try {
+      return history.slice(-HISTORY_WINDOW_SIZE);
+    } catch {
+      return [] as typeof history;
+    }
+  }, [history]);
+
+  // Vérifie si une chanson est trop proche de l'historique récent
+  const isRecentDuplicateCandidate = (song: { artist?: string; title?: string; id?: string }) => {
+    const key = normalizeKey(song.artist || '', song.title || '');
+    if (song.id && recentHistorySongIds.has(song.id)) return true;
+    if (recentHistoryKeys.has(key)) return true;
+
+    // Jaccard simple sur tokens du titre + artiste
+    const songTokens = `${normalizeArtist(song.artist || '')} ${sanitizeTitle(song.title || '')}`
+      .split(/\s+/)
+      .filter(Boolean);
+
+    for (const h of recentHistoryList) {
+      const histTokens = `${normalizeArtist(h.artist || '')} ${sanitizeTitle(h.title || '')}`
+        .split(/\s+/)
+        .filter(Boolean);
+      const setA = new Set(songTokens);
+      const setB = new Set(histTokens);
+      const inter = [...setA].filter(t => setB.has(t)).length;
+      const union = new Set([...setA, ...setB]).size;
+      const jaccard = union === 0 ? 0 : inter / union;
+      if (jaccard >= 0.8) return true;
+    }
+    return false;
+  };
+
   // Précharger les recommandations Last.fm dès le début de la chanson
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
@@ -345,8 +379,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               }
               
               if (song && song.id !== currentSong.id) {
-                const songKey = normalizeKey(song.artist || '', song.title || '');
-                if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
+                if (!isRecentDuplicateCandidate(song)) {
                   candidates.push(song);
                 }
               }
@@ -369,8 +402,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               }
               
               if (song && song.id !== currentSong.id) {
-                const songKey = normalizeKey(song.artist || '', song.title || '');
-                if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
+                if (!isRecentDuplicateCandidate(song)) {
                   candidates.push(song);
                 }
               }
@@ -1050,8 +1082,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   }
                   
                   if (song && song.id !== currentSong.id) {
-                    const songKey = normalizeKey(song.artist || '', song.title || '');
-                    if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
+                    if (!isRecentDuplicateCandidate(song)) {
                       candidates.push(song);
                     }
                   }
@@ -1074,8 +1105,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   }
                   
                   if (song && song.id !== currentSong.id) {
-                    const songKey = normalizeKey(song.artist || '', song.title || '');
-                    if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
+                    if (!isRecentDuplicateCandidate(song)) {
                       candidates.push(song);
                     }
                   }
