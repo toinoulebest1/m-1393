@@ -34,6 +34,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Historique des artistes pour éviter les répétitions
   const recentArtistsRef = useRef<string[]>([]);
   
+  // Cache des recommandations Last.fm préchargées
+  const lastfmCacheRef = useRef<Song | null>(null);
+  const lastfmPreloadingRef = useRef(false);
+  
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
     // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
@@ -813,44 +817,45 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // Si la queue est vide, essayer de trouver une chanson similaire via Last.fm
           if (activeQueue.length === 0 && currentSong) {
-            console.log('[LastFM Autoplay] Queue vide, recherche de chanson similaire...');
+            // Utiliser la recommandation préchargée si disponible
+            if (lastfmCacheRef.current) {
+              console.log('[LastFM Autoplay] Utilisation de la recommandation préchargée:', lastfmCacheRef.current.title);
+              const cachedSong = lastfmCacheRef.current;
+              lastfmCacheRef.current = null;
+              toast.success(`Lecture automatique: ${cachedSong.title} par ${cachedSong.artist}`);
+              await play(cachedSong);
+              return;
+            }
+            
+            console.log('[LastFM Autoplay] Queue vide, recherche immédiate de chanson similaire...');
             
             try {
               let nextSongToPlay = null;
               
               // 1. Essayer de trouver des chansons similaires avec track.getsimilar
               if (currentSong.artist && currentSong.title) {
-                console.log('[LastFM Autoplay] Recherche de tracks similaires pour:', currentSong.title, 'by', currentSong.artist);
                 const similarTracks = await lastfmService.getSimilarTracks(
                   currentSong.artist,
                   currentSong.title
                 );
                 
-                console.log('[LastFM Autoplay] Tracks similaires trouvées:', similarTracks.length);
-                
                 // Chercher ces chansons dans la base de données ou sur les services de streaming
                 for (const track of similarTracks) {
-                  // Vérifier si l'artiste a été joué récemment
                   if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
-                    console.log('[LastFM Autoplay] Artiste déjà joué récemment, skip:', track.artist.name);
                     continue;
                   }
                   
-                  // D'abord chercher dans la base de données locale
                   let song = await lastfmService.findSongInDatabase(
                     track.artist.name,
                     track.name
                   );
                   
-                  // Si pas trouvé localement, chercher sur Qobuz/Tidal
                   if (!song) {
-                    console.log('[LastFM Autoplay] Chanson non trouvée localement, recherche sur Qobuz/Tidal:', track.name, 'by', track.artist.name);
                     song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
                   }
                   
                   if (song && song.id !== currentSong.id) {
                     nextSongToPlay = song;
-                    console.log('[LastFM Autoplay] Chanson similaire trouvée:', song.title, 'by', song.artist);
                     break;
                   }
                 }
@@ -858,22 +863,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               // 2. Si aucune chanson similaire, essayer des artistes similaires
               if (!nextSongToPlay && currentSong.artist) {
-                console.log('[LastFM Autoplay] Aucune chanson similaire, recherche d\'artistes similaires...');
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
                 for (const artist of similarArtists) {
-                  // Vérifier si l'artiste a été joué récemment (dans les 5 dernières chansons)
                   if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
-                    console.log('[LastFM Autoplay] Artiste déjà joué récemment, skip:', artist.name);
                     continue;
                   }
                   
-                  // D'abord essayer dans la base locale
                   let song = await lastfmService.findSongsByArtist(artist.name);
                   
-                  // Si pas trouvé localement, chercher sur Qobuz/Tidal
                   if (!song) {
-                    console.log('[LastFM Autoplay] Recherche sur Qobuz/Tidal pour:', artist.name);
                     song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
                   }
                   
