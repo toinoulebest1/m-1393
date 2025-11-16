@@ -11,9 +11,9 @@ serve(async (req) => {
   }
 
   try {
-    const { method, endpoint, body, sessionId, traceId, algorithm } = await req.json();
+    const { method, endpoint, requestBody, sessionId, traceId, algorithm } = await req.json();
 
-    console.log('[Spotalike Proxy] Request:', { method, endpoint, sessionId, traceId });
+    console.log('[Spotalike Proxy] Request:', { method, endpoint, sessionId, traceId, requestBody, algorithm });
 
     const url = `https://api.spotalike.com${endpoint}`;
     const headers: Record<string, string> = {
@@ -31,8 +31,9 @@ serve(async (req) => {
       headers: headers,
     };
 
-    if (body && (method === 'POST' || method === 'PUT')) {
-      options.body = JSON.stringify(body);
+    if (requestBody && (method === 'POST' || method === 'PUT')) {
+      options.body = JSON.stringify(requestBody);
+      console.log('[Spotalike Proxy] Request body:', JSON.stringify(requestBody));
     }
 
     console.log('[Spotalike Proxy] Calling:', url);

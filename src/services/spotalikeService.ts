@@ -37,7 +37,7 @@ export const spotalikeService = {
           sessionId: SESSION_ID,
           traceId: traceId,
           algorithm: 'gamma',
-          body: {
+          requestBody: {
             tracks: [{
               artist: artist,
               title: track
