@@ -5,13 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to compute MD5 hash
+// Helper function to compute MD5 hash using Deno std library
 function md5(message: string): string {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
-  const hashBuffer = crypto.subtle.digestSync("MD5", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const hash = crypto.subtle.digestSync("MD5", data);
+  // Convert to hex string
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 const QOBUZ_API_BASE = 'https://www.qobuz.com/api.json/0.2';
