@@ -47,11 +47,18 @@ export const updatePositionState = (
     return; // Bloque la mise à jour si la durée n'est pas fiable.
   }
 
+  // GARDE DE SÉCURITÉ : Ne jamais envoyer une position > durée
+  const safePosition = isNaN(position) ? 0 : position;
+  if (safePosition > duration) {
+    console.warn(`MediaSession update bloquée: position (${safePosition.toFixed(2)}) > durée (${duration.toFixed(2)})`);
+    return; // Bloque si la position dépasse la durée
+  }
+
   if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
     try {
       navigator.mediaSession.setPositionState({
         duration: duration,
-        position: isNaN(position) ? 0 : position,
+        position: safePosition,
         playbackRate: playbackRate || 1
       });
     } catch (error) {
