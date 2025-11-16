@@ -1,34 +1,26 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import { Clock, MoreHorizontal, Music2, Plus, Play, Image as ImageIcon, Trash2 } from "lucide-react";
+import { Clock, MoreVertical, Play, Plus, Shuffle, Edit2, Trash2, Music, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { SongPicker } from "@/components/SongPicker";
+import { generateImageFromSongs } from "@/utils/storage";
+import { cn } from "@/lib/utils";
+import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
+import { Layout } from "@/components/Layout";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { SongPicker } from "@/components/SongPicker";
-import { generateImageFromSongs } from "@/utils/storage";
-import { SongCard } from "@/components/SongCard";
-import { cn } from "@/lib/utils";
-import { PlaylistVisibilitySettings } from "@/components/PlaylistVisibilitySettings";
-import { Layout } from "@/components/Layout";
 
 interface Song {
   id: string;
@@ -58,33 +50,13 @@ interface Playlist {
   visibility?: string;
 }
 
-// Simplified function to generate playlist cover
 const generatePlaylistCover = async (songs: PlaylistSong[]): Promise<string | null> => {
-  console.log("=== STARTING PLAYLIST COVER GENERATION ===");
-  console.log(`Total songs in playlist: ${songs.length}`);
-  
-  if (songs.length === 0) {
-    console.log("No songs found, cannot generate cover");
-    return null;
-  }
+  if (songs.length === 0) return null;
 
-  // Filter songs that have images
   const songsWithImages = songs.filter(song => song.songs.imageUrl);
-  console.log(`Songs with images: ${songsWithImages.length}`);
-  
-  if (songsWithImages.length === 0) {
-    console.log("No songs with images found");
-    return null;
-  }
+  if (songsWithImages.length === 0) return null;
 
   try {
-    console.log("=== STARTING PLAYLIST COVER GENERATION ===");
-    console.log(`Number of songs: ${songs.length}`);
-    
-    // Filter songs that have images
-    const songsWithImages = songs.filter(song => song.songs.imageUrl);
-    
-    console.log(`Songs with images: ${songsWithImages.length}`);
     
     if (songsWithImages.length === 0) {
       console.error("No songs with images available");
@@ -239,7 +211,6 @@ const PlaylistDetail = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { play, addToQueue, queue, setQueue, currentSong, favorites, isPlaying, pause, getCurrentAudioElement } = usePlayer();
-  const [dominantColors, setDominantColors] = useState<Record<string, [number, number, number] | null>>({});
   
   // Suivre le nombre précédent de chansons pour éviter de régénérer la couverture inutilement
   const previousSongCountRef = useRef<number | null>(null);
@@ -714,31 +685,6 @@ const PlaylistDetail = () => {
     });
   };
 
-  const isCurrentSong = (song: Song) => {
-    return currentSong && currentSong.id === song.id;
-  };
-
-  const isFavoriteSong = (song: Song) => {
-    return favorites.some(fav => fav.id === song.id);
-  };
-  
-  const handleLyricsClick = (song: Song) => {
-    console.log("Show lyrics for:", song.title);
-  };
-
-  const handleReportClick = (song: Song) => {
-    console.log("Report song:", song.title);
-  };
-
-  const songCardContextMenu = (song: PlaylistSong) => [
-    {
-      label: "Retirer de la playlist",
-      icon: <Trash2 className="h-4 w-4" />,
-      action: () => handleRemoveSong(song.id),
-      show: true
-    }
-  ];
-
   const handleVisibilityChanged = async (newVisibility: string) => {
     if (!playlistId) return;
     try {
@@ -825,7 +771,7 @@ const PlaylistDetail = () => {
       <Layout>
         <div className="container p-6">
           <div className="text-center py-12">
-            <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
+            <Music className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
             <p className="text-spotify-neutral text-lg">{t('playlists.notFound')}</p>
           </div>
         </div>
@@ -849,7 +795,7 @@ const PlaylistDetail = () => {
                   }}
                 />
               ) : (
-                <Music2 className="w-1/3 h-1/3 text-spotify-neutral" />
+                <Music className="w-1/3 h-1/3 text-spotify-neutral" />
               )}
               
               {/* Afficher les contrôles de couverture seulement si l'utilisateur est propriétaire */}
@@ -881,7 +827,7 @@ const PlaylistDetail = () => {
                         className="bg-spotify-accent hover:bg-spotify-accent-hover p-2 rounded-full"
                         title="Générer couverture"
                       >
-                        <Music2 className="h-5 w-5" />
+                        <Music className="h-5 w-5" />
                       </button>
                     )}
                   </div>
@@ -985,27 +931,98 @@ const PlaylistDetail = () => {
           
           {songs.length > 0 ? (
             <div className="space-y-2">
-              {songs.map((song) => (
-                <div 
-                  key={song.id} 
-                  className="cursor-pointer"
-                  onClick={() => playSong(song.songs)}
-                >
-                  <SongCard
-                    song={song.songs}
-                    isCurrentSong={isCurrentSong(song.songs)}
-                    isFavorite={isFavoriteSong(song.songs)}
-                    dominantColor={dominantColors[song.songs.id] || null}
-                    onLyricsClick={() => handleLyricsClick(song.songs)}
-                    onReportClick={() => handleReportClick(song.songs)}
-                    contextMenuItems={isOwner ? songCardContextMenu(song) : []}
-                  />
+              {/* Header */}
+              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-4 py-2 text-sm text-muted-foreground border-b border-border/50">
+                <div className="w-10 text-center">#</div>
+                <div>{t('common.title')}</div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
                 </div>
-              ))}
+                <div className="w-10"></div>
+              </div>
+
+              {/* Song Rows */}
+              {songs.map((playlistSong, index) => {
+                const song = playlistSong.songs;
+                return (
+                  <div
+                    key={playlistSong.id}
+                    className={cn(
+                      "grid grid-cols-[auto_1fr_auto_auto] gap-4 px-4 py-3 rounded-lg",
+                      "hover:bg-muted/50 transition-colors group"
+                    )}
+                  >
+                    {/* Index/Play Button */}
+                    <div className="w-10 flex items-center justify-center text-muted-foreground">
+                      <span className="group-hover:hidden">{index + 1}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hidden group-hover:flex h-8 w-8"
+                        onClick={() => playSong(song)}
+                      >
+                        <Play className="h-4 w-4 fill-current" />
+                      </Button>
+                    </div>
+
+                    {/* Song Info */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                        {song.imageUrl ? (
+                          <img
+                            src={song.imageUrl}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Music className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{song.title}</p>
+                        <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
+                      </div>
+                    </div>
+
+                    {/* Duration */}
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      {song.duration}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="w-10 flex items-center justify-center">
+                      {isOwner && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleRemoveSong(playlistSong.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {t('playlists.removeSong')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 border border-dashed border-spotify-card rounded-lg">
-              <Music2 className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
+              <Music className="mx-auto h-16 w-16 text-spotify-neutral mb-4" />
               <p className="text-spotify-neutral text-lg mb-4">{t('playlists.noSongs')}</p>
               {/* Afficher le bouton d'ajout seulement si l'utilisateur est propriétaire */}
               {isOwner && (
