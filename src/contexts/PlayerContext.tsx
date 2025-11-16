@@ -37,6 +37,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Historique des chansons récentes pour éviter les répétitions
   const recentSongsHistoryRef = useRef<string[]>([]);
   
+  // Tracker la dernière chanson sauvegardée pour éviter les doublons
+  const lastSavedSongRef = useRef<{ id: string; timestamp: number } | null>(null);
+  
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
     // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
@@ -124,6 +127,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const saveToHistory = async () => {
       try {
+        // Éviter les doublons : ne pas sauvegarder si c'est la même chanson dans les 5 dernières secondes
+        const now = Date.now();
+        if (lastSavedSongRef.current?.id === currentSong.id && 
+            now - lastSavedSongRef.current.timestamp < 5000) {
+          return;
+        }
+
         const { supabase } = await import('@/integrations/supabase/client');
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -170,8 +180,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
           
-          // Mettre à jour le cache local de l'historique
+          // Mettre à jour le cache local de l'historique et le tracker
           recentSongsHistoryRef.current = [currentSong.id, ...recentSongsHistoryRef.current.slice(0, 99)];
+          lastSavedSongRef.current = { id: currentSong.id, timestamp: Date.now() };
         }
       } catch (error) {
         console.error('❌ Erreur lors de l\'enregistrement dans l\'historique:', error);
