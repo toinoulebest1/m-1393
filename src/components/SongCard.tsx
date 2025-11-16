@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerContext } from "@/contexts/PlayerContext";
@@ -14,6 +14,7 @@ import { rgbToClass } from "@/utils/colorExtractor";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AutoplayManager } from "@/utils/autoplayManager";
 import { toast } from "@/hooks/use-toast";
+import { getMusicStreamUrl, detectProviderFromUrl } from "@/services/musicService";
 
 interface ContextMenuItem {
   label: string;
@@ -51,6 +52,20 @@ export const SongCard = ({
   const { toggleFavorite, isPlaying, pause, play } = usePlayerContext();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Précharger l'URL de streaming dès que l'utilisateur appuie (mousedown/touchstart)
+  const prefetchStream = useCallback(() => {
+    if (!song.url) return;
+    const provider = detectProviderFromUrl(song.url);
+    if (!provider) return;
+    try {
+      const trackId = song.url.split(':')[1];
+      if (trackId) {
+        // Fire-and-forget pour peupler le cache
+        getMusicStreamUrl(trackId, provider).catch(() => {});
+      }
+    } catch (_) {}
+  }, [song.url]);
   const handlePlay = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
@@ -113,6 +128,8 @@ export const SongCard = ({
         isCurrentSong && colorClass ? "bg-gradient-to-br" : ""
       )}
       style={bgStyle}
+      onMouseDown={prefetchStream}
+      onTouchStart={prefetchStream}
       onClick={handlePlay}
     >
       <div className="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative group">
