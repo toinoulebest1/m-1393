@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_sessions: {
+        Row: {
+          browser_info: string | null
+          created_at: string
+          id: string
+          last_ping: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          browser_info?: string | null
+          created_at?: string
+          id?: string
+          last_ping?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          browser_info?: string | null
+          created_at?: string
+          id?: string
+          last_ping?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -1200,6 +1227,7 @@ export type Database = {
         Args: { playlist_id: string; viewer_user_id: string }
         Returns: boolean
       }
+      cleanup_inactive_sessions: { Args: never; Returns: undefined }
       deactivate_expired_bans: { Args: never; Returns: undefined }
       delete_song_completely: {
         Args: { song_id_param: string }
