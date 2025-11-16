@@ -594,22 +594,26 @@ export function GuessTheLyricsGame() {
     }
 
     const audioElement = getCurrentAudioElement();
-    if (audioElement && excerptStartTime > 0) {
-      const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
-      const startTime = Math.max(0, effectiveStart - 5);
-      
-      const onSeeked = () => {
-        audioElement.removeEventListener('seeked', onSeeked);
-        audioElement.play().catch(() => {
-          playerPlay();
-        });
-      };
+    if (audioElement) {
+      if (excerptStartTime > 0) {
+        const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
+        const startTime = Math.max(0, effectiveStart - 5);
+        
+        const onSeeked = () => {
+          audioElement.removeEventListener('seeked', onSeeked);
+          audioElement.play().catch(() => {
+            console.error("Erreur lors de la lecture audio");
+          });
+        };
 
-      audioElement.addEventListener('seeked', onSeeked, { once: true });
-      audioElement.currentTime = startTime;
-      setCurrentAudioTime(startTime);
-    } else {
-      playerPlay();
+        audioElement.addEventListener('seeked', onSeeked, { once: true });
+        audioElement.currentTime = startTime;
+        setCurrentAudioTime(startTime);
+      } else {
+        audioElement.play().catch(() => {
+          console.error("Erreur lors de la lecture audio");
+        });
+      }
     }
   };
 
