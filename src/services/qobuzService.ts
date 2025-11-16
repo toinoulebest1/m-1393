@@ -84,6 +84,8 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
 // Cache mémoire pour les URLs Qobuz (TTL: 50 minutes)
 const urlCache = new Map<string, { url: string; timestamp: number }>();
 const CACHE_TTL = 50 * 60 * 1000; // 50 minutes
+// Déduplication des requêtes en cours (évite doubles appels au clic)
+const pendingRequests = new Map<string, Promise<{ url: string } | null>>();
 
 const getCachedUrl = (trackId: string): string | null => {
   const cached = urlCache.get(trackId);
@@ -103,36 +105,40 @@ const setCachedUrl = (trackId: string, url: string) => {
 export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string } | null> => {
   if (!trackId) return null;
 
-  // Vérifier le cache d'abord
+  // 1) Cache mémoire durable
   const cachedUrl = getCachedUrl(trackId);
   if (cachedUrl) {
     console.log(`[QobuzService] Cache HIT for track ${trackId}`);
     return { url: cachedUrl };
   }
 
-  try {
-    // Appeler l'edge function pour obtenir l'URL directe Qobuz
-    const response = await fetch(`${QOBUZ_STREAM_URL}?track_id=${trackId}`);
-    
-    if (!response.ok) {
-      throw new Error(`Qobuz stream request failed: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (!data.url) {
-      throw new Error('No URL in Qobuz stream response');
-    }
-    
-    // Mettre en cache
-    setCachedUrl(trackId, data.url);
-    
-    console.log(`[QobuzService] Got direct CDN URL for track ${trackId}`);
-    return { url: data.url };
-  } catch (error) {
-    console.error('Erreur lors de la génération de l\'URL du flux Qobuz:', error);
-    return null;
+  // 2) Requête déjà en cours ? Réutiliser la même promesse
+  const inFlight = pendingRequests.get(trackId);
+  if (inFlight) {
+    console.log(`[QobuzService] Pending request reused for ${trackId}`);
+    return inFlight;
   }
+
+  // 3) Lancer la requête et la stocker
+  const promise = (async () => {
+    try {
+      const response = await fetch(`${QOBUZ_STREAM_URL}?track_id=${trackId}`);
+      if (!response.ok) throw new Error(`Qobuz stream request failed: ${response.status}`);
+      const data = await response.json();
+      if (!data.url) throw new Error('No URL in Qobuz stream response');
+      setCachedUrl(trackId, data.url);
+      console.log(`[QobuzService] Got direct CDN URL for track ${trackId}`);
+      return { url: data.url };
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'URL du flux Qobuz:', error);
+      return null;
+    } finally {
+      pendingRequests.delete(trackId);
+    }
+  })();
+
+  pendingRequests.set(trackId, promise);
+  return promise;
 };
 
 // Préchargement batch des URLs pour démarrage instantané - ULTRA RAPIDE
