@@ -83,7 +83,7 @@ export const lastfmService = {
         .ilike('artist', artist)
         .ilike('title', title)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (!error && data) {
         console.log('[LastFM Service] Found exact match:', data.title, 'by', data.artist);
@@ -95,11 +95,11 @@ export const lastfmService = {
         };
       }
 
-      // Si pas de correspondance exacte, recherche approximative
+      // Si pas de correspondance exacte, recherche approximative par artiste
       const { data: songs } = await supabase
         .from('songs')
         .select('*')
-        .or(`artist.ilike.%${artist}%,title.ilike.%${title}%`)
+        .ilike('artist', `%${artist}%`)
         .limit(10);
 
       if (songs && songs.length > 0) {
