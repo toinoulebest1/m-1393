@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import hiResLogo from "@/assets/hi-res-logo.png";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { 
@@ -164,9 +165,12 @@ export const SongCard = ({
         <div className="text-xs text-muted-foreground flex items-center gap-2" title={song.artist || "Artiste inconnu"}>
           <span className="truncate">{song.artist || "Artiste inconnu"}</span>
           {(song as Song).audioQuality?.isHiRes && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border-primary/30 flex-shrink-0">
-              Hi-Res
-            </Badge>
+            <img 
+              src={hiResLogo} 
+              alt="Hi-Res" 
+              className="h-3.5 w-auto flex-shrink-0"
+              title={`Hi-Res ${(song as Song).audioQuality?.bitDepth}bit/${((song as Song).audioQuality?.samplingRate || 0) / 1000}kHz`}
+            />
           )}
         </div>
       </div>
