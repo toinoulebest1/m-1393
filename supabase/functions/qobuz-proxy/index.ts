@@ -105,32 +105,51 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Build signature exactly like the working HTML example
-      const sigString = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
-      const signature = md5(sigString);
+      // Build candidate signatures (different community-documented variants)
+      const sig1 = md5(`trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`);
+      const sig2 = md5(`trackgetFileUrlformat_id${formatId}intent${intent}request_ts${requestTs}track_id${trackId}${appSecret}`);
+      const sig3 = md5(`trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}request_ts${requestTs}${appSecret}`);
 
-      // Build URL with only required query params
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&request_ts=${requestTs}&request_sig=${signature}&intent=${intent}`;
-      
+      // Qobuz API expects app_id and user_auth_token in query (headers alone may be ignored)
+      const buildUrl = (sig: string) =>
+        `${QOBUZ_API_BASE}/track/getFileUrl?request_ts=${requestTs}`+
+        `&request_sig=${sig}`+
+        `&track_id=${trackId}`+
+        `&format_id=${formatId}`+
+        `&intent=${intent}`+
+        `&app_id=${appId}`+
+        `&user_auth_token=${userToken}`;
+
+      const headers = {
+        'User-Agent': 'Mozilla/5.0'
+      } as HeadersInit;
+
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId} ts=${requestTs}`);
-      
-      // Use headers for authentication like the HTML example
-      const response = await fetch(qobuzUrl, {
-        headers: {
-          'X-User-Auth-Token': userToken,
-          'X-App-Id': appId,
-          'User-Agent': 'Mozilla/5.0'
-        }
-      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[QobuzProxy] Stream error: ${response.status} - ${errorText}`);
+      // Try up to three signature patterns
+      const urls = [buildUrl(sig1), buildUrl(sig2), buildUrl(sig3)];
+      let response: Response | null = null;
+      let lastErrBody = '';
+
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          response = await fetch(urls[i], { headers });
+          if (response.ok) break;
+          lastErrBody = await response.text();
+          console.warn(`[QobuzProxy] Signature try #${i+1} failed: ${response.status} - ${lastErrBody}`);
+        } catch (e) {
+          lastErrBody = String(e);
+          console.warn(`[QobuzProxy] Signature try #${i+1} threw: ${lastErrBody}`);
+        }
+      }
+
+      if (!response || !response.ok) {
         return new Response(
-          JSON.stringify({ error: 'Failed to get stream URL', details: errorText }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Failed to get stream URL', details: lastErrBody }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
 
       const data = await response.json();
       
