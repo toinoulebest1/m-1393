@@ -164,18 +164,18 @@ export const SongCard = ({
         <div className="text-base font-medium truncate">{song.title}</div>
         <div className="text-xs text-muted-foreground flex items-center gap-2" title={song.artist || "Artiste inconnu"}>
           <span className="truncate">{song.artist || "Artiste inconnu"}</span>
-          {(song as Song).audioQuality?.isHiRes && (
-            <img 
-              src={hiResLogo} 
-              alt="Hi-Res" 
-              className="h-3 w-auto flex-shrink-0"
-              title={`Hi-Res ${(song as Song).audioQuality?.bitDepth}bit/${((song as Song).audioQuality?.samplingRate || 0) / 1000}kHz`}
-            />
-          )}
         </div>
       </div>
 
       <div className="flex items-center gap-1">
+        {(song as Song).audioQuality?.isHiRes && (
+          <img 
+            src={hiResLogo} 
+            alt="Hi-Res" 
+            className="h-5 w-auto flex-shrink-0 mr-1"
+            title={`Hi-Res ${(song as Song).audioQuality?.bitDepth}bit/${((song as Song).audioQuality?.samplingRate || 0) / 1000}kHz`}
+          />
+        )}
         {song.duration && (
           <div className="text-xs text-muted-foreground hidden sm:block">
             {song.duration}
