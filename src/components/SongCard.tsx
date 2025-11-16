@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { Heart, MoreHorizontal, Mic, AlertTriangle, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { usePlayerContext } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 import { 
@@ -31,6 +32,11 @@ interface SongCardProps {
     duration?: string;
     imageUrl?: string;
     url?: string; // Make url optional in the component interface
+    audioQuality?: {
+      bitDepth?: number;
+      samplingRate?: number;
+      isHiRes?: boolean;
+    };
   };
   isCurrentSong?: boolean;
   isFavorite?: boolean;
@@ -155,8 +161,13 @@ export const SongCard = ({
 
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="text-base font-medium truncate">{song.title}</div>
-        <div className="text-xs text-muted-foreground" title={song.artist || "Artiste inconnu"}>
-          {song.artist || "Artiste inconnu"}
+        <div className="text-xs text-muted-foreground flex items-center gap-2" title={song.artist || "Artiste inconnu"}>
+          <span className="truncate">{song.artist || "Artiste inconnu"}</span>
+          {(song as Song).audioQuality?.isHiRes && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/20 text-primary border-primary/30 flex-shrink-0">
+              Hi-Res
+            </Badge>
+          )}
         </div>
       </div>
 
