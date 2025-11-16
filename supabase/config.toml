@@ -83,3 +83,6 @@ verify_jwt = false
 [functions.audio-proxy]
 verify_jwt = false
 
+[functions.lastfm-recommendations]
+verify_jwt = false
+

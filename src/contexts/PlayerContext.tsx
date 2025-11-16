@@ -15,6 +15,7 @@ import { updateMediaSessionMetadata, updatePositionState, durationToSeconds } fr
 import { getFromCache } from '@/utils/audioCache';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
+import { lastfmService } from '@/services/lastfmService';
 
 import { optimizeAudioElement, createOptimizedAudio } from '@/utils/audioOptimization';
 
@@ -777,7 +778,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    const handleEnded = () => {
+    const handleEnded = async () => {
       // console.log("=== SONG ENDED ===");
       // console.log("Chanson terminée:", currentSong?.title);
       // console.log("Fondu en cours:", fadingRef.current);
@@ -791,8 +792,67 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(err => console.error("Erreur lors de la répétition:", err));
         } else {
-          // Utiliser la logique de file d'attente pour passer à la suivante
-          nextSongFromQueue();
+          const activeQueue = shuffleMode ? shuffledQueue : queue;
+          
+          // Si la queue est vide, essayer de trouver une chanson similaire via Last.fm
+          if (activeQueue.length === 0 && currentSong) {
+            console.log('[LastFM Autoplay] Queue vide, recherche de chanson similaire...');
+            
+            try {
+              let nextSongToPlay = null;
+              
+              // 1. Essayer de trouver des chansons similaires
+              if (currentSong.artist && currentSong.title) {
+                const similarTracks = await lastfmService.getSimilarTracks(
+                  currentSong.artist,
+                  currentSong.title
+                );
+                
+                // Chercher ces chansons dans la base de données
+                for (const track of similarTracks) {
+                  const song = await lastfmService.findSongInDatabase(
+                    track.artist.name,
+                    track.name
+                  );
+                  if (song && song.id !== currentSong.id) {
+                    nextSongToPlay = song;
+                    console.log('[LastFM Autoplay] Chanson similaire trouvée:', song.title);
+                    break;
+                  }
+                }
+              }
+              
+              // 2. Si aucune chanson similaire, essayer des artistes similaires
+              if (!nextSongToPlay && currentSong.artist) {
+                console.log('[LastFM Autoplay] Aucune chanson similaire, recherche d\'artistes similaires...');
+                const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
+                
+                for (const artist of similarArtists) {
+                  const song = await lastfmService.findSongsByArtist(artist.name);
+                  if (song && song.id !== currentSong.id) {
+                    nextSongToPlay = song;
+                    console.log('[LastFM Autoplay] Chanson d\'artiste similaire trouvée:', song.title, 'by', song.artist);
+                    break;
+                  }
+                }
+              }
+              
+              // 3. Jouer la chanson trouvée
+              if (nextSongToPlay) {
+                toast.success(`Lecture automatique: ${nextSongToPlay.title} par ${nextSongToPlay.artist}`);
+                await play(nextSongToPlay);
+              } else {
+                console.log('[LastFM Autoplay] Aucune recommandation trouvée');
+                toast.info("Aucune recommandation trouvée");
+              }
+            } catch (error) {
+              console.error('[LastFM Autoplay] Erreur:', error);
+              toast.error("Erreur lors de la recherche de recommandations");
+            }
+          } else {
+            // Utiliser la logique de file d'attente normale
+            nextSongFromQueue();
+          }
         }
       }
       // console.log("==================");
