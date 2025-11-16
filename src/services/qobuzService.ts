@@ -18,7 +18,7 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
 
   try {
     const response = await fetch(
-      `${QOBUZ_PROXY_URL}?endpoint=search&q=${encodeURIComponent(query)}&offset=0&type=track`
+      `${QOBUZ_PROXY_URL}?endpoint=search&q=${encodeURIComponent(query)}&limit=100&offset=0&type=track`
     );
     
     if (!response.ok) {
