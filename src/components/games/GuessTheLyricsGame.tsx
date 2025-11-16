@@ -557,11 +557,38 @@ export function GuessTheLyricsGame() {
         duration: currentSong.duration,
       };
       
-      await playerPlay(playerSong);
-      setTimeout(() => {
-        pause();
+      try {
+        await playerPlay(playerSong);
+        
+        const audioElement = getCurrentAudioElement();
+        if (audioElement) {
+          await new Promise<void>((resolve) => {
+            const onCanPlay = () => {
+              audioElement.removeEventListener('canplay', onCanPlay);
+              audioElement.removeEventListener('error', onError);
+              resolve();
+            };
+            const onError = () => {
+              audioElement.removeEventListener('canplay', onCanPlay);
+              audioElement.removeEventListener('error', onError);
+              resolve();
+            };
+            
+            if (audioElement.readyState >= 3) {
+              resolve();
+            } else {
+              audioElement.addEventListener('canplay', onCanPlay, { once: true });
+              audioElement.addEventListener('error', onError, { once: true });
+            }
+          });
+          
+          pause();
+        }
+      } catch (error) {
+        console.error("Erreur de préchargement audio:", error);
+      } finally {
         setIsPreloading(false);
-      }, 100);
+      }
     }
   };
 
