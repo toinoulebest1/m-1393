@@ -174,5 +174,35 @@ export const lastfmService = {
       console.error('[LastFM Service] Error searching on streaming service:', error);
       return null;
     }
+  },
+
+  /**
+   * Search for a specific track on Qobuz/Tidal API
+   */
+  searchTrackOnStreamingService: async (artistName: string, trackName: string) => {
+    try {
+      const { searchMusicTracks } = await import('@/services/musicService');
+      console.log('[LastFM Service] Searching on streaming service for track:', trackName, 'by', artistName);
+      
+      // Chercher avec artiste + titre
+      const searchQuery = `${artistName} ${trackName}`;
+      const results = await searchMusicTracks(searchQuery);
+      
+      if (results && results.length > 0) {
+        // Essayer de trouver la meilleure correspondance
+        const bestMatch = results.find(song => 
+          song.title.toLowerCase().includes(trackName.toLowerCase()) &&
+          song.artist.toLowerCase().includes(artistName.toLowerCase())
+        ) || results[0];
+        
+        console.log('[LastFM Service] Found track on streaming service:', bestMatch.title, 'by', bestMatch.artist);
+        return bestMatch;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[LastFM Service] Error searching track on streaming service:', error);
+      return null;
+    }
   }
 };
