@@ -51,26 +51,54 @@ export const fetchAndSaveLyrics = async (
     }
 
     // 4. Récupérer les paroles depuis l'API Tidal
-    // console.log(`[lyricsManager] 4. Tentative de récupération depuis l'API Tidal...`);
-    const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${effectiveTidalId}`;
-    // console.log(`[lyricsManager] 4.1. URL de l'API: ${tidalApiUrl}`);
-    const tidalLyricsResponse = await fetch(tidalApiUrl);
+    let lyricsContent: string | null = null;
+    
+    if (effectiveTidalId) {
+      // console.log(`[lyricsManager] 4. Tentative de récupération depuis l'API Tidal...`);
+      const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${effectiveTidalId}`;
+      // console.log(`[lyricsManager] 4.1. URL de l'API: ${tidalApiUrl}`);
+      const tidalLyricsResponse = await fetch(tidalApiUrl);
 
-    // console.log(`[lyricsManager] 4.2. Réponse de l'API: Statut ${tidalLyricsResponse.status}`);
-    if (!tidalLyricsResponse.ok) {
-      console.warn(`[lyricsManager] L'API a répondu avec une erreur. Pas de paroles trouvées.`);
-      return null;
+      // console.log(`[lyricsManager] 4.2. Réponse de l'API: Statut ${tidalLyricsResponse.status}`);
+      if (tidalLyricsResponse.ok) {
+        const tidalLyricsData = await tidalLyricsResponse.json();
+        // console.log('[lyricsManager] 4.3. Données JSON reçues:', tidalLyricsData);
+        const lyricsInfo = Array.isArray(tidalLyricsData) ? tidalLyricsData[0] : tidalLyricsData;
+
+        if (lyricsInfo && (lyricsInfo.subtitles || lyricsInfo.lyrics)) {
+          lyricsContent = lyricsInfo.subtitles || lyricsInfo.lyrics;
+          // console.log('[lyricsManager] 5. Paroles trouvées via l\'API Tidal. Contenu (100 premiers caractères):', lyricsContent.substring(0, 100));
+        }
+      } else {
+        console.warn(`[lyricsManager] L'API Tidal a répondu avec une erreur.`);
+      }
     }
 
-    const tidalLyricsData = await tidalLyricsResponse.json();
-    // console.log('[lyricsManager] 4.3. Données JSON reçues:', tidalLyricsData);
-    const lyricsInfo = Array.isArray(tidalLyricsData) ? tidalLyricsData[0] : tidalLyricsData;
+    // 5. Si pas de paroles Tidal, essayer l'API de paroles synchronisées générique
+    if (!lyricsContent && artist && songTitle) {
+      // console.log('[lyricsManager] 5.1. Tentative de récupération depuis l\'API de paroles synchronisées...');
+      try {
+        const lyricsApiUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(songTitle)}`;
+        const lyricsResponse = await fetch(lyricsApiUrl);
+        
+        if (lyricsResponse.ok) {
+          const lyricsData = await lyricsResponse.json();
+          if (lyricsData && lyricsData.syncedLyrics) {
+            lyricsContent = lyricsData.syncedLyrics;
+            // console.log('[lyricsManager] 5.2. Paroles synchronisées trouvées via l\'API générique.');
+          } else if (lyricsData && lyricsData.plainLyrics) {
+            lyricsContent = lyricsData.plainLyrics;
+            // console.log('[lyricsManager] 5.3. Paroles non synchronisées trouvées via l\'API générique.');
+          }
+        }
+      } catch (error) {
+        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'API de paroles:', error);
+      }
+    }
 
-    if (lyricsInfo && (lyricsInfo.subtitles || lyricsInfo.lyrics)) {
-      const lyricsContent = lyricsInfo.subtitles || lyricsInfo.lyrics;
-      // console.log('[lyricsManager] 5. Paroles trouvées via l\'API Tidal. Contenu (100 premiers caractères):', lyricsContent.substring(0, 100));
+    if (lyricsContent) {
 
-      // 5. Sauvegarder les paroles dans la base de données
+      // 6. Sauvegarder les paroles dans la base de données
       // console.log(`[lyricsManager] 6. Sauvegarde dans la DB pour song_id: ${songId}`);
       const { error: insertError } = await supabase
         .from('lyrics')
@@ -83,7 +111,7 @@ export const fetchAndSaveLyrics = async (
         // console.log(`[lyricsManager] 6.2. Paroles sauvegardées avec succès.`);
       }
 
-      // 6. Sauvegarder dans Dropbox si activé
+      // 7. Sauvegarder dans Dropbox si activé
       if (isDropboxEnabled()) {
         // console.log('[lyricsManager] 7. Tentative de sauvegarde Dropbox...');
         uploadLyricsToDropbox(songId, lyricsContent).catch(error => {
@@ -92,10 +120,10 @@ export const fetchAndSaveLyrics = async (
       }
       
       return lyricsContent; // Retourner les paroles trouvées
-    } else {
-      // console.log('[lyricsManager] 5.1. Aucune parole (`subtitles` ou `lyrics`) trouvée dans la réponse JSON.');
-      return null;
     }
+
+    // console.log('[lyricsManager] Aucune parole trouvée depuis aucune source.');
+    return null;
   } catch (error) {
     console.error('❌ [lyricsManager] Erreur globale dans fetchAndSaveLyrics:', error);
     toast.error("Erreur de récupération des paroles", {
