@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
 
     const appId = Deno.env.get('QOBUZ_APP_ID');
     const appSecret = Deno.env.get('QOBUZ_APP_SECRET');
-    const userToken = Deno.env.get('QOBUZ_API_TOKEN');
+    const userToken = Deno.env.get('QOBUZ_API_TOKEN') || Deno.env.get('QOBUZ_USER_TOKEN');
 
     if (!appId || !appSecret || !userToken) {
       console.error('[QobuzStream] Missing credentials');
@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
     }
 
     const requestTs = Math.floor(Date.now() / 1000);
-    const sigString = `trackgetFileUrlformat_id${quality}intentstreamtrack_id${trackId}${requestTs}${appSecret}`;
+    // Qobuz signature requires concatenating method + param names and values, then app secret.
+    // Include all params present in the request (order matters).
+    const sigString =
+      `trackgetFileUrlapp_id${appId}format_id${quality}intentstreamtrack_id${trackId}user_auth_token${userToken}request_ts${requestTs}${appSecret}`;
     const signature = CryptoJS.MD5(sigString).toString();
 
     console.log(`[QobuzStream] Track ${trackId} | ts=${requestTs} | sig=${signature}`);
