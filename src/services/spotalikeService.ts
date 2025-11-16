@@ -38,10 +38,8 @@ export const spotalikeService = {
           traceId: traceId,
           algorithm: 'gamma',
           requestBody: {
-            tracks: [{
-              artist: artist,
-              title: track
-            }]
+            artist: artist,
+            track: track
           }
         }
       });
@@ -51,15 +49,17 @@ export const spotalikeService = {
         return [];
       }
 
-      const tracks = data?.tracks || [];
+      const raw = data || {};
+      const tracks = raw.tracks || raw.playlist?.tracks || raw.items || [];
       
-      // Convertir au format attendu
-      const formattedTracks = tracks.map((t: any) => ({
-        name: t.title || t.name,
-        artist: {
-          name: t.artist
-        }
-      }));
+      const formattedTracks = tracks.map((t: any) => {
+        const title = t.title || t.name || t.track_title;
+        const artistName = t.artist || t.artist_name || (Array.isArray(t.artists) ? t.artists[0]?.name : undefined);
+        return {
+          name: title,
+          artist: { name: artistName }
+        } as SpotalikeSimilarTrack;
+      }).filter((t: SpotalikeSimilarTrack) => t.name && t.artist?.name);
       
       console.log('[Spotalike Service] Found', formattedTracks.length, 'similar tracks');
       return formattedTracks;
@@ -70,41 +70,26 @@ export const spotalikeService = {
   },
 
   /**
-   * Get similar artists from Spotalike (via track search)
+   * Get similar artists from Spotalike by deriving from similar tracks
    */
   getSimilarArtists: async (artist: string): Promise<{ name: string }[]> => {
     try {
       console.log('[Spotalike Service] Fetching similar artists for:', artist);
       
-      const traceId = generateUUID();
-      
-      // Rechercher des tracks de cet artiste pour obtenir des recommandations
-      const { data, error } = await supabase.functions.invoke('spotalike-proxy', {
-        body: {
-          method: 'GET',
-          endpoint: `/v1/tracks/search?q=${encodeURIComponent(artist)}&v=2`,
-          sessionId: SESSION_ID,
-          traceId: traceId,
-        }
-      });
+      // Tentative: dériver des artistes à partir des titres similaires du même artiste
+      // On utilise un titre fictif minimal pour guider l'API si nécessaire
+      const seedTrack = 'best of';
+      const tracks = await spotalikeService.getSimilarTracks(artist, seedTrack);
 
-      if (error) {
-        console.error('[Spotalike Service] API error:', error);
-        return [];
-      }
-
-      const tracks = data?.tracks || [];
-      
-      // Extraire les artistes uniques
       const artistsMap = new Map<string, boolean>();
-      tracks.forEach((t: any) => {
-        if (t.artist && t.artist !== artist) {
-          artistsMap.set(t.artist, true);
+      tracks.forEach((t) => {
+        const a = t.artist?.name;
+        if (a && a.toLowerCase() !== artist.toLowerCase()) {
+          artistsMap.set(a, true);
         }
       });
-      
-      const artists = Array.from(artistsMap.keys()).map(name => ({ name }));
-      
+
+      const artists = Array.from(artistsMap.keys()).map((name) => ({ name }));
       console.log('[Spotalike Service] Found', artists.length, 'similar artists');
       return artists;
     } catch (error) {

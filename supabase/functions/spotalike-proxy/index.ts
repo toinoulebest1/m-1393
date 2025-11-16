@@ -29,6 +29,10 @@ serve(async (req) => {
     const url = `https://api.spotalike.com${endpoint}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Origin': 'https://spotalike.com',
+      'Referer': 'https://spotalike.com/',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
       'spotalike-session-id': sessionId,
       'spotalike-trace-id': traceId,
     };
