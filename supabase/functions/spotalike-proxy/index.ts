@@ -11,9 +11,20 @@ serve(async (req) => {
   }
 
   try {
-    const { method, endpoint, requestBody, sessionId, traceId, algorithm } = await req.json();
+    const requestData = await req.json();
+    console.log('[Spotalike Proxy] Full request data:', JSON.stringify(requestData));
+    
+    const { method, endpoint, requestBody, sessionId, traceId, algorithm } = requestData;
 
-    console.log('[Spotalike Proxy] Request:', { method, endpoint, sessionId, traceId, requestBody, algorithm });
+    console.log('[Spotalike Proxy] Extracted params:', { 
+      method, 
+      endpoint, 
+      sessionId, 
+      traceId, 
+      algorithm,
+      hasRequestBody: !!requestBody,
+      requestBodyKeys: requestBody ? Object.keys(requestBody) : []
+    });
 
     const url = `https://api.spotalike.com${endpoint}`;
     const headers: Record<string, string> = {
