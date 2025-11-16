@@ -2,13 +2,8 @@ import { getAudioFileUrl } from '@/utils/storage';
 import { getMusicStreamUrl, detectProviderFromUrl } from '@/services/musicService';
 import { getFromCache, addToCache, cacheCurrentSong } from './audioCache';
 import { UltraFastCache } from './ultraFastCache';
-// import { memoryCache } from './memoryCache'; // DÉSACTIVÉ
 
 export class UltraFastStreaming {
-  /**
-   * Récupère l'URL de streaming audio la plus rapide possible.
-   * Priorise le cache L0, puis le cache IndexedDB, puis le pré-warm, puis le réseau.
-   */
   static async getAudioUrlUltraFast(
     filePath: string,
     songTitle?: string,
@@ -25,11 +20,10 @@ export class UltraFastStreaming {
     const isMusicApi = isTidal || isQobuz;
     const isHttp = filePath.startsWith('http://') || filePath.startsWith('https://');
 
-    // 1. Vérifier le cache L0 (variables globales)
+    // 1. Vérifier le cache L0
     if (songId && UltraFastCache.hasL0(songId)) {
       const cachedUrl = UltraFastCache.getL0(songId)!;
       console.log(`${logPrefix} HIT L0 Cache`);
-      console.log(`${logPrefix}   - Cached URL: ${cachedUrl}`);
       return { url: cachedUrl };
     }
 
@@ -38,17 +32,14 @@ export class UltraFastStreaming {
       const cachedBlobUrl = await getFromCache(songId);
       if (cachedBlobUrl) {
         console.log(`${logPrefix} HIT IndexedDB Cache`);
-        console.log(`${logPrefix}   - Cached Blob URL: ${cachedBlobUrl}`);
-        // UltraFastCache.setL0(songId, cachedBlobUrl, new Blob()); // Blob vide car déjà en mémoire
         return { url: cachedBlobUrl };
       }
     }
 
-    // 3. Vérifier le cache "warm" (URLs pré-calculées)
+    // 3. Vérifier le cache "warm"
     if (songId && UltraFastCache.getWarm(songId)) {
       const warmUrl = UltraFastCache.getWarm(songId)!;
       console.log(`${logPrefix} HIT Warm Cache`);
-      console.log(`${logPrefix}   - Warm URL: ${warmUrl}`);
       return { url: warmUrl };
     }
 
@@ -59,45 +50,42 @@ export class UltraFastStreaming {
       if (isMusicApi) {
         const provider = detectProviderFromUrl(filePath);
         const trackId = filePath.split(':')[1];
-        console.log(`${logPrefix} STEP 2: Getting ${provider?.toUpperCase()} stream URL via proxy...`);
-        console.log(`${logPrefix} INFO: Extracted Track ID: ${trackId}`);
+        console.log(`${logPrefix} STEP 2: Getting ${provider?.toUpperCase()} stream URL...`);
         const streamUrlResult = await getMusicStreamUrl(trackId, provider || 'tidal');
-        console.log(`${logPrefix} INFO: Result from getMusicStreamUrl:`, streamUrlResult);
 
         if (!streamUrlResult || !streamUrlResult.url) {
-          throw new Error(`Impossible d'obtenir l'URL directe de ${provider?.toUpperCase()}.`);
+          throw new Error(`Impossible d'obtenir l'URL de ${provider?.toUpperCase()}.`);
         }
-        const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(streamUrlResult.url)}`;
-        console.log(`${logPrefix} INFO: Constructed proxy URL: ${proxyUrl.substring(0, 100)}...`);
-        remoteStream = { url: proxyUrl };
+        
+        // Qobuz utilise directement qobuz-stream (pas d'audio-proxy)
+        if (isQobuz) {
+          console.log(`${logPrefix} Using direct qobuz-stream`);
+          remoteStream = { url: streamUrlResult.url };
+        } else {
+          // Tidal utilise audio-proxy
+          const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(streamUrlResult.url)}`;
+          remoteStream = { url: proxyUrl };
+        }
       } else if (isHttp) {
-        console.log(`${logPrefix} STEP 2: Path is a direct HTTP URL.`);
         remoteStream = { url: filePath };
       } else {
-        console.log(`${logPrefix} STEP 2: Getting Supabase/local file URL...`);
         remoteStream = await getAudioFileUrl(filePath, songTitle, songArtist, songId);
       }
 
       if (!remoteStream || !remoteStream.url) {
-        throw new Error("Impossible d'obtenir une URL de streaming distante.");
+        throw new Error("Impossible d'obtenir une URL de streaming.");
       }
 
-      console.log(`${logPrefix} SUCCESS: Got remote URL for instant playback: ${remoteStream.url.substring(0, 100)}...`);
-
+      console.log(`${logPrefix} SUCCESS: Got remote URL`);
       this.backgroundCache(filePath, remoteStream.url, songId, songTitle);
-
       return remoteStream;
 
     } catch (error) {
-      console.error(`${logPrefix} FAILED: Could not get any playable URL.`, error);
+      console.error(`${logPrefix} ERROR:`, error);
       throw error;
     }
   }
 
-  /**
-   * Met en cache l'audio en arrière-plan.
-   * Télécharge le fichier et le stocke dans IndexedDB et le cache L0.
-   */
   static async backgroundCache(
     originalFilePath: string,
     audioUrl: string,
@@ -105,9 +93,7 @@ export class UltraFastStreaming {
     songTitle?: string
   ): Promise<void> {
     const logPrefix = `[UltraFastStreaming.backgroundCache] ${songTitle || 'N/A'} |`;
-    if (!songId) {
-      return;
-    }
+    if (!songId) return;
 
     try {
       const response = await fetch(audioUrl);
@@ -115,14 +101,10 @@ export class UltraFastStreaming {
         throw new Error(`Erreur de téléchargement: ${response.status} ${response.statusText}`);
       }
       const blob = await response.blob();
-
       await addToCache(songId, blob);
-
       const blobUrl = URL.createObjectURL(blob);
       UltraFastCache.setL0(songId, blobUrl, blob);
-
       await cacheCurrentSong(songId, blob, songId, songTitle);
-
     } catch (error) {
       console.warn(`${logPrefix} Failed background caching:`, error);
     }
