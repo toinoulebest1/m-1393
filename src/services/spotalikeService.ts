@@ -103,8 +103,8 @@ export const spotalikeService = {
    */
   findSongInDatabase: async (artist: string, title: string) => {
     try {
-      // Recherche exacte d'abord
-      let { data, error } = await supabase
+      // Recherche STRICTE uniquement - pas de fallback approximatif
+      const { data, error } = await supabase
         .from('songs')
         .select('*')
         .ilike('artist', artist)
@@ -121,23 +121,7 @@ export const spotalikeService = {
         };
       }
 
-      // Si pas de correspondance exacte, recherche approximative par artiste
-      const { data: songs } = await supabase
-        .from('songs')
-        .select('*')
-        .ilike('artist', `%${artist}%`)
-        .limit(10);
-
-      if (songs && songs.length > 0) {
-        const randomSong = songs[Math.floor(Math.random() * songs.length)];
-        console.log('[Spotalike Service] Found approximate match:', randomSong.title, 'by', randomSong.artist);
-        return {
-          ...randomSong,
-          url: randomSong.file_path,
-          imageUrl: randomSong.image_url
-        };
-      }
-
+      console.log('[Spotalike Service] No exact match found for:', artist, '-', title);
       return null;
     } catch (error) {
       console.error('[Spotalike Service] Error finding song in database:', error);
@@ -150,10 +134,11 @@ export const spotalikeService = {
    */
   findSongsByArtist: async (artist: string) => {
     try {
+      // Recherche STRICTE uniquement - égalité exacte de l'artiste
       const { data, error } = await supabase
         .from('songs')
         .select('*')
-        .ilike('artist', `%${artist}%`)
+        .ilike('artist', artist)
         .limit(20);
 
       if (error) {
@@ -163,6 +148,7 @@ export const spotalikeService = {
 
       if (data && data.length > 0) {
         const randomSong = data[Math.floor(Math.random() * data.length)];
+        console.log('[Spotalike Service] Found exact artist match:', randomSong.title, 'by', randomSong.artist);
         return {
           ...randomSong,
           url: randomSong.file_path,
@@ -170,6 +156,7 @@ export const spotalikeService = {
         };
       }
 
+      console.log('[Spotalike Service] No exact artist match found for:', artist);
       return null;
     } catch (error) {
       console.error('[Spotalike Service] Error finding songs by artist:', error);
