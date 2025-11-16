@@ -71,7 +71,9 @@ Deno.serve(async (req) => {
         albumTitle: track.album?.title,
         albumCover: track.album?.image?.large || track.album?.image?.small,
         duration: track.duration,
-        genre: track.genre?.name
+        genre: track.genre?.name,
+        maximum_bit_depth: track.maximum_bit_depth,
+        maximum_sampling_rate: track.maximum_sampling_rate
       })) || [];
 
       console.log(`[QobuzProxy] Found ${tracks.length} tracks`);
