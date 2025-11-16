@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, uploadLyricsToDropbox } from './dropboxStorage';
 import { toast } from 'sonner';
 
 /**
@@ -129,14 +128,6 @@ export const fetchAndSaveLyrics = async (
         // Ne pas bloquer le retour des paroles même si la sauvegarde échoue
       } else {
         // console.log(`[lyricsManager] 6.2. Paroles sauvegardées avec succès.`);
-      }
-
-      // 7. Sauvegarder dans Dropbox si activé
-      if (isDropboxEnabled()) {
-        // console.log('[lyricsManager] 7. Tentative de sauvegarde Dropbox...');
-        uploadLyricsToDropbox(songId, lyricsContent).catch(error => {
-          console.warn('⚠️ [lyricsManager] 7.2. Échec sauvegarde Dropbox:', error);
-        });
       }
       
       return lyricsContent; // Retourner les paroles trouvées

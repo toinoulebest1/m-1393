@@ -1,30 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { isDropboxEnabled, isDropboxEnabledForReading, uploadFileToDropbox, getDropboxSharedLink } from './dropboxStorage';
-import { generateAndSaveDropboxLinkAdvanced } from './dropboxLinkGenerator';
-import { getDropboxConfig } from './dropboxStorage';
 import { getMusicStreamUrl, detectProviderFromUrl } from '@/services/musicService';
 
 export const uploadAudioFile = async (file: File, fileName: string): Promise<string> => {
-  // Priorité à Dropbox si activé
-  if (isDropboxEnabled()) {
-    console.log('Using Dropbox for file upload');
-    const dropboxPath = await uploadFileToDropbox(file, `audio/${fileName}`);
-    
-    try {
-      const config = getDropboxConfig();
-      if (config.accessToken) {
-        console.log('🔗 Génération immédiate du lien partagé...');
-        await generateAndSaveDropboxLinkAdvanced(fileName, dropboxPath, config.accessToken);
-        console.log('✅ Lien partagé pré-généré avec succès');
-      }
-    } catch (error) {
-      console.warn('⚠️ Échec génération lien partagé immédiat:', error);
-    }
-    
-    return dropboxPath;
-  }
-  
-  // Fallback vers Supabase
   console.log('Using Supabase for file upload');
   const { data, error } = await supabase.storage
     .from('audio')
@@ -47,24 +24,7 @@ export const getAudioFileUrl = async (filePath: string, songTitle?: string, song
   // Cette fonction est maintenant dédiée aux fichiers locaux.
   // Les URLs directes (http/https) et les IDs Tidal sont gérés par UltraFastStreaming.
 
-  // Tenter Dropbox si activé
-  if (isDropboxEnabledForReading() && songId) {
-    console.log('[storage.getAudioFileUrl] Dropbox est activé pour la lecture. Tentative de récupération du lien partagé Dropbox pour songId:', songId);
-    try {
-      const dropboxUrl = await getDropboxSharedLink(songId);
-      if (dropboxUrl) {
-        console.log('✅ URL Dropbox récupérée.');
-        return { url: dropboxUrl };
-      }
-      console.log('⚠️ Aucun lien Dropbox partagé trouvé pour songId:', songId, '. Fallback vers Supabase.');
-    } catch (error) {
-      console.warn('⚠️ Échec de la récupération du lien Dropbox, fallback vers Supabase:', error);
-    }
-  } else {
-    console.log('[storage.getAudioFileUrl] Dropbox n\'est pas activé pour la lecture ou songId manquant. Passage direct à Supabase.');
-  }
-
-  // Fallback vers Supabase Storage
+  // Supabase Storage
   console.log('[storage.getAudioFileUrl] Tentative de récupération de l\'URL signée Supabase pour filePath:', filePath);
   try {
     const { data, error } = await supabase.storage
