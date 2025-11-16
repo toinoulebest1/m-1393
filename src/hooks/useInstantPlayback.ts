@@ -10,8 +10,8 @@ export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
     }
 
     const preloadSongUrls = async () => {
-      // Précharger les 5 premières chansons en parallèle
-      const songsToPreload = songs.slice(0, 5);
+      // Précharger les 2 premières chansons en parallèle
+      const songsToPreload = songs.slice(0, 2);
       console.log(`🎵 Début du préchargement pour ${songsToPreload.length} chansons.`);
 
       const preloadPromises = songsToPreload.map(async (song) => {
