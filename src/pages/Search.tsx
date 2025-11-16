@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Player } from "@/components/Player";
@@ -47,9 +47,23 @@ const SearchPage = () => {
   const [dominantColor, setDominantColor] = useState<[number, number, number] | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Refs pour gérer le debounce et éviter les recherches multiples
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSearchRef = useRef<string>("");
+  const isSearchingRef = useRef(false);
 
   // Lance le préchargement des URLs dès que les résultats de recherche sont disponibles
   useInstantPlayback(results, !isLoading && results.length > 0);
+  
+  // Cleanup du timer de debounce au démontage
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const scrollKey = `scroll-${location.pathname}`;
@@ -69,14 +83,20 @@ const SearchPage = () => {
   useEffect(() => {
     const savedSearch = localStorage.getItem('lastSearch');
     if (savedSearch && savedSearch.trim()) {
-      handleSearch(savedSearch);
+      performSearch(savedSearch, searchFilter);
     }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('lastSearchFilter', searchFilter);
-    if (searchQuery) {
-      handleSearch(searchQuery);
+    // Relancer la recherche uniquement si on a une query existante
+    if (searchQuery && searchQuery.trim()) {
+      // Annuler le timer précédent
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      // Lancer la recherche immédiatement quand on change de filtre
+      performSearch(searchQuery, searchFilter);
     }
   }, [searchFilter]);
 
@@ -100,20 +120,28 @@ const SearchPage = () => {
     }
   }, [currentSong?.imageUrl]);
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    localStorage.setItem('lastSearch', query);
+  // Fonction principale de recherche (avec la vraie logique)
+  const performSearch = async (query: string, filter: typeof searchFilter) => {
+    // Éviter les recherches multiples pour la même query
+    const searchKey = `${query}|${filter}`;
+    if (isSearchingRef.current || lastSearchRef.current === searchKey) {
+      return;
+    }
+    
+    isSearchingRef.current = true;
+    lastSearchRef.current = searchKey;
     const isWildcardSearch = query === "*";
-    if (!isWildcardSearch && query.length < 2 && searchFilter !== "genre") {
+    if (!isWildcardSearch && query.length < 2 && filter !== "genre") {
       setResults([]);
       setPlaylistResults([]);
+      isSearchingRef.current = false;
       return;
     }
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (searchFilter === "playlist") {
+      if (filter === "playlist") {
         let playlistQuery = supabase.from('playlists').select('*');
         if (!isWildcardSearch) {
           playlistQuery = playlistQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`);
@@ -141,6 +169,7 @@ const SearchPage = () => {
         }
         setPlaylistResults(visiblePlaylists);
         setResults([]);
+        isSearchingRef.current = false;
         setIsLoading(false);
         return;
       }
@@ -151,11 +180,11 @@ const SearchPage = () => {
       let localSongsPromise;
       let songQuery = supabase.from('songs').select('*');
       if (!isWildcardSearch) {
-        if (searchFilter === "all") {
+        if (filter === "all") {
           songQuery = songQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%`);
-        } else if (searchFilter === "title") {
+        } else if (filter === "title") {
           songQuery = songQuery.ilike('title', `%${query}%`);
-        } else if (searchFilter === "artist") {
+        } else if (filter === "artist") {
           songQuery = songQuery.ilike('artist', `%${query}%`);
         }
       } else {
@@ -208,9 +237,34 @@ const SearchPage = () => {
       console.error('Erreur de recherche:', error);
       toast.error("Erreur lors de la recherche");
     } finally {
+      isSearchingRef.current = false;
       setIsLoading(false);
     }
   };
+  
+  // Fonction handleSearch avec debouncing
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    localStorage.setItem('lastSearch', query);
+    
+    // Annuler le timer de debounce précédent
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Si la query est vide ou trop courte, clear immédiatement
+    if (!query.trim() || (query.length < 2 && searchFilter !== "genre")) {
+      setResults([]);
+      setPlaylistResults([]);
+      lastSearchRef.current = "";
+      return;
+    }
+    
+    // Debounce de 300ms pour éviter trop de requêtes pendant la frappe
+    debounceTimerRef.current = setTimeout(() => {
+      performSearch(query, searchFilter);
+    }, 300);
+  }, [searchFilter]);
 
   const handlePlay = (song: any) => {
     if (currentSong?.id === song.id) {
