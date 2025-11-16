@@ -59,6 +59,20 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
     }).filter(Boolean);
 
     console.log(`[QobuzService] ${songs.length} pistes trouvées`);
+    
+    // Précharger immédiatement les URLs des 5 premières chansons
+    const topTrackIds = songs.slice(0, 5).map(song => {
+      const match = song.url.match(/^qobuz:(.+)$/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+    
+    if (topTrackIds.length > 0) {
+      // Fire and forget - ne pas attendre
+      preloadQobuzUrls(topTrackIds).catch(err => 
+        console.warn('[QobuzService] Préchargement background échoué:', err)
+      );
+    }
+    
     return songs;
   } catch (error) {
     console.error('Erreur lors de la recherche de pistes Qobuz:', error);
@@ -66,8 +80,34 @@ export const searchQobuzTracks = async (query: string): Promise<Song[]> => {
   }
 };
 
+// Cache mémoire pour les URLs Qobuz (TTL: 50 minutes)
+const urlCache = new Map<string, { url: string; timestamp: number }>();
+const CACHE_TTL = 50 * 60 * 1000; // 50 minutes
+
+const getCachedUrl = (trackId: string): string | null => {
+  const cached = urlCache.get(trackId);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return cached.url;
+  }
+  if (cached) {
+    urlCache.delete(trackId);
+  }
+  return null;
+};
+
+const setCachedUrl = (trackId: string, url: string) => {
+  urlCache.set(trackId, { url, timestamp: Date.now() });
+};
+
 export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string } | null> => {
   if (!trackId) return null;
+
+  // Vérifier le cache d'abord
+  const cachedUrl = getCachedUrl(trackId);
+  if (cachedUrl) {
+    console.log(`[QobuzService] Cache HIT for track ${trackId}`);
+    return { url: cachedUrl };
+  }
 
   try {
     // Appeler l'edge function pour obtenir l'URL directe Qobuz
@@ -83,10 +123,31 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
       throw new Error('No URL in Qobuz stream response');
     }
     
+    // Mettre en cache
+    setCachedUrl(trackId, data.url);
+    
     console.log(`[QobuzService] Got direct CDN URL for track ${trackId}`);
     return { url: data.url };
   } catch (error) {
     console.error('Erreur lors de la génération de l\'URL du flux Qobuz:', error);
     return null;
   }
+};
+
+// Préchargement batch des URLs pour démarrage instantané
+export const preloadQobuzUrls = async (trackIds: string[]): Promise<void> => {
+  if (trackIds.length === 0) return;
+  
+  console.log(`[QobuzService] Préchargement batch de ${trackIds.length} URLs...`);
+  
+  const preloadPromises = trackIds.map(async (trackId) => {
+    try {
+      await getQobuzStreamUrl(trackId);
+    } catch (error) {
+      console.warn(`[QobuzService] Échec préchargement ${trackId}:`, error);
+    }
+  });
+  
+  await Promise.allSettled(preloadPromises);
+  console.log(`[QobuzService] Préchargement terminé`);
 };
