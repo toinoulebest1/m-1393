@@ -72,38 +72,23 @@ Deno.serve(async (req) => {
     }
 
     const audioUrl = qobuzData.url;
-    console.log(`[QobuzStream] Streaming audio for track ${trackId}`);
+    console.log(`[QobuzStream] Got direct URL for track ${trackId}`);
 
-    const rangeHeader = req.headers.get('range');
-    const audioHeaders: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' };
-    if (rangeHeader) audioHeaders['Range'] = rangeHeader;
-
-    const audioResponse = await fetch(audioUrl, { headers: audioHeaders });
-
-    if (!audioResponse.ok && audioResponse.status !== 206) {
-      console.error(`[QobuzStream] Failed to fetch audio: ${audioResponse.status}`);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch audio from Qobuz' }),
-        { status: audioResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const responseHeaders = new Headers(corsHeaders);
-    const contentType = audioResponse.headers.get('content-type') || 'audio/flac';
-    const contentLength = audioResponse.headers.get('content-length');
-    const acceptRanges = audioResponse.headers.get('accept-ranges');
-    const contentRange = audioResponse.headers.get('content-range');
-
-    if (contentType) responseHeaders.set('Content-Type', contentType);
-    if (contentLength) responseHeaders.set('Content-Length', contentLength);
-    if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges);
-    if (contentRange) responseHeaders.set('Content-Range', contentRange);
-    responseHeaders.set('Cache-Control', 'public, max-age=3600');
-
-    return new Response(audioResponse.body, {
-      status: audioResponse.status === 206 ? 206 : 200,
-      headers: responseHeaders
-    });
+    // Return the direct Qobuz URL for ultra-fast streaming
+    return new Response(
+      JSON.stringify({ 
+        url: audioUrl,
+        expires_in: 3600 // URL typically valid for ~1 hour
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'private, max-age=3600'
+        }
+      }
+    );
 
   } catch (error) {
     console.error('[QobuzStream] Error:', error);

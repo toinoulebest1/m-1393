@@ -50,21 +50,20 @@ export class UltraFastStreaming {
       if (isMusicApi) {
         const provider = detectProviderFromUrl(filePath);
         const trackId = filePath.split(':')[1];
-        console.log(`${logPrefix} STEP 2: Getting ${provider?.toUpperCase()} stream URL...`);
+        console.log(`${logPrefix} Getting ${provider?.toUpperCase()} stream URL...`);
         const streamUrlResult = await getMusicStreamUrl(trackId, provider || 'tidal');
 
         if (!streamUrlResult || !streamUrlResult.url) {
           throw new Error(`Impossible d'obtenir l'URL de ${provider?.toUpperCase()}.`);
         }
         
-        // Qobuz utilise directement qobuz-stream (pas d'audio-proxy)
-        if (isQobuz) {
-          console.log(`${logPrefix} Using direct qobuz-stream`);
-          remoteStream = { url: streamUrlResult.url };
-        } else {
-          // Tidal utilise audio-proxy
-          const proxyUrl = `https://pwknncursthenghqgevl.supabase.co/functions/v1/audio-proxy?src=${encodeURIComponent(streamUrlResult.url)}`;
-          remoteStream = { url: proxyUrl };
+        // Both providers return direct URLs - stream directly from CDN for max speed
+        console.log(`${logPrefix} Using direct ${provider?.toUpperCase()} CDN URL`);
+        remoteStream = { url: streamUrlResult.url };
+        
+        // Cache URL for ultra-fast subsequent access
+        if (songId) {
+          UltraFastCache.setWarm(songId, streamUrlResult.url);
         }
       } else if (isHttp) {
         remoteStream = { url: filePath };
