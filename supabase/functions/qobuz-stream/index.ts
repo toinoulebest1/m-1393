@@ -38,10 +38,10 @@ Deno.serve(async (req) => {
     }
 
     const requestTs = Math.floor(Date.now() / 1000);
-    // Qobuz signature requires concatenating method + param names and values, then app secret.
-    // Include all params present in the request (order matters).
-    const sigString =
-      `trackgetFileUrlapp_id${appId}format_id${quality}intentstreamtrack_id${trackId}user_auth_token${userToken}request_ts${requestTs}${appSecret}`;
+    
+    // Qobuz signature: trackgetFileUrlformat_id{format}intentstreamtrack_id{track}{request_ts}{app_secret}
+    // NOTE: app_id and user_auth_token are NOT included in the signature string!
+    const sigString = `trackgetFileUrlformat_id${quality}intentstreamtrack_id${trackId}${requestTs}${appSecret}`;
     const signature = CryptoJS.MD5(sigString).toString();
 
     console.log(`[QobuzStream] Track ${trackId} | ts=${requestTs} | sig=${signature}`);
