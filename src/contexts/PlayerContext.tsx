@@ -40,6 +40,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Tracker la dernière chanson sauvegardée pour éviter les doublons
   const lastSavedSongRef = useRef<{ id: string; timestamp: number } | null>(null);
   
+  // Cache des recommandations Spotalike préchargées
+  const spotalikeRecommendationsRef = useRef<Song[]>([]);
+  const spotalikeLoadingRef = useRef<boolean>(false);
+  
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
     // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
@@ -191,6 +195,108 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     saveToHistory();
   }, [currentSong?.id]);
+
+  // Précharger les recommandations Spotalike dès qu'une chanson commence
+  useEffect(() => {
+    if (!currentSong || !isPlaying) return;
+
+    // Éviter de précharger si déjà en cours
+    if (spotalikeLoadingRef.current) return;
+
+    const preloadSpotalikeRecommendations = async () => {
+      spotalikeLoadingRef.current = true;
+      console.log('[Spotalike Preload] Début du préchargement pour:', currentSong.title);
+
+      try {
+        const MAX_CANDIDATES = 15;
+        const candidates: Song[] = [];
+
+        // Fonction helper pour vérifier les doublons
+        const isRecentDuplicateCandidate = (song: Song) => {
+          return candidates.some(c => 
+            c.title.toLowerCase() === song.title.toLowerCase() && 
+            c.artist.toLowerCase() === song.artist.toLowerCase()
+          );
+        };
+
+        // 1. Essayer de trouver des chansons similaires
+        if (currentSong.artist && currentSong.title) {
+          const similarTracks = await spotalikeService.getSimilarTracks(
+            currentSong.artist,
+            currentSong.title
+          );
+
+          const tracksToProcess = similarTracks.slice(0, 15);
+          console.log('[Spotalike Preload] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
+
+          for (const track of tracksToProcess) {
+            if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
+              continue;
+            }
+
+            let song = await spotalikeService.findSongInDatabase(
+              track.artist.name,
+              track.name
+            ) as any;
+
+            if (!song) {
+              song = await spotalikeService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+            }
+
+            if (song && song.id !== currentSong.id) {
+              if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
+                candidates.push(song);
+              }
+            }
+
+            if (candidates.length >= MAX_CANDIDATES) break;
+          }
+        }
+
+        // 2. Si pas assez de candidats, essayer des artistes similaires
+        if (candidates.length === 0 && currentSong.artist) {
+          console.log('[Spotalike Preload] Aucune recommandation de tracks. Tentative avec les artistes similaires...');
+          const similarArtists = await spotalikeService.getSimilarArtists(currentSong.artist);
+
+          if (similarArtists.length > 0) {
+            const artistsToProcess = similarArtists.slice(0, 10);
+            console.log('[Spotalike Preload] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
+
+            for (const artist of artistsToProcess) {
+              if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
+                continue;
+              }
+
+              let song = await spotalikeService.findSongsByArtist(artist.name) as any;
+
+              if (!song) {
+                song = await spotalikeService.searchArtistOnStreamingService(artist.name) as any;
+              }
+
+              if (song && song.id !== currentSong.id) {
+                if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
+                  candidates.push(song);
+                }
+              }
+
+              if (candidates.length >= MAX_CANDIDATES) break;
+            }
+          }
+        }
+
+        // Stocker les recommandations dans le cache
+        spotalikeRecommendationsRef.current = candidates;
+        console.log('[Spotalike Preload] ✅ Préchargement terminé:', candidates.length, 'candidats trouvés');
+      } catch (error) {
+        console.error('[Spotalike Preload] ❌ Erreur lors du préchargement:', error);
+        spotalikeRecommendationsRef.current = [];
+      } finally {
+        spotalikeLoadingRef.current = false;
+      }
+    };
+
+    preloadSpotalikeRecommendations();
+  }, [currentSong?.id, isPlaying]);
 
   // Mettre à jour la prédiction quand la chanson change
   useEffect(() => {
@@ -978,92 +1084,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           const activeQueue = shuffleMode ? shuffledQueue : queue;
           
-          // Si la queue est vide, recherche Spotalike directe
+          // Si la queue est vide, utiliser les recommandations préchargées
           if (activeQueue.length === 0 && currentSong) {
-            console.log('[Spotalike Autoplay] Queue vide détectée, recherche immédiate...');
+            console.log('[Spotalike Autoplay] Queue vide détectée, utilisation du cache préchargé...');
             
             try {
-              const MAX_CANDIDATES = 15;
-              const candidates: any[] = [];
+              // Utiliser les recommandations déjà préchargées
+              const candidates = spotalikeRecommendationsRef.current;
               
-              // 1. Essayer de trouver des chansons similaires
-              if (currentSong.artist && currentSong.title) {
-                const similarTracks = await spotalikeService.getSimilarTracks(
-                  currentSong.artist,
-                  currentSong.title
-                );
-                
-                const tracksToProcess = similarTracks.slice(0, 15);
-                console.log('[Spotalike Autoplay] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
-                
-                for (const track of tracksToProcess) {
-                  if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
-                    continue;
-                  }
-                  
-                  let song = await spotalikeService.findSongInDatabase(
-                    track.artist.name,
-                    track.name
-                  );
-                  
-                  if (!song) {
-                    song = await spotalikeService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
-                  }
-                  
-                  if (song && song.id !== currentSong.id) {
-                    if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
-                      candidates.push(song);
-                    }
-                  }
-                  
-                  if (candidates.length >= MAX_CANDIDATES) break;
-                }
-              }
-              
-              // 2. Si pas assez de candidats, essayer des artistes similaires
-              if (candidates.length === 0 && currentSong.artist) {
-                console.log('[Spotalike Autoplay] Aucune recommandation de tracks. Tentative avec les artistes similaires...');
-                const similarArtists = await spotalikeService.getSimilarArtists(currentSong.artist);
-                
-                if (similarArtists.length > 0) {
-                  const artistsToProcess = similarArtists.slice(0, 10);
-                  console.log('[Spotalike Autoplay] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
-                  
-                  for (const artist of artistsToProcess) {
-                    if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
-                      continue;
-                    }
-                    
-                    let song = await spotalikeService.findSongsByArtist(artist.name);
-                    
-                    if (!song) {
-                      song = await spotalikeService.searchArtistOnStreamingService(artist.name) as any;
-                    }
-                    
-                    if (song && song.id !== currentSong.id) {
-                      if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
-                        candidates.push(song);
-                      }
-                    }
-                    
-                    if (candidates.length >= MAX_CANDIDATES) break;
-                  }
-                }
-              }
-
               // 3. Jouer la chanson trouvée
               let nextSongToPlay = null;
               if (candidates.length > 0) {
                 const randomIndex = Math.floor(Math.random() * candidates.length);
                 nextSongToPlay = candidates[randomIndex];
-                console.log('[Spotalike Autoplay] Recommandation choisie (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
+                console.log('[Spotalike Autoplay] Recommandation choisie du cache (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
               }
               
               if (nextSongToPlay) {
                 toast.success(`Lecture automatique: ${nextSongToPlay.title} par ${nextSongToPlay.artist}`);
                 await play(nextSongToPlay);
               } else {
-                console.log('[Spotalike Autoplay] Aucune recommandation trouvée');
+                console.log('[Spotalike Autoplay] Aucune recommandation dans le cache');
                 toast.info("Aucune recommandation trouvée");
               }
             } catch (error) {
