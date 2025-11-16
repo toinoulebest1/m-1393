@@ -76,7 +76,10 @@ export class UltraFastStreaming {
       }
 
       console.log(`${logPrefix} SUCCESS: Got remote URL`);
-      this.backgroundCache(filePath, remoteStream.url, songId, songTitle);
+      // Éviter le gros téléchargement en arrière-plan pour Qobuz/Tidal (URLs temporaires et lourdes)
+      if (!isMusicApi) {
+        this.backgroundCache(filePath, remoteStream.url, songId, songTitle);
+      }
       return remoteStream;
 
     } catch (error) {
@@ -93,6 +96,11 @@ export class UltraFastStreaming {
   ): Promise<void> {
     const logPrefix = `[UltraFastStreaming.backgroundCache] ${songTitle || 'N/A'} |`;
     if (!songId) return;
+
+    // Ne pas mettre en cache en arrière-plan les flux Qobuz/Tidal (trop lourds et URLs éphémères)
+    if (originalFilePath.startsWith('qobuz:') || originalFilePath.startsWith('tidal:')) {
+      return;
+    }
 
     try {
       const response = await fetch(audioUrl);
