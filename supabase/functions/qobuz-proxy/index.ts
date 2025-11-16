@@ -105,36 +105,31 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Build signature source according to Qobuz requirements
-      // Primary signature pattern (per community references)
-      const sigSrc1 = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
-      const sig1 = md5(sigSrc1);
+      // Build signature exactly like the working HTML example
+      const sigString = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
+      const signature = md5(sigString);
 
-      // Alternate signature pattern including request_ts label (try if first fails)
-      const sigSrc2 = `trackgetFileUrlformat_id${formatId}intent${intent}request_ts${requestTs}track_id${trackId}${appSecret}`;
-      const sig2 = md5(sigSrc2);
-
-      let qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?request_ts=${requestTs}&request_sig=${sig1}&track_id=${trackId}&format_id=${formatId}&intent=${intent}&app_id=${appId}&user_auth_token=${userToken}`;
+      // Build URL with only required query params
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&request_ts=${requestTs}&request_sig=${signature}&intent=${intent}`;
+      
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId} ts=${requestTs}`);
       
-      let response = await fetch(qobuzUrl);
+      // Use headers for authentication like the HTML example
+      const response = await fetch(qobuzUrl, {
+        headers: {
+          'X-User-Auth-Token': userToken,
+          'X-App-Id': appId,
+          'User-Agent': 'Mozilla/5.0'
+        }
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        // If signature invalid, try alternate signature pattern once
-        if (response.status === 400 && errorText.includes('Invalid Request Signature')) {
-          qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?request_ts=${requestTs}&request_sig=${sig2}&track_id=${trackId}&format_id=${formatId}&intent=${intent}&app_id=${appId}&user_auth_token=${userToken}`;
-          console.warn('[QobuzProxy] Retrying with alternate signature');
-          response = await fetch(qobuzUrl);
-        }
-        if (!response.ok) {
-          const errAgain = await response.text();
-          console.error(`[QobuzProxy] Stream error: ${response.status} - ${errAgain}`);
-          return new Response(
-            JSON.stringify({ error: 'Failed to get stream URL', details: errAgain }),
-            { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        console.error(`[QobuzProxy] Stream error: ${response.status} - ${errorText}`);
+        return new Response(
+          JSON.stringify({ error: 'Failed to get stream URL', details: errorText }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       const data = await response.json();
