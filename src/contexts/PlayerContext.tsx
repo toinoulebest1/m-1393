@@ -251,11 +251,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHistory,
   });
 
-  // Ensemble des IDs des morceaux récents pour éviter les répétitions
-  const recentHistoryIds = React.useMemo(() => {
+  // Constante pour la taille de la fenêtre d'historique à exclure
+  const HISTORY_WINDOW_SIZE = 20;
+
+  // Fonction de normalisation pour créer des clés artiste+titre
+  const normalizeKey = (artist: string, title: string): string => {
+    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${normalize(artist)}_${normalize(title)}`;
+  };
+
+  // Ensemble des clés normalisées des morceaux récents pour éviter les répétitions
+  const recentHistoryKeys = React.useMemo(() => {
     try {
-      const last = history.slice(-20);
-      return new Set(last.map(s => s.id));
+      const last = history.slice(-HISTORY_WINDOW_SIZE);
+      return new Set(last.map(s => normalizeKey(s.artist || '', s.title || '')));
     } catch {
       return new Set<string>();
     }
@@ -282,7 +291,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       (async () => {
         try {
-          let nextSongToPlay = null;
+          const candidates: any[] = [];
           
           // 1. Essayer de trouver des chansons similaires
           if (currentSong.artist && currentSong.title) {
@@ -291,10 +300,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               currentSong.title
             );
             
-            // Mélanger les résultats pour plus de variété
-            const shuffledTracks = [...similarTracks].sort(() => Math.random() - 0.5);
-            
-            for (const track of shuffledTracks) {
+            for (const track of similarTracks) {
               if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                 continue;
               }
@@ -308,22 +314,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
               }
               
-              if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
-                nextSongToPlay = song;
-                console.log('[LastFM Preload] Recommandation préchargée:', song.title, 'by', song.artist);
-                break;
+              if (song && song.id !== currentSong.id) {
+                const songKey = normalizeKey(song.artist || '', song.title || '');
+                if (!recentHistoryKeys.has(songKey)) {
+                  candidates.push(song);
+                }
               }
             }
           }
           
-          // 2. Si aucune chanson similaire, essayer des artistes similaires
-          if (!nextSongToPlay && currentSong.artist) {
+          // 2. Si pas assez de candidats, essayer des artistes similaires
+          if (candidates.length < 3 && currentSong.artist) {
             const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
             
-            // Mélanger les résultats pour plus de variété
-            const shuffledArtists = [...similarArtists].sort(() => Math.random() - 0.5);
-            
-            for (const artist of shuffledArtists) {
+            for (const artist of similarArtists) {
               if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                 continue;
               }
@@ -334,12 +338,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
               }
               
-              if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
-                nextSongToPlay = song;
-                console.log('[LastFM Preload] Artiste similaire préchargé:', song.title, 'by', song.artist);
-                break;
+              if (song && song.id !== currentSong.id) {
+                const songKey = normalizeKey(song.artist || '', song.title || '');
+                if (!recentHistoryKeys.has(songKey)) {
+                  candidates.push(song);
+                }
               }
             }
+          }
+          
+          // 3. Choisir uniformément au hasard parmi les candidats
+          let nextSongToPlay = null;
+          if (candidates.length > 0) {
+            const randomIndex = Math.floor(Math.random() * candidates.length);
+            nextSongToPlay = candidates[randomIndex];
+            console.log('[LastFM Preload] Recommandation préchargée (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
           }
           
           if (nextSongToPlay) {
@@ -983,7 +996,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.log('[LastFM Autoplay] ⚠️ Pas de cache, recherche immédiate de chanson similaire...');
             
             try {
-              let nextSongToPlay = null;
+              const candidates: any[] = [];
               
               // 1. Essayer de trouver des chansons similaires avec track.getsimilar
               if (currentSong.artist && currentSong.title) {
@@ -992,11 +1005,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   currentSong.title
                 );
                 
-                // Mélanger les résultats pour plus de variété
-                const shuffledTracks = [...similarTracks].sort(() => Math.random() - 0.5);
-                
-                // Chercher ces chansons dans la base de données ou sur les services de streaming
-                for (const track of shuffledTracks) {
+                for (const track of similarTracks) {
                   if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                     continue;
                   }
@@ -1010,21 +1019,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
                   }
                   
-                  if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
-                    nextSongToPlay = song;
-                    break;
+                  if (song && song.id !== currentSong.id) {
+                    const songKey = normalizeKey(song.artist || '', song.title || '');
+                    if (!recentHistoryKeys.has(songKey)) {
+                      candidates.push(song);
+                    }
                   }
                 }
               }
               
-              // 2. Si aucune chanson similaire, essayer des artistes similaires
-              if (!nextSongToPlay && currentSong.artist) {
+              // 2. Si pas assez de candidats, essayer des artistes similaires
+              if (candidates.length < 3 && currentSong.artist) {
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
-                // Mélanger les résultats pour plus de variété
-                const shuffledArtists = [...similarArtists].sort(() => Math.random() - 0.5);
-                
-                for (const artist of shuffledArtists) {
+                for (const artist of similarArtists) {
                   if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                     continue;
                   }
@@ -1035,12 +1043,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
                   }
                   
-                  if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
-                    nextSongToPlay = song;
-                    console.log('[LastFM Autoplay] Chanson d\'artiste similaire trouvée:', song.title, 'by', song.artist);
-                    break;
+                  if (song && song.id !== currentSong.id) {
+                    const songKey = normalizeKey(song.artist || '', song.title || '');
+                    if (!recentHistoryKeys.has(songKey)) {
+                      candidates.push(song);
+                    }
                   }
                 }
+              }
+              
+              // 3. Choisir uniformément au hasard parmi les candidats
+              let nextSongToPlay = null;
+              if (candidates.length > 0) {
+                const randomIndex = Math.floor(Math.random() * candidates.length);
+                nextSongToPlay = candidates[randomIndex];
+                console.log('[LastFM Autoplay] Recommandation choisie (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
               }
               
               // 3. Jouer la chanson trouvée
