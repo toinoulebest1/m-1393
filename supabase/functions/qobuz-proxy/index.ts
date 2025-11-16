@@ -1,3 +1,5 @@
+import { Md5 } from "https://deno.land/std@0.177.0/hash/md5.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -82,8 +84,24 @@ Deno.serve(async (req) => {
 
       // format_id 5 = MP3 320kbps, 6 = FLAC 16bit, 27 = FLAC 24bit
       const formatId = '5'; // MP3 320kbps for compatibility
+      const intent = 'stream';
       const requestTs = Math.floor(Date.now() / 1000);
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&app_id=${appId}&user_auth_token=${userToken}&request_ts=${requestTs}`;
+
+      const appSecret = Deno.env.get('QOBUZ_APP_SECRET');
+      if (!appSecret) {
+        console.error('[QobuzProxy] Missing QOBUZ_APP_SECRET');
+        return new Response(
+          JSON.stringify({ error: 'Missing Qobuz app secret' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Build signature source according to Qobuz requirements
+      // sigsrc = "trackgetFileUrlformat_id{format}intent{intent}track_id{track}{requestTs}{appSecret}"
+      const sigSource = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
+      const requestSig = new Md5().update(sigSource).toString();
+
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?request_ts=${requestTs}&request_sig=${requestSig}&track_id=${trackId}&format_id=${formatId}&intent=${intent}&app_id=${appId}&user_auth_token=${userToken}`;
       
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId}`);
       
