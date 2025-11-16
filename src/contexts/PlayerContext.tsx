@@ -364,7 +364,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               currentSong.title
             );
             
-            for (const track of similarTracks) {
+            // Limiter à 10 premières recommandations pour éviter trop de requêtes
+            const tracksToProcess = similarTracks.slice(0, 10);
+            console.log('[LastFM Preload] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
+            
+            for (const track of tracksToProcess) {
               if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                 continue;
               }
@@ -390,7 +394,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (candidates.length < 3 && currentSong.artist) {
             const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
             
-            for (const artist of similarArtists) {
+            // Limiter à 10 premiers artistes pour éviter trop de requêtes
+            const artistsToProcess = similarArtists.slice(0, 10);
+            console.log('[LastFM Preload] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
+            
+            for (const artist of artistsToProcess) {
               if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                 continue;
               }
@@ -1067,7 +1075,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   currentSong.title
                 );
                 
-                for (const track of similarTracks) {
+                // Limiter à 10 premières recommandations pour éviter trop de requêtes
+                const tracksToProcess = similarTracks.slice(0, 10);
+                console.log('[LastFM Autoplay] Traitement de', tracksToProcess.length, '/', similarTracks.length, 'recommandations');
+                
+                for (const track of tracksToProcess) {
                   if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                     continue;
                   }
@@ -1093,7 +1105,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               if (candidates.length < 3 && currentSong.artist) {
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
-                for (const artist of similarArtists) {
+                // Limiter à 10 premiers artistes pour éviter trop de requêtes
+                const artistsToProcess = similarArtists.slice(0, 10);
+                console.log('[LastFM Autoplay] Traitement de', artistsToProcess.length, '/', similarArtists.length, 'artistes similaires');
+                
+                for (const artist of artistsToProcess) {
                   if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                     continue;
                   }
