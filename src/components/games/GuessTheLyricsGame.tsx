@@ -626,19 +626,16 @@ export function GuessTheLyricsGame() {
         const effectiveStart = Math.max(0, excerptStartTime + syncOffsetMs / 1000);
         const startTime = Math.max(0, effectiveStart - 5);
         
-        const onSeeked = () => {
-          audioElement.removeEventListener('seeked', onSeeked);
-          audioElement.play().catch(() => {
-            console.error("Erreur lors de la lecture audio");
-          });
-        };
-
-        audioElement.addEventListener('seeked', onSeeked, { once: true });
         audioElement.currentTime = startTime;
         setCurrentAudioTime(startTime);
+        
+        audioElement.play().catch((error) => {
+          console.error("Erreur lors de la lecture audio:", error);
+        });
       } else {
-        audioElement.play().catch(() => {
-          console.error("Erreur lors de la lecture audio");
+        audioElement.currentTime = 0;
+        audioElement.play().catch((error) => {
+          console.error("Erreur lors de la lecture audio:", error);
         });
       }
     }
