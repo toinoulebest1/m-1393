@@ -3,6 +3,7 @@ import { Song } from '@/types/player';
 const SUPABASE_URL = 'https://pwknncursthenghqgevl.supabase.co';
 const QOBUZ_PROXY_URL = `${SUPABASE_URL}/functions/v1/qobuz-proxy`;
 const QOBUZ_STREAM_URL = `${SUPABASE_URL}/functions/v1/qobuz-stream`;
+const QOBUZ_STREAM_BATCH_URL = `${SUPABASE_URL}/functions/v1/qobuz-stream-batch`;
 
 // Helper pour formater la durée de secondes en MM:SS
 const formatDuration = (seconds: number): string => {
@@ -134,20 +135,34 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
   }
 };
 
-// Préchargement batch des URLs pour démarrage instantané
+// Préchargement batch des URLs pour démarrage instantané - ULTRA RAPIDE
 export const preloadQobuzUrls = async (trackIds: string[]): Promise<void> => {
   if (trackIds.length === 0) return;
   
-  console.log(`[QobuzService] Préchargement batch de ${trackIds.length} URLs...`);
+  console.log(`[QobuzService] Préchargement BATCH de ${trackIds.length} URLs en 1 appel...`);
   
-  const preloadPromises = trackIds.map(async (trackId) => {
-    try {
-      await getQobuzStreamUrl(trackId);
-    } catch (error) {
-      console.warn(`[QobuzService] Échec préchargement ${trackId}:`, error);
+  try {
+    const response = await fetch(QOBUZ_STREAM_BATCH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ track_ids: trackIds })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Batch request failed: ${response.status}`);
     }
-  });
-  
-  await Promise.allSettled(preloadPromises);
-  console.log(`[QobuzService] Préchargement terminé`);
+    
+    const data = await response.json();
+    
+    // Mettre tous les résultats en cache immédiatement
+    data.results.forEach((result: any) => {
+      if (result.url) {
+        setCachedUrl(result.trackId, result.url);
+      }
+    });
+    
+    console.log(`[QobuzService] ✅ Batch préchargement terminé: ${data.success_count}/${data.total}`);
+  } catch (error) {
+    console.warn('[QobuzService] Batch préchargement échoué:', error);
+  }
 };

@@ -16,16 +16,17 @@ import { getFromCache } from '@/utils/audioCache';
 import { UltraFastStreaming } from '@/utils/ultraFastStreaming';
 import { fetchLyricsInBackground } from '@/utils/lyricsManager';
 
-// Contexte global et audio
+import { optimizeAudioElement, createOptimizedAudio } from '@/utils/audioOptimization';
+
+// ... keep existing code
+
+// Contexte global et audio optimisé
 const PlayerContext = createContext<PlayerContextType | null>(null);
-const globalAudio = new Audio();
-globalAudio.crossOrigin = "anonymous";
+const globalAudio = createOptimizedAudio();
 
 // Helper function to create next audio element
 const createNextAudio = () => {
-  const nextAudio = new Audio();
-  nextAudio.crossOrigin = "anonymous";
-  return nextAudio;
+  return createOptimizedAudio();
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
