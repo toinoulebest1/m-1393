@@ -49,20 +49,18 @@ export const fetchAndSaveLyrics = async (
     
     // 3.1. Essayer d'abord l'API Qobuz si on a l'artiste et le titre
     if (artist && songTitle) {
-      // console.log('[lyricsManager] 3.1. Tentative de récupération depuis l\'API Qobuz...');
+      // console.log('[lyricsManager] 3.1. Tentative de récupération depuis l\'edge function qobuz-lyrics...');
       try {
-        const qobuzApiUrl = `https://api.kinoplus.online/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(songTitle)}`;
-        const qobuzLyricsResponse = await fetch(qobuzApiUrl);
+        const { data: qobuzLyricsData, error: qobuzError } = await supabase.functions.invoke(
+          `qobuz-lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(songTitle)}`
+        );
         
-        if (qobuzLyricsResponse.ok) {
-          const qobuzLyricsData = await qobuzLyricsResponse.json();
-          if (qobuzLyricsData && qobuzLyricsData.lyrics) {
-            lyricsContent = qobuzLyricsData.lyrics;
-            // console.log('[lyricsManager] 3.2. Paroles trouvées via l\'API Qobuz.');
-          }
+        if (!qobuzError && qobuzLyricsData && qobuzLyricsData.lyrics) {
+          lyricsContent = qobuzLyricsData.lyrics;
+          // console.log('[lyricsManager] 3.2. Paroles trouvées via l\'API Qobuz.');
         }
       } catch (error) {
-        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'API Qobuz:', error);
+        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'edge function qobuz-lyrics:', error);
       }
     }
 
