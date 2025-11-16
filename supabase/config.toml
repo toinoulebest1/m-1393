@@ -71,6 +71,9 @@ verify_jwt = false
 [functions.qobuz-proxy]
 verify_jwt = false
 
+[functions.qobuz-stream]
+verify_jwt = false
+
 [functions.audio-proxy]
 verify_jwt = false
 
