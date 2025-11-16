@@ -257,9 +257,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     const activeQueue = shuffleMode ? shuffledQueue : queue;
     
-    // Ne précharger que si la queue est vide et qu'on n'a pas déjà une recommandation
-    if (activeQueue.length === 0 && !lastfmPreloadingRef.current && !lastfmCacheRef.current) {
-      console.log('[LastFM Preload] Début du préchargement pour:', currentSong.title);
+    // Nettoyer le cache si la chanson actuelle n'est pas la recommandation cachée
+    if (lastfmCacheRef.current && lastfmCacheRef.current.id !== currentSong.id) {
+      console.log('[LastFM Preload] Nettoyage du cache (chanson différente)');
+      lastfmCacheRef.current = null;
+    }
+    
+    // Précharger si la queue est vide (ou va bientôt l'être)
+    const shouldPreload = activeQueue.length === 0 && !lastfmPreloadingRef.current && !lastfmCacheRef.current;
+    
+    if (shouldPreload) {
+      console.log('[LastFM Preload] Début du préchargement pour:', currentSong.title, '| Queue:', activeQueue.length);
       lastfmPreloadingRef.current = true;
       
       (async () => {
@@ -320,13 +328,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           if (nextSongToPlay) {
             lastfmCacheRef.current = nextSongToPlay;
+            console.log('[LastFM Preload] ✅ Recommandation mise en cache:', nextSongToPlay.title);
+          } else {
+            console.log('[LastFM Preload] ⚠️ Aucune recommandation trouvée');
           }
         } catch (error) {
-          console.error('[LastFM Preload] Erreur:', error);
+          console.error('[LastFM Preload] ❌ Erreur:', error);
         } finally {
           lastfmPreloadingRef.current = false;
+          console.log('[LastFM Preload] Fin du préchargement');
         }
       })();
+    } else {
+      if (activeQueue.length > 0) {
+        console.log('[LastFM Preload] Ignoré: Queue non vide (' + activeQueue.length + ' chansons)');
+      }
     }
   }, [currentSong, isPlaying, queue, shuffledQueue, shuffleMode]);
 
@@ -935,17 +951,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           // Si la queue est vide, essayer de trouver une chanson similaire via Last.fm
           if (activeQueue.length === 0 && currentSong) {
+            console.log('[LastFM Autoplay] Queue vide détectée. Cache disponible:', !!lastfmCacheRef.current);
+            
             // Utiliser la recommandation préchargée si disponible
             if (lastfmCacheRef.current) {
-              console.log('[LastFM Autoplay] Utilisation de la recommandation préchargée:', lastfmCacheRef.current.title);
+              console.log('[LastFM Autoplay] ✅ Utilisation de la recommandation préchargée:', lastfmCacheRef.current.title);
               const cachedSong = lastfmCacheRef.current;
               lastfmCacheRef.current = null;
+              lastfmPreloadingRef.current = false; // Reset du flag de préchargement
               toast.success(`Lecture automatique: ${cachedSong.title} par ${cachedSong.artist}`);
               await play(cachedSong);
               return;
             }
             
-            console.log('[LastFM Autoplay] Queue vide, recherche immédiate de chanson similaire...');
+            console.log('[LastFM Autoplay] ⚠️ Pas de cache, recherche immédiate de chanson similaire...');
             
             try {
               let nextSongToPlay = null;
