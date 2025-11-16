@@ -25,18 +25,17 @@ const History = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const { 
-    history, 
     play, 
     pause, 
     isPlaying, 
     favorites, 
-    setHistory, 
     currentSong,
     setQueue 
   } = usePlayer();
   const [dominantColor, setDominantColor] = React.useState<[number, number, number] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [songToReport, setSongToReport] = React.useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
   // Restaurer la position de scroll au retour
   React.useEffect(() => {
