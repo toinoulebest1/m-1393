@@ -87,7 +87,12 @@ export const lastfmService = {
 
       if (!error && data) {
         console.log('[LastFM Service] Found exact match:', data.title, 'by', data.artist);
-        return data;
+        // S'assurer que url est défini avec file_path
+        return {
+          ...data,
+          url: data.file_path,
+          imageUrl: data.image_url
+        };
       }
 
       // Si pas de correspondance exacte, recherche approximative
@@ -101,7 +106,12 @@ export const lastfmService = {
         // Retourner une chanson aléatoire parmi les résultats
         const randomSong = songs[Math.floor(Math.random() * songs.length)];
         console.log('[LastFM Service] Found approximate match:', randomSong.title, 'by', randomSong.artist);
-        return randomSong;
+        // S'assurer que url est défini avec file_path
+        return {
+          ...randomSong,
+          url: randomSong.file_path,
+          imageUrl: randomSong.image_url
+        };
       }
 
       return null;
@@ -129,7 +139,12 @@ export const lastfmService = {
       // Retourner une chanson aléatoire de cet artiste
       const randomSong = data[Math.floor(Math.random() * data.length)];
       console.log('[LastFM Service] Found song by similar artist:', randomSong.title, 'by', randomSong.artist);
-      return randomSong;
+      // S'assurer que url est défini avec file_path
+      return {
+        ...randomSong,
+        url: randomSong.file_path,
+        imageUrl: randomSong.image_url
+      };
     } catch (error) {
       console.error('[LastFM Service] Error finding songs by artist:', error);
       return null;
