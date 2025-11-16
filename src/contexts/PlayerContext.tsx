@@ -818,22 +818,39 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             try {
               let nextSongToPlay = null;
               
-              // 1. Essayer de trouver des chansons similaires
+              // 1. Essayer de trouver des chansons similaires avec track.getsimilar
               if (currentSong.artist && currentSong.title) {
+                console.log('[LastFM Autoplay] Recherche de tracks similaires pour:', currentSong.title, 'by', currentSong.artist);
                 const similarTracks = await lastfmService.getSimilarTracks(
                   currentSong.artist,
                   currentSong.title
                 );
                 
-                // Chercher ces chansons dans la base de données
+                console.log('[LastFM Autoplay] Tracks similaires trouvées:', similarTracks.length);
+                
+                // Chercher ces chansons dans la base de données ou sur les services de streaming
                 for (const track of similarTracks) {
-                  const song = await lastfmService.findSongInDatabase(
+                  // Vérifier si l'artiste a été joué récemment
+                  if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
+                    console.log('[LastFM Autoplay] Artiste déjà joué récemment, skip:', track.artist.name);
+                    continue;
+                  }
+                  
+                  // D'abord chercher dans la base de données locale
+                  let song = await lastfmService.findSongInDatabase(
                     track.artist.name,
                     track.name
                   );
+                  
+                  // Si pas trouvé localement, chercher sur Qobuz/Tidal
+                  if (!song) {
+                    console.log('[LastFM Autoplay] Chanson non trouvée localement, recherche sur Qobuz/Tidal:', track.name, 'by', track.artist.name);
+                    song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+                  }
+                  
                   if (song && song.id !== currentSong.id) {
                     nextSongToPlay = song;
-                    console.log('[LastFM Autoplay] Chanson similaire trouvée:', song.title);
+                    console.log('[LastFM Autoplay] Chanson similaire trouvée:', song.title, 'by', song.artist);
                     break;
                   }
                 }
