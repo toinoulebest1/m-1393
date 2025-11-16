@@ -251,6 +251,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHistory,
   });
 
+  // Ensemble des IDs des morceaux récents pour éviter les répétitions
+  const recentHistoryIds = React.useMemo(() => {
+    try {
+      const last = history.slice(-20);
+      return new Set(last.map(s => s.id));
+    } catch {
+      return new Set<string>();
+    }
+  }, [history]);
+
   // Précharger les recommandations Last.fm dès le début de la chanson
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
@@ -298,7 +308,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
               }
               
-              if (song && song.id !== currentSong.id) {
+              if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
                 nextSongToPlay = song;
                 console.log('[LastFM Preload] Recommandation préchargée:', song.title, 'by', song.artist);
                 break;
@@ -324,7 +334,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
               }
               
-              if (song && song.id !== currentSong.id) {
+              if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
                 nextSongToPlay = song;
                 console.log('[LastFM Preload] Artiste similaire préchargé:', song.title, 'by', song.artist);
                 break;
@@ -1000,7 +1010,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     song = await lastfmService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
                   }
                   
-                  if (song && song.id !== currentSong.id) {
+                  if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
                     nextSongToPlay = song;
                     break;
                   }
@@ -1025,7 +1035,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     song = await lastfmService.searchArtistOnStreamingService(artist.name) as any;
                   }
                   
-                  if (song && song.id !== currentSong.id) {
+                  if (song && song.id !== currentSong.id && !recentHistoryIds.has(song.id)) {
                     nextSongToPlay = song;
                     console.log('[LastFM Autoplay] Chanson d\'artiste similaire trouvée:', song.title, 'by', song.artist);
                     break;
