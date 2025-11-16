@@ -251,13 +251,33 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHistory,
   });
 
-  // Constante pour la taille de la fenêtre d'historique à exclure
-  const HISTORY_WINDOW_SIZE = 20;
+  // Fenêtre d'historique plus large pour éviter les répétitions
+  const HISTORY_WINDOW_SIZE = 100;
+
+  // Nettoyage agressif du titre pour éviter les variations (live, remaster, etc.)
+  const sanitizeTitle = (title: string): string => {
+    let t = (title || '').toLowerCase();
+    // Retirer le contenu entre parenthèses/crochets/accolades
+    t = t.replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}/g, ' ');
+    // Mots parasites fréquents
+    t = t.replace(/\b(remaster(ed)?|live|version|radio edit|mono|stereo|remix|mix|edit|explicit|clean|deluxe|extended|single|album|feat\.?|featuring)\b/g, ' ');
+    // Années
+    t = t.replace(/\b(19|20)\d{2}\b/g, ' ');
+    // Normaliser
+    t = t.replace(/[^a-z0-9]+/g, '');
+    return t;
+  };
+
+  const normalizeArtist = (artist: string): string => {
+    let a = (artist || '').toLowerCase();
+    a = a.replace(/\b(feat\.?|featuring|&|and)\b/g, ' ');
+    a = a.replace(/[^a-z0-9]+/g, '');
+    return a;
+  };
 
   // Fonction de normalisation pour créer des clés artiste+titre
   const normalizeKey = (artist: string, title: string): string => {
-    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return `${normalize(artist)}_${normalize(title)}`;
+    return `${normalizeArtist(artist)}_${sanitizeTitle(title)}`;
   };
 
   // Ensemble des clés normalisées des morceaux récents pour éviter les répétitions
@@ -265,6 +285,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const last = history.slice(-HISTORY_WINDOW_SIZE);
       return new Set(last.map(s => normalizeKey(s.artist || '', s.title || '')));
+    } catch {
+      return new Set<string>();
+    }
+  }, [history]);
+
+  // Ensemble des IDs récents pour un blocage strict par identifiant
+  const recentHistorySongIds = React.useMemo(() => {
+    try {
+      const last = history.slice(-HISTORY_WINDOW_SIZE);
+      return new Set(last.map(s => s.id));
     } catch {
       return new Set<string>();
     }
@@ -316,7 +346,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               if (song && song.id !== currentSong.id) {
                 const songKey = normalizeKey(song.artist || '', song.title || '');
-                if (!recentHistoryKeys.has(songKey)) {
+                if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
                   candidates.push(song);
                 }
               }
@@ -340,7 +370,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               
               if (song && song.id !== currentSong.id) {
                 const songKey = normalizeKey(song.artist || '', song.title || '');
-                if (!recentHistoryKeys.has(songKey)) {
+                if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
                   candidates.push(song);
                 }
               }
@@ -1021,7 +1051,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   
                   if (song && song.id !== currentSong.id) {
                     const songKey = normalizeKey(song.artist || '', song.title || '');
-                    if (!recentHistoryKeys.has(songKey)) {
+                    if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
                       candidates.push(song);
                     }
                   }
@@ -1045,7 +1075,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   
                   if (song && song.id !== currentSong.id) {
                     const songKey = normalizeKey(song.artist || '', song.title || '');
-                    if (!recentHistoryKeys.has(songKey)) {
+                    if (!recentHistoryKeys.has(songKey) && !recentHistorySongIds.has(song.id)) {
                       candidates.push(song);
                     }
                   }
