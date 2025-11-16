@@ -30,28 +30,27 @@ export const spotalikeService = {
       
       const traceId = generateUUID();
       
-      const response = await fetch('https://api.spotalike.com/v1/playlists', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'spotalike-session-id': SESSION_ID,
-          'spotalike-trace-id': traceId,
-          'spotalike-algorithm': 'gamma',
-        },
-        body: JSON.stringify({
-          tracks: [{
-            artist: artist,
-            title: track
-          }]
-        })
+      const { data, error } = await supabase.functions.invoke('spotalike-proxy', {
+        body: {
+          method: 'POST',
+          endpoint: '/v1/playlists',
+          sessionId: SESSION_ID,
+          traceId: traceId,
+          algorithm: 'gamma',
+          body: {
+            tracks: [{
+              artist: artist,
+              title: track
+            }]
+          }
+        }
       });
 
-      if (!response.ok) {
-        console.error('[Spotalike Service] API error:', response.status, response.statusText);
+      if (error) {
+        console.error('[Spotalike Service] API error:', error);
         return [];
       }
 
-      const data = await response.json();
       const tracks = data?.tracks || [];
       
       // Convertir au format attendu
@@ -80,21 +79,20 @@ export const spotalikeService = {
       const traceId = generateUUID();
       
       // Rechercher des tracks de cet artiste pour obtenir des recommandations
-      const response = await fetch(`https://api.spotalike.com/v1/tracks/search?q=${encodeURIComponent(artist)}&v=2`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'spotalike-session-id': SESSION_ID,
-          'spotalike-trace-id': traceId,
+      const { data, error } = await supabase.functions.invoke('spotalike-proxy', {
+        body: {
+          method: 'GET',
+          endpoint: `/v1/tracks/search?q=${encodeURIComponent(artist)}&v=2`,
+          sessionId: SESSION_ID,
+          traceId: traceId,
         }
       });
 
-      if (!response.ok) {
-        console.error('[Spotalike Service] API error:', response.status, response.statusText);
+      if (error) {
+        console.error('[Spotalike Service] API error:', error);
         return [];
       }
 
-      const data = await response.json();
       const tracks = data?.tracks || [];
       
       // Extraire les artistes uniques
