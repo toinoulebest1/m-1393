@@ -1,19 +1,10 @@
 /**
- * Optimise un élément audio pour des performances maximales
- * - Décodage hardware accéléré
- * - Préchargement intelligent
- * - Gestion mémoire optimale
+ * Configuration minimale d'un élément audio
  */
 export const optimizeAudioElement = (audio: HTMLAudioElement): HTMLAudioElement => {
-  // CORS pour CDN
   audio.crossOrigin = "anonymous";
-  
-  // Préchargement intelligent - metadata seulement pour économiser bande passante
-  audio.preload = "metadata";
-  
-  // Désactiver les contrôles pour réduire overhead
+  audio.preload = "none"; // Ne rien précharger automatiquement
   audio.controls = false;
-  
   return audio;
 };
 
