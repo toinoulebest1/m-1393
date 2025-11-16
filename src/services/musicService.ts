@@ -6,13 +6,25 @@ import { searchQobuzTracks, getQobuzStreamUrl } from './qobuzService';
 // Cache pour éviter de refaire la requête à chaque fois
 let cachedProvider: string | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 5000; // 5 secondes
+const CACHE_DURATION = 1000; // 1 seconde seulement pour détecter rapidement les changements
+
+// Clé localStorage pour détecter les changements de provider
+const PROVIDER_CHANGE_KEY = 'music_provider_changed';
 
 /**
  * Récupère le fournisseur d'API musicale configuré
  */
 const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz'> => {
   const now = Date.now();
+  
+  // Vérifier si le provider a été changé manuellement
+  const providerChanged = localStorage.getItem(PROVIDER_CHANGE_KEY);
+  if (providerChanged) {
+    console.log('[MusicService] Détection d\'un changement de provider, rechargement...');
+    cachedProvider = null;
+    lastFetchTime = 0;
+    localStorage.removeItem(PROVIDER_CHANGE_KEY);
+  }
   
   // Si le cache est valide, l'utiliser
   if (cachedProvider && (now - lastFetchTime) < CACHE_DURATION) {
@@ -34,6 +46,7 @@ const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz'> => {
     }
 
     lastFetchTime = now;
+    console.log(`[MusicService] Provider configuré: ${cachedProvider}`);
     return cachedProvider as 'tidal' | 'qobuz';
   } catch (error) {
     console.error('[MusicService] Erreur:', error);
@@ -98,4 +111,7 @@ export const detectProviderFromUrl = (url: string): 'tidal' | 'qobuz' | null => 
 export const invalidateProviderCache = () => {
   cachedProvider = null;
   lastFetchTime = 0;
+  // Signal pour tous les composants qu'ils doivent recharger
+  localStorage.setItem(PROVIDER_CHANGE_KEY, Date.now().toString());
+  console.log('[MusicService] Cache invalidé et signal de changement envoyé');
 };
