@@ -281,7 +281,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               currentSong.title
             );
             
-            for (const track of similarTracks) {
+            // Mélanger les résultats pour plus de variété
+            const shuffledTracks = [...similarTracks].sort(() => Math.random() - 0.5);
+            
+            for (const track of shuffledTracks) {
               if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                 continue;
               }
@@ -307,7 +310,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (!nextSongToPlay && currentSong.artist) {
             const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
             
-            for (const artist of similarArtists) {
+            // Mélanger les résultats pour plus de variété
+            const shuffledArtists = [...similarArtists].sort(() => Math.random() - 0.5);
+            
+            for (const artist of shuffledArtists) {
               if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                 continue;
               }
@@ -976,8 +982,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   currentSong.title
                 );
                 
+                // Mélanger les résultats pour plus de variété
+                const shuffledTracks = [...similarTracks].sort(() => Math.random() - 0.5);
+                
                 // Chercher ces chansons dans la base de données ou sur les services de streaming
-                for (const track of similarTracks) {
+                for (const track of shuffledTracks) {
                   if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
                     continue;
                   }
@@ -1002,7 +1011,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               if (!nextSongToPlay && currentSong.artist) {
                 const similarArtists = await lastfmService.getSimilarArtists(currentSong.artist);
                 
-                for (const artist of similarArtists) {
+                // Mélanger les résultats pour plus de variété
+                const shuffledArtists = [...similarArtists].sort(() => Math.random() - 0.5);
+                
+                for (const artist of shuffledArtists) {
                   if (recentArtistsRef.current.includes(artist.name.toLowerCase())) {
                     continue;
                   }
