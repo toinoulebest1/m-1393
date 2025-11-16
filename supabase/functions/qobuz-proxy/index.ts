@@ -31,8 +31,9 @@ Deno.serve(async (req) => {
       const query = url.searchParams.get('q') || '';
       const limit = url.searchParams.get('limit') || '50';
       const offset = url.searchParams.get('offset') || '0';
+      const requestTs = Math.floor(Date.now() / 1000);
 
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/search?query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&app_id=${appId}&user_auth_token=${userToken}`;
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/search?query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&app_id=${appId}&user_auth_token=${userToken}&request_ts=${requestTs}`;
       
       console.log(`[QobuzProxy] Searching: ${query}`);
       
@@ -81,7 +82,8 @@ Deno.serve(async (req) => {
 
       // format_id 5 = MP3 320kbps, 6 = FLAC 16bit, 27 = FLAC 24bit
       const formatId = '5'; // MP3 320kbps for compatibility
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&app_id=${appId}&user_auth_token=${userToken}`;
+      const requestTs = Math.floor(Date.now() / 1000);
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&app_id=${appId}&user_auth_token=${userToken}&request_ts=${requestTs}`;
       
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId}`);
       
