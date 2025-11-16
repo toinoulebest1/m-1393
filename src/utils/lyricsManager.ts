@@ -44,39 +44,52 @@ export const fetchAndSaveLyrics = async (
     }
     // console.log(`[lyricsManager] 2. ID Tidal effectif: ${effectiveTidalId}`);
 
-    // 3. Si ce n'est pas une chanson Tidal, on s'arrête ici.
-    if (!effectiveTidalId) {
-      // console.log('[lyricsManager] 3. Pas un morceau Tidal. Arrêt de la recherche de paroles.');
-      return null;
-    }
-
-    // 4. Récupérer les paroles depuis l'API Tidal
+    // 3. Récupérer les paroles - Prioriser Qobuz API
     let lyricsContent: string | null = null;
     
-    if (effectiveTidalId) {
-      // console.log(`[lyricsManager] 4. Tentative de récupération depuis l'API Tidal...`);
-      const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${effectiveTidalId}`;
-      // console.log(`[lyricsManager] 4.1. URL de l'API: ${tidalApiUrl}`);
-      const tidalLyricsResponse = await fetch(tidalApiUrl);
-
-      // console.log(`[lyricsManager] 4.2. Réponse de l'API: Statut ${tidalLyricsResponse.status}`);
-      if (tidalLyricsResponse.ok) {
-        const tidalLyricsData = await tidalLyricsResponse.json();
-        // console.log('[lyricsManager] 4.3. Données JSON reçues:', tidalLyricsData);
-        const lyricsInfo = Array.isArray(tidalLyricsData) ? tidalLyricsData[0] : tidalLyricsData;
-
-        if (lyricsInfo && (lyricsInfo.subtitles || lyricsInfo.lyrics)) {
-          lyricsContent = lyricsInfo.subtitles || lyricsInfo.lyrics;
-          // console.log('[lyricsManager] 5. Paroles trouvées via l\'API Tidal. Contenu (100 premiers caractères):', lyricsContent.substring(0, 100));
+    // 3.1. Essayer d'abord l'API Qobuz si on a l'artiste et le titre
+    if (artist && songTitle) {
+      // console.log('[lyricsManager] 3.1. Tentative de récupération depuis l\'API Qobuz...');
+      try {
+        const qobuzApiUrl = `https://api.kinoplus.online/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(songTitle)}`;
+        const qobuzLyricsResponse = await fetch(qobuzApiUrl);
+        
+        if (qobuzLyricsResponse.ok) {
+          const qobuzLyricsData = await qobuzLyricsResponse.json();
+          if (qobuzLyricsData && qobuzLyricsData.lyrics) {
+            lyricsContent = qobuzLyricsData.lyrics;
+            // console.log('[lyricsManager] 3.2. Paroles trouvées via l\'API Qobuz.');
+          }
         }
-      } else {
-        console.warn(`[lyricsManager] L'API Tidal a répondu avec une erreur.`);
+      } catch (error) {
+        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'API Qobuz:', error);
       }
     }
 
-    // 5. Si pas de paroles Tidal, essayer l'API de paroles synchronisées générique
+    // 3.2. Si pas de paroles Qobuz, essayer Tidal si c'est une chanson Tidal
+    if (!lyricsContent && effectiveTidalId) {
+      // console.log(`[lyricsManager] 3.3. Tentative de récupération depuis l'API Tidal...`);
+      try {
+        const tidalApiUrl = `https://tidal.kinoplus.online/lyrics/?id=${effectiveTidalId}`;
+        const tidalLyricsResponse = await fetch(tidalApiUrl);
+
+        if (tidalLyricsResponse.ok) {
+          const tidalLyricsData = await tidalLyricsResponse.json();
+          const lyricsInfo = Array.isArray(tidalLyricsData) ? tidalLyricsData[0] : tidalLyricsData;
+
+          if (lyricsInfo && (lyricsInfo.subtitles || lyricsInfo.lyrics)) {
+            lyricsContent = lyricsInfo.subtitles || lyricsInfo.lyrics;
+            // console.log('[lyricsManager] 3.4. Paroles trouvées via l\'API Tidal.');
+          }
+        }
+      } catch (error) {
+        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'API Tidal:', error);
+      }
+    }
+
+    // 3.3. Si toujours pas de paroles, essayer lrclib.net comme dernier recours
     if (!lyricsContent && artist && songTitle) {
-      // console.log('[lyricsManager] 5.1. Tentative de récupération depuis l\'API de paroles synchronisées...');
+      // console.log('[lyricsManager] 3.5. Tentative de récupération depuis lrclib.net...');
       try {
         const lyricsApiUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(songTitle)}`;
         const lyricsResponse = await fetch(lyricsApiUrl);
@@ -85,14 +98,14 @@ export const fetchAndSaveLyrics = async (
           const lyricsData = await lyricsResponse.json();
           if (lyricsData && lyricsData.syncedLyrics) {
             lyricsContent = lyricsData.syncedLyrics;
-            // console.log('[lyricsManager] 5.2. Paroles synchronisées trouvées via l\'API générique.');
+            // console.log('[lyricsManager] 3.6. Paroles synchronisées trouvées via lrclib.net.');
           } else if (lyricsData && lyricsData.plainLyrics) {
             lyricsContent = lyricsData.plainLyrics;
-            // console.log('[lyricsManager] 5.3. Paroles non synchronisées trouvées via l\'API générique.');
+            // console.log('[lyricsManager] 3.7. Paroles non synchronisées trouvées via lrclib.net.');
           }
         }
       } catch (error) {
-        console.warn('[lyricsManager] Erreur lors de la récupération depuis l\'API de paroles:', error);
+        console.warn('[lyricsManager] Erreur lors de la récupération depuis lrclib.net:', error);
       }
     }
 
