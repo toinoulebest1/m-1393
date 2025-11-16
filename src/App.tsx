@@ -24,16 +24,13 @@ import { SyncedLyricsView } from "./components/SyncedLyricsView";
 import { useSessionQuery } from "./hooks/useSessionQuery";
 import { useBanStatus } from "./hooks/useBanStatus";
 import { BannedUserPage } from "./components/BannedUserPage";
-import { useSessionDetection } from "./hooks/useSessionDetection";
+import { SessionDetectionWrapper } from "./components/SessionDetectionWrapper";
 
 const queryClient = new QueryClient();
 
 function App() {
   const { data: session, isLoading } = useSessionQuery();
   const { isBanned } = useBanStatus(session?.user?.id);
-  
-  // Détection de sessions multiples
-  useSessionDetection(session?.user?.id);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -41,9 +38,10 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <PlayerProvider>
-            <CastProvider>
-              <Routes>
+          <SessionDetectionWrapper>
+            <PlayerProvider>
+              <CastProvider>
+                <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/home" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -70,6 +68,7 @@ function App() {
               </Routes>
             </CastProvider>
           </PlayerProvider>
+          </SessionDetectionWrapper>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
