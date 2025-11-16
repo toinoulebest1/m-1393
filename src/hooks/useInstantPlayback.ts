@@ -28,10 +28,10 @@ export const useInstantPlayback = (songs: any[], enabled: boolean = true) => {
       console.log(`🎯 Préchargement des URLs terminé pour ${songsToPreload.length} chansons.`);
     };
 
-    // Lancer le préchargement après un court délai pour ne pas bloquer le rendu
+    // Lancer le préchargement quasi-immédiatement
     const timer = setTimeout(() => {
       preloadSongUrls();
-    }, 750); // Augmenté à 750ms pour un meilleur debounce lors de la saisie
+    }, 100); // Réduit à 100ms pour démarrage ultra-rapide
 
     return () => clearTimeout(timer);
   }, [songs, enabled]);
