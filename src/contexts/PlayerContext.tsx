@@ -34,6 +34,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Historique des artistes pour éviter les répétitions
   const recentArtistsRef = useRef<string[]>([]);
   
+  // Historique des chansons récentes pour éviter les répétitions
+  const recentSongsHistoryRef = useRef<string[]>([]);
+  
   // Cache des recommandations Last.fm préchargées
   const lastfmCacheRef = useRef<Song | null>(null);
   const lastfmPreloadingRef = useRef(false);
@@ -91,6 +94,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const predictedNextRef = useRef<Song | null>(null);
   const previousSongRef = useRef<Song | null>(null);
 
+  // Charger l'historique récent au montage du composant
+  useEffect(() => {
+    const loadRecentHistory = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const { data: historyData } = await supabase
+            .from('play_history')
+            .select('song_id')
+            .eq('user_id', user.id)
+            .order('played_at', { ascending: false })
+            .limit(100);
+          
+          if (historyData) {
+            recentSongsHistoryRef.current = historyData.map(h => h.song_id);
+            console.log('[PlayerContext] Historique chargé:', recentSongsHistoryRef.current.length, 'chansons récentes');
+          }
+        }
+      } catch (error) {
+        console.error('[PlayerContext] Erreur lors du chargement de l\'historique:', error);
+      }
+    };
+    
+    loadRecentHistory();
+  }, []);
+
   // Enregistrer dans l'historique Supabase quand une chanson est jouée
   useEffect(() => {
     if (!currentSong) return;
@@ -141,7 +172,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error('❌ Erreur enregistrement historique:', error);
           }
         } else {
-          // console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
+          console.log('✅ Chanson enregistrée dans l\'historique:', currentSong.title);
+          
+          // Mettre à jour le cache local de l'historique
+          recentSongsHistoryRef.current = [currentSong.id, ...recentSongsHistoryRef.current.slice(0, 99)];
         }
       } catch (error) {
         console.error('❌ Erreur lors de l\'enregistrement dans l\'historique:', error);
@@ -383,7 +417,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               }
               
               if (song && song.id !== currentSong.id) {
-                if (!isRecentDuplicateCandidate(song)) {
+                if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
                   candidates.push(song);
                 }
               }
@@ -410,7 +444,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               }
               
               if (song && song.id !== currentSong.id) {
-                if (!isRecentDuplicateCandidate(song)) {
+                if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
                   candidates.push(song);
                 }
               }
@@ -1052,18 +1086,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (activeQueue.length === 0 && currentSong) {
             console.log('[LastFM Autoplay] Queue vide détectée. Cache disponible:', !!lastfmCacheRef.current);
             
-            // Utiliser la recommandation préchargée si disponible
+            // Utiliser la recommandation préchargée si disponible ET pas dans l'historique
             if (lastfmCacheRef.current) {
-              console.log('[LastFM Autoplay] ✅ Utilisation de la recommandation préchargée:', lastfmCacheRef.current.title);
-              const cachedSong = lastfmCacheRef.current;
-              lastfmCacheRef.current = null;
-              lastfmPreloadingRef.current = false; // Reset du flag de préchargement
-              toast.success(`Lecture automatique: ${cachedSong.title} par ${cachedSong.artist}`);
-              await play(cachedSong);
-              return;
+              if (!recentSongsHistoryRef.current.includes(lastfmCacheRef.current.id)) {
+                console.log('[LastFM Autoplay] ✅ Utilisation de la recommandation préchargée:', lastfmCacheRef.current.title);
+                const cachedSong = lastfmCacheRef.current;
+                lastfmCacheRef.current = null;
+                lastfmPreloadingRef.current = false;
+                toast.success(`Lecture automatique: ${cachedSong.title} par ${cachedSong.artist}`);
+                await play(cachedSong);
+                return;
+              } else {
+                console.log('[LastFM Autoplay] ⚠️ Cache ignoré (déjà dans l\'historique)');
+                lastfmCacheRef.current = null;
+                lastfmPreloadingRef.current = false;
+              }
             }
             
-            console.log('[LastFM Autoplay] ⚠️ Pas de cache, recherche immédiate de chanson similaire...');
+            console.log('[LastFM Autoplay] ⚠️ Pas de cache valide, recherche immédiate de chanson similaire...');
             
             try {
               const candidates: any[] = [];
@@ -1094,7 +1134,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   }
                   
                   if (song && song.id !== currentSong.id) {
-                    if (!isRecentDuplicateCandidate(song)) {
+                    if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
                       candidates.push(song);
                     }
                   }
@@ -1119,12 +1159,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   if (!song) {
                     song = await spotalikeService.searchArtistOnStreamingService(artist.name) as any;
                   }
-                  
-                  if (song && song.id !== currentSong.id) {
-                    if (!isRecentDuplicateCandidate(song)) {
-                      candidates.push(song);
+                    
+                    if (song && song.id !== currentSong.id) {
+                      if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
+                        candidates.push(song);
+                      }
                     }
-                  }
                 }
               }
               
