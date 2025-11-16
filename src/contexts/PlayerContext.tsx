@@ -648,8 +648,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audio.addEventListener('playing', handlePlaying);
     audio.addEventListener('pause', handlePause);
 
-    // Action handlers for seeking
+    // Media Session API - Setup all action handlers
     if ('mediaSession' in navigator) {
+      // Playback controls
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          const audio = audioRef.current;
+          if (audio && currentSong) {
+            audio.play();
+            setIsPlaying(true);
+          }
+        });
+      } catch (e) { console.warn("Could not set play handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('pause', () => {
+          const audio = audioRef.current;
+          if (audio) {
+            audio.pause();
+            setIsPlaying(false);
+          }
+        });
+      } catch (e) { console.warn("Could not set pause handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          nextSong();
+        });
+      } catch (e) { console.warn("Could not set nexttrack handler"); }
+
+      try {
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          previousSong();
+        });
+      } catch (e) { console.warn("Could not set previoustrack handler"); }
+
+      // Seeking controls
       try {
         navigator.mediaSession.setActionHandler('seekbackward', (details) => {
           const audio = audioRef.current;
@@ -700,15 +734,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         audio.removeEventListener('playing', handlePlaying);
         audio.removeEventListener('pause', handlePause);
       }
-      // Clear handlers
+      // Clear all Media Session handlers
       if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
         navigator.mediaSession.setActionHandler('seekbackward', null);
         navigator.mediaSession.setActionHandler('seekforward', null);
         navigator.mediaSession.setActionHandler('seekto', null);
         navigator.mediaSession.setActionHandler('stop', null);
       }
     };
-  }, [currentSong, setProgress, isChangingSong, stopCurrentSong, isSeeking]);
+  }, [currentSong, setProgress, isChangingSong, stopCurrentSong, isSeeking, nextSong, previousSong]);
 
   // Persistance des données
   useEffect(() => {
