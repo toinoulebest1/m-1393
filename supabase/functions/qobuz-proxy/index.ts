@@ -1,9 +1,16 @@
-import { Md5 } from "https://deno.land/std@0.177.0/hash/md5.ts";
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Helper function to compute MD5 hash
+async function md5(message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const QOBUZ_API_BASE = 'https://www.qobuz.com/api.json/0.2';
 
@@ -99,7 +106,7 @@ Deno.serve(async (req) => {
       // Build signature source according to Qobuz requirements
       // sigsrc = "trackgetFileUrlformat_id{format}intent{intent}track_id{track}{requestTs}{appSecret}"
       const sigSource = `trackgetFileUrlformat_id${formatId}intent${intent}track_id${trackId}${requestTs}${appSecret}`;
-      const requestSig = new Md5().update(sigSource).toString();
+      const requestSig = await md5(sigSource);
 
       const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?request_ts=${requestTs}&request_sig=${requestSig}&track_id=${trackId}&format_id=${formatId}&intent=${intent}&app_id=${appId}&user_auth_token=${userToken}`;
       
