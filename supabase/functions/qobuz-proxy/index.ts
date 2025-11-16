@@ -15,11 +15,11 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const endpoint = url.searchParams.get('endpoint');
     
-    const userId = Deno.env.get('QOBUZ_USER_ID');
+    const appId = Deno.env.get('QOBUZ_APP_ID');
     const userToken = Deno.env.get('QOBUZ_API_TOKEN');
 
-    if (!userId || !userToken) {
-      console.error('[QobuzProxy] Missing QOBUZ_USER_ID or QOBUZ_API_TOKEN');
+    if (!appId || !userToken) {
+      console.error('[QobuzProxy] Missing QOBUZ_APP_ID or QOBUZ_API_TOKEN');
       return new Response(
         JSON.stringify({ error: 'Missing Qobuz credentials' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       const limit = url.searchParams.get('limit') || '50';
       const offset = url.searchParams.get('offset') || '0';
 
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/search?query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&app_id=${userId}&user_auth_token=${userToken}`;
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/search?query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&app_id=${appId}&user_auth_token=${userToken}`;
       
       console.log(`[QobuzProxy] Searching: ${query}`);
       
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
 
       // format_id 5 = MP3 320kbps, 6 = FLAC 16bit, 27 = FLAC 24bit
       const formatId = '5'; // MP3 320kbps for compatibility
-      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&app_id=${userId}&user_auth_token=${userToken}`;
+      const qobuzUrl = `${QOBUZ_API_BASE}/track/getFileUrl?track_id=${trackId}&format_id=${formatId}&app_id=${appId}&user_auth_token=${userToken}`;
       
       console.log(`[QobuzProxy] Getting stream URL for track: ${trackId}`);
       
