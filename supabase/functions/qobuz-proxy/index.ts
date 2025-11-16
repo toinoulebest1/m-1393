@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       }
 
       // format_id 5 = MP3 320kbps, 6 = FLAC 16bit, 27 = FLAC 24bit
-      const formatId = '5'; // MP3 320kbps for compatibility
+      const formatId = '27'; // FLAC 24-bit like the working HTML example
       const intent = 'stream';
       const requestTs = Math.floor(Date.now() / 1000);
 
