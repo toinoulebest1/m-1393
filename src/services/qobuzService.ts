@@ -70,12 +70,21 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
   if (!trackId) return null;
 
   try {
-    // Utiliser la nouvelle edge function qui stream directement l'audio
-    // Plus besoin d'appeler l'API Qobuz depuis le front, tout est géré côté serveur
-    const streamUrl = `${QOBUZ_STREAM_URL}?track_id=${trackId}`;
+    // Appeler l'edge function pour obtenir l'URL directe Qobuz
+    const response = await fetch(`${QOBUZ_STREAM_URL}?track_id=${trackId}`);
     
-    console.log(`[QobuzService] Using direct stream URL for track ${trackId}`);
-    return { url: streamUrl };
+    if (!response.ok) {
+      throw new Error(`Qobuz stream request failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.url) {
+      throw new Error('No URL in Qobuz stream response');
+    }
+    
+    console.log(`[QobuzService] Got direct CDN URL for track ${trackId}`);
+    return { url: data.url };
   } catch (error) {
     console.error('Erreur lors de la génération de l\'URL du flux Qobuz:', error);
     return null;
