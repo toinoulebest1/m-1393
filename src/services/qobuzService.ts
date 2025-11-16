@@ -2,6 +2,7 @@ import { Song } from '@/types/player';
 
 const SUPABASE_URL = 'https://pwknncursthenghqgevl.supabase.co';
 const QOBUZ_PROXY_URL = `${SUPABASE_URL}/functions/v1/qobuz-proxy`;
+const QOBUZ_STREAM_URL = `${SUPABASE_URL}/functions/v1/qobuz-stream`;
 
 // Helper pour formater la durée de secondes en MM:SS
 const formatDuration = (seconds: number): string => {
@@ -69,22 +70,14 @@ export const getQobuzStreamUrl = async (trackId: string): Promise<{ url: string 
   if (!trackId) return null;
 
   try {
-    const response = await fetch(`${QOBUZ_PROXY_URL}?endpoint=stream&trackId=${trackId}`);
+    // Utiliser la nouvelle edge function qui stream directement l'audio
+    // Plus besoin d'appeler l'API Qobuz depuis le front, tout est géré côté serveur
+    const streamUrl = `${QOBUZ_STREAM_URL}?track_id=${trackId}`;
     
-    if (!response.ok) {
-      throw new Error(`La récupération du flux Qobuz a échoué: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data && data.url) {
-      return { url: data.url };
-    }
-
-    console.warn('[QobuzService] URL not found in stream response.');
-    return null;
+    console.log(`[QobuzService] Using direct stream URL for track ${trackId}`);
+    return { url: streamUrl };
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'URL du flux Qobuz:', error);
+    console.error('Erreur lors de la génération de l\'URL du flux Qobuz:', error);
     return null;
   }
 };
