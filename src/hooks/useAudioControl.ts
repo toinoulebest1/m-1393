@@ -63,13 +63,18 @@ export const useAudioControl = ({
       );
       if (!result || !result.url) throw new Error("URL audio non trouvée");
 
+      // Configuration instantanée pour lecture immédiate
+      audioRef.current!.preload = "auto";
       audioRef.current!.src = result.url;
       audioRef.current!.volume = volume / 100;
       
       // Mettre à jour la durée de l'API
       apiDurationRef.current = durationToSeconds(song.duration);
 
-      await audioRef.current!.play();
+      // Démarrer la lecture IMMÉDIATEMENT sans attendre
+      audioRef.current!.play().catch(err => {
+        console.error("Erreur play immédiat:", err);
+      });
       
       setIsPlaying(true);
       setCurrentSong(song);
