@@ -277,11 +277,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { trackId, quality = 2 } = await req.json();
+    // Accepter les paramètres en query string (GET) ou en body (POST)
+    const url = new URL(req.url);
+    let trackId = url.searchParams.get('trackId');
+    let quality = parseInt(url.searchParams.get('quality') || '2');
+
+    // Si pas de query params, essayer le body (POST)
+    if (!trackId && req.method === 'POST') {
+      const body = await req.json();
+      trackId = body.trackId;
+      quality = body.quality || 2;
+    }
 
     if (!trackId) {
       return new Response(
-        JSON.stringify({ error: 'Track ID requis' }),
+        JSON.stringify({ error: 'Track ID requis (query param ou body)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

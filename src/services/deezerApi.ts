@@ -22,27 +22,17 @@ export const deezerApi = {
  */
 export const getDeezerStreamUrl = async (trackId: string, quality: number = 2): Promise<{ url: string } | null> => {
   try {
-    console.log(`[Deezer] Demande de stream pour track ${trackId}, qualité ${quality}`);
+    console.log(`[Deezer] Configuration stream pour track ${trackId}, qualité ${quality}`);
 
-    // L'edge function retourne directement le stream audio déchiffré
-    const { data, error } = await supabase.functions.invoke('deezer-stream', {
-      body: { trackId, quality }
-    });
-
-    if (error) {
-      console.error('[Deezer] Erreur edge function:', error);
-      return null;
-    }
-
-    // Construire l'URL de l'edge function qui stream l'audio
+    // L'edge function accepte les paramètres en query string pour être compatible avec <audio>
     const supabaseUrl = 'https://pwknncursthenghqgevl.supabase.co';
-    const streamUrl = `${supabaseUrl}/functions/v1/deezer-stream`;
+    const streamUrl = `${supabaseUrl}/functions/v1/deezer-stream?trackId=${encodeURIComponent(trackId)}&quality=${quality}`;
     
-    console.log(`[Deezer] URL de stream configurée: ${streamUrl}`);
+    console.log(`[Deezer] URL de stream directe: ${streamUrl}`);
     
     return { url: streamUrl };
   } catch (error) {
-    console.error('[Deezer] Erreur lors de la récupération de l\'URL:', error);
+    console.error('[Deezer] Erreur lors de la configuration de l\'URL:', error);
     return null;
   }
 };
