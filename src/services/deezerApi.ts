@@ -18,11 +18,13 @@ export const deezerApi = {
 
 /**
  * Récupère l'URL de streaming Deezer via l'edge function
+ * L'edge function gère tout: authentification, déchiffrement Blowfish, streaming
  */
 export const getDeezerStreamUrl = async (trackId: string, quality: number = 2): Promise<{ url: string } | null> => {
   try {
     console.log(`[Deezer] Demande de stream pour track ${trackId}, qualité ${quality}`);
 
+    // L'edge function retourne directement le stream audio déchiffré
     const { data, error } = await supabase.functions.invoke('deezer-stream', {
       body: { trackId, quality }
     });
@@ -32,14 +34,13 @@ export const getDeezerStreamUrl = async (trackId: string, quality: number = 2): 
       return null;
     }
 
-    if (!data || !data.url) {
-      console.error('[Deezer] Aucune URL retournée');
-      return null;
-    }
-
-    console.log(`[Deezer] URL de stream obtenue`);
+    // Construire l'URL de l'edge function qui stream l'audio
+    const supabaseUrl = 'https://pwknncursthenghqgevl.supabase.co';
+    const streamUrl = `${supabaseUrl}/functions/v1/deezer-stream`;
     
-    return { url: data.url };
+    console.log(`[Deezer] URL de stream configurée: ${streamUrl}`);
+    
+    return { url: streamUrl };
   } catch (error) {
     console.error('[Deezer] Erreur lors de la récupération de l\'URL:', error);
     return null;
