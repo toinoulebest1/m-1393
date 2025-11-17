@@ -11,6 +11,7 @@ import { invalidateProviderCache } from "@/services/musicService";
 
 export const MusicApiSettings = () => {
   const [selectedApi, setSelectedApi] = useState<string>("tidal");
+  const [deezerArl, setDeezerArl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
@@ -35,6 +36,17 @@ export const MusicApiSettings = () => {
       if (data) {
         setSelectedApi(data.value || "tidal");
       }
+
+      // Récupérer l'ARL Deezer depuis la table secrets
+      const { data: secretData, error: secretError } = await supabase
+        .from('secrets')
+        .select('value')
+        .eq('name', 'DEEZER_ARL')
+        .maybeSingle();
+
+      if (!secretError && secretData) {
+        setDeezerArl(secretData.value || "");
+      }
     } catch (error) {
       console.error('Erreur lors de la récupération des paramètres:', error);
     } finally {
@@ -46,6 +58,13 @@ export const MusicApiSettings = () => {
     try {
       setIsLoading(true);
 
+      // Valider que l'ARL est fourni si Deezer est sélectionné
+      if (selectedApi === 'deezer' && !deezerArl.trim()) {
+        toast.error("Veuillez entrer votre ARL Deezer");
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('site_settings')
         .upsert({
@@ -56,6 +75,25 @@ export const MusicApiSettings = () => {
         });
 
       if (error) throw error;
+
+      // Sauvegarder l'ARL Deezer si nécessaire
+      if (selectedApi === 'deezer' && deezerArl.trim()) {
+        const { error: secretError } = await supabase
+          .from('secrets')
+          .upsert({
+            name: 'DEEZER_ARL',
+            value: deezerArl.trim()
+          }, {
+            onConflict: 'name'
+          });
+
+        if (secretError) {
+          console.error('Erreur lors de la sauvegarde de l\'ARL:', secretError);
+          toast.error("Erreur lors de la sauvegarde de l'ARL Deezer");
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Invalider le cache du provider pour forcer le rechargement
       invalidateProviderCache();
@@ -111,6 +149,22 @@ export const MusicApiSettings = () => {
               : "L'API Deezer est utilisée pour le streaming musical"}
           </p>
         </div>
+
+        {selectedApi === 'deezer' && (
+          <div className="space-y-2">
+            <Label htmlFor="deezer-arl">ARL Deezer</Label>
+            <Input
+              id="deezer-arl"
+              type="password"
+              placeholder="Entrez votre ARL Deezer"
+              value={deezerArl}
+              onChange={(e) => setDeezerArl(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              🔐 L'ARL est nécessaire pour accéder au streaming Deezer. Vous pouvez le trouver dans les cookies de votre compte Deezer.
+            </p>
+          </div>
+        )}
 
         <Button
           onClick={handleSave}
