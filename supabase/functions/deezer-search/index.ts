@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
       artist: track.artist?.name || 'Unknown Artist',
       album: track.album?.title || 'Unknown Album',
       duration: track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : '0:00',
-      image: track.album?.cover_medium || track.album?.cover_big || track.album?.cover_xl || null,
+      imageUrl: track.album?.cover_medium || track.album?.cover_big || track.album?.cover_xl || null,
+      url: `deezer:${track.id}`,
       deezer_id: String(track.id),
     }));
 
