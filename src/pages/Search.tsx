@@ -215,7 +215,7 @@ const SearchPage = () => {
           title: song.title,
           artist: song.artist || '',
           duration: song.duration || '0:00',
-          url: song.tidal_id ? `tidal:${song.tidal_id}` : (song.deezer_id ? `qobuz:${song.deezer_id}` : song.file_path),
+          url: song.tidal_id ? `tidal:${song.tidal_id}` : (song.deezer_id ? `deezer:${song.deezer_id}` : song.file_path),
           imageUrl: song.image_url,
           album_name: song.album_name,
           isLocal: true,
