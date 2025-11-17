@@ -203,7 +203,7 @@ async function getTrackDownloadInfo(arl: string, trackId: string, quality: numbe
 
   const { apiToken, licenseToken } = await getUserData(arl);
 
-  const trackInfo = await deezerGwApiCall(
+  let trackInfo = await deezerGwApiCall(
     arl,
     "song.getData",
     { sng_id: trackId },
@@ -211,8 +211,20 @@ async function getTrackDownloadInfo(arl: string, trackId: string, quality: numbe
   );
 
   if (!trackInfo || !trackInfo.SNG_ID) {
-    console.error("[Deezer ERROR] Invalid trackInfo:", trackInfo);
-    throw new Error(`No track data found for track ${trackId}`);
+    // Fallback to list API
+    const list = await deezerGwApiCall(
+      arl,
+      "song.getListData",
+      { sng_ids: [trackId] },
+      apiToken
+    );
+    const candidate = Array.isArray(list) ? list[0] : (list?.data?.[0] || null);
+    if (candidate?.SNG_ID) {
+      trackInfo = candidate;
+    } else {
+      console.error("[Deezer ERROR] Invalid trackInfo (after fallback):", list);
+      throw new Error(`No track data found for track ${trackId}`);
+    }
   }
 
   const track = trackInfo;
@@ -330,11 +342,17 @@ Deno.serve(async (req) => {
     const trackUrl = url.searchParams.get("trackUrl");
     let quality = parseInt(url.searchParams.get("quality") || "2");
 
-    // Extract ID from full URL
+    // Normalize ID from any input (full URL, deezer:ID, plain ID)
+    const extractFromInput = (input: string | null): string | null => {
+      if (!input) return null;
+      const m = input.match(/track\/(\d+)/) || input.match(/(?:deezer:)?(\d+)/);
+      return m ? m[1] : null;
+    };
+
     if (!trackId && trackUrl) {
-      const m = trackUrl.match(/track\/(\d+)/);
-      trackId = m ? m[1] : null;
+      trackId = extractFromInput(trackUrl);
     }
+    trackId = extractFromInput(trackId);
 
     if (!trackId)
       return new Response(JSON.stringify({ error: "trackId missing" }), {
