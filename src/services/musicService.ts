@@ -2,6 +2,7 @@ import { Song } from '@/types/player';
 import { supabase } from '@/integrations/supabase/client';
 import { searchTidalTracks, getTidalStreamUrl } from './tidalService';
 import { searchQobuzTracks, getQobuzStreamUrl } from './qobuzService';
+import { getDeezerStreamUrl } from './deezerApi';
 
 // Cache pour éviter de refaire la requête à chaque fois
 let cachedProvider: string | null = null;
@@ -80,6 +81,8 @@ export const getMusicStreamUrl = async (trackId: string, provider?: 'tidal' | 'q
 
   if (apiProvider === 'qobuz') {
     return getQobuzStreamUrl(trackId);
+  } else if (apiProvider === 'deezer') {
+    return getDeezerStreamUrl(trackId);
   } else {
     return getTidalStreamUrl(trackId);
   }
