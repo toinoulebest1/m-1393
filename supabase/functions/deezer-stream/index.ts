@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
+import { Aes } from "https://deno.land/x/crypto@v0.10.0/aes.ts";
+import { Ecb } from "https://deno.land/x/crypto@v0.10.0/block-modes.ts";
+import { Blowfish } from "https://esm.sh/egoroof-blowfish@2.4.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,9 +136,8 @@ class DeezerClient {
 
   private aesEncrypt(data: Uint8Array): Uint8Array {
     const key = new TextEncoder().encode("jo6aey6haid2Teih");
-    // Note: Deno crypto doesn't support synchronous AES-ECB easily
-    // This is a simplified version - in production, use proper crypto library
-    return data; // Placeholder - need proper AES-ECB implementation
+    const cipher = new Ecb(Aes, key);
+    return cipher.encrypt(data);
   }
 
   private bytesToHex(bytes: Uint8Array): string {
@@ -206,11 +208,15 @@ class DeezerClient {
   }
 
   async decryptChunk(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
-    // Blowfish CBC decryption
-    // Note: Deno doesn't have native Blowfish support
-    // This is a placeholder - need to use a proper crypto library
-    // For production, use: https://deno.land/x/blowfish or similar
-    return data; // Placeholder
+    const iv = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
+    const bf = new Blowfish(Array.from(key), Blowfish.MODE.CBC, Blowfish.PADDING.NULL);
+    bf.setIv(Array.from(iv));
+    
+    // Convertir Uint8Array en Array pour la librairie
+    const dataArray = Array.from(data);
+    const decrypted = bf.decode(dataArray, Blowfish.TYPE.UINT8_ARRAY);
+    
+    return new Uint8Array(decrypted);
   }
 
   async downloadAndDecrypt(trackInfo: DeezerTrackInfo): Promise<Uint8Array> {
