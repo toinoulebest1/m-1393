@@ -75,6 +75,7 @@ async function deezerGwApiCall(arl: string, method: string, params: any = {}): P
   });
   
   const data = await response.json();
+  console.log(`[Deezer GW API] Method: ${method}, Response:`, JSON.stringify(data).substring(0, 200));
   return data.results;
 }
 
@@ -109,6 +110,13 @@ async function getTrackDownloadInfo(arl: string, trackId: string, quality: numbe
   console.log(`[Deezer] Getting download info for track ${trackId}, quality ${quality}`);
   
   const trackInfo = await deezerGwApiCall(arl, 'song.getListData', { sng_ids: [trackId] });
+  
+  // Vérification de la structure de la réponse
+  if (!trackInfo || !trackInfo.data || !Array.isArray(trackInfo.data) || trackInfo.data.length === 0) {
+    console.error('[Deezer] Invalid trackInfo structure:', JSON.stringify(trackInfo));
+    throw new Error(`No track data found for track ${trackId}`);
+  }
+  
   const track = trackInfo.data[0];
   
   const fallbackId = track?.FALLBACK?.SNG_ID;
