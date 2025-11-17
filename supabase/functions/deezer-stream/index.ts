@@ -61,7 +61,7 @@ function getEncryptedFileUrl(metaId: string, trackHash: string, mediaVersion: st
 }
 
 // Appel API Deezer Gateway (EXACTEMENT comme Python)
-async function deezerGwApiCall(arl: string, method: string, params: any = {}): Promise<any> {
+async function deezerGwApiCall(arl: string, method: string, params: any = {}, apiToken: string = 'null'): Promise<any> {
   const response = await fetch('https://www.deezer.com/ajax/gw-light.php', {
     method: 'POST',
     headers: {
@@ -69,18 +69,42 @@ async function deezerGwApiCall(arl: string, method: string, params: any = {}): P
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      method: method,
-      params: params,
+      api_version: '1.0',
+      api_token: apiToken,
+      input: '3',
+      method,
+      params,
     }),
   });
   
   const data = await response.json();
-  console.log(`[Deezer GW API] Method: ${method}, Response:`, JSON.stringify(data).substring(0, 200));
+  console.log(`[Deezer GW API] Method: ${method}, ok=${!!data?.results}, hasError=${!!data?.error}`);
   return data.results;
 }
 
+// Récupération du token API et du license_token (mis en cache)
+let cachedUserData: { apiToken: string; licenseToken: string; fetchedAt: number } | null = null;
+async function getUserData(arl: string): Promise<{ apiToken: string; licenseToken: string }> {
+  if (cachedUserData && Date.now() - cachedUserData.fetchedAt < 10 * 60 * 1000) {
+    return { apiToken: cachedUserData.apiToken, licenseToken: cachedUserData.licenseToken };
+  }
+  const res = await fetch('https://www.deezer.com/ajax/gw-light.php', {
+    method: 'POST',
+    headers: { 'Cookie': `arl=${arl}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_version: '1.0', api_token: 'null', input: '3', method: 'deezer.getUserData', params: {} })
+  });
+  const data = await res.json();
+  const apiToken = data?.results?.checkForm || data?.results?.CHECKFORM || null;
+  const licenseToken = data?.results?.USER?.LICENSE_TOKEN || null;
+  console.log(`[Deezer UserData] apiToken=${apiToken ? 'ok' : 'missing'} license=${licenseToken ? 'ok' : 'missing'}`);
+  if (!apiToken) throw new Error('Deezer API token introuvable');
+  if (!licenseToken) throw new Error('Deezer license token introuvable');
+  cachedUserData = { apiToken, licenseToken, fetchedAt: Date.now() };
+  return { apiToken, licenseToken };
+}
+
 // Récupération token track (EXACTEMENT comme Python)
-async function getTrackToken(arl: string, trackId: string): Promise<string> {
+async function getTrackToken(arl: string, trackToken: string, licenseToken: string): Promise<string> {
   const response = await fetch('https://media.deezer.com/v1/get_url', {
     method: 'POST',
     headers: {
@@ -88,8 +112,8 @@ async function getTrackToken(arl: string, trackId: string): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      track_tokens: [trackId],
-      license_token: '',
+      track_tokens: [trackToken],
+      license_token: licenseToken,
       media: [{
         type: 'FULL',
         formats: [
@@ -102,15 +126,18 @@ async function getTrackToken(arl: string, trackId: string): Promise<string> {
   });
   
   const data = await response.json();
-  return data.data[0]?.media[0]?.sources?.[0]?.url || null;
+  return data.data?.[0]?.media?.[0]?.sources?.[0]?.url || null;
 }
 
 // Téléchargement info track (EXACTEMENT comme Python)
 async function getTrackDownloadInfo(arl: string, trackId: string, quality: number = 2): Promise<any> {
   console.log(`[Deezer] Getting download info for track ${trackId}, quality ${quality}`);
   
-  // Utiliser song.getData au lieu de song.getListData
-  const trackInfo = await deezerGwApiCall(arl, 'song.getData', { sng_id: trackId });
+  // Récupérer les tokens nécessaires
+  const { apiToken, licenseToken } = await getUserData(arl);
+  
+  // Utiliser song.getData avec apiToken
+  const trackInfo = await deezerGwApiCall(arl, 'song.getData', { sng_id: trackId }, apiToken);
   
   // Vérification de la structure de la réponse
   if (!trackInfo || !trackInfo.SNG_ID) {
@@ -141,7 +168,7 @@ async function getTrackDownloadInfo(arl: string, trackId: string, quality: numbe
   
   let url = null;
   try {
-    url = await getTrackToken(arl, token);
+    url = await getTrackToken(arl, token, licenseToken);
   } catch (error) {
     console.log('[Deezer] Failed to get URL with token, using encryption method');
   }
@@ -289,18 +316,33 @@ Deno.serve(async (req) => {
     // Accepter les paramètres en query string (GET) ou en body (POST)
     const url = new URL(req.url);
     let trackId = url.searchParams.get('trackId');
+    const trackUrlParam = url.searchParams.get('trackUrl');
     let quality = parseInt(url.searchParams.get('quality') || '2');
 
     // Si pas de query params, essayer le body (POST)
-    if (!trackId && req.method === 'POST') {
+    if ((!trackId && !trackUrlParam) && req.method === 'POST') {
       const body = await req.json();
-      trackId = body.trackId;
+      trackId = body.trackId || body.id || null;
       quality = body.quality || 2;
+    }
+
+    // Si une URL complète est fournie, extraire l'ID
+    const extractFromUrl = (input: string | null): string | null => {
+      if (!input) return null;
+      const m = input.match(/track\/(\d+)/) || input.match(/(?:deezer:)?(\d+)/);
+      return m ? m[1] : null;
+    };
+
+    if (!trackId && trackUrlParam) {
+      trackId = extractFromUrl(trackUrlParam);
+    }
+    if (trackId && /http(s)?:\/\//.test(trackId)) {
+      trackId = extractFromUrl(trackId);
     }
 
     if (!trackId) {
       return new Response(
-        JSON.stringify({ error: 'Track ID requis (query param ou body)' }),
+        JSON.stringify({ error: 'Track ID requis (query param trackId/trackUrl ou body)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
