@@ -95,10 +95,10 @@ async function getUserData(arl: string): Promise<{ apiToken: string; licenseToke
   });
   const data = await res.json();
   const apiToken = data?.results?.checkForm || data?.results?.CHECKFORM || null;
-  const licenseToken = data?.results?.USER?.LICENSE_TOKEN || null;
-  console.log(`[Deezer UserData] apiToken=${apiToken ? 'ok' : 'missing'} license=${licenseToken ? 'ok' : 'missing'}`);
+  const licenseToken = data?.results?.USER?.LICENSE_TOKEN || '';
+  console.log(`[Deezer UserData] apiToken=${apiToken ? 'ok' : 'missing'} license=${licenseToken ? 'ok' : 'missing (using fallback)'}`);
   if (!apiToken) throw new Error('Deezer API token introuvable');
-  if (!licenseToken) throw new Error('Deezer license token introuvable');
+  // Le license token n'est pas obligatoire, on utilisera la méthode chiffrée en fallback
   cachedUserData = { apiToken, licenseToken, fetchedAt: Date.now() };
   return { apiToken, licenseToken };
 }
@@ -167,10 +167,16 @@ async function getTrackDownloadInfo(arl: string, trackId: string, quality: numbe
   const token = track.TRACK_TOKEN;
   
   let url = null;
-  try {
-    url = await getTrackToken(arl, token, licenseToken);
-  } catch (error) {
-    console.log('[Deezer] Failed to get URL with token, using encryption method');
+  // Essayer d'obtenir l'URL via le token seulement si on a un license token
+  if (licenseToken && token) {
+    try {
+      url = await getTrackToken(arl, token, licenseToken);
+      console.log('[Deezer] Got URL via token method');
+    } catch (error) {
+      console.log('[Deezer] Failed to get URL with token, using encryption method');
+    }
+  } else {
+    console.log('[Deezer] No license token, using encryption method directly');
   }
   
   if (!url) {
