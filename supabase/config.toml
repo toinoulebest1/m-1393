@@ -35,6 +35,9 @@ verify_jwt = false
 [functions.deezer-search]
 verify_jwt = false
 
+[functions.deezer-stream]
+verify_jwt = false
+
 [functions.deezer-artist]
 verify_jwt = false
 
