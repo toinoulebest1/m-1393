@@ -14,7 +14,7 @@ const PROVIDER_CHANGE_KEY = 'music_provider_changed';
 /**
  * Récupère le fournisseur d'API musicale configuré
  */
-const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz'> => {
+const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz' | 'deezer'> => {
   const now = Date.now();
   
   // Vérifier si le provider a été changé manuellement
@@ -28,7 +28,7 @@ const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz'> => {
   
   // Si le cache est valide, l'utiliser
   if (cachedProvider && (now - lastFetchTime) < CACHE_DURATION) {
-    return cachedProvider as 'tidal' | 'qobuz';
+    return cachedProvider as 'tidal' | 'qobuz' | 'deezer';
   }
 
   try {
@@ -47,7 +47,7 @@ const getMusicApiProvider = async (): Promise<'tidal' | 'qobuz'> => {
 
     lastFetchTime = now;
     console.log(`[MusicService] Provider configuré: ${cachedProvider}`);
-    return cachedProvider as 'tidal' | 'qobuz';
+    return cachedProvider as 'tidal' | 'qobuz' | 'deezer';
   } catch (error) {
     console.error('[MusicService] Erreur:', error);
     return 'tidal'; // Fallback vers Tidal
@@ -73,7 +73,7 @@ export const searchMusicTracks = async (query: string): Promise<Song[]> => {
 /**
  * Récupère l'URL de streaming selon le fournisseur configuré
  */
-export const getMusicStreamUrl = async (trackId: string, provider?: 'tidal' | 'qobuz'): Promise<{ url: string } | null> => {
+export const getMusicStreamUrl = async (trackId: string, provider?: 'tidal' | 'qobuz' | 'deezer'): Promise<{ url: string } | null> => {
   // Si le provider n'est pas spécifié, le détecter
   const apiProvider = provider || await getMusicApiProvider();
   console.log(`[MusicService] Récupération de l'URL de stream avec: ${apiProvider}, trackId: ${trackId}`);
@@ -88,11 +88,13 @@ export const getMusicStreamUrl = async (trackId: string, provider?: 'tidal' | 'q
 /**
  * Détecte le type de provider depuis l'URL de la chanson
  */
-export const detectProviderFromUrl = (url: string): 'tidal' | 'qobuz' | null => {
+export const detectProviderFromUrl = (url: string): 'tidal' | 'qobuz' | 'deezer' | null => {
   if (url.startsWith('tidal:')) {
     return 'tidal';
   } else if (url.startsWith('qobuz:')) {
     return 'qobuz';
+  } else if (url.startsWith('deezer:')) {
+    return 'deezer';
   }
   return null;
 };
