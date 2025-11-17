@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { Aes } from "https://deno.land/x/crypto@v0.10.0/aes.ts";
 import { Ecb } from "https://deno.land/x/crypto@v0.10.0/block-modes.ts";
-import { Blowfish } from "https://esm.sh/egoroof-blowfish@2.4.2";
+import { Blowfish } from "https://cdn.skypack.dev/egoroof-blowfish@4.0.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
