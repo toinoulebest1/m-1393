@@ -2,7 +2,7 @@ import { Song } from '@/types/player';
 import { supabase } from '@/integrations/supabase/client';
 import { searchTidalTracks, getTidalStreamUrl } from './tidalService';
 import { searchQobuzTracks, getQobuzStreamUrl } from './qobuzService';
-import { getDeezerStreamUrl } from './deezerApi';
+import { getDeezerStreamUrl, searchDeezerTracks } from './deezerApi';
 
 // Cache pour éviter de refaire la requête à chaque fois
 let cachedProvider: string | null = null;
@@ -65,6 +65,10 @@ export const searchMusicTracks = async (query: string): Promise<Song[]> => {
   if (provider === 'qobuz') {
     const results = await searchQobuzTracks(query);
     console.log(`[MusicService] Qobuz a renvoyé ${results.length} résultats`);
+    return results;
+  } else if (provider === 'deezer') {
+    const results = await searchDeezerTracks(query);
+    console.log(`[MusicService] Deezer a renvoyé ${results.length} résultats`);
     return results;
   } else {
     return searchTidalTracks(query);

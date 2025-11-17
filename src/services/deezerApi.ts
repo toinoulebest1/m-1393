@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Song } from '@/types/player';
 
 // Deezer Artist interface
 export interface DeezerArtist {
@@ -9,6 +10,36 @@ export interface DeezerArtist {
   picture_big?: string;
   nb_fan?: number;
 }
+
+/**
+ * Recherche de pistes via l'API Deezer
+ */
+export const searchDeezerTracks = async (query: string): Promise<Song[]> => {
+  try {
+    console.log(`[Deezer] Recherche: ${query}`);
+
+    const { data, error } = await supabase.functions.invoke('deezer-search', {
+      body: { query }
+    });
+
+    if (error) {
+      console.error('[Deezer] Erreur edge function:', error);
+      return [];
+    }
+
+    if (!data || !data.tracks) {
+      console.error('[Deezer] Aucun résultat');
+      return [];
+    }
+
+    console.log(`[Deezer] ${data.tracks.length} résultats trouvés`);
+    
+    return data.tracks;
+  } catch (error) {
+    console.error('[Deezer] Erreur lors de la recherche:', error);
+    return [];
+  }
+};
 
 export const deezerApi = {
   searchArtist: async (query: string): Promise<DeezerArtist[]> => {
