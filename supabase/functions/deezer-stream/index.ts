@@ -109,15 +109,16 @@ async function getTrackToken(arl: string, trackId: string): Promise<string> {
 async function getTrackDownloadInfo(arl: string, trackId: string, quality: number = 2): Promise<any> {
   console.log(`[Deezer] Getting download info for track ${trackId}, quality ${quality}`);
   
-  const trackInfo = await deezerGwApiCall(arl, 'song.getListData', { sng_ids: [trackId] });
+  // Utiliser song.getData au lieu de song.getListData
+  const trackInfo = await deezerGwApiCall(arl, 'song.getData', { sng_id: trackId });
   
   // Vérification de la structure de la réponse
-  if (!trackInfo || !trackInfo.data || !Array.isArray(trackInfo.data) || trackInfo.data.length === 0) {
+  if (!trackInfo || !trackInfo.SNG_ID) {
     console.error('[Deezer] Invalid trackInfo structure:', JSON.stringify(trackInfo));
     throw new Error(`No track data found for track ${trackId}`);
   }
   
-  const track = trackInfo.data[0];
+  const track = trackInfo;
   
   const fallbackId = track?.FALLBACK?.SNG_ID;
   
