@@ -17,7 +17,8 @@ export class UltraFastStreaming {
 
     const isTidal = filePath.startsWith('tidal:');
     const isQobuz = filePath.startsWith('qobuz:');
-    const isMusicApi = isTidal || isQobuz;
+    const isDeezer = filePath.startsWith('deezer:');
+    const isMusicApi = isTidal || isQobuz || isDeezer;
     const isHttp = filePath.startsWith('http://') || filePath.startsWith('https://');
 
     // 1. Vérifier le cache L0
@@ -97,8 +98,8 @@ export class UltraFastStreaming {
     const logPrefix = `[UltraFastStreaming.backgroundCache] ${songTitle || 'N/A'} |`;
     if (!songId) return;
 
-    // Ne pas mettre en cache en arrière-plan les flux Qobuz/Tidal (trop lourds et URLs éphémères)
-    if (originalFilePath.startsWith('qobuz:') || originalFilePath.startsWith('tidal:')) {
+    // Ne pas mettre en cache en arrière-plan les flux Qobuz/Tidal/Deezer (trop lourds et URLs éphémères)
+    if (originalFilePath.startsWith('qobuz:') || originalFilePath.startsWith('tidal:') || originalFilePath.startsWith('deezer:')) {
       return;
     }
 
