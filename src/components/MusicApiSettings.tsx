@@ -76,20 +76,20 @@ export const MusicApiSettings = () => {
 
       if (error) throw error;
 
-      // Sauvegarder l'ARL Deezer si nécessaire
+      // Sauvegarder l'ARL Deezer si nécessaire via edge function
       if (selectedApi === 'deezer' && deezerArl.trim()) {
-        const { error: secretError } = await supabase
-          .from('secrets')
-          .upsert({
-            name: 'DEEZER_ARL',
-            value: deezerArl.trim()
-          }, {
-            onConflict: 'name'
-          });
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const { data: saveResult, error: secretError } = await supabase.functions.invoke('save-deezer-arl', {
+          body: { arl: deezerArl.trim() },
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`
+          }
+        });
 
-        if (secretError) {
+        if (secretError || !saveResult?.success) {
           console.error('Erreur lors de la sauvegarde de l\'ARL:', secretError);
-          toast.error("Erreur lors de la sauvegarde de l'ARL Deezer");
+          toast.error(saveResult?.error || "Erreur lors de la sauvegarde de l'ARL Deezer");
           setIsLoading(false);
           return;
         }
