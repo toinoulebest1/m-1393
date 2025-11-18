@@ -13,7 +13,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { AdBanner } from "./AdBanner";
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import hiResLogo from "@/assets/hi-res-logo.png";
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -23,6 +22,7 @@ export const Sidebar = () => {
     i18n
   } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
+  const logoUrl = "https://pwknncursthenghqgevl.supabase.co/storage/v1/object/public/logo/logo.png";
   useEffect(() => {
     const checkAdminStatus = async () => {
       const {
@@ -103,8 +103,8 @@ export const Sidebar = () => {
   };
   return <div className="hidden md:flex fixed top-0 left-0 w-64 bg-spotify-dark p-6 flex-col h-full z-50">
       <div className="mb-8">
-        <div className="flex items-center gap-3">
-          <img src={hiResLogo} alt="Logo" className="w-12 h-12 object-contain" />
+        <div className="flex items-center gap-2">
+          <img src={logoUrl} alt="Logo" className="w-8 h-8" />
           <h1 className="text-xl font-bold text-white">{t('common.appName')}</h1>
         </div>
       </div>
