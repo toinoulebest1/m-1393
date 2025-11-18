@@ -44,8 +44,6 @@ export const Player = () => {
     maskingState,
   } = usePlayer();
 
-  const [metadataOpacity, setMetadataOpacity] = useState(1);
-  const [previousSongData, setPreviousSongData] = useState<{ title: string; artist: string; imageUrl: string } | null>(null);
   const [localProgress, setLocalProgress] = useState<number | null>(null);
 
   // We need to get the required parameters for useAudioControl from the PlayerContext
@@ -80,28 +78,6 @@ export const Player = () => {
   const [isMuted, setIsMuted] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
 
-  // Gérer la transition des métadonnées pendant le crossfade
-  useEffect(() => {
-    if (isChangingSong && displayedSong) {
-      // Sauvegarder les métadonnées actuelles
-      setPreviousSongData({
-        title: displayedSong.title,
-        artist: displayedSong.artist,
-        imageUrl: displayedSong.imageUrl || 'https://picsum.photos/100'
-      });
-      
-      // Fade out progressif sur 3 secondes (durée typique d'un crossfade)
-      setMetadataOpacity(0);
-    } else if (!isChangingSong && displayedSong) {
-      // Fade in progressif après le crossfade
-      const timer = setTimeout(() => {
-        setMetadataOpacity(1);
-        // Effacer les anciennes métadonnées après le fade in
-        setTimeout(() => setPreviousSongData(null), 700);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isChangingSong, displayedSong]);
 
   // Debug audio state when playing state changes
   useEffect(() => {
@@ -385,33 +361,8 @@ export const Player = () => {
       
       <div className="flex items-center justify-between p-4 max-w-screen-2xl mx-auto">
         {displayedSong ? (
-          <div className="flex items-center space-x-4 w-56 overflow-hidden relative">
-            {/* Anciennes métadonnées (fade out) */}
-            {previousSongData && isChangingSong && (
-              <div 
-                className="absolute inset-0 flex items-center space-x-4 transition-opacity duration-[3000ms] ease-out"
-                style={{ opacity: 1 - metadataOpacity }}
-              >
-                <div className="w-16 h-16 rounded overflow-hidden shadow-md flex-shrink-0">
-                  <img
-                    src={previousSongData.imageUrl}
-                    alt="Previous album art"
-                    className="w-full h-full object-cover"
-                    crossOrigin="anonymous"
-                  />
-                </div>
-                <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                  <span className="text-sm font-semibold text-white truncate">{previousSongData.title}</span>
-                  <span className="text-xs text-spotify-neutral truncate">{previousSongData.artist}</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Nouvelles métadonnées (fade in) */}
-            <div 
-              className="flex items-center space-x-4 w-full transition-opacity duration-[3000ms] ease-in"
-              style={{ opacity: metadataOpacity }}
-            >
+          <div className="flex items-center space-x-4 w-56 overflow-hidden">
+            <div className="flex items-center space-x-4 w-full">
               <div className="w-16 h-16 rounded overflow-hidden shadow-md flex-shrink-0">
                 <img
                   src={displayedSong.imageUrl || 'https://picsum.photos/100'}
