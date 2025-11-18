@@ -47,6 +47,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const spotalikeRecommendationsRef = useRef<Song[]>([]);
   const spotalikeLoadingRef = useRef<boolean>(false);
   
+  // Charger les recommandations Spotalike depuis localStorage au démarrage
+  useEffect(() => {
+    const savedRecommendations = localStorage.getItem('spotalikeRecommendations');
+    if (savedRecommendations) {
+      try {
+        spotalikeRecommendationsRef.current = JSON.parse(savedRecommendations);
+        console.log('[Spotalike] ✅ Recommandations rechargées depuis localStorage:', spotalikeRecommendationsRef.current.length);
+      } catch (error) {
+        console.error('[Spotalike] ❌ Erreur lors du chargement des recommandations:', error);
+      }
+    }
+  }, []);
+  
   // Nettoyage des anciennes données de queue, mais CONSERVATION des données de restauration
   useEffect(() => {
     // console.log("🧹 Nettoyage des anciennes données (sauf restauration)...");
@@ -339,12 +352,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }
 
-        // Stocker les recommandations dans le cache
+        // Stocker les recommandations dans le cache et localStorage
         spotalikeRecommendationsRef.current = candidates;
+        localStorage.setItem('spotalikeRecommendations', JSON.stringify(candidates));
         console.log('[Spotalike Preload] ✅ Préchargement terminé:', candidates.length, 'candidats trouvés');
       } catch (error) {
         console.error('[Spotalike Preload] ❌ Erreur lors du préchargement:', error);
         spotalikeRecommendationsRef.current = [];
+        localStorage.removeItem('spotalikeRecommendations');
       } finally {
         spotalikeLoadingRef.current = false;
       }
@@ -1147,6 +1162,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               // Prendre la PREMIÈRE chanson et la retirer du cache avec shift()
               // Si cette chanson n'a pas de recommandations, la 2ème prendra le relais au prochain autoplay
               let nextSongToPlay = spotalikeRecommendationsRef.current.shift();
+              
+              // Mettre à jour localStorage après shift()
+              localStorage.setItem('spotalikeRecommendations', JSON.stringify(spotalikeRecommendationsRef.current));
               
               if (nextSongToPlay) {
                 console.log('[Spotalike Autoplay] Lecture de la recommandation #1, reste', spotalikeRecommendationsRef.current.length, 'chanson(s) en backup:', nextSongToPlay.title, 'by', nextSongToPlay.artist);
