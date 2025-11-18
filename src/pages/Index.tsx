@@ -15,6 +15,7 @@ import { Song } from "@/types/player";
 import { Music } from "lucide-react";
 import { extractDominantColor } from "@/utils/colorExtractor";
 import { MusicDiscovery } from "@/components/MusicDiscovery";
+import { QobuzCharts } from "@/components/QobuzCharts";
 const Index = () => {
   const location = useLocation();
   const [username, setUsername] = useState<string | null>(null);
@@ -247,6 +248,8 @@ const Index = () => {
         </div>
 
         <MusicDiscovery />
+        
+        <QobuzCharts />
         
         {showCacheManager && <div className="absolute right-4 top-14 z-50 w-80">
             <AudioCacheManager />
