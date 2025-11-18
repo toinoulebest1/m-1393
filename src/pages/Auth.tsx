@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music, Sparkles } from "lucide-react";
 import type { AuthError } from "@supabase/supabase-js";
+import hiResLogo from "@/assets/hi-res-logo.png";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const Auth = () => {
             <div className="relative group">
               <div className="absolute inset-0 bg-spotify-accent/20 rounded-full blur-xl group-hover:bg-spotify-accent/30 transition-all duration-500" />
               <div className="relative p-6 bg-gradient-to-br from-spotify-accent/20 to-purple-500/20 rounded-full backdrop-blur-xl border border-spotify-accent/30">
-                <Music className="w-16 h-16 text-spotify-accent" />
+                <img src={hiResLogo} alt="Logo" className="w-16 h-16 object-contain" />
               </div>
             </div>
           </div>
