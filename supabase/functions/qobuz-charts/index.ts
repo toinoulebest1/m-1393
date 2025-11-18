@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
     const requestTs = Math.floor(Date.now() / 1000);
     
     // Récupérer les playlists featured (contient les charts)
-    const featuredUrl = `${QOBUZ_API_BASE}/playlist/getFeatured?type=all&limit=20&app_id=${appId}&user_auth_token=${userToken}&request_ts=${requestTs}`;
+    // type accepte: "last-created" ou "editor-picks"
+    const featuredUrl = `${QOBUZ_API_BASE}/playlist/getFeatured?type=editor-picks&limit=20&app_id=${appId}&user_auth_token=${userToken}&request_ts=${requestTs}`;
     
     console.log('[QobuzCharts] Fetching featured playlists...');
     
