@@ -12,6 +12,13 @@ const Auth = () => {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    // Vérifier la session existante au chargement
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/home', { replace: true });
+      }
+    });
+
     const {
       data: {
         subscription
