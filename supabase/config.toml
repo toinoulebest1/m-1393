@@ -89,3 +89,18 @@ verify_jwt = false
 [functions.lastfm-recommendations]
 verify_jwt = false
 
+[functions.qobuz-charts]
+verify_jwt = false
+
+[functions.spotalike-proxy]
+verify_jwt = false
+
+[functions.reset-top100]
+verify_jwt = false
+
+[functions.purge-play-history]
+verify_jwt = false
+
+[functions.save-deezer-arl]
+verify_jwt = false
+
