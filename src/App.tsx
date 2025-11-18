@@ -25,6 +25,7 @@ import { useSessionQuery } from "./hooks/useSessionQuery";
 import { useBanStatus } from "./hooks/useBanStatus";
 import { BannedUserPage } from "./components/BannedUserPage";
 import { SessionDetectionWrapper } from "./components/SessionDetectionWrapper";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -42,30 +43,30 @@ function App() {
             <PlayerProvider>
               <CastProvider>
                 <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                {isBanned ? <Route path="*" element={<BannedUserPage banInfo={{ reason: "Violation des règles", ban_type: "permanent", expires_at: null }} />} /> : (
-                  <>
-                    <Route path="/favorites" element={<Favorites />} />
-                    <Route path="/history" element={<History />} />
-                    <Route path="/playlists" element={<Playlists />} />
-                    <Route path="/playlist/:id" element={<PlaylistDetail />} />
-                    <Route path="/search" element={<SearchPage />} />
-                    <Route path="/top100" element={<Top100 />} />
-                    <Route path="/games" element={<GamesPage />} />
-                    <Route path="/synced-lyrics" element={<SyncedLyricsView />} />
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/auth" element={<Auth />} />
+                  {isBanned ? (
+                    <Route path="*" element={<BannedUserPage banInfo={{ reason: "Violation des règles", ban_type: "permanent", expires_at: null }} />} />
+                  ) : (
+                    <>
+                      <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                      <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+                      <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+                      <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
+                      <Route path="/playlist/:id" element={<ProtectedRoute><PlaylistDetail /></ProtectedRoute>} />
+                      <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+                      <Route path="/top100" element={<ProtectedRoute><Top100 /></ProtectedRoute>} />
+                      <Route path="/games" element={<ProtectedRoute><GamesPage /></ProtectedRoute>} />
+                      <Route path="/synced-lyrics" element={<ProtectedRoute><SyncedLyricsView /></ProtectedRoute>} />
 
-                    {/* Routes Admin */}
-                    <Route path="/admin/maintenance" element={<MaintenanceAdmin />} />
-                    <Route path="/maintenance-admin" element={<MaintenanceAdmin />} />
-                    <Route path="/admin/history" element={<AdminHistory />} />
-                    {/* <Route path="/admin/audio-sources" element={<ManageAudioSources />} /> */}
-                    {/* <Route path="/admin/metadata" element={<SongMetadataUpdate />} /> */}
-                    <Route path="/admin/reports" element={<Reports />} />
-                  </>
-                )}
-              </Routes>
+                      {/* Routes Admin */}
+                      <Route path="/admin/maintenance" element={<ProtectedRoute><MaintenanceAdmin /></ProtectedRoute>} />
+                      <Route path="/maintenance-admin" element={<ProtectedRoute><MaintenanceAdmin /></ProtectedRoute>} />
+                      <Route path="/admin/history" element={<ProtectedRoute><AdminHistory /></ProtectedRoute>} />
+                      <Route path="/admin/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                    </>
+                  )}
+                </Routes>
             </CastProvider>
           </PlayerProvider>
           </SessionDetectionWrapper>
