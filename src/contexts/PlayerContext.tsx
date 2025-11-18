@@ -40,6 +40,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Tracker la dernière chanson sauvegardée pour éviter les doublons
   const lastSavedSongRef = useRef<{ id: string; timestamp: number } | null>(null);
   
+  // Sauvegarder les 2 dernières chansons pour fallback de recommandations
+  const recentPlayedSongsRef = useRef<Song[]>([]);
+  
   // Cache des recommandations Spotalike préchargées
   const spotalikeRecommendationsRef = useRef<Song[]>([]);
   const spotalikeLoadingRef = useRef<boolean>(false);
@@ -196,6 +199,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveToHistory();
   }, [currentSong?.id]);
 
+  // Mettre à jour l'historique des 2 dernières chansons jouées
+  useEffect(() => {
+    if (!currentSong) return;
+    
+    // Ajouter la chanson actuelle au début et garder seulement les 2 dernières
+    recentPlayedSongsRef.current = [
+      currentSong,
+      ...recentPlayedSongsRef.current.filter(s => s.id !== currentSong.id)
+    ].slice(0, 2);
+    
+    console.log('[Recent Songs] Mise à jour:', recentPlayedSongsRef.current.map(s => s.title));
+  }, [currentSong]);
+
   // Précharger les recommandations Spotalike dès qu'une chanson commence
   useEffect(() => {
     if (!currentSong || !isPlaying) return;
@@ -274,6 +290,45 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               }
 
               if (song && song.id !== currentSong.id) {
+                if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
+                  candidates.push(song);
+                }
+              }
+
+              if (candidates.length >= MAX_CANDIDATES) break;
+            }
+          }
+        }
+
+        // 3. FALLBACK: Si toujours pas de candidats, essayer avec la chanson précédente sauvegardée
+        if (candidates.length === 0 && recentPlayedSongsRef.current.length > 1) {
+          const previousSong = recentPlayedSongsRef.current[1]; // La 2ème chanson sauvegardée
+          console.log('[Spotalike Preload] Aucune recommandation pour', currentSong.title, '- Tentative avec la chanson précédente:', previousSong.title);
+          
+          if (previousSong.artist && previousSong.title) {
+            const similarTracks = await spotalikeService.getSimilarTracks(
+              previousSong.artist,
+              previousSong.title
+            );
+
+            const tracksToProcess = similarTracks.slice(0, 15);
+            console.log('[Spotalike Preload] Traitement de', tracksToProcess.length, 'recommandations depuis la chanson précédente');
+
+            for (const track of tracksToProcess) {
+              if (recentArtistsRef.current.includes(track.artist.name.toLowerCase())) {
+                continue;
+              }
+
+              let song = await spotalikeService.findSongInDatabase(
+                track.artist.name,
+                track.name
+              ) as any;
+
+              if (!song) {
+                song = await spotalikeService.searchTrackOnStreamingService(track.artist.name, track.name) as any;
+              }
+
+              if (song && song.id !== currentSong.id && song.id !== previousSong.id) {
                 if (!isRecentDuplicateCandidate(song) && !recentSongsHistoryRef.current.includes(song.id)) {
                   candidates.push(song);
                 }
