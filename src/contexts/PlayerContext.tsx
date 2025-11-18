@@ -1144,15 +1144,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.log('[Spotalike Autoplay] Queue vide détectée, utilisation du cache préchargé...');
             
             try {
-              // Utiliser les recommandations déjà préchargées
-              const candidates = spotalikeRecommendationsRef.current;
+              // Prendre la PREMIÈRE chanson et la retirer du cache avec shift()
+              // Si cette chanson n'a pas de recommandations, la 2ème prendra le relais au prochain autoplay
+              let nextSongToPlay = spotalikeRecommendationsRef.current.shift();
               
-              // 3. Jouer la chanson trouvée
-              let nextSongToPlay = null;
-              if (candidates.length > 0) {
-                const randomIndex = Math.floor(Math.random() * candidates.length);
-                nextSongToPlay = candidates[randomIndex];
-                console.log('[Spotalike Autoplay] Recommandation choisie du cache (', randomIndex + 1, '/', candidates.length, '):', nextSongToPlay.title, 'by', nextSongToPlay.artist);
+              if (nextSongToPlay) {
+                console.log('[Spotalike Autoplay] Lecture de la recommandation #1, reste', spotalikeRecommendationsRef.current.length, 'chanson(s) en backup:', nextSongToPlay.title, 'by', nextSongToPlay.artist);
               }
               
               if (nextSongToPlay) {
