@@ -224,7 +224,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('[Spotalike Preload] Début du préchargement pour:', currentSong.title);
 
       try {
-        const MAX_CANDIDATES = 15;
+        const MAX_CANDIDATES = 2;
         const candidates: Song[] = [];
 
         // Fonction helper pour vérifier les doublons
