@@ -35,8 +35,6 @@ const Index = () => {
   const [showCacheManager, setShowCacheManager] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [previousSongId, setPreviousSongId] = useState<string | null>(null);
-  const [metadataOpacity, setMetadataOpacity] = useState(1);
-  const [previousSongData, setPreviousSongData] = useState<{ title: string; artist: string; imageUrl: string } | null>(null);
 
   // Restaurer la position de scroll au retour
   useEffect(() => {
@@ -67,28 +65,6 @@ const Index = () => {
     extractColor();
   }, [currentSong?.imageUrl]);
 
-  // Gérer la transition des métadonnées pendant le crossfade
-  useEffect(() => {
-    if (isChangingSong && currentSong) {
-      // Sauvegarder les métadonnées actuelles avant le changement
-      setPreviousSongData({
-        title: currentSong.title,
-        artist: currentSong.artist,
-        imageUrl: currentSong.imageUrl || 'https://picsum.photos/300/300'
-      });
-      
-      // Fade out progressif sur 3 secondes (durée typique d'un crossfade)
-      setMetadataOpacity(0);
-    } else if (!isChangingSong && currentSong) {
-      // Fade in progressif après le crossfade
-      const timer = setTimeout(() => {
-        setMetadataOpacity(1);
-        // Effacer les anciennes métadonnées après le fade in
-        setTimeout(() => setPreviousSongData(null), 3000);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isChangingSong, currentSong]);
 
   // Set up MediaSession API for mobile device notifications
   useEffect(() => {
@@ -249,24 +225,8 @@ const Index = () => {
         
         <div className="w-full flex items-center justify-center py-8">
           {currentSong ? (
-            <div className="text-center p-6 max-w-md mx-auto relative">
-              {/* Anciennes métadonnées (fade out) */}
-              {previousSongData && isChangingSong && (
-                <div className="absolute inset-0 transition-opacity duration-[3000ms] ease-out" style={{ opacity: 1 - metadataOpacity }}>
-                  <div className="w-64 h-64 mx-auto mb-8">
-                    <img 
-                      src={previousSongData.imageUrl} 
-                      alt="Previous album art" 
-                      className="w-full h-full object-cover rounded-lg shadow-lg"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold mb-2 text-foreground">{previousSongData.title}</h2>
-                  <p className="text-lg text-muted-foreground mb-4">{previousSongData.artist}</p>
-                </div>
-              )}
-              
-              {/* Nouvelles métadonnées (fade in) */}
-              <div className="transition-opacity duration-[3000ms] ease-in" style={{ opacity: metadataOpacity }}>
+            <div className="text-center p-6 max-w-md mx-auto">
+              <div>
                 <div className="w-64 h-64 mx-auto mb-8 relative">
                   <img src={currentSong.imageUrl || "https://picsum.photos/300/300"} alt="Album art" className="w-full h-full object-cover rounded-lg shadow-lg transition-all duration-300" style={getGlowStyle()} />
                 </div>
