@@ -12,20 +12,16 @@ const Auth = () => {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    // Vérifier la session existante au chargement
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/home', { replace: true });
-      }
-    });
-
     const {
       data: {
         subscription
       }
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
-        navigate('/home');
+      if (event === 'SIGNED_IN' && session) {
+        // Petit délai pour laisser React Query se mettre à jour
+        setTimeout(() => {
+          navigate('/home', { replace: true });
+        }, 100);
       }
       if (event === 'SIGNED_OUT') {
         setErrorMessage("");
