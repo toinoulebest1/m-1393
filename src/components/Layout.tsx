@@ -18,7 +18,10 @@ export const Layout = ({ children, hideNavbar = false }: LayoutProps) => {
         "relative z-10 flex-1 flex flex-col overflow-hidden",
         (hideNavbar || isMobile) ? "w-full" : "md:ml-64"
       )}>
-        <main className="flex-1 overflow-y-auto pb-[152px] md:pb-[88px]">
+        <main className={cn(
+          "flex-1 overflow-y-auto pb-[152px] md:pb-[88px]",
+          isMobile && !hideNavbar && "pt-14"
+        )}>
           {children}
         </main>
       </div>
