@@ -1,5 +1,5 @@
 import React from "react";
-import { Server, Shield, Zap, Music4, Github, ArrowRight, Disc, Sliders, Wifi, Lock, Terminal } from "lucide-react";
+import { Server, Shield, Zap, Music4, Github, ArrowRight, Disc, Sliders, Wifi, Lock, Terminal, Play } from "lucide-react";
 
 const Landing = () => {
   return (
